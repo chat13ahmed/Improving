@@ -1,0 +1,24 @@
+node_modules/
+cloud/node_modules/
+mobile/node_modules/
+
+# local data & secrets (never upload these)
+data/
+data-*.json
+settings.json
+accounts.json
+sessions.json
+cloud/data.db
+cloud/data.db-shm
+cloud/data.db-wal
+.env
+
+# build output / native projects
+dist/
+release/
+mobile/www/
+mobile/android/
+mobile/ios/
+
+*.log
+.DS_Store

@@ -1,0 +1,14 @@
+{
+  "name": "Business Escalate",
+  "short_name": "Escalate",
+  "description": "Track fitness, nutrition, networking, income and reading — with a Claude AI coach.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0F1117",
+  "theme_color": "#0F1117",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

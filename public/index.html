@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Business Escalate</title>
+  <meta name="theme-color" content="#0F1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Escalate">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=12">
+  <script src="vendor/chart.umd.min.js"></script>
+  <script src="vendor/marked.min.js"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">⚡</span>
+      <div>
+        <div class="brand-title">Business Escalate</div>
+        <div class="brand-sub">Life Progress</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard">
+        <span class="nav-icon">📊</span><span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-page="log">
+        <span class="nav-icon">📝</span><span>Log Today</span>
+      </a>
+      <a href="#" class="nav-item" data-page="contacts">
+        <span class="nav-icon">👥</span><span>Contacts</span><span class="nav-badge" id="contacts-badge" style="display:none"></span>
+      </a>
+      <a href="#" class="nav-item" data-page="ideas">
+        <span class="nav-icon">💡</span><span>Business Ideas</span>
+      </a>
+      <a href="#" class="nav-item" data-page="reading">
+        <span class="nav-icon">📚</span><span>Reading</span>
+      </a>
+      <a href="#" class="nav-item" data-page="coach">
+        <span class="nav-icon">🤖</span><span>AI Coach</span>
+      </a>
+      <a href="#" class="nav-item" data-page="history">
+        <span class="nav-icon">📋</span><span>History</span>
+      </a>
+      <a href="#" class="nav-item" data-page="settings">
+        <span class="nav-icon">⚙️</span><span>Settings</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="btn-demo" onclick="loadSampleData()">📦 Load Demo Data</button>
+    </div>
+  </aside>
+
+  <main class="main" id="main">
+    <div class="loading-screen">
+      <div class="loading-spinner"></div>
+      <p>Loading your dashboard…</p>
+    </div>
+  </main>
+
+  <script src="app.js?v=12"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+    }
+  </script>
+</body>
+</html>

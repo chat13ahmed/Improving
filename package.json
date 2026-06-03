@@ -1,0 +1,21 @@
+{
+  "name": "business-escalate",
+  "version": "1.0.0",
+  "description": "AI-powered life progress tracker — fitness, nutrition, networking, income & reading, with a Claude coach.",
+  "author": "Business Escalate",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "server": "node server.js",
+    "test": "node tests/run.js",
+    "build": "electron-packager . \"Business Escalate\" --platform=win32 --arch=x64 --out=dist --overwrite --ignore=\"^/dist\" --ignore=\"^/.git\" --ignore=\"^/electron.log\" --ignore=\"^/tests\" --ignore=\"^/docs\" --ignore=\"^/cloud\" --ignore=\"^/mobile\""
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.0",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "electron": "^28.3.0",
+    "electron-packager": "^17.1.2"
+  }
+}
