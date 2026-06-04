@@ -2772,7 +2772,9 @@ async function runCustomAnalysis() {
 }
 
 function enrichedData() {
-  const { profile, days, weeks, ideas, books } = state.data;
+  const { days, weeks, ideas, books } = state.data;
+  // Don't send contact details (email/phone) to the AI — strip them out
+  const { email, phone, ...profile } = state.data.profile || {};
   const sortedDays  = [...days].sort((a, b) => new Date(b.date) - new Date(a.date));
   const sortedWeeks = [...weeks].sort((a, b) => new Date(b.weekStart) - new Date(a.weekStart));
   const stats = getWeekStats();
@@ -2846,8 +2848,11 @@ async function saveGoals(e) {
   const readEl = document.getElementById('g-read');
   if (readEl) state.data.profile.weeklyReadGoal = parseInt(readEl.value) || 0;
   state.data.profile.name = document.getElementById('g-name').value.trim();
+  const ageEl = document.getElementById('g-age');     if (ageEl)   state.data.profile.age = parseInt(ageEl.value) || '';
+  const emailEl = document.getElementById('g-email'); if (emailEl) state.data.profile.email = emailEl.value.trim();
+  const phoneEl = document.getElementById('g-phone'); if (phoneEl) state.data.profile.phone = phoneEl.value.trim();
   await saveData();
-  showToast('Goals saved! 🎯', 'success');
+  showToast('Saved! 🎯', 'success');
   navigate('dashboard');
 }
 
@@ -3583,6 +3588,7 @@ function showOnboarding() {
   state._onboard = {
     step: 1,
     firstName: p.firstName || '', lastName: p.lastName || '', age: p.age || '', sex: p.sex || 'male',
+    email: p.email || '', phone: p.phone || '',
     areas: { gym: true, food: true, networking: true, money: true, reading: true },
     goals: { gymDaysPerWeek: p.gymDaysPerWeek || 5, weeklyNetworkGoal: p.weeklyNetworkGoal || 3, weeklyIncomeGoal: p.weeklyIncomeGoal || '', weeklyReadGoal: p.weeklyReadGoal || '' },
     jobTitle: p.jobTitle || '',
@@ -3608,6 +3614,10 @@ function renderOnboardStep() {
       '<div class="form-group"><label>Age</label><input type="number" id="ob-age" min="13" max="100" value="' + (f.age || '') + '" placeholder="28"></div>' +
       '<div class="form-group"><label>Sex <span style="font-weight:400;color:var(--text-muted)">(for nutrition math)</span></label>' +
       '<select id="ob-sex"><option value="male"' + (f.sex === 'male' ? ' selected' : '') + '>Male</option><option value="female"' + (f.sex === 'female' ? ' selected' : '') + '>Female</option></select></div>' +
+      '</div>' +
+      '<div class="form-row">' +
+      '<div class="form-group"><label>Email</label><input type="email" id="ob-email" value="' + escapeHtml(f.email) + '" placeholder="you@email.com" autocomplete="email"></div>' +
+      '<div class="form-group"><label>Phone <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label><input type="tel" id="ob-phone" value="' + escapeHtml(f.phone) + '" placeholder="+1 555 123 4567" autocomplete="tel"></div>' +
       '</div>';
   } else if (f.step === 2) {
     title = 'What do you want to develop?';
@@ -3698,6 +3708,8 @@ function captureOnboard() {
     f.lastName = (document.getElementById('ob-last')?.value || '').trim();
     f.age = parseInt(document.getElementById('ob-age')?.value) || '';
     f.sex = document.getElementById('ob-sex')?.value || f.sex;
+    f.email = (document.getElementById('ob-email')?.value || '').trim();
+    f.phone = (document.getElementById('ob-phone')?.value || '').trim();
   } else if (f.step === 3) {
     if (document.getElementById('ob-gym'))    f.goals.gymDaysPerWeek = parseInt(document.getElementById('ob-gym').value) || 5;
     if (document.getElementById('ob-net'))    f.goals.weeklyNetworkGoal = parseInt(document.getElementById('ob-net').value) || 0;
@@ -3724,6 +3736,7 @@ function onboardNext() {
   const f = state._onboard;
   if (f.step === 1) {
     if (!f.firstName) { showToast('Please enter your first name.', 'error'); return; }
+    if (f.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)) { showToast('Enter a valid email (or leave it blank).', 'error'); return; }
     f.step = 2;
   } else if (f.step === 2) {
     if (!Object.values(f.areas).some(Boolean)) { showToast('Pick at least one area to work on.', 'error'); return; }
@@ -3746,6 +3759,8 @@ async function onboardFinish() {
   p.lastName = f.lastName;
   p.age = f.age || '';
   p.sex = f.sex;
+  p.email = f.email || '';
+  p.phone = f.phone || '';
   p.name = ((f.firstName || '') + ' ' + (f.lastName || '')).trim();
   if (!p.pillars) p.pillars = defaultPillars();
   PILLAR_IDS.forEach(id => { if (!p.pillars[id]) p.pillars[id] = {}; p.pillars[id].enabled = !!f.areas[id]; });
@@ -4028,8 +4043,18 @@ function renderSettingsPage() {
     (isPillarOn('reading') ? '<div class="form-group"><label>' + readP.icon + ' ' + escapeHtml(readP.label) + ' pages per week</label>' +
       '<input type="number" id="g-read" min="0" step="10" placeholder="e.g. 100" value="' + (p.weeklyReadGoal||'') + '"></div>' : '<input type="hidden" id="g-read" value="' + (p.weeklyReadGoal||0) + '">') +
     '</div>' +
-    '<div class="form-group"><label>Your name (optional)</label>' +
+    '<div class="form-row">' +
+    '<div class="form-group"><label>Your name</label>' +
     '<input type="text" id="g-name" placeholder="Your name" value="' + escapeHtml(p.name||'') + '"></div>' +
+    '<div class="form-group"><label>Age</label>' +
+    '<input type="number" id="g-age" min="13" max="100" placeholder="28" value="' + (p.age||'') + '"></div>' +
+    '</div>' +
+    '<div class="form-row">' +
+    '<div class="form-group"><label>Email</label>' +
+    '<input type="email" id="g-email" placeholder="you@email.com" value="' + escapeHtml(p.email||'') + '"></div>' +
+    '<div class="form-group"><label>Phone</label>' +
+    '<input type="tel" id="g-phone" placeholder="+1 555 123 4567" value="' + escapeHtml(p.phone||'') + '"></div>' +
+    '</div>' +
     '<button type="submit" class="btn btn-primary">💾 Save Goals</button>' +
     '</form></div>' +
 
