@@ -201,6 +201,14 @@ if (C) {
   eq('cloud parseFoodEstimate', C.parseFoodEstimate('{"name":"Egg","grams":50,"calories":72,"protein":6,"carbs":0.4,"fat":5}'), { name: 'Egg', grams: 50, kcal: 72, p: 6, c: 0.4, f: 5 });
   ok('cloud buildSystemPrompt mentions water', /WATER/.test(C.buildSystemPrompt({ pillars: { gym: { enabled: true } } })));
   eq('cloud defaultData shape', Object.keys(C.defaultData()).sort(), ['books', 'contacts', 'days', 'ideas', 'profile', 'weeks', 'weights']);
+  // Owner gate for the broadcast tool (reads OWNER_USERNAMES env dynamically)
+  process.env.OWNER_USERNAMES = 'Ahmed, partner';
+  ok('isOwner matches (case-insensitive)', C.isOwner('ahmed') === true && C.isOwner('AHMED') === true);
+  ok('isOwner second name', C.isOwner('partner') === true);
+  ok('isOwner rejects others', C.isOwner('randomuser') === false);
+  ok('isOwner rejects empty', C.isOwner('') === false && C.isOwner(null) === false);
+  delete process.env.OWNER_USERNAMES;
+  ok('isOwner false when env unset', C.isOwner('ahmed') === false);
 }
 
 // Push helpers (pure, no web-push needed)

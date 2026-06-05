@@ -575,6 +575,7 @@ async function init() {
   if (!session.authed) { state.token = null; localStorage.removeItem('be_token'); renderAuthScreen(); return; }
   state.user = session.username;
   state.hasSecurity = session.hasSecurity;
+  state.isOwner = !!session.isOwner;
   await startApp();
 }
 
@@ -4271,6 +4272,9 @@ function renderSettingsPage() {
     '<div class="page-header"><h2 class="page-title">Settings</h2>' +
     '<p class="page-sub">Customize your pillars, goals, profile, and app preferences</p></div>' +
 
+    // Owner-only broadcast tool (invisible to everyone else)
+    renderOwnerCard() +
+
     // Customize pillars (first — it's the headline feature)
     pillarCustomizerCard() +
 
@@ -4349,6 +4353,48 @@ function renderSettingsPage() {
     'the app will send a Windows notification if you haven\'t logged yet. ' +
     'The app must be running for this to work. Close the window but don\'t quit the app to keep it active.' +
     '</div></div>';
+
+  if (state.isOwner) loadBroadcastReach();
+}
+
+// Owner-only card: type a message → push it to everyone's phone. Returns '' for normal users.
+function renderOwnerCard() {
+  if (!state.isOwner) return '';
+  return '<div class="card" style="border:1px solid rgba(124,92,255,0.4)">' +
+    '<h3 class="card-title">📣 Send a notification to everyone</h3>' +
+    '<p class="card-sub">Owner tool — pushes a notification to every person who turned on notifications, right on their phone. <span id="bc-reach"></span></p>' +
+    '<div class="form-group"><label>Title</label>' +
+    '<input type="text" id="bc-title" maxlength="80" placeholder="e.g. New feature added 🎉"></div>' +
+    '<div class="form-group"><label>Message</label>' +
+    '<textarea id="bc-body" rows="2" maxlength="300" placeholder="e.g. Don\'t forget to log your day — keep the streak alive!"></textarea></div>' +
+    '<button type="button" class="btn btn-primary" onclick="sendBroadcast()">📣 Send to everyone</button>' +
+    '</div>';
+}
+
+async function loadBroadcastReach() {
+  try {
+    const j = await fetch('/api/admin/reach', { headers: authHeaders() }).then(r => r.json());
+    const el = document.getElementById('bc-reach');
+    if (el && j && typeof j.devices === 'number') {
+      el.textContent = j.devices ? ('Will reach ' + j.devices + ' device' + (j.devices === 1 ? '' : 's') + '.') : 'No one has enabled notifications yet.';
+    }
+  } catch {}
+}
+
+async function sendBroadcast() {
+  const title = (document.getElementById('bc-title').value || '').trim();
+  const body = (document.getElementById('bc-body').value || '').trim();
+  if (!title) { showToast('Add a title first.', 'error'); return; }
+  if (!confirm('Send this notification to everyone who enabled notifications?')) return;
+  try {
+    const r = await fetch('/api/admin/broadcast', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ title, body }) });
+    const j = await r.json();
+    if (r.ok) {
+      showToast('Sent to ' + (j.sent || 0) + ' device' + (j.sent === 1 ? '' : 's') + ' 📣', 'success');
+      document.getElementById('bc-title').value = '';
+      document.getElementById('bc-body').value = '';
+    } else showToast(j.error || 'Could not send.', 'error');
+  } catch { showToast('Could not send.', 'error'); }
 }
 
 async function saveProfileSettings(e) {

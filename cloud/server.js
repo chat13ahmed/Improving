@@ -135,7 +135,13 @@ function tokenFrom(req) {
 function requireAuth(req, res, next) {
   const p = verifyJwt(tokenFrom(req), JWT_SECRET);
   if (!p) return res.status(401).json({ error: 'NOT_AUTHED' });
-  req.userId = p.sub; next();
+  req.userId = p.sub; req.username = p.username; next();
+}
+// The app owner(s) — set OWNER_USERNAMES="me,partner" to grant the broadcast tool.
+function isOwner(name) {
+  if (!name) return false;
+  const owners = (process.env.OWNER_USERNAMES || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  return owners.includes(String(name).toLowerCase());
 }
 
 // ── Accounts / auth ──
@@ -176,7 +182,7 @@ app.get('/api/session', (req, res) => {
   const p = verifyJwt(tokenFrom(req), JWT_SECRET);
   if (!p) return res.json({ authed: false });
   DB.findUserById(p.sub)
-    .then(u => u ? res.json({ authed: true, username: u.username, hasSecurity: !!u.sec_question }) : res.json({ authed: false }))
+    .then(u => u ? res.json({ authed: true, username: u.username, hasSecurity: !!u.sec_question, isOwner: isOwner(u.username) }) : res.json({ authed: false }))
     .catch(() => res.json({ authed: false }));
 });
 
@@ -340,6 +346,31 @@ app.post('/api/push/test', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Send failed' }); }
 });
 
+// Owner-only: how many devices a broadcast would reach.
+app.get('/api/admin/reach', requireAuth, async (req, res) => {
+  if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });
+  try { const subs = await DB.allPushSubs(); res.json({ devices: subs.length, users: new Set(subs.map(s => String(s.user_id))).size }); }
+  catch { res.json({ devices: 0, users: 0 }); }
+});
+
+// Owner-only: push a custom notification to every subscribed device.
+app.post('/api/admin/broadcast', requireAuth, async (req, res) => {
+  if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });
+  if (!push.configured()) return res.status(400).json({ error: 'Push not configured on the server.' });
+  const title = String(req.body.title || '').trim().slice(0, 80);
+  const body = String(req.body.body || '').trim().slice(0, 300);
+  if (!title) return res.status(400).json({ error: 'A title is required.' });
+  try {
+    const subs = await DB.allPushSubs();
+    let sent = 0, failed = 0;
+    for (const s of subs) {
+      try { await push.sendPush(s.sub, { title, body, url: './' }); sent++; }
+      catch (e) { failed++; if (e && (e.statusCode === 404 || e.statusCode === 410)) { try { await DB.deletePushSub(s.sub.endpoint); } catch {} } }
+    }
+    res.json({ sent, failed, devices: subs.length });
+  } catch (e) { res.status(500).json({ error: 'Broadcast failed' }); }
+});
+
 // Called by an external cron (e.g. cron-job.org) every minute. Sends due reminders.
 app.post('/api/cron/tick', async (req, res) => {
   const secret = req.query.secret || req.headers['x-cron-secret'];
@@ -382,4 +413,4 @@ if (require.main === module) {
     .catch(err => { console.error('Startup failed:', err.message); process.exit(1); });
 }
 
-module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate };
+module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner };

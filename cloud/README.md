@@ -84,6 +84,13 @@ The app can send each user's reminders as real push notifications. To turn it on
 user must **Add to Home Screen** first (iOS 16.4+). Times use each user's own
 timezone (captured automatically when they enable notifications).
 
+### Broadcast to everyone (owner tool)
+To push a one-off announcement (or a "don't forget to log!" nudge) to *all* users at
+once: set `OWNER_USERNAMES` to your own app account username (comma-separated for
+several owners). Then in the app, **Settings → 📣 Send a notification to everyone**
+appears only for you — type a title + message and send. The server enforces this
+(non-owners get 403), so it's safe to leave the code public.
+
 ## Notes / future (Phase 3+)
 - Logout is client-side token discard (JWT). For true revocation add a token denylist.
 - Email-based password reset needs an email provider (Resend/SES) — the
