@@ -17,6 +17,7 @@ const crypto = require('crypto');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const DB = require('./db');
+const push = require('./push');
 
 const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET || crypto.createHash('sha256').update('be-dev-secret-change-me').digest('hex');
@@ -315,6 +316,61 @@ app.post('/api/insight', async (req, res) => {
     if (!insight) return res.status(502).json({ error: 'No insight generated.' });
     res.json({ insight });
   } catch (e) { res.status(500).json({ error: e.message || 'Insight failed' }); }
+});
+
+// ── Web push (reminders that reach the phone even when the app is closed) ──
+app.get('/api/push/key', (req, res) => res.json({ key: process.env.VAPID_PUBLIC_KEY || '' }));
+
+app.post('/api/push/subscribe', requireAuth, async (req, res) => {
+  try {
+    const sub = req.body.subscription;
+    if (!sub || !sub.endpoint) return res.status(400).json({ error: 'Bad subscription' });
+    await DB.savePushSub(req.userId, sub);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: 'Could not save subscription' }); }
+});
+
+app.post('/api/push/test', requireAuth, async (req, res) => {
+  if (!push.configured()) return res.status(400).json({ error: 'Push not configured on the server.' });
+  try {
+    const subs = (await DB.allPushSubs()).filter(s => String(s.user_id) === String(req.userId));
+    let sent = 0;
+    for (const s of subs) { try { await push.sendPush(s.sub, { title: '🔔 Test notification', body: 'Push is working — see you every day!', url: './' }); sent++; } catch (e) {} }
+    res.json({ sent });
+  } catch (e) { res.status(500).json({ error: 'Send failed' }); }
+});
+
+// Called by an external cron (e.g. cron-job.org) every minute. Sends due reminders.
+app.post('/api/cron/tick', async (req, res) => {
+  const secret = req.query.secret || req.headers['x-cron-secret'];
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) return res.status(401).json({ error: 'bad secret' });
+  if (!push.configured()) return res.json({ sent: 0, note: 'VAPID not configured' });
+  try {
+    const allSubs = await DB.allPushSubs();
+    const byUser = {};
+    allSubs.forEach(s => { (byUser[s.user_id] = byUser[s.user_id] || []).push(s.sub); });
+    let sent = 0;
+    for (const uid of Object.keys(byUser)) {
+      const d = await DB.getData(uid);
+      if (!d || !d.data) continue;
+      const data = d.data;
+      const reminders = data.reminders || [];
+      if (!reminders.length) continue;
+      const tz = data.profile && Number(data.profile.tz);
+      const local = push.userLocal(Number.isFinite(tz) ? tz : 0);
+      let changed = false;
+      for (const r of reminders) {
+        if (!push.isReminderDue(r, local.hhmm, local.date)) continue;
+        for (const sub of byUser[uid]) {
+          try { await push.sendPush(sub, { title: '⏰ ' + r.label, body: 'Business Escalate', url: './', tag: r.id }); sent++; }
+          catch (e) { if (e && (e.statusCode === 404 || e.statusCode === 410)) { try { await DB.deletePushSub(sub.endpoint); } catch {} } }
+        }
+        r._lastFired = local.date; changed = true;
+      }
+      if (changed) await DB.saveData(uid, data, d.version + 1);
+    }
+    res.json({ sent });
+  } catch (e) { res.status(500).json({ error: 'cron failed' }); }
 });
 
 // SPA fallback → serve the client for any non-API route

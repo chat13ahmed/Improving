@@ -61,6 +61,29 @@ npm start
 - **AI is on your key** → you pay per request. `AI_HOURLY_LIMIT` caps calls per IP.
   Add per-user caps or a "bring your own key" option later if usage grows.
 
+## Push notifications (reminders that reach phones when the app is closed)
+The app can send each user's reminders as real push notifications. To turn it on:
+
+1. **Generate VAPID keys** (identifies your server to the push services):
+   ```
+   node -e "const e=require('crypto').createECDH('prime256v1');e.generateKeys();console.log('VAPID_PUBLIC_KEY='+e.getPublicKey().toString('base64url'));console.log('VAPID_PRIVATE_KEY='+e.getPrivateKey().toString('base64url'))"
+   ```
+2. **Set env vars** on your host: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (a `mailto:` you own), and a random `CRON_SECRET`.
+   (`web-push` is already in dependencies — a redeploy installs it.)
+3. **Set up a free cron** to deliver due reminders every minute. On
+   [cron-job.org](https://cron-job.org) (free) create a job that does **POST** to:
+   ```
+   https://YOUR-APP.onrender.com/api/cron/tick?secret=YOUR_CRON_SECRET
+   ```
+   every 1 minute. (This also keeps the free Render instance awake.)
+4. In the app: **Checklist → Reminders → Enable notifications** (the user grants
+   permission and subscribes their device). Add reminders with a label + time.
+   Tap **Send test** to confirm it works on the device.
+
+**Platform notes:** works on Android/desktop Chrome & Edge broadly; on **iPhone** the
+user must **Add to Home Screen** first (iOS 16.4+). Times use each user's own
+timezone (captured automatically when they enable notifications).
+
 ## Notes / future (Phase 3+)
 - Logout is client-side token discard (JWT). For true revocation add a token denylist.
 - Email-based password reset needs an email provider (Resend/SES) — the

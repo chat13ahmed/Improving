@@ -38,6 +38,13 @@ function sqliteImpl() {
         data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1,
         updated_at TEXT DEFAULT (datetime('now'))
       )`);
+      db.exec(`CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        endpoint TEXT UNIQUE NOT NULL,
+        sub TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+      )`);
     },
     async createUser(u) {
       const r = db.prepare('INSERT INTO users(username,pw_salt,pw_hash,sec_question,sec_salt,sec_hash) VALUES(?,?,?,?,?,?)')
@@ -53,7 +60,14 @@ function sqliteImpl() {
       db.prepare(`INSERT INTO user_data(user_id,data,version,updated_at) VALUES(?,?,?,datetime('now'))
                   ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, version=excluded.version, updated_at=datetime('now')`)
         .run(userId, JSON.stringify(dataObj), version);
-    }
+    },
+    async savePushSub(userId, sub) {
+      db.prepare(`INSERT INTO push_subscriptions(user_id,endpoint,sub) VALUES(?,?,?)
+                  ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id, sub=excluded.sub`)
+        .run(userId, sub.endpoint, JSON.stringify(sub));
+    },
+    async deletePushSub(endpoint) { db.prepare('DELETE FROM push_subscriptions WHERE endpoint=?').run(endpoint); },
+    async allPushSubs() { return db.prepare('SELECT user_id, sub FROM push_subscriptions').all().map(r => ({ user_id: r.user_id, sub: JSON.parse(r.sub) })); }
   };
 }
 
@@ -69,6 +83,8 @@ function pgImpl() {
                pw_salt TEXT NOT NULL, pw_hash TEXT NOT NULL, sec_question TEXT, sec_salt TEXT, sec_hash TEXT, created_at TIMESTAMPTZ DEFAULT now())`);
       await q(`CREATE TABLE IF NOT EXISTS user_data (user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
                data JSONB NOT NULL, version INTEGER NOT NULL DEFAULT 1, updated_at TIMESTAMPTZ DEFAULT now())`);
+      await q(`CREATE TABLE IF NOT EXISTS push_subscriptions (id BIGSERIAL PRIMARY KEY, user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+               endpoint TEXT UNIQUE NOT NULL, sub JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT now())`);
     },
     async createUser(u) {
       const r = await q('INSERT INTO users(username,pw_salt,pw_hash,sec_question,sec_salt,sec_hash) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',
@@ -83,7 +99,13 @@ function pgImpl() {
     async saveData(userId, dataObj, version) {
       await q(`INSERT INTO user_data(user_id,data,version,updated_at) VALUES($1,$2,$3,now())
                ON CONFLICT(user_id) DO UPDATE SET data=$2, version=$3, updated_at=now()`, [userId, JSON.stringify(dataObj), version]);
-    }
+    },
+    async savePushSub(userId, sub) {
+      await q(`INSERT INTO push_subscriptions(user_id,endpoint,sub) VALUES($1,$2,$3)
+               ON CONFLICT(endpoint) DO UPDATE SET user_id=$1, sub=$3`, [userId, sub.endpoint, JSON.stringify(sub)]);
+    },
+    async deletePushSub(endpoint) { await q('DELETE FROM push_subscriptions WHERE endpoint=$1', [endpoint]); },
+    async allPushSubs() { const r = await q('SELECT user_id, sub FROM push_subscriptions', []); return r.rows.map(x => ({ user_id: x.user_id, sub: x.sub })); }
   };
 }
 
@@ -96,5 +118,8 @@ module.exports = {
   updatePassword: (i, s, h) => impl.updatePassword(i, s, h),
   setSecurity: (i, q, s, h) => impl.setSecurity(i, q, s, h),
   getData: (i) => impl.getData(i),
-  saveData: (i, d, v) => impl.saveData(i, d, v)
+  saveData: (i, d, v) => impl.saveData(i, d, v),
+  savePushSub: (i, s) => impl.savePushSub(i, s),
+  deletePushSub: (e) => impl.deletePushSub(e),
+  allPushSubs: () => impl.allPushSubs()
 };

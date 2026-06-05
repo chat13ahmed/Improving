@@ -4118,10 +4118,47 @@ async function enableNotifications() {
   if (!('Notification' in window)) { showToast('Notifications aren\'t supported here.', 'error'); return; }
   try {
     const p = await Notification.requestPermission();
-    if (p === 'granted') { showToast('Notifications on 🔔', 'success'); try { new Notification('Reminders enabled', { body: "We'll nudge you while the app is open." }); } catch {} }
-    else showToast('Notifications blocked — turn them on in your browser settings.', 'error');
+    if (p === 'granted') {
+      const pushed = await subscribeToPush();
+      showToast(pushed ? 'Notifications on — you\'ll get reminders even when the app is closed 🔔' : 'Notifications on 🔔', 'success');
+      try { if (!pushed) new Notification('Reminders enabled', { body: "We'll nudge you while the app is open." }); } catch {}
+    } else showToast('Notifications blocked — turn them on in your browser settings.', 'error');
   } catch { showToast('Could not enable notifications.', 'error'); }
   if (state.page === 'checklist') renderChecklistPage();
+}
+
+function urlBase64ToUint8Array(base64) {
+  const padding = '='.repeat((4 - base64.length % 4) % 4);
+  const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(b64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+// Subscribe this device to web push so reminders arrive when the app is closed.
+// Returns false (gracefully) if push isn't supported or the server isn't configured.
+async function subscribeToPush() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+    const keyResp = await fetch('/api/push/key').then(r => r.json()).catch(() => ({}));
+    if (!keyResp.key) return false; // server has no VAPID key set yet
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(keyResp.key) });
+    state.data.profile.tz = -new Date().getTimezoneOffset(); // local = UTC + tz minutes
+    const r = await fetch('/api/push/subscribe', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ subscription: sub }) });
+    await saveData(); // persist timezone
+    return r.ok;
+  } catch { return false; }
+}
+
+async function sendTestPush() {
+  try {
+    const r = await fetch('/api/push/test', { method: 'POST', headers: authHeaders() });
+    const j = await r.json();
+    if (r.ok && j.sent > 0) showToast('Test sent — check your notifications 🔔', 'success');
+    else showToast(j.error || 'Enable notifications first, then try again.', 'error');
+  } catch { showToast('Could not send test.', 'error'); }
 }
 
 // Pure: is this reminder due to fire right now? (testable)
@@ -4193,7 +4230,7 @@ function renderChecklistPage() {
     : '<div class="chk-empty">No reminders yet — add one below.</div>';
 
   const notifBtn = ('Notification' in window && Notification.permission === 'granted')
-    ? '<span class="rem-notif-on">🔔 Notifications on</span>'
+    ? '<span class="rem-notif-on">🔔 On</span> <button type="button" class="btn-link" onclick="sendTestPush()">Send test</button>'
     : '<button type="button" class="btn btn-outline" onclick="enableNotifications()">🔔 Enable notifications</button>';
 
   document.getElementById('main').innerHTML =

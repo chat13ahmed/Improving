@@ -1,0 +1,32 @@
+/*
+ * Web Push helper (VAPID). Sends notifications that reach a user's phone
+ * even when the app is closed. Lazy-requires 'web-push' so the module can be
+ * loaded for tests without the dependency installed.
+ */
+'use strict';
+let _wp = null;
+function wp() {
+  if (!_wp) {
+    _wp = require('web-push');
+    _wp.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@example.com', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+  }
+  return _wp;
+}
+function configured() { return !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY); }
+async function sendPush(subscription, payload) {
+  return wp().sendNotification(subscription, JSON.stringify(payload));
+}
+// Pure: should this reminder fire at the given local time/date? (testable)
+function isReminderDue(r, hhmm, date) {
+  return !!r && r.enabled && r._lastFired !== date && (r.time || '99:99') <= hhmm;
+}
+// The user's local wall-clock, given a tz offset in minutes (local = UTC + tz)
+function userLocal(tzMin, nowMs) {
+  const t = Number.isFinite(tzMin) ? tzMin : 0;
+  const d = new Date((nowMs || Date.now()) + t * 60000);
+  return {
+    hhmm: String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0'),
+    date: d.toISOString().split('T')[0]
+  };
+}
+module.exports = { sendPush, configured, isReminderDue, userLocal };

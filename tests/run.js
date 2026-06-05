@@ -203,6 +203,18 @@ if (C) {
   eq('cloud defaultData shape', Object.keys(C.defaultData()).sort(), ['books', 'contacts', 'days', 'ideas', 'profile', 'weeks', 'weights']);
 }
 
+// Push helpers (pure, no web-push needed)
+let P;
+try { P = require(path.join(__dirname, '..', 'cloud', 'push.js')); } catch (e) { failures.push('cloud/push.js failed to load — ' + e.message); }
+if (P) {
+  ok('push due (past time)', P.isReminderDue({ enabled: true, _lastFired: '', time: '08:00' }, '09:00', '2026-06-03') === true);
+  ok('push not due (future time)', P.isReminderDue({ enabled: true, _lastFired: '', time: '10:00' }, '09:00', '2026-06-03') === false);
+  ok('push not due (fired today)', P.isReminderDue({ enabled: true, _lastFired: '2026-06-03', time: '08:00' }, '09:00', '2026-06-03') === false);
+  const ul = P.userLocal(120, Date.UTC(2026, 5, 3, 18, 30)); // 18:30 UTC + 2h → 20:30 local
+  ok('push userLocal applies tz offset', ul.hhmm === '20:30' && ul.date === '2026-06-03');
+  ok('push configured() false without VAPID env', P.configured() === false);
+}
+
 // ─────────────────────────────────────────────────────────────
 // CLOUD DATABASE — real SQLite round-trip (in-memory, no install)
 // ─────────────────────────────────────────────────────────────
@@ -228,6 +240,15 @@ if (C) {
     ok('DB updatePassword persists', u2.pw_hash === 'h2');
     await DBm.setSecurity(id, 'Pet?', 'ss', 'hh');
     ok('DB setSecurity persists', (await DBm.findUserById(id)).sec_question === 'Pet?');
+    // push subscriptions
+    const sub = { endpoint: 'https://push.example/abc', keys: { p256dh: 'x', auth: 'y' } };
+    await DBm.savePushSub(id, sub);
+    let subs = await DBm.allPushSubs();
+    ok('DB push sub round-trips', subs.length === 1 && subs[0].sub.endpoint === sub.endpoint && String(subs[0].user_id) === String(id));
+    await DBm.savePushSub(id, sub);
+    ok('DB push sub upserts by endpoint', (await DBm.allPushSubs()).length === 1);
+    await DBm.deletePushSub(sub.endpoint);
+    ok('DB deletePushSub works', (await DBm.allPushSubs()).length === 0);
   } catch (e) { failures.push('cloud DB (sqlite) — ' + e.message); }
 
   // ── report ──
