@@ -38,7 +38,14 @@ function writeSessions(s) { writeJson(SESSIONS_FILE, s); }
 
 function dataFileFor(id)  { return path.join(BASE_DIR, 'data-' + id + '.json'); }
 function readData(id)     { return readJson(dataFileFor(id), defaultData()); }
-function writeData(id, d) { writeJson(dataFileFor(id), d); }
+function writeData(id, d) {
+  const file = dataFileFor(id);
+  // Auto-backup: keep a rolling copy of the previous save so a crash never wipes everything
+  if (fs.existsSync(file)) {
+    try { fs.copyFileSync(file, file + '.backup'); } catch {}
+  }
+  writeJson(file, d);
+}
 
 function readSettings() { return readJson(SETTINGS_FILE, { apiKey: '' }); }
 function getApiKey() {
@@ -264,6 +271,45 @@ app.get('/api/session', (req, res) => {
 app.get('/api/data',  requireAuth, (req, res) => { try { res.json(readData(req.accountId)); } catch { res.status(500).json({ error: 'Failed to read data' }); } });
 app.post('/api/data', requireAuth, (req, res) => { try { writeData(req.accountId, req.body); res.json({ success: true }); } catch { res.status(500).json({ error: 'Failed to save data' }); } });
 app.get('/api/key-status', (req, res) => { res.json({ hasKey: !!getApiKey() }); });
+
+// ── Notification helpers (no auth — read-only, local-only) ──
+// Checks if the first account logged today (for the 8 PM desktop reminder)
+app.get('/api/reminder-check', (req, res) => {
+  try {
+    const accounts = readAccounts();
+    if (!accounts.length) return res.json({ loggedToday: true }); // no accounts yet, stay quiet
+    const data = readData(accounts[0].id);
+    const today = new Date().toISOString().split('T')[0];
+    res.json({ loggedToday: (data.days || []).some(d => d.date === today) });
+  } catch { res.json({ loggedToday: true }); }
+});
+
+// Returns a short week-in-review message for the Sunday evening notification
+app.get('/api/week-summary', (req, res) => {
+  try {
+    const accounts = readAccounts();
+    if (!accounts.length) return res.json({ message: "Open the dashboard to review your week!" });
+    const data = readData(accounts[0].id);
+    const now = new Date();
+    const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay()); weekStart.setHours(0,0,0,0);
+    const weekStartStr = weekStart.toISOString().split('T')[0];
+    const weekDays = (data.days || []).filter(d => d.date >= weekStartStr);
+    const gymDays = weekDays.filter(d => d.gym?.done).length;
+    const gymGoal = data.profile?.gymDaysPerWeek || 5;
+    const networkCount = weekDays.reduce((s, d) => s + (d.networking?.count || 0), 0);
+    const networkGoal = data.profile?.weeklyNetworkGoal || 3;
+    const income = (data.weeks || []).find(w => w.weekStart === weekStartStr)?.income || 0;
+    const incomeGoal = data.profile?.weeklyIncomeGoal || 0;
+    const parts = [];
+    parts.push(`💪 ${gymDays}/${gymGoal} gym days`);
+    if (networkCount > 0 || networkGoal > 0) parts.push(`🤝 ${networkCount}/${networkGoal} connections`);
+    if (income > 0 || incomeGoal > 0) parts.push(`💰 $${income}${incomeGoal > 0 ? '/$' + incomeGoal : ''} income`);
+    const message = parts.length > 0
+      ? `This week: ${parts.join(' · ')}. Open the app to review!`
+      : "Time to reflect on your week — open the dashboard!";
+    res.json({ message });
+  } catch { res.json({ message: "Time to reflect on your week — open the dashboard!" }); }
+});
 
 app.get('/api/settings', (req, res) => {
   try { const s = readSettings(); res.json({ hasKey: !!s.apiKey, keyPreview: s.apiKey ? s.apiKey.slice(0, 10) + '…' : '' }); }

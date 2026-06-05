@@ -599,6 +599,7 @@ async function startApp() {
   if (!state.data.contacts) state.data.contacts = [];
   if (!state.data.books)    state.data.books    = [];
   if (!state.data.weights)  state.data.weights  = [];
+  ensureChecklistData();
   if (!state.data.profile.pillars) state.data.profile.pillars = defaultPillars();
 
   // Dark mode chart defaults (guarded — app still works if Chart didn't load)
@@ -621,6 +622,7 @@ async function startApp() {
   if (!state.data.profile.onboarded && state.data.days.length === 0) showOnboarding();
   navigate('dashboard');
   showWeeklyReview();
+  startReminderLoop();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -872,7 +874,7 @@ function navigate(page) {
   Object.values(charts).forEach(c => c.destroy());
   charts = {};
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
-  const pages = { dashboard: renderDashboard, log: renderLogToday, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
+  const pages = { dashboard: renderDashboard, log: renderLogToday, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
   injectFAB();
   (pages[page] || renderDashboard)();
 }
@@ -1681,26 +1683,45 @@ function renderDashboard() {
     PILLAR_IDS.map(id => pillarCardHtml(id, cardCtx)).join('') +
     '</div>';
 
-  // Weekly score card — goal rows generated from enabled pillars
+  // Weekly score card — goal rows with progress bars
   const goalRows = [];
+  function goalBar(current, goal, color) {
+    const pct = goal > 0 ? Math.min(100, Math.round(current / goal * 100)) : 0;
+    const barColor = pct >= 100 ? 'var(--success)' : pct >= 60 ? 'var(--accent)' : color || 'var(--warning)';
+    return '<div class="goal-bar"><div class="goal-bar-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>';
+  }
   if (isPillarOn('money')) {
     const pc = pillar('money');
-    goalRows.push('<div class="sg-item"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + ' goal</span>' +
-      (profile.weeklyIncomeGoal > 0
-        ? '<strong>' + formatCurrency(profile.weeklyIncomeGoal) + '/wk</strong>'
-        : '<button class="btn-link-inline" onclick="showGoalSetup()">Set goal</button>') + '</div>');
+    const goal = profile.weeklyIncomeGoal || 0;
+    if (goal > 0) {
+      goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + '</span>' +
+        '<strong>' + formatCurrency(stats.weekIncome) + ' / ' + formatCurrency(goal) + '</strong></div>' +
+        goalBar(stats.weekIncome, goal) + '</div>');
+    } else {
+      goalRows.push('<div class="sg-item"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + ' goal</span>' +
+        '<button class="btn-link-inline" onclick="showGoalSetup()">Set goal</button></div>');
+    }
   }
   if (isPillarOn('gym')) {
     const pc = pillar('gym');
-    goalRows.push('<div class="sg-item"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + ' goal</span><strong>' + (profile.gymDaysPerWeek || 0) + ' days/wk</strong></div>');
+    const goal = profile.gymDaysPerWeek || 5;
+    goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + '</span>' +
+      '<strong>' + stats.gymDays + ' / ' + goal + ' days</strong></div>' +
+      goalBar(stats.gymDays, goal, 'var(--gym-color)') + '</div>');
   }
   if (isPillarOn('networking')) {
     const pc = pillar('networking');
-    goalRows.push('<div class="sg-item"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + ' goal</span><strong>' + (profile.weeklyNetworkGoal || 0) + '/wk</strong></div>');
+    const goal = profile.weeklyNetworkGoal || 3;
+    goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + '</span>' +
+      '<strong>' + stats.networkCount + ' / ' + goal + '</strong></div>' +
+      goalBar(stats.networkCount, goal, 'var(--network-color)') + '</div>');
   }
   if (isPillarOn('reading') && profile.weeklyReadGoal > 0) {
     const pc = pillar('reading');
-    goalRows.push('<div class="sg-item"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + ' goal</span><strong>' + profile.weeklyReadGoal + ' pg/wk</strong></div>');
+    const goal = profile.weeklyReadGoal;
+    goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + '</span>' +
+      '<strong>' + stats.readPages + ' / ' + goal + ' pg</strong></div>' +
+      goalBar(stats.readPages, goal) + '</div>');
   }
   const onCount = enabledPillars().length;
   const scoreHtml =
@@ -1756,7 +1777,7 @@ function renderDashboard() {
     '<h2 class="page-title">Dashboard</h2>' +
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p>' +
     '</div>' +
-    renderReminderBanner() + renderQuoteCard() + renderCoachInsightCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + focusHtml + renderRecentNotesCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
+    renderReminderBanner() + renderQuoteCard() + renderCoachInsightCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderChecklistCard() + focusHtml + renderRecentNotesCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
 
   setTimeout(animateCounters, 120);
   if (showIncomeChart) initIncomeChart(sortedWeeks);
@@ -2324,7 +2345,9 @@ async function analyzeIdeas() {
 // ─────────────────────────────────────────────────────────────
 function renderContactsPage() {
   updateNavBadges();
+  // Starred contacts always float to the top
   const { contacts } = state.data;
+  contacts.sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0));
   const today = todayStr();
   const overdue = contacts.filter(c => c.followUpDate && c.followUpDate < today  && !['closed','dropped'].includes(c.status));
   const dueToday= contacts.filter(c => c.followUpDate && c.followUpDate === today && !['closed','dropped'].includes(c.status));
@@ -2348,9 +2371,11 @@ function renderContactsPage() {
     const statusStyle = 'background:' + (statusColors[c.status] || 'var(--text-muted)') + '22;color:' + (statusColors[c.status] || 'var(--text-muted)') + ';border:1px solid ' + (statusColors[c.status] || 'var(--text-muted)') + '44';
     const catStyle = 'background:' + (catColors[c.category] || 'var(--text-muted)') + '22;color:' + (catColors[c.category] || 'var(--text-muted)');
 
-    return '<div class="contact-card' + (isOverdue ? ' contact-overdue' : isToday ? ' contact-today' : '') + '">' +
+    return '<div class="contact-card' + (isOverdue ? ' contact-overdue' : isToday ? ' contact-today' : '') + (c.starred ? ' contact-starred' : '') + '">' +
       '<div class="contact-top">' +
-      '<div class="contact-name">' + c.name + '</div>' +
+      '<div class="contact-name">' +
+      '<button class="star-btn' + (c.starred ? ' starred' : '') + '" onclick="toggleStar(\'' + c.id + '\')" title="' + (c.starred ? 'Unpin contact' : 'Pin contact') + '">' + (c.starred ? '⭐' : '☆') + '</button>' +
+      c.name + '</div>' +
       '<div class="contact-badges">' +
       '<span class="contact-badge" style="' + catStyle + '">' + (c.category || 'contact') + '</span>' +
       '<span class="contact-badge" style="' + statusStyle + '">' + (c.status || 'new') + '</span>' +
@@ -2555,6 +2580,14 @@ async function deleteContact(id) {
   state.data.contacts = state.data.contacts.filter(x => x.id !== id);
   await saveData();
   showToast('Contact deleted.', 'success');
+  renderContactsPage();
+}
+
+async function toggleStar(id) {
+  const c = state.data.contacts.find(x => x.id === id);
+  if (!c) return;
+  c.starred = !c.starred;
+  await saveData();
   renderContactsPage();
 }
 
@@ -3025,7 +3058,18 @@ async function loadSampleData() {
     weights.push({ id: uid(), date: d.toISOString().split('T')[0], kg });
   }
 
-  state.data = { profile, days, weeks, ideas, contacts, books, weights };
+  const checklist = [
+    { id: uid(), text: 'Drink water throughout the day' },
+    { id: uid(), text: 'Plan tomorrow before bed' },
+    { id: uid(), text: '10-minute walk' }
+  ];
+  const reminders = [
+    { id: uid(), label: 'Log your day', time: '20:00', enabled: true, _lastFired: '' },
+    { id: uid(), label: 'Hydrate 💧', time: '14:00', enabled: true, _lastFired: '' }
+  ];
+  const checkDone = { [todayStr()]: [checklist[0].id] };
+
+  state.data = { profile, days, weeks, ideas, contacts, books, weights, checklist, reminders, checkDone };
   await saveData();
   showToast('Demo data loaded! 🎉', 'success');
   navigate('dashboard');
@@ -3983,7 +4027,8 @@ async function importData(input) {
     }
     if (!confirm('Import this backup? It will REPLACE all current data for this account.')) { input.value = ''; return; }
     data.profile = data.profile || {};
-    ['days', 'weeks', 'ideas', 'contacts', 'books', 'weights'].forEach(k => { if (!Array.isArray(data[k])) data[k] = []; });
+    ['days', 'weeks', 'ideas', 'contacts', 'books', 'weights', 'checklist', 'reminders'].forEach(k => { if (!Array.isArray(data[k])) data[k] = []; });
+    if (!data.checkDone || typeof data.checkDone !== 'object') data.checkDone = {};
     if (!data.profile.pillars) data.profile.pillars = defaultPillars();
     state.data = data;
     await saveData();
@@ -4008,6 +4053,171 @@ function renderBackupCard() {
     '<input type="file" id="import-file" accept="application/json,.json" style="display:none" onchange="importData(this)">' +
     '</div>' +
     '<div class="backup-note">⚠️ Importing replaces this account\'s current data. Export first if you want a safety copy.</div>' +
+    '</div>';
+}
+
+// ─────────────────────────────────────────────────────────────
+// CHECKLIST & REMINDERS
+// ─────────────────────────────────────────────────────────────
+function ensureChecklistData() {
+  if (!state.data.checklist) state.data.checklist = [];
+  if (!state.data.checkDone || typeof state.data.checkDone !== 'object') state.data.checkDone = {};
+  if (!state.data.reminders) state.data.reminders = [];
+}
+function checkDoneToday() { return (state.data.checkDone && state.data.checkDone[todayStr()]) || []; }
+function isChecked(id) { return checkDoneToday().includes(id); }
+function checklistProgress() {
+  const items = state.data.checklist || [];
+  return { done: items.filter(i => isChecked(i.id)).length, total: items.length };
+}
+
+async function addCheckItem() {
+  const inp = document.getElementById('chk-new');
+  const text = (inp && inp.value || '').trim();
+  if (!text) return;
+  ensureChecklistData();
+  state.data.checklist.push({ id: uid(), text });
+  if (inp) inp.value = '';
+  await saveData();
+  renderChecklistPage();
+}
+async function deleteCheckItem(id) {
+  state.data.checklist = (state.data.checklist || []).filter(i => i.id !== id);
+  await saveData();
+  if (state.page === 'checklist') renderChecklistPage(); else renderDashboard();
+}
+async function toggleCheck(id) {
+  ensureChecklistData();
+  const t = todayStr();
+  if (!state.data.checkDone[t]) state.data.checkDone[t] = [];
+  const arr = state.data.checkDone[t];
+  const i = arr.indexOf(id);
+  if (i >= 0) arr.splice(i, 1); else arr.push(id);
+  await saveData();
+  if (state.page === 'checklist') renderChecklistPage(); else if (state.page === 'dashboard') renderDashboard();
+}
+
+async function addReminder() {
+  const label = (document.getElementById('rem-label')?.value || '').trim();
+  const time = document.getElementById('rem-time')?.value || '';
+  if (!label || !time) { showToast('Add a label and a time.', 'error'); return; }
+  ensureChecklistData();
+  state.data.reminders.push({ id: uid(), label, time, enabled: true, _lastFired: '' });
+  await saveData();
+  renderChecklistPage();
+}
+async function deleteReminder(id) {
+  state.data.reminders = (state.data.reminders || []).filter(r => r.id !== id);
+  await saveData(); renderChecklistPage();
+}
+async function toggleReminder(id) {
+  const r = (state.data.reminders || []).find(x => x.id === id);
+  if (r) { r.enabled = !r.enabled; await saveData(); renderChecklistPage(); }
+}
+async function enableNotifications() {
+  if (!('Notification' in window)) { showToast('Notifications aren\'t supported here.', 'error'); return; }
+  try {
+    const p = await Notification.requestPermission();
+    if (p === 'granted') { showToast('Notifications on 🔔', 'success'); try { new Notification('Reminders enabled', { body: "We'll nudge you while the app is open." }); } catch {} }
+    else showToast('Notifications blocked — turn them on in your browser settings.', 'error');
+  } catch { showToast('Could not enable notifications.', 'error'); }
+  if (state.page === 'checklist') renderChecklistPage();
+}
+
+// Pure: is this reminder due to fire right now? (testable)
+function reminderDue(r, hhmm, today) {
+  return !!r && r.enabled && r._lastFired !== today && (r.time || '99:99') <= hhmm;
+}
+function fireReminder(r) {
+  const name = state.data.profile && state.data.profile.firstName;
+  showToast('⏰ ' + r.label, 'success');
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try { new Notification('⏰ ' + (name ? name + ', ' : '') + r.label, { body: 'Business Escalate', tag: r.id }); } catch {}
+  }
+}
+function checkReminders() {
+  const now = new Date();
+  const hhmm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  const today = todayStr();
+  let changed = false;
+  (state.data.reminders || []).forEach(r => { if (reminderDue(r, hhmm, today)) { r._lastFired = today; changed = true; fireReminder(r); } });
+  if (changed) saveData();
+}
+let _reminderTimer = null;
+function startReminderLoop() {
+  if (_reminderTimer) return;
+  checkReminders();
+  _reminderTimer = setInterval(checkReminders, 60000);
+}
+
+// Compact checklist card for the dashboard (hidden if no items)
+function renderChecklistCard() {
+  const items = state.data.checklist || [];
+  if (!items.length) return '';
+  const prog = checklistProgress();
+  const pct = prog.total ? Math.round((prog.done / prog.total) * 100) : 0;
+  const rows = items.slice(0, 8).map(i =>
+    '<div class="chk-row chk-row-sm' + (isChecked(i.id) ? ' chk-done' : '') + '">' +
+    '<button type="button" class="chk-box" onclick="toggleCheck(\'' + i.id + '\')">' + (isChecked(i.id) ? '✓' : '') + '</button>' +
+    '<span class="chk-text">' + escapeHtml(i.text) + '</span></div>').join('');
+  return '<div class="card">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+    '<h3 class="card-title" style="margin-bottom:0">✅ Today\'s Checklist</h3>' +
+    '<span style="font-size:13px;color:var(--text-muted)">' + prog.done + '/' + prog.total + '</span></div>' +
+    '<div class="chk-progress"><div style="width:' + pct + '%"></div></div>' +
+    '<div class="chk-list">' + rows + '</div></div>';
+}
+
+function renderChecklistPage() {
+  ensureChecklistData();
+  const items = state.data.checklist;
+  const prog = checklistProgress();
+  const pct = prog.total ? Math.round((prog.done / prog.total) * 100) : 0;
+
+  const checklistRows = items.length
+    ? items.map(i => '<div class="chk-row' + (isChecked(i.id) ? ' chk-done' : '') + '">' +
+        '<button type="button" class="chk-box" onclick="toggleCheck(\'' + i.id + '\')">' + (isChecked(i.id) ? '✓' : '') + '</button>' +
+        '<span class="chk-text">' + escapeHtml(i.text) + '</span>' +
+        '<button type="button" class="chk-del" onclick="deleteCheckItem(\'' + i.id + '\')" title="Remove">🗑️</button>' +
+        '</div>').join('')
+    : '<div class="chk-empty">No checklist items yet — add your daily must-dos below.</div>';
+
+  const reminders = state.data.reminders;
+  const remRows = reminders.length
+    ? reminders.map(r => '<div class="rem-row' + (r.enabled ? '' : ' rem-off') + '">' +
+        '<span class="rem-time">' + escapeHtml(r.time) + '</span>' +
+        '<span class="rem-label">' + escapeHtml(r.label) + '</span>' +
+        '<label class="pc-toggle"><input type="checkbox" ' + (r.enabled ? 'checked' : '') + ' onchange="toggleReminder(\'' + r.id + '\')"><span class="pc-slider"></span></label>' +
+        '<button type="button" class="chk-del" onclick="deleteReminder(\'' + r.id + '\')" title="Remove">🗑️</button>' +
+        '</div>').join('')
+    : '<div class="chk-empty">No reminders yet — add one below.</div>';
+
+  const notifBtn = ('Notification' in window && Notification.permission === 'granted')
+    ? '<span class="rem-notif-on">🔔 Notifications on</span>'
+    : '<button type="button" class="btn btn-outline" onclick="enableNotifications()">🔔 Enable notifications</button>';
+
+  document.getElementById('main').innerHTML =
+    '<div class="page-header"><h2 class="page-title">Checklist & Reminders</h2>' +
+    '<p class="page-sub">Your daily must-dos and nudges to stay on track</p></div>' +
+    '<div class="card">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+    '<h3 class="card-title" style="margin-bottom:0">✅ Today\'s Checklist</h3>' +
+    '<span style="font-size:13px;color:var(--text-muted)">' + prog.done + '/' + prog.total + ' done</span></div>' +
+    '<div class="chk-progress"><div style="width:' + pct + '%"></div></div>' +
+    '<div class="chk-list">' + checklistRows + '</div>' +
+    '<div class="chk-add"><input type="text" id="chk-new" placeholder="Add a daily task… (e.g. Take vitamins)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addCheckItem();}">' +
+    '<button type="button" class="btn btn-primary" onclick="addCheckItem()">+ Add</button></div>' +
+    '</div>' +
+    '<div class="card">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+    '<h3 class="card-title" style="margin-bottom:0">⏰ Reminders</h3>' + notifBtn + '</div>' +
+    '<div class="rem-list">' + remRows + '</div>' +
+    '<div class="rem-add">' +
+    '<input type="text" id="rem-label" placeholder="Reminder (e.g. Log your day)">' +
+    '<input type="time" id="rem-time" value="20:00">' +
+    '<button type="button" class="btn btn-primary" onclick="addReminder()">+ Add</button>' +
+    '</div>' +
+    '<div class="rem-note">💡 Reminders nudge you while the app is open. On a phone, add it to your home screen and allow notifications for the best results.</div>' +
     '</div>';
 }
 

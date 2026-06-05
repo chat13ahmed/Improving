@@ -34,18 +34,40 @@ function checkReminder() {
   const now = new Date();
   const hour = now.getHours();
   const minute = now.getMinutes();
-  // Fire at 8:00 PM by default
+  const day = now.getDay(); // 0 = Sunday
+
+  // Sunday at 7:00 PM — weekly recap notification
+  if (day === 0 && hour === 19 && minute === 0) {
+    http.get(`http://localhost:${PORT}/api/week-summary`, res => {
+      let raw = '';
+      res.on('data', c => raw += c);
+      res.on('end', () => {
+        try {
+          const summary = JSON.parse(raw);
+          if (Notification.isSupported()) {
+            const n = new Notification({
+              title: '📊 Weekly Recap — Business Escalate',
+              body: summary.message || "Time to reflect on your week — open the dashboard to see your progress!"
+            });
+            n.on('click', () => { if (win) { win.show(); win.focus(); } });
+            n.show();
+          }
+        } catch {}
+      });
+    }).on('error', () => {});
+    return;
+  }
+
+  // Every day at 8:00 PM — log-today reminder
   if (hour !== 20 || minute !== 0) return;
 
-  http.get(`http://localhost:${PORT}/api/data`, res => {
+  http.get(`http://localhost:${PORT}/api/reminder-check`, res => {
     let raw = '';
     res.on('data', c => raw += c);
     res.on('end', () => {
       try {
-        const data = JSON.parse(raw);
-        const today = new Date().toISOString().split('T')[0];
-        const logged = (data.days || []).some(d => d.date === today);
-        if (!logged && Notification.isSupported()) {
+        const info = JSON.parse(raw);
+        if (!info.loggedToday && Notification.isSupported()) {
           const n = new Notification({
             title: '⚡ Business Escalate',
             body: "You haven't logged today yet — 2 minutes keeps your streak alive!"

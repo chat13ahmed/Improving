@@ -56,7 +56,8 @@ function loadApp(fieldValues) {
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
   code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
-    ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner });';
+    ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
+    ' reminderDue, isChecked, checklistProgress, ensureChecklistData });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -142,6 +143,19 @@ ok('falls back to most recent note (not yesterday)', (() => { const n = A.lastNo
 A.state.data.days = [{ date: _older, notes: '' }];
 eq('no notes → null', A.lastNoteEntry(), null);
 eq('no notes → empty banner', A.renderPrevNoteBanner(), '');
+
+// Checklist + reminders
+const _t = new Date().toISOString().split('T')[0];
+A.state.data = { profile: {}, days: [], weeks: [], weights: [], checklist: [{ id: 'a', text: 'X' }, { id: 'b', text: 'Y' }], checkDone: { [_t]: ['a'] }, reminders: [] };
+ok('checklist progress = 1/2 today', (() => { const p = A.checklistProgress(); return p.done === 1 && p.total === 2; })());
+ok('isChecked true/false', A.isChecked('a') === true && A.isChecked('b') === false);
+ok('reminderDue: due (past time, enabled, unfired)', A.reminderDue({ enabled: true, _lastFired: '', time: '08:00' }, '09:00', _t) === true);
+ok('reminderDue: not due (future time)', A.reminderDue({ enabled: true, _lastFired: '', time: '23:00' }, '09:00', _t) === false);
+ok('reminderDue: already fired today', A.reminderDue({ enabled: true, _lastFired: _t, time: '08:00' }, '09:00', _t) === false);
+ok('reminderDue: disabled', A.reminderDue({ enabled: false, _lastFired: '', time: '08:00' }, '09:00', _t) === false);
+A.state.data = { profile: {}, days: [], weeks: [], weights: [] };
+A.ensureChecklistData();
+ok('ensureChecklistData creates the fields', Array.isArray(A.state.data.checklist) && Array.isArray(A.state.data.reminders) && typeof A.state.data.checkDone === 'object');
 
 // Weekly score only counts enabled pillars (no crash, 0..100)
 A.state.data = { profile: { pillars: dp, gymDaysPerWeek: 5, weeklyNetworkGoal: 3, weeklyIncomeGoal: 1000, weeklyReadGoal: 100 }, days: [], weeks: [], weights: [] };
