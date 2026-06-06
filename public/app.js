@@ -920,14 +920,17 @@ function getWeekStats() {
   const foodRatings = weekDays.filter(d => d.food?.rating > 0).map(d => d.food.rating);
   const avgFood = foodRatings.length ? foodRatings.reduce((a, b) => a + b, 0) / foodRatings.length : 0;
   const networkCount = weekDays.reduce((s, d) => s + (d.networking?.count || 0), 0);
-  const weekIncome = (state.data.weeks.find(w => w.weekStart === thisWeekStart)?.income) || 0;
+  const _wk = state.data.weeks.find(w => w.weekStart === thisWeekStart);
+  const weekIncome = (_wk?.income) || 0;
+  const weekExpenses = (_wk?.expenses) || 0;
+  const weekNet = weekIncome - weekExpenses;
   const readPages = weekDays.reduce((s, d) => s + (d.reading?.pages || 0), 0);
   const readDays  = weekDays.filter(d => d.reading?.pages > 0).length;
   const waterDaysArr = weekDays.filter(d => d.water > 0).map(d => d.water);
   const waterTotal = waterDaysArr.reduce((a, b) => a + b, 0);
   const avgWater = waterDaysArr.length ? waterTotal / waterDaysArr.length : 0;
   const waterToday = state.data.days.find(d => d.date === todayStr())?.water || 0;
-  return { gymDays, avgFood, networkCount, weekIncome, readPages, readDays, waterTotal, avgWater, waterToday };
+  return { gymDays, avgFood, networkCount, weekIncome, weekExpenses, weekNet, readPages, readDays, waterTotal, avgWater, waterToday };
 }
 
 function getGymStreak() {
@@ -1919,6 +1922,15 @@ function renderDashboard() {
       goalRows.push('<div class="sg-item"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + ' goal</span>' +
         '<button class="btn-link-inline" onclick="showGoalSetup()">Set goal</button></div>');
     }
+    // Net = income − spending (only once there's any money logged this week)
+    if (stats.weekExpenses > 0 || stats.weekIncome > 0) {
+      const net = stats.weekNet;
+      const rate = stats.weekIncome > 0 ? Math.round(net / stats.weekIncome * 100) : 0;
+      goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>💵 Net this week</span>' +
+        '<strong style="color:' + (net >= 0 ? 'var(--success)' : 'var(--danger)') + '">' + formatCurrency(net) +
+        (stats.weekIncome > 0 ? ' · ' + rate + '% saved' : '') + '</strong></div>' +
+        '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + formatCurrency(stats.weekIncome) + ' in − ' + formatCurrency(stats.weekExpenses) + ' out</div></div>');
+    }
   }
   if (isPillarOn('gym')) {
     const pc = pillar('gym');
@@ -2047,9 +2059,11 @@ function initIncomeChart(sortedWeeks) {
   const ctx = document.getElementById('incomeChart')?.getContext('2d');
   if (!ctx) return;
   const goal = state.data.profile.weeklyIncomeGoal || 0;
+  const hasExpenses = last12.some(w => (w.expenses || 0) > 0);
   const ds = [{ label: 'Income', data: last12.map(w => w.income), borderColor: '#E8A838', backgroundColor: 'rgba(232,168,56,0.12)', tension: 0.3, fill: true, pointBackgroundColor: '#7B3F00', pointRadius: 4 }];
+  if (hasExpenses) ds.push({ label: 'Spending', data: last12.map(w => w.expenses || 0), borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,0.10)', tension: 0.3, fill: true, pointBackgroundColor: '#991B1B', pointRadius: 4 });
   if (goal) ds.push({ label: 'Goal $' + goal, data: last12.map(() => goal), borderColor: 'rgba(123,63,0,0.3)', borderDash: [6, 4], pointRadius: 0, fill: false });
-  charts.income = new Chart(ctx, { type: 'line', data: { labels: last12.map(w => formatWeekRange(w.weekStart, true)), datasets: ds }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: !!goal } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v } } } } });
+  charts.income = new Chart(ctx, { type: 'line', data: { labels: last12.map(w => formatWeekRange(w.weekStart, true)), datasets: ds }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: !!goal || hasExpenses } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v } } } } });
 }
 
 function initGymChart(days) {
@@ -2289,12 +2303,29 @@ function renderWeeklyIncomeInline() {
   const existing = state.data.weeks.find(w => w.weekStart === thisWeekStart);
   const pc = pillar('money');
   return '<div class="today-section money-section" style="border-color:var(--accent)">' +
-    '<div class="today-section-header money-header">💵 Weekly ' + escapeHtml(pc.label) + ' Total</div>' +
-    '<div class="form-group">' +
-    '<label>Total <strong>this week</strong> so far ($) <span style="font-weight:400;color:var(--text-muted)">— updates each time you log</span></label>' +
+    '<div class="today-section-header money-header">💵 Weekly ' + escapeHtml(pc.label) + ' & Spending</div>' +
+    '<div class="form-row">' +
+    '<div class="form-group"><label>💰 ' + escapeHtml(pc.label) + ' <strong>this week</strong> ($)</label>' +
     '<input type="number" id="week-income" min="0" step="0.01" placeholder="0" value="' + (existing?.income || '') + '" ' +
-    'style="font-size:22px;font-weight:800;padding:12px 16px;border-color:var(--accent)"></div>' +
+    'oninput="updateNetHint()" style="font-size:20px;font-weight:800;padding:12px 16px;border-color:var(--accent)"></div>' +
+    '<div class="form-group"><label>💸 Spent <strong>this week</strong> ($)</label>' +
+    '<input type="number" id="week-expenses" min="0" step="0.01" placeholder="0" value="' + (existing?.expenses || '') + '" ' +
+    'oninput="updateNetHint()" style="font-size:20px;font-weight:800;padding:12px 16px;border-color:var(--danger)"></div>' +
+    '</div>' +
+    '<div id="net-hint" class="net-hint"></div>' +
     '</div>';
+}
+// Live "Net = income − spending" hint under the weekly money inputs
+function updateNetHint() {
+  const el = document.getElementById('net-hint'); if (!el) return;
+  const inc = parseFloat(document.getElementById('week-income')?.value) || 0;
+  const exp = parseFloat(document.getElementById('week-expenses')?.value) || 0;
+  if (!inc && !exp) { el.innerHTML = ''; return; }
+  const net = inc - exp;
+  const rate = inc > 0 ? Math.round(net / inc * 100) : 0;
+  el.innerHTML = '<span style="color:var(--text-muted)">Net this week:</span> ' +
+    '<strong style="color:' + (net >= 0 ? 'var(--success)' : 'var(--danger)') + '">' + formatCurrency(net) + '</strong>' +
+    (inc > 0 ? ' <span style="color:var(--text-muted)">· ' + rate + '% saved</span>' : '');
 }
 
 function setGymDone(val) {
@@ -2335,6 +2366,7 @@ async function submitDay(e) {
   const gymDone = gymDoneBtn ? gymDoneBtn.classList.contains('gym-yes') : null;
   const foodEl = document.getElementById('food-rating');
   const weekIncome = parseFloat(document.getElementById('week-income')?.value) || 0;
+  const weekExpenses = parseFloat(document.getElementById('week-expenses')?.value) || 0;
 
   const entry = {
     id: state._editDayId || prior.id || uid(),
@@ -2399,11 +2431,12 @@ async function submitDay(e) {
     }
   }
 
-  // Save weekly income
-  if (weekIncome > 0) {
+  // Save weekly income + expenses
+  if (weekIncome > 0 || weekExpenses > 0) {
     const thisWeekStart = getWeekStart(date);
     const wi = state.data.weeks.findIndex(w => w.weekStart === thisWeekStart);
-    const weekEntry = { id: wi >= 0 ? state.data.weeks[wi].id : uid(), weekStart: thisWeekStart, income: weekIncome, notes: '' };
+    const prevW = wi >= 0 ? state.data.weeks[wi] : null;
+    const weekEntry = { id: prevW ? prevW.id : uid(), weekStart: thisWeekStart, income: weekIncome, expenses: weekExpenses, notes: prevW?.notes || '' };
     if (wi >= 0) state.data.weeks[wi] = weekEntry; else state.data.weeks.push(weekEntry);
   }
 
@@ -3054,6 +3087,13 @@ function enrichedData() {
       totalPagesRead: days.reduce((s, d) => s + (d.reading?.pages || 0), 0),
       readingStreak: getReadingStreak(),
       avg4WeekIncome: Math.round(getWeeklyAvg(weeks, 4)),
+      moneyFlow: (() => {
+        const wk = weeks.filter(w => (w.income || 0) > 0 || (w.expenses || 0) > 0);
+        if (!wk.length) return null;
+        const inc = wk.reduce((s, w) => s + (w.income || 0), 0);
+        const exp = wk.reduce((s, w) => s + (w.expenses || 0), 0);
+        return { avgWeeklyIncome: Math.round(inc / wk.length), avgWeeklyExpenses: Math.round(exp / wk.length), avgWeeklyNet: Math.round((inc - exp) / wk.length), savingsRatePct: inc > 0 ? Math.round((inc - exp) / inc * 100) : 0 };
+      })(),
       avgWaterGallons: (() => { const w = days.filter(d => d.water > 0); return w.length ? +(w.reduce((s, d) => s + d.water, 0) / w.length).toFixed(2) : 0; })(),
       thisWeekStats: stats
     }

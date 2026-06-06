@@ -58,7 +58,7 @@ function loadApp(fieldValues) {
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
-    ' loggingStreak, weekShareStats, weekShareTiles });';
+    ' loggingStreak, weekShareStats, weekShareTiles, getWeekStats, getWeekStart });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -173,6 +173,14 @@ const _ws = A.weekShareStats();
 ok('weekShareStats reads today', _ws.daysLogged === 1 && _ws.workouts === 1 && _ws.pages === 15 && _ws.connections === 3);
 const _tiles = A.weekShareTiles(_ws);
 ok('weekShareTiles ≤4 and leads with Days logged', _tiles.length <= 4 && _tiles[0].label === 'Days logged' && _tiles.some(t => t.label === 'Workouts'));
+
+// Expense tracker — weekly net = income − spending
+const _wkS = A.getWeekStart(new Date().toISOString().split('T')[0]);
+A.state.data = { profile: { pillars: dp }, weights: [], days: [{ date: new Date().toISOString().split('T')[0] }], weeks: [{ weekStart: _wkS, income: 1000, expenses: 300 }] };
+const _m = A.getWeekStats();
+ok('weekStats net = income − spending', _m.weekIncome === 1000 && _m.weekExpenses === 300 && _m.weekNet === 700);
+A.state.data.weeks = [{ weekStart: _wkS, income: 500, expenses: 800 }];
+ok('weekStats net goes negative when overspending', A.getWeekStats().weekNet === -300);
 
 // Weekly score only counts enabled pillars (no crash, 0..100)
 A.state.data = { profile: { pillars: dp, gymDaysPerWeek: 5, weeklyNetworkGoal: 3, weeklyIncomeGoal: 1000, weeklyReadGoal: 100 }, days: [], weeks: [], weights: [] };
