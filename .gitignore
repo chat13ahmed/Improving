@@ -12,6 +12,8 @@ cloud/data.db
 cloud/data.db-shm
 cloud/data.db-wal
 .env
+RENDER_SETUP.FILLED.md
+*.secrets.md
 
 # build output / native projects
 dist/
