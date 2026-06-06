@@ -390,6 +390,38 @@ app.get('/api/admin/reach', requireAuth, async (req, res) => {
   catch { res.json({ devices: 0, users: 0 }); }
 });
 
+// Owner-only: live usage numbers (how many people use it & how active they are).
+app.get('/api/admin/stats', requireAuth, async (req, res) => {
+  if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });
+  try {
+    const [users, dataRows, subs] = await Promise.all([DB.allUsers(), DB.allUserData(), DB.allPushSubs()]);
+    const byId = {}; dataRows.forEach(r => { byId[String(r.user_id)] = r.data || {}; });
+    const DAY = 86400000;
+    const today = new Date().toISOString().split('T')[0];
+    const dayWithin = (ds, n) => { if (!ds) return false; const t = Date.parse(ds + 'T00:00:00Z'); return !isNaN(t) && Date.now() - t < n * DAY && Date.now() - t > -DAY; };
+    const createdWithin = (c, n) => { if (!c) return false; const t = Date.parse(c); return !isNaN(t) && Date.now() - t < n * DAY; };
+    let loggedToday = 0, active7 = 0, active30 = 0, totalDays = 0;
+    const rows = users.map(u => {
+      const days = Array.isArray((byId[String(u.id)] || {}).days) ? byId[String(u.id)].days : [];
+      const dates = days.map(d => d && d.date).filter(Boolean);
+      totalDays += days.length;
+      if (dates.includes(today)) loggedToday++;
+      if (dates.some(d => dayWithin(d, 7))) active7++;
+      if (dates.some(d => dayWithin(d, 30))) active30++;
+      return { username: u.username, days: days.length, last: dates.sort().slice(-1)[0] || null };
+    });
+    rows.sort((a, b) => String(b.last || '').localeCompare(String(a.last || '')) || b.days - a.days);
+    res.json({
+      totalUsers: users.length, loggedToday, active7, active30, totalDays,
+      avgDays: users.length ? +(totalDays / users.length).toFixed(1) : 0,
+      pushDevices: subs.length,
+      newToday: users.filter(u => createdWithin(u.created_at, 1)).length,
+      new7: users.filter(u => createdWithin(u.created_at, 7)).length,
+      recent: rows.slice(0, 20)
+    });
+  } catch (e) { res.status(500).json({ error: 'Stats failed' }); }
+});
+
 // Owner-only: push a custom notification to every subscribed device.
 app.post('/api/admin/broadcast', requireAuth, async (req, res) => {
   if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });

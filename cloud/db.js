@@ -67,7 +67,9 @@ function sqliteImpl() {
         .run(userId, sub.endpoint, JSON.stringify(sub));
     },
     async deletePushSub(endpoint) { db.prepare('DELETE FROM push_subscriptions WHERE endpoint=?').run(endpoint); },
-    async allPushSubs() { return db.prepare('SELECT user_id, sub FROM push_subscriptions').all().map(r => ({ user_id: r.user_id, sub: JSON.parse(r.sub) })); }
+    async allPushSubs() { return db.prepare('SELECT user_id, sub FROM push_subscriptions').all().map(r => ({ user_id: r.user_id, sub: JSON.parse(r.sub) })); },
+    async allUsers() { return db.prepare('SELECT id, username, created_at FROM users').all(); },
+    async allUserData() { return db.prepare('SELECT user_id, data FROM user_data').all().map(r => ({ user_id: r.user_id, data: JSON.parse(r.data) })); }
   };
 }
 
@@ -105,7 +107,9 @@ function pgImpl() {
                ON CONFLICT(endpoint) DO UPDATE SET user_id=$1, sub=$3`, [userId, sub.endpoint, JSON.stringify(sub)]);
     },
     async deletePushSub(endpoint) { await q('DELETE FROM push_subscriptions WHERE endpoint=$1', [endpoint]); },
-    async allPushSubs() { const r = await q('SELECT user_id, sub FROM push_subscriptions', []); return r.rows.map(x => ({ user_id: x.user_id, sub: x.sub })); }
+    async allPushSubs() { const r = await q('SELECT user_id, sub FROM push_subscriptions', []); return r.rows.map(x => ({ user_id: x.user_id, sub: x.sub })); },
+    async allUsers() { const r = await q('SELECT id, username, created_at FROM users', []); return r.rows; },
+    async allUserData() { const r = await q('SELECT user_id, data FROM user_data', []); return r.rows.map(x => ({ user_id: x.user_id, data: x.data })); }
   };
 }
 
@@ -121,5 +125,7 @@ module.exports = {
   saveData: (i, d, v) => impl.saveData(i, d, v),
   savePushSub: (i, s) => impl.savePushSub(i, s),
   deletePushSub: (e) => impl.deletePushSub(e),
-  allPushSubs: () => impl.allPushSubs()
+  allPushSubs: () => impl.allPushSubs(),
+  allUsers: () => impl.allUsers(),
+  allUserData: () => impl.allUserData()
 };

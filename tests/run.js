@@ -283,6 +283,11 @@ if (P) {
     ok('DB push sub upserts by endpoint', (await DBm.allPushSubs()).length === 1);
     await DBm.deletePushSub(sub.endpoint);
     ok('DB deletePushSub works', (await DBm.allPushSubs()).length === 0);
+    // analytics reads
+    const allU = await DBm.allUsers();
+    ok('DB allUsers returns rows with created_at', allU.length === 1 && allU[0].username === 'tuser' && !!allU[0].created_at);
+    const allD = await DBm.allUserData();
+    ok('DB allUserData returns parsed data', allD.length === 1 && String(allD[0].user_id) === String(id) && typeof allD[0].data === 'object');
   } catch (e) { failures.push('cloud DB (sqlite) — ' + e.message); }
 
   // ── report ──

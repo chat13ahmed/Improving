@@ -4523,7 +4523,8 @@ function renderSettingsPage() {
     '<div class="page-header"><h2 class="page-title">Settings</h2>' +
     '<p class="page-sub">Customize your pillars, goals, profile, and app preferences</p></div>' +
 
-    // Owner-only broadcast tool (invisible to everyone else)
+    // Owner-only tools (invisible to everyone else)
+    renderAdminStatsCard() +
     renderOwnerCard() +
 
     // Customize pillars (first — it's the headline feature)
@@ -4605,7 +4606,7 @@ function renderSettingsPage() {
     'The app must be running for this to work. Close the window but don\'t quit the app to keep it active.' +
     '</div></div>';
 
-  if (state.isOwner) loadBroadcastReach();
+  if (state.isOwner) { loadBroadcastReach(); loadAdminStats(); }
 }
 
 // Owner-only card: type a message → push it to everyone's phone. Returns '' for normal users.
@@ -4620,6 +4621,43 @@ function renderOwnerCard() {
     '<textarea id="bc-body" rows="2" maxlength="300" placeholder="e.g. Don\'t forget to log your day — keep the streak alive!"></textarea></div>' +
     '<button type="button" class="btn btn-primary" onclick="sendBroadcast()">📣 Send to everyone</button>' +
     '</div>';
+}
+
+// Owner-only live analytics — so you can SEE if people actually use it
+function renderAdminStatsCard() {
+  if (!state.isOwner) return '';
+  return '<div class="card" style="border:1px solid rgba(45,212,191,0.3)">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+    '<h3 class="card-title" style="margin-bottom:0">📊 Your app — live numbers</h3>' +
+    '<button class="btn btn-outline btn-sm" onclick="loadAdminStats()">↻ Refresh</button></div>' +
+    '<p class="card-sub">Owner only. How many people use Business Escalate and how active they are.</p>' +
+    '<div id="admin-stats" class="admin-grid"><div class="di-loading"><div class="spinner"></div><span>Loading…</span></div></div>' +
+    '<div id="admin-recent"></div></div>';
+}
+async function loadAdminStats() {
+  const grid = document.getElementById('admin-stats');
+  const recent = document.getElementById('admin-recent');
+  if (grid) grid.innerHTML = '<div class="di-loading"><div class="spinner"></div><span>Loading…</span></div>';
+  try {
+    const j = await fetch('/api/admin/stats', { headers: authHeaders() }).then(r => r.json());
+    if (!grid) return;
+    const tile = (n, label, hint) => '<div class="admin-tile"><div class="admin-n">' + n + '</div><div class="admin-l">' + label + '</div>' + (hint ? '<div class="admin-h">' + hint + '</div>' : '') + '</div>';
+    grid.innerHTML =
+      tile(j.totalUsers, 'Total users', j.new7 ? '+' + j.new7 + ' this week' : '') +
+      tile(j.loggedToday, 'Logged today', j.totalUsers ? Math.round(j.loggedToday / j.totalUsers * 100) + '% of users' : '') +
+      tile(j.active7, 'Active · 7 days') +
+      tile(j.active30, 'Active · 30 days') +
+      tile(j.avgDays, 'Avg days / user') +
+      tile(j.pushDevices, 'Push devices');
+    if (recent) {
+      const rowsHtml = (j.recent || []).map(r => '<tr><td>' + escapeHtml(r.username) + '</td><td style="text-align:center">' + r.days + '</td><td style="text-align:right;color:var(--text-muted)">' + (r.last ? fmtDateShort(r.last) : '—') + '</td></tr>').join('');
+      recent.innerHTML = (j.recent && j.recent.length)
+        ? '<table class="admin-table"><thead><tr><th>User</th><th style="text-align:center">Days</th><th style="text-align:right">Last active</th></tr></thead><tbody>' + rowsHtml + '</tbody></table>'
+        : '<p class="card-sub" style="margin-top:10px">No signups yet — share your link to get your first users.</p>';
+    }
+  } catch {
+    if (grid) grid.innerHTML = '<p class="card-sub">Couldn\'t load stats — try Refresh.</p>';
+  }
 }
 
 async function loadBroadcastReach() {
