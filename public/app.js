@@ -666,6 +666,7 @@ function renderAuthScreen(mode) {
     (isSignup ? 'Already have an account? <button class="btn-link" onclick="renderAuthScreen(\'login\')">Log in</button>'
               : 'New here? <button class="btn-link" onclick="renderAuthScreen(\'signup\')">Create an account</button>') +
     '<div class="auth-note">🔒 Your account is private — only you can see your data.</div>' +
+    '<div style="margin-top:10px"><a class="btn-link" href="about.html">What is Business Escalate? →</a></div>' +
     '</div>' +
     '</div>';
   document.body.appendChild(screen);
@@ -4308,6 +4309,37 @@ function renderChecklistCard() {
     '<div class="chk-list">' + rows + '</div></div>';
 }
 
+// Daily streak nudge control (server sends it; this just sets the preference)
+function renderNudgeCard() {
+  const p = state.data.profile || {};
+  const on = p.dailyNudge !== false; // default ON
+  const hour = Number.isFinite(+p.nudgeHour) ? +p.nudgeHour : 19;
+  const fmt = h => ((h % 12) || 12) + ':00 ' + (h < 12 ? 'AM' : 'PM');
+  const opts = Array.from({ length: 24 }, (_, h) => '<option value="' + h + '"' + (h === hour ? ' selected' : '') + '>' + fmt(h) + '</option>').join('');
+  return '<div class="card">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+    '<h3 class="card-title" style="margin-bottom:0">🔥 Daily streak nudge</h3>' +
+    '<label class="pc-toggle"><input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="toggleDailyNudge()"><span class="pc-slider"></span></label></div>' +
+    '<p class="card-sub">If you haven\'t logged by this time, we\'ll send one friendly push to your phone — so you never break your streak.</p>' +
+    '<div class="rem-add"><label style="align-self:center;color:var(--text-muted);font-size:14px;white-space:nowrap">Remind me at</label>' +
+    '<select id="nudge-hour" onchange="setNudgeHour(this.value)"' + (on ? '' : ' disabled') + '>' + opts + '</select></div>' +
+    '<div class="rem-note">📱 Needs notifications enabled (above). Sent at most once a day, only if you haven\'t logged yet.</div>' +
+    '</div>';
+}
+async function toggleDailyNudge() {
+  const p = state.data.profile = state.data.profile || {};
+  const currentlyOn = p.dailyNudge !== false;
+  p.dailyNudge = !currentlyOn;
+  if (p.dailyNudge) p.tz = -new Date().getTimezoneOffset(); // make sure the server knows your local time
+  await saveData();
+  renderChecklistPage();
+}
+async function setNudgeHour(v) {
+  const p = state.data.profile = state.data.profile || {};
+  p.nudgeHour = parseInt(v, 10) || 19;
+  await saveData();
+}
+
 function renderChecklistPage() {
   ensureChecklistData();
   const items = state.data.checklist;
@@ -4358,7 +4390,8 @@ function renderChecklistPage() {
     '<button type="button" class="btn btn-primary" onclick="addReminder()">+ Add</button>' +
     '</div>' +
     '<div class="rem-note">💡 Reminders nudge you while the app is open. On a phone, add it to your home screen and allow notifications for the best results.</div>' +
-    '</div>';
+    '</div>' +
+    renderNudgeCard();
 }
 
 // ─────────────────────────────────────────────────────────────

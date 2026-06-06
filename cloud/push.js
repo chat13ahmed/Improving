@@ -29,4 +29,14 @@ function userLocal(tzMin, nowMs) {
     date: d.toISOString().split('T')[0]
   };
 }
-module.exports = { sendPush, configured, isReminderDue, userLocal };
+// Pure: should the daily streak nudge fire? Once/day, in the evening, only if
+// the user hasn't logged today and hasn't already been nudged today. (testable)
+function isNudgeDue(opts) {
+  const o = opts || {};
+  if (o.enabled === false) return false;        // user turned it off (default on)
+  if (o.loggedToday) return false;              // already logged — no nudge needed
+  if (o.lastNudge === o.date) return false;     // already nudged today
+  const hour = Number.isFinite(+o.nudgeHour) ? +o.nudgeHour : 19;
+  return (o.hhmm || '00:00') >= (String(hour).padStart(2, '0') + ':00');
+}
+module.exports = { sendPush, configured, isReminderDue, userLocal, isNudgeDue };

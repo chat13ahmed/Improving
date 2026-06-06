@@ -422,12 +422,13 @@ app.post('/api/cron/tick', async (req, res) => {
       const d = await DB.getData(uid);
       if (!d || !d.data) continue;
       const data = d.data;
-      const reminders = data.reminders || [];
-      if (!reminders.length) continue;
-      const tz = data.profile && Number(data.profile.tz);
+      const profile = data.profile || {};
+      const tz = Number(profile.tz);
       const local = push.userLocal(Number.isFinite(tz) ? tz : 0);
       let changed = false;
-      for (const r of reminders) {
+
+      // 1) Due reminders the user set
+      for (const r of (data.reminders || [])) {
         if (!push.isReminderDue(r, local.hhmm, local.date)) continue;
         for (const sub of byUser[uid]) {
           try { await push.sendPush(sub, { title: '⏰ ' + r.label, body: 'Business Escalate', url: './', tag: r.id }); sent++; }
@@ -435,6 +436,18 @@ app.post('/api/cron/tick', async (req, res) => {
         }
         r._lastFired = local.date; changed = true;
       }
+
+      // 2) Daily streak nudge — once/day, evening, only if they haven't logged today
+      const loggedToday = (data.days || []).some(x => x.date === local.date);
+      if (push.isNudgeDue({ hhmm: local.hhmm, date: local.date, nudgeHour: profile.nudgeHour, loggedToday, lastNudge: data._lastNudge, enabled: profile.dailyNudge })) {
+        const name = profile.firstName || profile.name || '';
+        for (const sub of byUser[uid]) {
+          try { await push.sendPush(sub, { title: '🔥 Keep your streak alive', body: (name ? name + ', ' : '') + "you haven't logged today — it takes 30 seconds.", url: './', tag: 'daily-nudge' }); sent++; }
+          catch (e) { if (e && (e.statusCode === 404 || e.statusCode === 410)) { try { await DB.deletePushSub(sub.endpoint); } catch {} } }
+        }
+        data._lastNudge = local.date; changed = true;
+      }
+
       if (changed) await DB.saveData(uid, data, d.version + 1);
     }
     res.json({ sent });

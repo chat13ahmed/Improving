@@ -221,6 +221,15 @@ if (P) {
   const ul = P.userLocal(120, Date.UTC(2026, 5, 3, 18, 30)); // 18:30 UTC + 2h → 20:30 local
   ok('push userLocal applies tz offset', ul.hhmm === '20:30' && ul.date === '2026-06-03');
   ok('push configured() false without VAPID env', P.configured() === false);
+  // Daily streak nudge gate
+  const D = '2026-06-03';
+  ok('nudge due (evening, not logged, not nudged)', P.isNudgeDue({ hhmm: '19:30', date: D, loggedToday: false, lastNudge: '', enabled: true }) === true);
+  ok('nudge not due before the hour', P.isNudgeDue({ hhmm: '12:00', date: D, loggedToday: false, lastNudge: '' }) === false);
+  ok('nudge not due if logged today', P.isNudgeDue({ hhmm: '21:00', date: D, loggedToday: true, lastNudge: '' }) === false);
+  ok('nudge not due if already nudged today', P.isNudgeDue({ hhmm: '21:00', date: D, loggedToday: false, lastNudge: D }) === false);
+  ok('nudge disabled when off', P.isNudgeDue({ hhmm: '21:00', date: D, loggedToday: false, lastNudge: '', enabled: false }) === false);
+  ok('nudge respects custom hour', P.isNudgeDue({ hhmm: '08:00', date: D, loggedToday: false, lastNudge: '', nudgeHour: 8 }) === true);
+  ok('nudge default hour is 19', P.isNudgeDue({ hhmm: '18:59', date: D, loggedToday: false, lastNudge: '' }) === false);
 }
 
 // ─────────────────────────────────────────────────────────────
