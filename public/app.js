@@ -655,10 +655,12 @@ function renderAuthScreen(mode) {
     (isSignup
       ? '<div class="auth-field"><label>Security question <span style="font-weight:400;color:var(--text-muted)">(optional — lets you reset your password)</span></label>' +
         '<select id="auth-secq">' + SECURITY_QUESTIONS.map(q => '<option value="' + escapeHtml(q) + '">' + escapeHtml(q) + '</option>').join('') + '</select></div>' +
-        '<div class="auth-field"><label>Your answer <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>' +
-        '<input type="text" id="auth-seca" autocomplete="off" placeholder="Leave blank to skip — you can add it later in Settings"></div>'
+        '<div class="auth-field"><label>Your answer <span style="font-weight:400;color:var(--text-muted)">(recommended)</span></label>' +
+        '<input type="text" id="auth-seca" autocomplete="off" placeholder="So you can reset your password later"></div>' +
+        '<div class="auth-warn">⚠️ Without a security question, you can\'t recover your account if you forget your password.</div>'
       : '') +
     '<div class="auth-error" id="auth-error"></div>' +
+    '<div class="auth-status" id="auth-status" style="display:none"></div>' +
     '<button type="submit" class="btn btn-primary auth-submit">' + (isSignup ? '✨ Create Account' : '→ Log In') + '</button>' +
     (!isSignup ? '<div class="auth-forgot"><button type="button" class="btn-link" onclick="renderForgotScreen()">Forgot password?</button></div>' : '') +
     '</form>' +
@@ -675,26 +677,55 @@ function renderAuthScreen(mode) {
 
 function authError(msg) {
   const el = document.getElementById('auth-error');
-  if (el) { el.textContent = msg; el.classList.add('visible'); }
+  if (el) { el.textContent = msg || ''; el.classList.toggle('visible', !!msg); }
+}
+function authStatus(msg) {
+  const el = document.getElementById('auth-status');
+  if (el) { el.textContent = msg || ''; el.style.display = msg ? '' : 'none'; }
+}
+// Auth requests can hit a sleeping free-tier server (cold start ~30–60s).
+// Show a friendly "waking up" note after a moment, and retry transient failures.
+async function authFetch(url, body) {
+  const slow = setTimeout(() => authStatus('⏳ Waking up the server… the first visit can take up to a minute on the free plan. Hang tight.'), 3500);
+  try {
+    let lastErr;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const ctrl = new AbortController();
+        const to = setTimeout(() => ctrl.abort(), 65000);
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal });
+        clearTimeout(to);
+        return res;
+      } catch (err) {
+        lastErr = err;
+        if (attempt < 2) { authStatus('⏳ Still waking up… retrying.'); await new Promise(r => setTimeout(r, 2000)); }
+      }
+    }
+    throw lastErr;
+  } finally { clearTimeout(slow); authStatus(''); }
 }
 
 async function doLogin(e) {
   e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
   const username = document.getElementById('auth-username').value.trim();
   const password = document.getElementById('auth-password').value;
   if (!username || !password) { authError('Enter your username and password.'); return; }
+  authError(''); if (btn) btn.disabled = true;
   try {
-    const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+    const res = await authFetch('/api/login', { username, password });
     const j = await res.json();
     if (!res.ok) { authError(j.error || 'Login failed.'); return; }
     state.token = j.token; state.user = j.username; state.hasSecurity = j.hasSecurity; localStorage.setItem('be_token', j.token);
     await startApp();
     showToast('Welcome back, ' + j.username + '! 👋', 'success');
-  } catch { authError('Could not reach the server.'); }
+  } catch { authError('Could not reach the server — check your connection and try again.'); }
+  finally { if (btn) btn.disabled = false; }
 }
 
 async function doSignup(e) {
   e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
   const username = document.getElementById('auth-username').value.trim();
   const password = document.getElementById('auth-password').value;
   const securityQuestion = document.getElementById('auth-secq')?.value || '';
@@ -702,14 +733,21 @@ async function doSignup(e) {
   if (username.length < 3) { authError('Username must be at least 3 characters.'); return; }
   if (password.length < 6) { authError('Password must be at least 6 characters.'); return; }
   if (securityAnswer && securityAnswer.length < 2) { authError('Your security answer is too short (or leave it blank).'); return; }
+  // Lockout nudge — make skipping a deliberate choice
+  if (!securityAnswer) {
+    const proceed = confirm("⚠️ No security question set.\n\nIf you forget your password, you won't be able to recover your account.\n\nPress OK to create it anyway, or Cancel to go back and add one.");
+    if (!proceed) { document.getElementById('auth-seca')?.focus(); return; }
+  }
+  authError(''); if (btn) btn.disabled = true;
   try {
-    const res = await fetch('/api/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password, securityQuestion, securityAnswer }) });
+    const res = await authFetch('/api/signup', { username, password, securityQuestion, securityAnswer });
     const j = await res.json();
     if (!res.ok) { authError(j.error || 'Sign up failed.'); return; }
     state.token = j.token; state.user = j.username; state.hasSecurity = !!j.hasSecurity; localStorage.setItem('be_token', j.token);
     await startApp();
     showToast('Account created — welcome, ' + j.username + '! 🎉', 'success');
-  } catch { authError('Could not reach the server.'); }
+  } catch { authError('Could not reach the server — check your connection and try again.'); }
+  finally { if (btn) btn.disabled = false; }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -4637,14 +4675,16 @@ function renderSettingsPage() {
     // Backup & data
     renderBackupCard() +
 
-    // Notification info
+    // Notifications info
     '<div class="card">' +
-    '<h3 class="card-title">🔔 Daily Reminder</h3>' +
-    '<div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);padding:14px 16px;font-size:14px;color:var(--text-muted);line-height:1.7">' +
-    '✅ <strong style="color:var(--text)">Reminder is active.</strong> Every day at <strong style="color:var(--primary)">8:00 PM</strong>, ' +
-    'the app will send a Windows notification if you haven\'t logged yet. ' +
-    'The app must be running for this to work. Close the window but don\'t quit the app to keep it active.' +
-    '</div></div>';
+    '<h3 class="card-title">🔔 Notifications & Reminders</h3>' +
+    '<div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);padding:14px 16px;font-size:14px;color:var(--text-muted);line-height:1.7;margin-bottom:12px">' +
+    'Get your reminders and a daily <strong style="color:var(--text)">streak nudge</strong> on your phone — <strong style="color:var(--text)">even when the app is closed</strong>. ' +
+    'Turn them on in <strong style="color:var(--text)">Checklist → Reminders → Enable notifications</strong>, then add your own reminder times and set the nudge.' +
+    '<br><br>📱 <strong style="color:var(--text)">On iPhone:</strong> add the app to your Home Screen first (Share → Add to Home Screen), then allow notifications.' +
+    '</div>' +
+    '<button class="btn btn-outline" onclick="navigate(\'checklist\')">Open Checklist & Reminders →</button>' +
+    '</div>';
 
   if (state.isOwner) { loadBroadcastReach(); loadAdminStats(); }
 }
