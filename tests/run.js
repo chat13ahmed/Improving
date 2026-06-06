@@ -57,7 +57,8 @@ function loadApp(fieldValues) {
   code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
-    ' reminderDue, isChecked, checklistProgress, ensureChecklistData });';
+    ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
+    ' loggingStreak, weekShareStats, weekShareTiles });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -156,6 +157,22 @@ ok('reminderDue: disabled', A.reminderDue({ enabled: false, _lastFired: '', time
 A.state.data = { profile: {}, days: [], weeks: [], weights: [] };
 A.ensureChecklistData();
 ok('ensureChecklistData creates the fields', Array.isArray(A.state.data.checklist) && Array.isArray(A.state.data.reminders) && typeof A.state.data.checkDone === 'object');
+
+// Shareable week card — streak + stats (pure; canvas itself needs a real browser)
+const _sd0 = new Date().toISOString().split('T')[0];
+const _sd1 = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+const _sd2 = new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0];
+A.state.data = { profile: { pillars: dp }, weeks: [], weights: [], days: [
+  { date: _sd2, gym: { done: true } }, { date: _sd1, gym: { done: true } }, { date: _sd0, gym: { done: true } }
+] };
+ok('loggingStreak counts consecutive incl today', A.loggingStreak() === 3);
+A.state.data.days = [{ date: _sd2, gym: { done: true } }, { date: _sd1, gym: { done: true } }]; // today not logged yet
+ok('loggingStreak counts through yesterday when today blank', A.loggingStreak() === 2);
+A.state.data.days = [{ date: _sd0, gym: { done: true }, reading: { pages: 15 }, networking: { count: 3 }, water: 1.5 }];
+const _ws = A.weekShareStats();
+ok('weekShareStats reads today', _ws.daysLogged === 1 && _ws.workouts === 1 && _ws.pages === 15 && _ws.connections === 3);
+const _tiles = A.weekShareTiles(_ws);
+ok('weekShareTiles ≤4 and leads with Days logged', _tiles.length <= 4 && _tiles[0].label === 'Days logged' && _tiles.some(t => t.label === 'Workouts'));
 
 // Weekly score only counts enabled pillars (no crash, 0..100)
 A.state.data = { profile: { pillars: dp, gymDaysPerWeek: 5, weeklyNetworkGoal: 3, weeklyIncomeGoal: 1000, weeklyReadGoal: 100 }, days: [], weeks: [], weights: [] };

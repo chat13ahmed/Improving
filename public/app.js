@@ -1626,7 +1626,8 @@ function renderReviewCard() {
       '</p><button class="btn btn-primary" onclick="fetchReview(true)">📋 Generate this week\'s review</button></div>';
   }
   return '<div class="card review-card' + (isSunday && !hasThisWeek ? ' review-due' : '') + '">' +
-    '<div class="di-head"><span class="di-icon">📋</span><span class="di-title">Weekly Life Review</span></div>' +
+    '<div class="di-head"><span class="di-icon">📋</span><span class="di-title">Weekly Life Review</span>' +
+    '<button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="shareMyWeek()">📤 Share</button></div>' +
     '<div class="di-body" id="rev-body">' + body + '</div></div>';
 }
 async function fetchReview() {
@@ -1650,6 +1651,120 @@ async function fetchReview() {
     setBody('<div class="di-empty">Connection error — try again.</div>');
   } finally {
     state._revLoading = false;
+  }
+}
+
+// ── One-tap shareable week card (the growth loop) ──
+// Consecutive days logged up to today (today counts; if not logged yet, counts through yesterday)
+function loggingStreak() {
+  const set = new Set((state.data.days || []).map(d => d.date));
+  let n = 0;
+  const d = new Date(todayStr() + 'T00:00:00');
+  if (!set.has(todayStr())) d.setDate(d.getDate() - 1);
+  while (set.has(d.toISOString().split('T')[0])) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+function weekShareStats() {
+  const wkStart = getWeekStart(todayStr()), t = todayStr();
+  const inWeek = (state.data.days || []).filter(d => d.date >= wkStart && d.date <= t);
+  const sum = f => inWeek.reduce((s, d) => s + (Number(f(d)) || 0), 0);
+  return {
+    daysLogged: inWeek.length,
+    workouts: inWeek.filter(d => d.gym && d.gym.done).length,
+    pages: sum(d => d.reading && d.reading.pages),
+    connections: sum(d => d.networking && d.networking.count),
+    water: +sum(d => d.water).toFixed(1),
+    streak: loggingStreak()
+  };
+}
+// Up to 4 brag-worthy, non-sensitive stats from enabled pillars (no $ amounts)
+function weekShareTiles(s) {
+  const tiles = [{ icon: '✅', value: s.daysLogged + '/7', label: 'Days logged' }];
+  if (isPillarOn('gym') && s.workouts) tiles.push({ icon: '🏋️', value: s.workouts, label: 'Workouts' });
+  if (isPillarOn('reading') && s.pages) tiles.push({ icon: '📚', value: s.pages, label: 'Pages read' });
+  if (isPillarOn('networking') && s.connections) tiles.push({ icon: '🤝', value: s.connections, label: 'Connections' });
+  if (tiles.length < 4 && s.water) tiles.push({ icon: '💧', value: s.water, label: 'Gal water' });
+  return tiles.slice(0, 4);
+}
+function buildWeekCardBlob() {
+  return new Promise(resolve => {
+    const W = 1080, H = 1920, cx = W / 2;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const x = cv.getContext('2d');
+    const rr = (px, py, w, h, r) => {
+      x.beginPath();
+      if (x.roundRect) x.roundRect(px, py, w, h, r);
+      else { x.moveTo(px + r, py); x.arcTo(px + w, py, px + w, py + h, r); x.arcTo(px + w, py + h, px, py + h, r); x.arcTo(px, py + h, px, py, r); x.arcTo(px, py, px + w, py, r); x.closePath(); }
+    };
+    const FONT = '-apple-system,Segoe UI,Roboto,sans-serif';
+    // Background + glows
+    x.fillStyle = '#0F1117'; x.fillRect(0, 0, W, H);
+    let g = x.createRadialGradient(cx, 280, 60, cx, 280, 900);
+    g.addColorStop(0, 'rgba(45,212,191,0.22)'); g.addColorStop(1, 'rgba(45,212,191,0)');
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+    g = x.createRadialGradient(cx, H - 220, 60, cx, H - 220, 900);
+    g.addColorStop(0, 'rgba(167,139,250,0.20)'); g.addColorStop(1, 'rgba(167,139,250,0)');
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+
+    x.textAlign = 'center';
+    x.fillStyle = '#eef1f7'; x.font = '700 46px ' + FONT;
+    x.fillText('⚡ Business Escalate', cx, 180);
+
+    const s = weekShareStats();
+    if (s.streak >= 2) {
+      x.font = '800 110px sans-serif'; x.fillText('🔥', cx, 470);
+      const ng = x.createLinearGradient(cx - 220, 0, cx + 220, 0);
+      ng.addColorStop(0, '#2dd4bf'); ng.addColorStop(1, '#3b82f6');
+      x.fillStyle = ng; x.font = '900 260px ' + FONT; x.fillText(String(s.streak), cx, 730);
+      x.fillStyle = '#9aa3b2'; x.font = '700 52px ' + FONT; x.fillText('DAY STREAK', cx, 810);
+    } else {
+      const ng = x.createLinearGradient(cx - 280, 0, cx + 280, 0);
+      ng.addColorStop(0, '#2dd4bf'); ng.addColorStop(1, '#a78bfa');
+      x.fillStyle = ng; x.font = '900 150px ' + FONT; x.fillText('My Week', cx, 560);
+      x.fillStyle = '#9aa3b2'; x.font = '500 46px ' + FONT; x.fillText(formatWeekRange(getWeekStart(todayStr())), cx, 660);
+    }
+
+    const tiles = weekShareTiles(s);
+    const tileW = 430, tileH = 230, gap = 40, cols = 2;
+    const gridW = cols * tileW + (cols - 1) * gap;
+    const sx = (W - gridW) / 2, sy = 910;
+    tiles.forEach((t, i) => {
+      const col = i % cols, row = Math.floor(i / cols);
+      const tx = sx + col * (tileW + gap), ty = sy + row * (tileH + gap);
+      x.fillStyle = 'rgba(255,255,255,0.05)'; rr(tx, ty, tileW, tileH, 28); x.fill();
+      x.strokeStyle = 'rgba(255,255,255,0.10)'; x.lineWidth = 2; rr(tx, ty, tileW, tileH, 28); x.stroke();
+      const mx = tx + tileW / 2;
+      x.fillStyle = '#eef1f7'; x.font = '700 62px sans-serif'; x.fillText(t.icon, mx, ty + 92);
+      x.fillStyle = '#ffffff'; x.font = '900 78px ' + FONT; x.fillText(String(t.value), mx, ty + 165);
+      x.fillStyle = '#9aa3b2'; x.font = '600 34px ' + FONT; x.fillText(t.label, mx, ty + 207);
+    });
+
+    const fg = x.createLinearGradient(cx - 320, 0, cx + 320, 0);
+    fg.addColorStop(0, '#2dd4bf'); fg.addColorStop(1, '#3b82f6');
+    x.fillStyle = fg; x.font = '800 54px ' + FONT; x.fillText('🔗 See what connects your life', cx, H - 240);
+    x.fillStyle = '#9aa3b2'; x.font = '500 42px ' + FONT; x.fillText('One app for your whole life', cx, H - 165);
+    x.fillStyle = '#eef1f7'; x.font = '700 44px ' + FONT; x.fillText('Business Escalate', cx, H - 95);
+
+    cv.toBlob(b => resolve(b), 'image/png');
+  });
+}
+async function shareMyWeek() {
+  try {
+    showToast('Building your card…', 'success');
+    const blob = await buildWeekCardBlob();
+    if (!blob) { showToast('Could not create the card.', 'error'); return; }
+    const file = new File([blob], 'my-week.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'My week on Business Escalate', text: 'See what connects your life 🔗' });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'my-week.png'; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      showToast('Card saved — post it to your story 🔥', 'success');
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return; // user dismissed the share sheet
+    showToast('Could not share the card.', 'error');
   }
 }
 
@@ -1876,9 +1991,10 @@ function renderDashboard() {
   const focusHtml = renderFocusCard(stats, lastStats);
 
   document.getElementById('main').innerHTML =
-    '<div class="page-header">' +
-    '<h2 class="page-title">Dashboard</h2>' +
-    '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p>' +
+    '<div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
+    '<div><h2 class="page-title">Dashboard</h2>' +
+    '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p></div>' +
+    (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">📤 Share my week</button>' : '') +
     '</div>' +
     renderReminderBanner() + renderQuoteCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
 
