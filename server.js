@@ -431,6 +431,45 @@ app.post('/api/insight', async (req, res) => {
   }
 });
 
+// ── Patterns: ONE cross-domain connection only a whole-life app could see ──
+app.post('/api/patterns', async (req, res) => {
+  const apiKey = getApiKey();
+  if (!apiKey) return res.status(400).json({ error: 'NO_KEY' });
+  try {
+    const client = new Anthropic({ apiKey });
+    const system = `You are this person's personal life coach with a rare advantage: you see EVERY area of their life at once — training, income/money, nutrition, weight, reading, networking, habits, mood notes. Find ONE genuine CROSS-DOMAIN connection in their data that a single-purpose app could never see: a way one area appears to affect another.
+Rules:
+- Connect TWO DIFFERENT areas (e.g. gym↔income, reading↔mood, protein↔weight, water↔workouts). Never an observation about a single area alone.
+- Use their REAL numbers and be specific.
+- Be honest — only claim a pattern the data actually supports. If there isn't enough data yet for a real cross-domain link, say so warmly in one sentence and name what to keep logging to unlock it.
+- 1–2 sentences (~40 words), a little surprising; end with a tiny nudge if it fits.
+- Output ONLY the sentence(s): no markdown, headings, lists, or preamble.`;
+    const message = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 180, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'My tracking data across all areas:\n\n```json\n' + JSON.stringify(req.body.data, null, 2) + '\n```\n\nFind one real cross-domain pattern.' }] });
+    const pattern = ((message.content && message.content[0] && message.content[0].text) || '').trim();
+    if (!pattern) return res.status(502).json({ error: 'No pattern found.' });
+    res.json({ pattern });
+  } catch (err) { res.status(500).json({ error: err.message || 'Patterns failed' }); }
+});
+
+// ── Weekly Life Review: the Sunday ritual across every pillar ──
+app.post('/api/review', async (req, res) => {
+  const apiKey = getApiKey();
+  if (!apiKey) return res.status(400).json({ error: 'NO_KEY' });
+  try {
+    const client = new Anthropic({ apiKey });
+    const system = `You are this person's personal chief-of-staff and coach. Write their WEEKLY LIFE REVIEW from their tracking data across every area of life. Make it feel personal and earned — reference their real numbers.
+Use EXACTLY these three short markdown sections and nothing else:
+**🏆 Wins this week** — 2–3 bullets of what genuinely went well.
+**🔗 The pattern I noticed** — ONE cross-domain connection between two different areas (e.g. training↔income, reading↔focus, protein↔weight). This is the most important part.
+**🎯 Focus for next week** — ONE concrete priority phrased as a single action.
+Rules: warm, direct, no fluff or generic filler; use their actual data. If the week is thin on data, keep it short and honest. ~120 words total. Output only the three sections.`;
+    const message = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 450, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'My tracking data:\n\n```json\n' + JSON.stringify(req.body.data, null, 2) + '\n```\n\nWrite my weekly review' + (req.body.weekLabel ? ' for the week of ' + req.body.weekLabel : '') + '.' }] });
+    const review = ((message.content && message.content[0] && message.content[0].text) || '').trim();
+    if (!review) return res.status(502).json({ error: 'No review generated.' });
+    res.json({ review });
+  } catch (err) { res.status(500).json({ error: err.message || 'Review failed' }); }
+});
+
 app.listen(PORT, HOST, () => {
   console.log(`Business Escalate server ready on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
   if (HOST === '0.0.0.0') console.log('LAN mode: open http://<your-computer-IP>:' + PORT + ' from a phone on the same Wi-Fi');

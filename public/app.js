@@ -1551,6 +1551,103 @@ async function fetchCoachInsight(force) {
   }
 }
 
+// ── Patterns: the signature feature — one cross-pillar connection a day ──
+const PATTERNS_MIN_DAYS = 3;
+function renderPatternsCard() {
+  if (!state.hasApiKey) return '';
+  const days = state.data.days || [];
+  if (days.length === 0) return '';
+  const cached = state.data.patternInsight;
+  let body;
+  if (cached && cached.date === todayStr() && cached.text) {
+    body = '<div class="di-text">' + escapeHtml(cached.text) + '</div>';
+  } else if (days.length < PATTERNS_MIN_DAYS) {
+    body = '<div class="di-empty">Log a few days and I\'ll start spotting connections across your pillars — like how your training affects your income.</div>';
+  } else {
+    body = '<div class="di-loading"><div class="spinner"></div><span>Connecting the dots across your life…</span></div>';
+  }
+  return '<div class="card insight-daily patterns-card">' +
+    '<div class="di-head"><span class="di-icon">🔗</span><span class="di-title">Patterns — what connects in your life</span>' +
+    (days.length >= PATTERNS_MIN_DAYS ? '<button class="di-refresh" onclick="fetchPatterns(true)" title="Find a new pattern">↻</button>' : '') +
+    '</div><div class="di-body" id="pat-body">' + body + '</div></div>';
+}
+// Auto-generate once per day (cached in data.patternInsight)
+function maybeGeneratePatterns() {
+  if (!state.hasApiKey || (state.data.days || []).length < PATTERNS_MIN_DAYS) return;
+  const c = state.data.patternInsight;
+  if (c && c.date === todayStr() && c.text) return;
+  return fetchPatterns(false);
+}
+async function fetchPatterns(force) {
+  if (state._patLoading) return;
+  if (!state.hasApiKey) { showToast('Connect Claude in Settings first.', 'error'); return; }
+  state._patLoading = true;
+  const setBody = (html) => { const b = document.getElementById('pat-body'); if (b) b.innerHTML = html; };
+  if (force) setBody('<div class="di-loading"><div class="spinner"></div><span>Finding a connection…</span></div>');
+  try {
+    const r = await fetch('/api/patterns', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ data: enrichedData() }) });
+    const j = await r.json();
+    if (!r.ok || !j.pattern) {
+      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect Claude in Settings to unlock Patterns.' : 'Couldn\'t find one — tap ↻ to retry.') + '</div>');
+      return;
+    }
+    state.data.patternInsight = { date: todayStr(), text: j.pattern };
+    await saveData();
+    setBody('<div class="di-text">' + escapeHtml(j.pattern) + '</div>');
+  } catch {
+    setBody('<div class="di-empty">Connection error — tap ↻ to retry.</div>');
+  } finally {
+    state._patLoading = false;
+  }
+}
+
+// ── Weekly Life Review: the Sunday ritual ──
+function renderReviewCard() {
+  if (!state.hasApiKey) return '';
+  const days = state.data.days || [];
+  if (days.length < PATTERNS_MIN_DAYS) return '';
+  const wkStart = getWeekStart(todayStr());
+  const saved = state.data.weeklyReview;
+  const hasThisWeek = saved && saved.weekStart === wkStart && saved.text;
+  const isSunday = new Date().getDay() === 0;
+  let body;
+  if (hasThisWeek) {
+    body = '<div class="review-text">' + renderMarkdown(saved.text) + '</div>' +
+      '<button class="btn btn-outline btn-sm" onclick="fetchReview(true)">↻ Regenerate</button>';
+  } else {
+    body = '<div class="review-cta"><p class="review-sub">' +
+      (isSunday ? 'It\'s review day. See your week decoded across every pillar — wins, the one pattern that mattered, and your focus for next week.'
+                : 'Get your week decoded across every pillar: your wins, the one pattern that mattered, and your single focus for next week.') +
+      '</p><button class="btn btn-primary" onclick="fetchReview(true)">📋 Generate this week\'s review</button></div>';
+  }
+  return '<div class="card review-card' + (isSunday && !hasThisWeek ? ' review-due' : '') + '">' +
+    '<div class="di-head"><span class="di-icon">📋</span><span class="di-title">Weekly Life Review</span></div>' +
+    '<div class="di-body" id="rev-body">' + body + '</div></div>';
+}
+async function fetchReview() {
+  if (state._revLoading) return;
+  if (!state.hasApiKey) { showToast('Connect Claude in Settings first.', 'error'); return; }
+  state._revLoading = true;
+  const setBody = (html) => { const b = document.getElementById('rev-body'); if (b) b.innerHTML = html; };
+  setBody('<div class="di-loading"><div class="spinner"></div><span>Reviewing your whole week…</span></div>');
+  try {
+    const r = await fetch('/api/review', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ data: enrichedData(), weekLabel: formatWeekRange(getWeekStart(todayStr())) }) });
+    const j = await r.json();
+    if (!r.ok || !j.review) {
+      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect Claude in Settings to unlock this.' : 'Couldn\'t generate — try again.') + '</div>');
+      return;
+    }
+    state.data.weeklyReview = { weekStart: getWeekStart(todayStr()), text: j.review };
+    await saveData();
+    setBody('<div class="review-text">' + renderMarkdown(j.review) + '</div>' +
+      '<button class="btn btn-outline btn-sm" onclick="fetchReview(true)">↻ Regenerate</button>');
+  } catch {
+    setBody('<div class="di-empty">Connection error — try again.</div>');
+  } finally {
+    state._revLoading = false;
+  }
+}
+
 // Weight trend card — current weight + change + a line chart over time
 function renderWeightTrend() {
   const ws = [...(state.data.weights || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -1778,13 +1875,14 @@ function renderDashboard() {
     '<h2 class="page-title">Dashboard</h2>' +
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p>' +
     '</div>' +
-    renderReminderBanner() + renderQuoteCard() + renderCoachInsightCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderChecklistCard() + focusHtml + renderRecentNotesCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
+    renderReminderBanner() + renderQuoteCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
 
   setTimeout(animateCounters, 120);
   if (showIncomeChart) initIncomeChart(sortedWeeks);
   if (showGymChart)    initGymChart(days);
   if ((state.data.weights || []).length >= 2) initWeightChart();
   maybeGenerateInsight();
+  maybeGeneratePatterns();
 }
 
 function renderStars(rating) {

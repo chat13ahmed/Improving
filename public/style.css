@@ -1072,6 +1072,30 @@ body {
 .di-loading { display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: 14px; }
 .di-empty { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
 
+/* ─── Patterns (signature cross-pillar card) ─────────────────── */
+.patterns-card {
+  background: linear-gradient(135deg, rgba(45,212,191,0.12), rgba(59,130,246,0.05));
+  border: 1px solid rgba(45,212,191,0.35);
+}
+.patterns-card .di-title { color: #2dd4bf; }
+.patterns-card .di-refresh:hover { border-color: #2dd4bf; color: #2dd4bf; }
+
+/* ─── Weekly Life Review ─────────────────── */
+.review-card {
+  background: linear-gradient(135deg, rgba(251,191,36,0.10), rgba(167,139,250,0.05));
+  border: 1px solid rgba(251,191,36,0.30);
+}
+.review-card .di-title { color: #fbbf24; }
+.review-due { box-shadow: 0 0 22px rgba(251,191,36,0.22); }
+.review-sub { font-size: 14px; color: var(--text-muted); line-height: 1.6; margin: 0 0 14px; }
+.review-cta { padding: 4px 0; }
+.review-text { font-size: 14.5px; line-height: 1.7; color: var(--text); }
+.review-text strong { color: var(--text); font-weight: 800; }
+.review-text ul { margin: 6px 0 14px; padding-left: 20px; }
+.review-text li { margin: 4px 0; }
+.review-text p { margin: 6px 0 12px; }
+.review-text + .btn { margin-top: 6px; }
+
 /* ─── Weigh-in + Weight Trend ─────────────────── */
 .weigh-section { border-color: var(--money-border); }
 .weigh-section:hover { box-shadow: 0 0 20px var(--money-glow); }
