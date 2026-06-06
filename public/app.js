@@ -584,14 +584,16 @@ async function startApp() {
   document.getElementById('auth-screen')?.remove();
   document.body.classList.remove('auth-active');
   try {
-    const [data, ks] = await Promise.all([
-      fetch('/api/data', { headers: authHeaders() }).then(r => r.json()),
+    const [dataRes, ks] = await Promise.all([
+      fetch('/api/data', { headers: authHeaders() }),
       fetch('/api/settings').then(r => r.json())
     ]);
-    state.data = data;
+    state.data = await dataRes.json();
+    state._dataVersion = parseInt(dataRes.headers.get('X-Data-Version'), 10) || 1;
     state.hasApiKey = ks.hasKey;
   } catch {
     state.data = { profile: { name: '', gymDaysPerWeek: 5, weeklyIncomeGoal: 0, weeklyNetworkGoal: 3 }, days: [], weeks: [], ideas: [] };
+    state._dataVersion = 1;
   }
   if (!state.data.profile)   state.data.profile   = { name: '', gymDaysPerWeek: 5, weeklyIncomeGoal: 0, weeklyNetworkGoal: 3 };
   if (!state.data.days)     state.data.days     = [];
@@ -927,8 +929,27 @@ function navigate(page) {
 // DATA HELPERS
 // ─────────────────────────────────────────────────────────────
 async function saveData() {
-  await fetch('/api/data', { method: 'POST', headers: authHeaders(), body: JSON.stringify(state.data) });
+  try {
+    const res = await fetch('/api/data', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ data: state.data, version: state._dataVersion })
+    });
+    if (res.status === 409) { await reloadAfterConflict(); }
+    else if (res.ok) { const j = await res.json().catch(() => null); if (j && j.version) state._dataVersion = j.version; }
+    // other errors: keep local changes; the next save will retry
+  } catch { /* offline — local state preserved, retried on next save */ }
   renderXPBar();
+}
+// Another device (or the server) changed this account's data since we loaded it.
+// Reload the latest instead of overwriting — prevents silent data loss.
+async function reloadAfterConflict() {
+  try {
+    const res = await fetch('/api/data', { headers: authHeaders() });
+    state.data = await res.json();
+    state._dataVersion = parseInt(res.headers.get('X-Data-Version'), 10) || state._dataVersion;
+    showToast('Your data changed on another device — reloaded the latest. Re-enter your last change if it’s missing.', 'error');
+    navigate(state.page || 'dashboard');
+  } catch { /* leave local state as-is */ }
 }
 
 function todayStr() { return new Date().toISOString().split('T')[0]; }
@@ -1599,13 +1620,19 @@ async function fetchCoachInsight(force) {
 
 // ── Patterns: the signature feature — one cross-pillar connection a day ──
 const PATTERNS_MIN_DAYS = 3;
+const PATTERNS_REFRESH_DAYS = 3; // auto-refresh cadence (controls AI cost); ↻ forces a fresh one anytime
+function daysSince(dateStr) {
+  if (!dateStr) return Infinity;
+  const t = Date.parse(dateStr + 'T00:00:00');
+  return isNaN(t) ? Infinity : (Date.now() - t) / 86400000;
+}
 function renderPatternsCard() {
   if (!state.hasApiKey) return '';
   const days = state.data.days || [];
   if (days.length === 0) return '';
   const cached = state.data.patternInsight;
   let body;
-  if (cached && cached.date === todayStr() && cached.text) {
+  if (cached && cached.text) {
     body = '<div class="di-text">' + escapeHtml(cached.text) + '</div>';
   } else if (days.length < PATTERNS_MIN_DAYS) {
     body = '<div class="di-empty">Log a few days and I\'ll start spotting connections across your pillars — like how your training affects your income.</div>';
@@ -1617,11 +1644,11 @@ function renderPatternsCard() {
     (days.length >= PATTERNS_MIN_DAYS ? '<button class="di-refresh" onclick="fetchPatterns(true)" title="Find a new pattern">↻</button>' : '') +
     '</div><div class="di-body" id="pat-body">' + body + '</div></div>';
 }
-// Auto-generate once per day (cached in data.patternInsight)
+// Auto-generate at most every few days (cached in data.patternInsight) to control AI cost
 function maybeGeneratePatterns() {
   if (!state.hasApiKey || (state.data.days || []).length < PATTERNS_MIN_DAYS) return;
   const c = state.data.patternInsight;
-  if (c && c.date === todayStr() && c.text) return;
+  if (c && c.text && daysSince(c.date) < PATTERNS_REFRESH_DAYS) return;
   return fetchPatterns(false);
 }
 async function fetchPatterns(force) {
@@ -4445,7 +4472,8 @@ async function subscribeToPush() {
     const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(keyResp.key) });
     state.data.profile.tz = -new Date().getTimezoneOffset(); // local = UTC + tz minutes
     const r = await fetch('/api/push/subscribe', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ subscription: sub }) });
-    await saveData(); // persist timezone
+    state.data.profile.pushSubscribed = !!r.ok; // server push now delivers reminders → avoid double-notifying
+    await saveData(); // persist timezone + flag
     return r.ok;
   } catch { return false; }
 }
@@ -4463,10 +4491,13 @@ async function sendTestPush() {
 function reminderDue(r, hhmm, today) {
   return !!r && r.enabled && r._lastFired !== today && (r.time || '99:99') <= hhmm;
 }
+function isPushSubscribed() { return !!(state.data && state.data.profile && state.data.profile.pushSubscribed); }
 function fireReminder(r) {
   const name = state.data.profile && state.data.profile.firstName;
   showToast('⏰ ' + r.label, 'success');
-  if ('Notification' in window && Notification.permission === 'granted') {
+  // If the device is subscribed to server push, the cron already delivers this
+  // reminder — don't also raise a local system notification (would double-notify).
+  if (!isPushSubscribed() && 'Notification' in window && Notification.permission === 'granted') {
     try { new Notification('⏰ ' + (name ? name + ', ' : '') + r.label, { body: 'Business Escalate', tag: r.id }); } catch {}
   }
 }

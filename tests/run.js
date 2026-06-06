@@ -58,7 +58,7 @@ function loadApp(fieldValues) {
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
-    ' loggingStreak, weekShareStats, weekShareTiles, getWeekStats, getWeekStart });';
+    ' loggingStreak, weekShareStats, weekShareTiles, getWeekStats, getWeekStart, daysSince });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -182,6 +182,11 @@ ok('weekStats net = income − spending', _m.weekIncome === 1000 && _m.weekExpen
 A.state.data.weeks = [{ weekStart: _wkS, income: 500, expenses: 800 }];
 ok('weekStats net goes negative when overspending', A.getWeekStats().weekNet === -300);
 
+// Patterns AI-cost throttle helper
+ok('daysSince today ≈ 0', A.daysSince(new Date().toISOString().split('T')[0]) < 1);
+ok('daysSince 5 days ago ≈ 5', Math.round(A.daysSince(new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0])) === 5);
+ok('daysSince empty = Infinity', A.daysSince('') === Infinity);
+
 // Weekly score only counts enabled pillars (no crash, 0..100)
 A.state.data = { profile: { pillars: dp, gymDaysPerWeek: 5, weeklyNetworkGoal: 3, weeklyIncomeGoal: 1000, weeklyReadGoal: 100 }, days: [], weeks: [], weights: [] };
 const score = A.getWeeklyScore();
@@ -296,6 +301,14 @@ if (P) {
     ok('DB allUsers returns rows with created_at', allU.length === 1 && allU[0].username === 'tuser' && !!allU[0].created_at);
     const allD = await DBm.allUserData();
     ok('DB allUserData returns parsed data', allD.length === 1 && String(allD[0].user_id) === String(id) && typeof allD[0].data === 'object');
+    // conditional metadata save (cron path): writes only on version match, never bumps, never clobbers
+    await DBm.saveData(id, { days: ['real'] }, 5);
+    const okMeta = await DBm.saveDataMeta(id, { days: ['real'], _lastNudge: '2026-06-06' }, 5);
+    const afterMeta = await DBm.getData(id);
+    ok('saveDataMeta writes at matching version (no bump)', okMeta === true && afterMeta.version === 5 && afterMeta.data._lastNudge === '2026-06-06');
+    const badMeta = await DBm.saveDataMeta(id, { days: ['STALE'] }, 99);
+    const afterBad = await DBm.getData(id);
+    ok('saveDataMeta refuses on version mismatch (no clobber)', badMeta === false && afterBad.data.days[0] === 'real');
   } catch (e) { failures.push('cloud DB (sqlite) — ' + e.message); }
 
   // ── report ──

@@ -61,6 +61,14 @@ function sqliteImpl() {
                   ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, version=excluded.version, updated_at=datetime('now')`)
         .run(userId, JSON.stringify(dataObj), version);
     },
+    // Server-side metadata write (e.g. cron _lastNudge): update only if the version
+    // is unchanged, and do NOT bump it — so it never clobbers a client save or
+    // invalidates a client's version. Returns true if it wrote.
+    async saveDataMeta(userId, dataObj, expectedVersion) {
+      const r = db.prepare(`UPDATE user_data SET data=?, updated_at=datetime('now') WHERE user_id=? AND version=?`)
+        .run(JSON.stringify(dataObj), userId, expectedVersion);
+      return r.changes > 0;
+    },
     async savePushSub(userId, sub) {
       db.prepare(`INSERT INTO push_subscriptions(user_id,endpoint,sub) VALUES(?,?,?)
                   ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id, sub=excluded.sub`)
@@ -102,6 +110,10 @@ function pgImpl() {
       await q(`INSERT INTO user_data(user_id,data,version,updated_at) VALUES($1,$2,$3,now())
                ON CONFLICT(user_id) DO UPDATE SET data=$2, version=$3, updated_at=now()`, [userId, JSON.stringify(dataObj), version]);
     },
+    async saveDataMeta(userId, dataObj, expectedVersion) {
+      const r = await q('UPDATE user_data SET data=$1, updated_at=now() WHERE user_id=$2 AND version=$3', [JSON.stringify(dataObj), userId, expectedVersion]);
+      return r.rowCount > 0;
+    },
     async savePushSub(userId, sub) {
       await q(`INSERT INTO push_subscriptions(user_id,endpoint,sub) VALUES($1,$2,$3)
                ON CONFLICT(endpoint) DO UPDATE SET user_id=$1, sub=$3`, [userId, sub.endpoint, JSON.stringify(sub)]);
@@ -123,6 +135,7 @@ module.exports = {
   setSecurity: (i, q, s, h) => impl.setSecurity(i, q, s, h),
   getData: (i) => impl.getData(i),
   saveData: (i, d, v) => impl.saveData(i, d, v),
+  saveDataMeta: (i, d, v) => impl.saveDataMeta(i, d, v),
   savePushSub: (i, s) => impl.savePushSub(i, s),
   deletePushSub: (e) => impl.deletePushSub(e),
   allPushSubs: () => impl.allPushSubs(),

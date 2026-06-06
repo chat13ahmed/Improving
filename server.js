@@ -268,8 +268,16 @@ app.get('/api/session', (req, res) => {
 });
 
 // ── Per-account data (auth required) ──
-app.get('/api/data',  requireAuth, (req, res) => { try { res.json(readData(req.accountId)); } catch { res.status(500).json({ error: 'Failed to read data' }); } });
-app.post('/api/data', requireAuth, (req, res) => { try { writeData(req.accountId, req.body); res.json({ success: true }); } catch { res.status(500).json({ error: 'Failed to save data' }); } });
+// Single-user local server: no real conflicts, but it must accept the same wrapped
+// { data, version } payload the shared client now sends, and unwrap it.
+app.get('/api/data',  requireAuth, (req, res) => { try { res.set('X-Data-Version', '1'); res.json(readData(req.accountId)); } catch { res.status(500).json({ error: 'Failed to read data' }); } });
+app.post('/api/data', requireAuth, (req, res) => {
+  try {
+    const wrapped = req.body && req.body.data && typeof req.body.data === 'object';
+    writeData(req.accountId, wrapped ? req.body.data : req.body);
+    res.json({ success: true, version: (wrapped && Number(req.body.version) || 0) + 1 });
+  } catch { res.status(500).json({ error: 'Failed to save data' }); }
+});
 app.get('/api/key-status', (req, res) => { res.json({ hasKey: !!getApiKey() }); });
 
 // ── Notification helpers (no auth — read-only, local-only) ──

@@ -480,7 +480,9 @@ app.post('/api/cron/tick', async (req, res) => {
         data._lastNudge = local.date; changed = true;
       }
 
-      if (changed) await DB.saveData(uid, data, d.version + 1);
+      // Conditional metadata write: only if the client hasn't saved since we read.
+      // Never bumps the version, so it can't clobber user data or force client conflicts.
+      if (changed) await DB.saveDataMeta(uid, data, d.version);
     }
     res.json({ sent });
   } catch (e) { res.status(500).json({ error: 'cron failed' }); }
