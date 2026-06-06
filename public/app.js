@@ -639,6 +639,10 @@ function renderAuthScreen(mode) {
     '<div class="auth-card">' +
     '<div class="auth-brand"><span class="brand-icon">⚡</span><div>' +
     '<div class="auth-title">Business Escalate</div><div class="auth-sub">Life Progress</div></div></div>' +
+    '<div class="auth-hook">' +
+    '<div class="auth-hook-title">🔗 See what connects your life</div>' +
+    '<div class="auth-hook-sub">One place for your gym, money, nutrition, reading and habits — with an AI coach that watches every area at once and reveals how they pull on each other.</div>' +
+    '</div>' +
     '<div class="auth-tabs">' +
     '<button class="auth-tab' + (!isSignup ? ' active' : '') + '" onclick="renderAuthScreen(\'login\')">Log In</button>' +
     '<button class="auth-tab' + (isSignup ? ' active' : '') + '" onclick="renderAuthScreen(\'signup\')">Sign Up</button>' +
@@ -661,7 +665,7 @@ function renderAuthScreen(mode) {
     '<div class="auth-foot">' +
     (isSignup ? 'Already have an account? <button class="btn-link" onclick="renderAuthScreen(\'login\')">Log in</button>'
               : 'New here? <button class="btn-link" onclick="renderAuthScreen(\'signup\')">Create an account</button>') +
-    '<div class="auth-note">🔒 Accounts and data are stored locally on this computer.</div>' +
+    '<div class="auth-note">🔒 Your account is private — only you can see your data.</div>' +
     '</div>' +
     '</div>';
   document.body.appendChild(screen);

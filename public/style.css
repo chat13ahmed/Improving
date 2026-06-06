@@ -1441,6 +1441,17 @@ body.auth-active .fab-btn { display: none !important; }
 .auth-title { font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -0.3px; }
 .auth-sub { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1.5px; margin-top: 2px; }
 
+.auth-hook {
+  background: linear-gradient(135deg, rgba(45,212,191,0.12), rgba(167,139,250,0.08));
+  border: 1px solid rgba(45,212,191,0.28);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 22px;
+  text-align: center;
+}
+.auth-hook-title { font-size: 15px; font-weight: 800; color: #2dd4bf; margin-bottom: 6px; letter-spacing: -0.2px; }
+.auth-hook-sub { font-size: 12.5px; color: var(--text-muted); line-height: 1.55; }
+
 .auth-tabs { display: flex; gap: 6px; background: rgba(0,0,0,0.3); border-radius: var(--radius-sm); padding: 4px; margin-bottom: 22px; }
 .auth-tab {
   flex: 1; padding: 9px; border: none; background: transparent;
