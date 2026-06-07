@@ -67,7 +67,7 @@ function buildSystemPrompt(p) {
     gym:        { icon: '💪', def: 'Gym',        line: (l) => `${l.toUpperCase()}: a daily "did I do it?" habit — goal is ${p.gymDaysPerWeek || 5} days/week (builds a streak)` },
     food:       { icon: '🥗', def: 'Food',       line: (l) => `${l.toUpperCase()}: rated daily from 1 to 5 (quality)` },
     networking: { icon: '🤝', def: 'Networking', line: (l) => `${l.toUpperCase()}: a daily count — goal is ${p.weeklyNetworkGoal || 3} per week` },
-    money:      { icon: '💰', def: 'Income',     line: (l) => `${l.toUpperCase()}: weekly income AND spending — so net (income − spending) and savings rate matter; connect spending to other pillars when you can. Weekly income goal $${p.weeklyIncomeGoal || 'not set'}` },
+    money:      { icon: '💰', def: 'Income',     line: (l) => `${l.toUpperCase()}: spending is logged DAILY; income is set per ${p.incomeCadence === 'weekly' ? 'week' : 'month'}. Net (income − spending) and savings rate matter — connect spending to other pillars (e.g. stress, gym, mood) when you can.` },
     reading:    { icon: '📚', def: 'Reading',    line: (l) => `${l.toUpperCase()}: pages read each day + written summaries${p.weeklyReadGoal ? ` — goal is ${p.weeklyReadGoal} pages/week` : ''}` }
   };
   const pillars = p.pillars || null;

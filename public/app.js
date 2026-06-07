@@ -981,7 +981,7 @@ function getWeekStats() {
   const networkCount = weekDays.reduce((s, d) => s + (d.networking?.count || 0), 0);
   const _wk = state.data.weeks.find(w => w.weekStart === thisWeekStart);
   const weekIncome = (_wk?.income) || 0;
-  const weekExpenses = (_wk?.expenses) || 0;
+  const weekExpenses = weekDays.reduce((s, d) => s + (Number(d.spent) || 0), 0); // spending is logged per day
   const weekNet = weekIncome - weekExpenses;
   const readPages = weekDays.reduce((s, d) => s + (d.reading?.pages || 0), 0);
   const readDays  = weekDays.filter(d => d.reading?.pages > 0).length;
@@ -990,6 +990,42 @@ function getWeekStats() {
   const avgWater = waterDaysArr.length ? waterTotal / waterDaysArr.length : 0;
   const waterToday = state.data.days.find(d => d.date === todayStr())?.water || 0;
   return { gymDays, avgFood, networkCount, weekIncome, weekExpenses, weekNet, readPages, readDays, waterTotal, avgWater, waterToday };
+}
+
+// ── Money model: spending is daily (day.spent); income is set per period ──
+// Cadence is the user's choice — weekly or monthly (default monthly).
+function moneyCadence() { return (state.data.profile && state.data.profile.incomeCadence) === 'weekly' ? 'weekly' : 'monthly'; }
+function moneyPeriodLabel(cad) { return (cad || moneyCadence()) === 'weekly' ? 'week' : 'month'; }
+function periodKeyFor(dateStr, cad) { return (cad || moneyCadence()) === 'weekly' ? getWeekStart(dateStr) : String(dateStr).slice(0, 7); } // weekStart or 'YYYY-MM'
+function currentPeriodKey(cad) { return periodKeyFor(todayStr(), cad || moneyCadence()); }
+function getPeriodIncome(cad, key) {
+  cad = cad || moneyCadence();
+  if (cad === 'weekly') return (state.data.weeks.find(w => w.weekStart === key)?.income) || 0;
+  return (state.data.incomes && state.data.incomes[key]) || 0;
+}
+function setPeriodIncome(cad, key, amt) {
+  cad = cad || moneyCadence();
+  if (cad === 'weekly') {
+    const wi = state.data.weeks.findIndex(w => w.weekStart === key);
+    const prev = wi >= 0 ? state.data.weeks[wi] : null;
+    const entry = { id: prev ? prev.id : uid(), weekStart: key, income: amt, notes: prev ? prev.notes || '' : '' };
+    if (wi >= 0) state.data.weeks[wi] = entry; else state.data.weeks.push(entry);
+  } else {
+    state.data.incomes = state.data.incomes || {};
+    if (amt > 0) state.data.incomes[key] = amt; else delete state.data.incomes[key];
+  }
+}
+function periodSpending(cad, key) {
+  cad = cad || moneyCadence();
+  return (state.data.days || []).filter(d => periodKeyFor(d.date, cad) === key).reduce((s, d) => s + (Number(d.spent) || 0), 0);
+}
+// Current period's money snapshot for the dashboard + coach
+function getMoneyPeriod() {
+  const cad = moneyCadence();
+  const key = currentPeriodKey(cad);
+  const income = getPeriodIncome(cad, key);
+  const spent = periodSpending(cad, key);
+  return { cad, key, label: moneyPeriodLabel(cad), income, spent, net: income - spent, rate: income > 0 ? Math.round((income - spent) / income * 100) : 0 };
 }
 
 function getGymStreak() {
@@ -1978,23 +2014,16 @@ function renderDashboard() {
   }
   if (isPillarOn('money')) {
     const pc = pillar('money');
-    const goal = profile.weeklyIncomeGoal || 0;
-    if (goal > 0) {
-      goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + '</span>' +
-        '<strong>' + formatCurrency(stats.weekIncome) + ' / ' + formatCurrency(goal) + '</strong></div>' +
-        goalBar(stats.weekIncome, goal) + '</div>');
-    } else {
-      goalRows.push('<div class="sg-item"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + ' goal</span>' +
-        '<button class="btn-link-inline" onclick="showGoalSetup()">Set goal</button></div>');
-    }
-    // Net = income − spending (only once there's any money logged this week)
-    if (stats.weekExpenses > 0 || stats.weekIncome > 0) {
-      const net = stats.weekNet;
-      const rate = stats.weekIncome > 0 ? Math.round(net / stats.weekIncome * 100) : 0;
-      goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>💵 Net this week</span>' +
+    const mp = getMoneyPeriod(); // current week/month: income, spent, net
+    if (mp.income > 0 || mp.spent > 0) {
+      const net = mp.net;
+      goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>' + pc.icon + ' Net this ' + mp.label + '</span>' +
         '<strong style="color:' + (net >= 0 ? 'var(--success)' : 'var(--danger)') + '">' + formatCurrency(net) +
-        (stats.weekIncome > 0 ? ' · ' + rate + '% saved' : '') + '</strong></div>' +
-        '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + formatCurrency(stats.weekIncome) + ' in − ' + formatCurrency(stats.weekExpenses) + ' out</div></div>');
+        (mp.income > 0 ? ' · ' + mp.rate + '% saved' : '') + '</strong></div>' +
+        '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + formatCurrency(mp.income) + ' in − ' + formatCurrency(mp.spent) + ' spent this ' + mp.label + '</div></div>');
+    } else {
+      goalRows.push('<div class="sg-item"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + '</span>' +
+        '<button class="btn-link-inline" onclick="navigate(\'log\')">Log spending →</button></div>');
     }
   }
   if (isPillarOn('gym')) {
@@ -2041,11 +2070,12 @@ function renderDashboard() {
     '</div>';
 
   // Charts & recent (if data)
-  const showIncomeChart = hasWeeks && isPillarOn('money');
+  const anySpend = (state.data.days || []).some(d => (d.spent || 0) > 0);
+  const showIncomeChart = isPillarOn('money') && (hasWeeks || anySpend);
   const showGymChart    = hasDays  && isPillarOn('gym');
   let chartsHtml = '';
   if (hasDays || hasWeeks) {
-    const incomeTitle = escapeHtml(pillar('money').label) + ' (last 12 weeks)';
+    const incomeTitle = 'Money (last 12 weeks)';
     const gymTitle    = escapeHtml(pillar('gym').label) + ' Days per Week';
     const chartCards =
       (showIncomeChart ? '<div class="card"><h3 class="card-title">' + incomeTitle + '</h3><div class="chart-wrap"><canvas id="incomeChart"></canvas></div></div>' : '') +
@@ -2118,17 +2148,22 @@ function renderRecentDaysTable(days) {
   return '<table class="table"><thead><tr><th>Date</th><th>' + pillar('gym').icon + ' ' + escapeHtml(pillar('gym').label) + '</th><th>' + pillar('food').icon + ' ' + escapeHtml(pillar('food').label) + '</th><th>' + pillar('networking').icon + ' ' + escapeHtml(pillar('networking').label) + '</th><th>' + pillar('money').icon + ' ' + escapeHtml(pillar('money').label) + '</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
-function initIncomeChart(sortedWeeks) {
+function initIncomeChart() {
   if (typeof Chart === 'undefined') return;
-  const last12 = [...sortedWeeks].reverse().slice(-12);
   const ctx = document.getElementById('incomeChart')?.getContext('2d');
   if (!ctx) return;
-  const goal = state.data.profile.weeklyIncomeGoal || 0;
-  const hasExpenses = last12.some(w => (w.expenses || 0) > 0);
-  const ds = [{ label: 'Income', data: last12.map(w => w.income), borderColor: '#E8A838', backgroundColor: 'rgba(232,168,56,0.12)', tension: 0.3, fill: true, pointBackgroundColor: '#7B3F00', pointRadius: 4 }];
-  if (hasExpenses) ds.push({ label: 'Spending', data: last12.map(w => w.expenses || 0), borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,0.10)', tension: 0.3, fill: true, pointBackgroundColor: '#991B1B', pointRadius: 4 });
-  if (goal) ds.push({ label: 'Goal $' + goal, data: last12.map(() => goal), borderColor: 'rgba(123,63,0,0.3)', borderDash: [6, 4], pointRadius: 0, fill: false });
-  charts.income = new Chart(ctx, { type: 'line', data: { labels: last12.map(w => formatWeekRange(w.weekStart, true)), datasets: ds }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: !!goal || hasExpenses } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v } } } } });
+  // 12 week-start buckets ending with this week
+  const thisWk = getWeekStart(todayStr());
+  const buckets = [];
+  for (let i = 11; i >= 0; i--) { const d = new Date(thisWk + 'T00:00:00'); d.setDate(d.getDate() - i * 7); buckets.push(d.toISOString().split('T')[0]); }
+  const spendByWeek = {};
+  (state.data.days || []).forEach(day => { if (day.spent > 0) { const ws = getWeekStart(day.date); spendByWeek[ws] = (spendByWeek[ws] || 0) + Number(day.spent); } });
+  const incomeByWeek = {};
+  (state.data.weeks || []).forEach(w => { if (w.income > 0) incomeByWeek[w.weekStart] = w.income; });
+  const weekly = moneyCadence() === 'weekly';
+  const ds = [{ label: 'Spending', data: buckets.map(ws => spendByWeek[ws] || 0), borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,0.12)', tension: 0.3, fill: true, pointBackgroundColor: '#991B1B', pointRadius: 4 }];
+  if (weekly) ds.unshift({ label: 'Income', data: buckets.map(ws => incomeByWeek[ws] || 0), borderColor: '#E8A838', backgroundColor: 'rgba(232,168,56,0.10)', tension: 0.3, fill: true, pointBackgroundColor: '#7B3F00', pointRadius: 4 });
+  charts.income = new Chart(ctx, { type: 'line', data: { labels: buckets.map(ws => formatWeekRange(ws, true)), datasets: ds }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: weekly } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v } } } } });
 }
 
 function initGymChart(days) {
@@ -2188,7 +2223,7 @@ function renderLogToday(editDay) {
   const netCount = d.networking?.count || '';
   const netNotes = d.networking?.notes || '';
   const moneyActs = d.money?.activities || '';
-  const moneyIncome = d.money?.income || '';
+  const daySpent = (d.spent !== undefined && d.spent !== null && d.spent !== 0) ? d.spent : '';
   const waterVal = (d.water !== undefined && d.water !== null && d.water !== 0) ? d.water : '';
   const caloriesEaten = (d.calories !== undefined && d.calories !== null && d.calories !== 0) ? d.calories : '';
   // Seed the in-progress food log from the day being edited (or today's entry)
@@ -2295,10 +2330,10 @@ function renderLogToday(editDay) {
     (isPillarOn('money') ? (() => { const pc = pillar('money'); return
       '<div class="today-section money-section">' +
       '<div class="today-section-header money-header">' + pc.icon + ' ' + escapeHtml(pc.label) + '</div>' +
-      '<div class="form-group"><label>What did you do today?</label>' +
-      '<textarea id="money-acts" rows="3" placeholder="The actions you took today…">' + moneyActs + '</textarea></div>' +
-      '<div class="form-group"><label>Amount today <span style="font-weight:400;color:var(--text-muted)">(if applicable, $)</span></label>' +
-      '<input type="number" id="money-income" min="0" step="0.01" placeholder="0" value="' + moneyIncome + '"></div>' +
+      '<div class="form-group"><label>💸 Spent today <span style="font-weight:400;color:var(--text-muted)">($ — what you spent today)</span></label>' +
+      '<input type="number" id="money-spent" min="0" step="0.01" placeholder="0" value="' + daySpent + '" oninput="updateNetHint()" style="font-size:20px;font-weight:800"></div>' +
+      '<div class="form-group"><label>What did you do today? <span style="font-weight:400;color:var(--text-muted)">(money moves — optional)</span></label>' +
+      '<textarea id="money-acts" rows="2" placeholder="e.g. closed a deal, sent invoices, picked up a shift…">' + moneyActs + '</textarea></div>' +
       '</div>'; })() : '') +
 
     // READING PILLAR (reading slot)
@@ -2363,34 +2398,40 @@ function renderLogToday(editDay) {
     '</form></div>';
 }
 
+// Periodic income input (weekly or monthly per the user's cadence) — income changes
+// far less often than spending, so we ask for it per period, not every day.
 function renderWeeklyIncomeInline() {
-  const thisWeekStart = getWeekStart(todayStr());
-  const existing = state.data.weeks.find(w => w.weekStart === thisWeekStart);
+  const cad = moneyCadence();
+  const key = currentPeriodKey(cad);
+  const label = moneyPeriodLabel(cad);
   const pc = pillar('money');
+  const income = getPeriodIncome(cad, key);
   return '<div class="today-section money-section" style="border-color:var(--accent)">' +
-    '<div class="today-section-header money-header">💵 Weekly ' + escapeHtml(pc.label) + ' & Spending</div>' +
-    '<div class="form-row">' +
-    '<div class="form-group"><label>💰 ' + escapeHtml(pc.label) + ' <strong>this week</strong> ($)</label>' +
-    '<input type="number" id="week-income" min="0" step="0.01" placeholder="0" value="' + (existing?.income || '') + '" ' +
-    'oninput="updateNetHint()" style="font-size:20px;font-weight:800;padding:12px 16px;border-color:var(--accent)"></div>' +
-    '<div class="form-group"><label>💸 Spent <strong>this week</strong> ($)</label>' +
-    '<input type="number" id="week-expenses" min="0" step="0.01" placeholder="0" value="' + (existing?.expenses || '') + '" ' +
-    'oninput="updateNetHint()" style="font-size:20px;font-weight:800;padding:12px 16px;border-color:var(--danger)"></div>' +
-    '</div>' +
+    '<div class="today-section-header money-header">💰 ' + escapeHtml(pc.label) + ' this ' + label + '</div>' +
+    '<div class="form-group"><label>How much did you make this ' + label + '? ' +
+    '<span style="font-weight:400;color:var(--text-muted)">(optional — set it once, update when you get paid)</span></label>' +
+    '<input type="number" id="period-income" min="0" step="0.01" placeholder="0" value="' + (income || '') + '" ' +
+    'oninput="updateNetHint()" style="font-size:22px;font-weight:800;padding:12px 16px;border-color:var(--accent)"></div>' +
     '<div id="net-hint" class="net-hint"></div>' +
+    '<div class="rem-note" style="margin-top:8px">💡 You log spending each day above; set income per ' + label + ' here. Change weekly/monthly in Settings.</div>' +
     '</div>';
 }
-// Live "Net = income − spending" hint under the weekly money inputs
+// Live "income − spending = net" hint for the current period
 function updateNetHint() {
   const el = document.getElementById('net-hint'); if (!el) return;
-  const inc = parseFloat(document.getElementById('week-income')?.value) || 0;
-  const exp = parseFloat(document.getElementById('week-expenses')?.value) || 0;
-  if (!inc && !exp) { el.innerHTML = ''; return; }
-  const net = inc - exp;
-  const rate = inc > 0 ? Math.round(net / inc * 100) : 0;
-  el.innerHTML = '<span style="color:var(--text-muted)">Net this week:</span> ' +
-    '<strong style="color:' + (net >= 0 ? 'var(--success)' : 'var(--danger)') + '">' + formatCurrency(net) + '</strong>' +
-    (inc > 0 ? ' <span style="color:var(--text-muted)">· ' + rate + '% saved</span>' : '');
+  const cad = moneyCadence(); const key = currentPeriodKey(cad); const label = moneyPeriodLabel(cad);
+  const incEl = document.getElementById('period-income');
+  const income = incEl ? (parseFloat(incEl.value) || 0) : getPeriodIncome(cad, key);
+  // period spending from saved days, swapping today's saved value for what's typed now
+  const savedToday = (state.data.days.find(d => d.date === todayStr())?.spent) || 0;
+  const typedToday = parseFloat(document.getElementById('money-spent')?.value) || 0;
+  const spent = Math.max(0, periodSpending(cad, key) - savedToday + typedToday);
+  if (!income && !spent) { el.innerHTML = ''; return; }
+  const net = income - spent;
+  const rate = income > 0 ? Math.round(net / income * 100) : 0;
+  el.innerHTML = '<span style="color:var(--text-muted)">This ' + label + ':</span> ' + formatCurrency(income) + ' in − ' + formatCurrency(spent) + ' spent = ' +
+    '<strong style="color:' + (net >= 0 ? 'var(--success)' : 'var(--danger)') + '">' + formatCurrency(net) + ' net</strong>' +
+    (income > 0 ? ' <span style="color:var(--text-muted)">· ' + rate + '% saved</span>' : '');
 }
 
 function setGymDone(val) {
@@ -2430,9 +2471,6 @@ async function submitDay(e) {
   const gymDoneBtn = document.querySelector('.gym-btn.active');
   const gymDone = gymDoneBtn ? gymDoneBtn.classList.contains('gym-yes') : null;
   const foodEl = document.getElementById('food-rating');
-  const weekIncome = parseFloat(document.getElementById('week-income')?.value) || 0;
-  const weekExpenses = parseFloat(document.getElementById('week-expenses')?.value) || 0;
-
   const entry = {
     id: state._editDayId || prior.id || uid(),
     date,
@@ -2452,8 +2490,9 @@ async function submitDay(e) {
     } : (prior.networking || { count: 0, notes: '' }),
     money: document.getElementById('money-acts') ? {
       activities: document.getElementById('money-acts')?.value?.trim() || '',
-      income: parseFloat(document.getElementById('money-income')?.value) || 0
+      income: 0
     } : (prior.money || { activities: '', income: 0 }),
+    spent: document.getElementById('money-spent') ? (parseFloat(document.getElementById('money-spent').value) || 0) : (prior.spent || 0),
     water: document.getElementById('water-gallons') ? (parseFloat(document.getElementById('water-gallons').value) || 0) : (prior.water || 0),
     notes: document.getElementById('day-notes')?.value?.trim() || ''
   };
@@ -2496,13 +2535,11 @@ async function submitDay(e) {
     }
   }
 
-  // Save weekly income + expenses
-  if (weekIncome > 0 || weekExpenses > 0) {
-    const thisWeekStart = getWeekStart(date);
-    const wi = state.data.weeks.findIndex(w => w.weekStart === thisWeekStart);
-    const prevW = wi >= 0 ? state.data.weeks[wi] : null;
-    const weekEntry = { id: prevW ? prevW.id : uid(), weekStart: thisWeekStart, income: weekIncome, expenses: weekExpenses, notes: prevW?.notes || '' };
-    if (wi >= 0) state.data.weeks[wi] = weekEntry; else state.data.weeks.push(weekEntry);
+  // Save income for the period (weekly or monthly, per the user's chosen cadence)
+  const periodIncomeEl = document.getElementById('period-income');
+  if (periodIncomeEl) {
+    const cad = moneyCadence();
+    setPeriodIncome(cad, periodKeyFor(date, cad), parseFloat(periodIncomeEl.value) || 0);
   }
 
   // Save weigh-in (stored in kg) + keep nutrition weight current
@@ -3151,13 +3188,11 @@ function enrichedData() {
       totalConnections: days.reduce((s, d) => s + (d.networking?.count || 0), 0),
       totalPagesRead: days.reduce((s, d) => s + (d.reading?.pages || 0), 0),
       readingStreak: getReadingStreak(),
-      avg4WeekIncome: Math.round(getWeeklyAvg(weeks, 4)),
-      moneyFlow: (() => {
-        const wk = weeks.filter(w => (w.income || 0) > 0 || (w.expenses || 0) > 0);
-        if (!wk.length) return null;
-        const inc = wk.reduce((s, w) => s + (w.income || 0), 0);
-        const exp = wk.reduce((s, w) => s + (w.expenses || 0), 0);
-        return { avgWeeklyIncome: Math.round(inc / wk.length), avgWeeklyExpenses: Math.round(exp / wk.length), avgWeeklyNet: Math.round((inc - exp) / wk.length), savingsRatePct: inc > 0 ? Math.round((inc - exp) / inc * 100) : 0 };
+      avgDailySpend: (() => { const sp = days.filter(d => d.spent > 0); return sp.length ? Math.round(sp.reduce((s, d) => s + d.spent, 0) / sp.length) : 0; })(),
+      money: (() => {
+        const mp = getMoneyPeriod();
+        if (!mp.income && !mp.spent) return null;
+        return { cadence: mp.cad, thisPeriodIncome: mp.income, thisPeriodSpent: mp.spent, thisPeriodNet: mp.net, savingsRatePct: mp.rate };
       })(),
       avgWaterGallons: (() => { const w = days.filter(d => d.water > 0); return w.length ? +(w.reduce((s, d) => s + d.water, 0) / w.length).toFixed(2) : 0; })(),
       thisWeekStats: stats
@@ -3209,6 +3244,7 @@ async function saveGoals(e) {
   const ageEl = document.getElementById('g-age');     if (ageEl)   state.data.profile.age = parseInt(ageEl.value) || '';
   const emailEl = document.getElementById('g-email'); if (emailEl) state.data.profile.email = emailEl.value.trim();
   const phoneEl = document.getElementById('g-phone'); if (phoneEl) state.data.profile.phone = phoneEl.value.trim();
+  const cadEl = document.getElementById('g-cadence'); if (cadEl) state.data.profile.incomeCadence = cadEl.value === 'weekly' ? 'weekly' : 'monthly';
   await saveData();
   showToast('Saved! 🎯', 'success');
   navigate('dashboard');
@@ -3241,7 +3277,7 @@ async function clearApiKey() {
 async function loadSampleData() {
   if (state.data.days.length > 0 && !confirm('Replace current data with demo data?')) return;
 
-  const profile = { name: '', gymDaysPerWeek: 5, weeklyIncomeGoal: 1200, weeklyNetworkGoal: 3, weeklyReadGoal: 100,
+  const profile = { name: '', gymDaysPerWeek: 5, weeklyIncomeGoal: 1200, weeklyNetworkGoal: 3, weeklyReadGoal: 100, incomeCadence: 'weekly',
     pillars: (state.data.profile && state.data.profile.pillars) || defaultPillars(),
     nutrition: { age: 28, sex: 'male', heightCm: 180, weightKg: 80, heightUnit: 'ft', weightUnit: 'lbs', activity: 'active', goal: 'gain', strategy: 'muscle', mealsPerDay: 5 },
     onboarded: true };
@@ -3318,6 +3354,7 @@ async function loadSampleData() {
         };
       })(),
       water: Math.round((0.25 + Math.random() * 0.85) * 4) / 4, // 0.25–1.0 gal, quarter steps
+      spent: Math.round(15 + Math.random() * (isWeekend ? 130 : 80)), // daily spending ($), higher on weekends
       calories: 2000 + Math.floor(Math.random() * 1000), // 2000–3000 cal eaten
       notes: dayNotePool[Math.floor(Math.random() * dayNotePool.length)]
     });
@@ -3481,8 +3518,8 @@ function showQuickLog() {
 
     (isPillarOn('money') ?
     '<div class="ql-section">' +
-    '<div class="ql-label">' + moneyP.icon + ' ' + escapeHtml(moneyP.label) + ' — what you did today</div>' +
-    '<input type="text" id="ql-money" class="ql-input" placeholder="The actions you took today…" value="' + escapeHtml(existing?.money?.activities||'') + '">' +
+    '<div class="ql-label">💸 Spent today — $</div>' +
+    '<input type="number" id="ql-spent" class="ql-input" min="0" step="0.01" placeholder="0" value="' + ((existing && existing.spent) || '') + '">' +
     '</div>' : '') +
 
     '<div class="ql-section">' +
@@ -3528,7 +3565,7 @@ async function submitQuickLog() {
   const gymDone = window._qlGym;
   const foodRating = window._qlFood || parseInt(document.querySelector('.ql-r-btn.ql-r-sel')?.dataset.r) || 0;
   const netCount = parseInt(document.getElementById('ql-net')?.value) || 0;
-  const moneyActs = document.getElementById('ql-money')?.value?.trim() || '';
+  const spentEl = document.getElementById('ql-spent');
   const waterEl = document.getElementById('ql-water');
 
   const existing = state.data.days.find(d => d.date === today);
@@ -3537,7 +3574,8 @@ async function submitQuickLog() {
     gym: { done: gymDone === true, muscleGroup: existing?.gym?.muscleGroup || '', duration: existing?.gym?.duration || 0, notes: existing?.gym?.notes || '' },
     food: { rating: foodRating, notes: existing?.food?.notes || '' },
     networking: { count: netCount, notes: existing?.networking?.notes || '' },
-    money: { activities: moneyActs, income: existing?.money?.income || 0 },
+    money: { activities: existing?.money?.activities || '', income: existing?.money?.income || 0 },
+    spent: spentEl ? (parseFloat(spentEl.value) || 0) : (existing?.spent || 0),
     reading: (() => {
       const base = existing?.reading || { pages: 0, bookId: '', bookTitle: '', summary: '' };
       const readEl = document.getElementById('ql-read');
@@ -3851,7 +3889,7 @@ function showDayDetail(dateStr) {
     ddItem('gym',        gymLabel,   day.gym?.notes,        day.gym?.done) +
     ddItem('food',       foodLabel,  day.food?.notes,       day.food?.rating >= 4) +
     ddItem('networking', netLabel,   day.networking?.notes, day.networking?.count > 0) +
-    ddItem('money',      moneyLabel, day.money?.income > 0 ? formatCurrency(day.money.income) + ' earned' : '', !!day.money?.activities) +
+    ddItem('money',      moneyLabel, (day.spent > 0 ? formatCurrency(day.spent) + ' spent' : '') + (day.money?.activities ? (day.spent > 0 ? ' · ' : '') + day.money.activities : ''), day.spent > 0 || !!day.money?.activities) +
     ddItem('reading',    readLabel,  day.reading?.summary,  day.reading?.pages > 0) +
     '<div class="dd-item water' + (day.water > 0 ? ' dd-done' : '') + '">' +
     '<span class="dd-icon">💧</span><div>' +
@@ -4329,10 +4367,10 @@ function exportData() {
 function exportDaysCSV() {
   const days = [...state.data.days].sort((a, b) => new Date(a.date) - new Date(b.date));
   const esc = (v) => { const s = String(v == null ? '' : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
-  const header = ['Date', 'Gym done', 'Muscle/Category', 'Duration(min)', 'Food rating', 'Networking count', 'Money activities', 'Income', 'Reading pages', 'Reading summary', 'Water (gal)', 'Calories eaten', 'Notes'];
+  const header = ['Date', 'Gym done', 'Muscle/Category', 'Duration(min)', 'Food rating', 'Networking count', 'Money activities', 'Spent', 'Reading pages', 'Reading summary', 'Water (gal)', 'Calories eaten', 'Notes'];
   const rows = days.map(d => [
     d.date, d.gym && d.gym.done ? 'yes' : 'no', d.gym && d.gym.muscleGroup || '', d.gym && d.gym.duration || '',
-    d.food && d.food.rating || '', d.networking && d.networking.count || '', d.money && d.money.activities || '', d.money && d.money.income || '',
+    d.food && d.food.rating || '', d.networking && d.networking.count || '', d.money && d.money.activities || '', d.spent || '',
     d.reading && d.reading.pages || '', d.reading && d.reading.summary || '', d.water || '', d.calories || '', d.notes || ''
   ].map(esc).join(','));
   downloadFile('business-escalate-log-' + todayStr() + '.csv', header.join(',') + '\n' + rows.join('\n'), 'text/csv');
@@ -4649,6 +4687,10 @@ function renderSettingsPage() {
     (isPillarOn('money') ? '<div class="form-group"><label>' + moneyP.icon + ' Weekly ' + escapeHtml(moneyP.label) + ' goal ($)</label>' +
       '<input type="number" id="g-income" min="0" step="50" placeholder="e.g. 1200" value="' + (p.weeklyIncomeGoal||'') + '"></div>' : '<input type="hidden" id="g-income" value="' + (p.weeklyIncomeGoal||0) + '">') +
     '</div>' +
+    (isPillarOn('money') ? '<div class="form-row"><div class="form-group"><label>💰 How often do you set your income?</label>' +
+      '<select id="g-cadence"><option value="monthly"' + (moneyCadence()==='monthly'?' selected':'') + '>Monthly — set it once a month</option>' +
+      '<option value="weekly"' + (moneyCadence()==='weekly'?' selected':'') + '>Weekly — set it once a week</option></select></div>' +
+      '<div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:14px"><span style="font-size:12.5px;color:var(--text-muted);line-height:1.4">You log <strong>spending every day</strong>; income is set per period.</span></div></div>' : '') +
     '<div class="form-row">' +
     (isPillarOn('networking') ? '<div class="form-group"><label>' + netP.icon + ' ' + escapeHtml(netP.label) + ' per week</label>' +
       '<input type="number" id="g-net" min="0" value="' + (p.weeklyNetworkGoal||3) + '"></div>' : '<input type="hidden" id="g-net" value="' + (p.weeklyNetworkGoal||0) + '">') +

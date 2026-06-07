@@ -58,7 +58,8 @@ function loadApp(fieldValues) {
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
-    ' loggingStreak, weekShareStats, weekShareTiles, getWeekStats, getWeekStart, daysSince });';
+    ' loggingStreak, weekShareStats, weekShareTiles, getWeekStats, getWeekStart, daysSince,' +
+    ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -174,18 +175,36 @@ ok('weekShareStats reads today', _ws.daysLogged === 1 && _ws.workouts === 1 && _
 const _tiles = A.weekShareTiles(_ws);
 ok('weekShareTiles ≤4 and leads with Days logged', _tiles.length <= 4 && _tiles[0].label === 'Days logged' && _tiles.some(t => t.label === 'Workouts'));
 
-// Expense tracker — weekly net = income − spending
+// Money: weekly net = income − summed DAILY spend (spending is logged per day now)
 const _wkS = A.getWeekStart(new Date().toISOString().split('T')[0]);
-A.state.data = { profile: { pillars: dp }, weights: [], days: [{ date: new Date().toISOString().split('T')[0] }], weeks: [{ weekStart: _wkS, income: 1000, expenses: 300 }] };
+const _td0 = new Date().toISOString().split('T')[0];
+A.state.data = { profile: { pillars: dp }, weights: [], days: [{ date: _td0, spent: 300 }], weeks: [{ weekStart: _wkS, income: 1000 }] };
 const _m = A.getWeekStats();
-ok('weekStats net = income − spending', _m.weekIncome === 1000 && _m.weekExpenses === 300 && _m.weekNet === 700);
-A.state.data.weeks = [{ weekStart: _wkS, income: 500, expenses: 800 }];
+ok('weekStats net = income − daily spend', _m.weekIncome === 1000 && _m.weekExpenses === 300 && _m.weekNet === 700);
+A.state.data = { profile: { pillars: dp }, weights: [], days: [{ date: _td0, spent: 800 }], weeks: [{ weekStart: _wkS, income: 500 }] };
 ok('weekStats net goes negative when overspending', A.getWeekStats().weekNet === -300);
 
 // Patterns AI-cost throttle helper
 ok('daysSince today ≈ 0', A.daysSince(new Date().toISOString().split('T')[0]) < 1);
 ok('daysSince 5 days ago ≈ 5', Math.round(A.daysSince(new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0])) === 5);
 ok('daysSince empty = Infinity', A.daysSince('') === Infinity);
+
+// Money redesign: daily spending + periodic income (weekly or monthly)
+ok('periodKeyFor monthly = YYYY-MM', A.periodKeyFor('2026-06-15', 'monthly') === '2026-06');
+ok('periodKeyFor weekly = weekStart', A.periodKeyFor('2026-06-15', 'weekly') === A.getWeekStart('2026-06-15'));
+const _today = new Date().toISOString().split('T')[0];
+const _mKey = _today.slice(0, 7);
+A.state.data = { profile: { pillars: dp, incomeCadence: 'monthly' }, weeks: [], weights: [], incomes: {}, days: [{ date: _today, spent: 40 }] };
+A.setPeriodIncome('monthly', _mKey, 3000);
+ok('setPeriodIncome monthly → incomes map', A.state.data.incomes[_mKey] === 3000);
+const _mp = A.getMoneyPeriod();
+ok('getMoneyPeriod monthly net = income − daily spend', _mp.label === 'month' && _mp.income === 3000 && _mp.spent === 40 && _mp.net === 2960 && _mp.rate === 99);
+const _wKey = A.getWeekStart(_today);
+A.state.data = { profile: { pillars: dp, incomeCadence: 'weekly' }, weeks: [], weights: [], days: [{ date: _today, spent: 25 }] };
+A.setPeriodIncome('weekly', _wKey, 800);
+ok('setPeriodIncome weekly → weeks[]', (A.state.data.weeks.find(w => w.weekStart === _wKey) || {}).income === 800);
+const _wp = A.getMoneyPeriod();
+ok('getMoneyPeriod weekly net', _wp.label === 'week' && _wp.income === 800 && _wp.spent === 25 && _wp.net === 775);
 
 // Weekly score only counts enabled pillars (no crash, 0..100)
 A.state.data = { profile: { pillars: dp, gymDaysPerWeek: 5, weeklyNetworkGoal: 3, weeklyIncomeGoal: 1000, weeklyReadGoal: 100 }, days: [], weeks: [], weights: [] };
