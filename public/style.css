@@ -1,5 +1,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Never let the page pan sideways on a phone — content stays within the screen */
+html, body { overflow-x: hidden; max-width: 100%; }
+
 :root {
   /* ── Core Dark Theme ── */
   --bg:            #0F1117;
@@ -1188,8 +1191,14 @@ body {
   .sidebar-footer { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: none; }
   .user-chip { margin-bottom: 0; flex: 1; min-width: 0; }
   .btn-demo { width: auto; white-space: nowrap; }
-  .main { margin-left: 0; padding: 18px 14px; }
+  .main { margin-left: 0; padding: 18px 14px; max-width: 100%; min-width: 0; overflow-x: hidden; }
   .page-title { font-size: 22px; }
+  /* Anything that could be wider than the phone scrolls inside its own card */
+  .card { max-width: 100%; }
+  .main table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .chart-wrap { max-width: 100%; }
+  img, canvas, pre, textarea { max-width: 100%; }
+  .di-text, .review-text, .card { overflow-wrap: anywhere; word-break: break-word; }
 }
 
 @media (max-width: 520px) {
@@ -1206,6 +1215,7 @@ body {
   .cal-grid { gap: 2px; }
   .cal-cell { min-height: 42px; }
   .food-add-row #food-pick { flex-basis: 100%; }
+  .toast { left: 16px; right: 16px; max-width: none; text-align: center; }
 }
 
 @media (max-width: 640px) {
