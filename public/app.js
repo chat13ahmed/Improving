@@ -2057,12 +2057,23 @@ function renderDashboard() {
   if (isPillarOn('money')) {
     const pc = pillar('money');
     const mp = getMoneyPeriod(); // current week/month: income, spent, net
-    if (mp.income > 0 || mp.spent > 0) {
+    const sGoal = profile.savingsGoal || 0;
+    const detail = formatCurrency(mp.income) + ' in − ' + formatCurrency(mp.spent) + ' spent this ' + mp.label;
+    if (sGoal > 0) {
+      // Savings goal with a progress bar — net toward the target
+      const net = mp.net;
+      goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>💰 Save this ' + mp.label + '</span>' +
+        '<strong>' + formatCurrency(Math.max(0, net)) + ' / ' + formatCurrency(sGoal) + '</strong></div>' +
+        goalBar(Math.max(0, net), sGoal) +
+        '<div style="font-size:12px;color:var(--text-muted);margin-top:4px">' + detail +
+        (net >= sGoal ? ' · 🎉 goal hit!' : ' · ' + formatCurrency(sGoal - net) + ' to go') + '</div></div>');
+    } else if (mp.income > 0 || mp.spent > 0) {
       const net = mp.net;
       goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>' + pc.icon + ' Net this ' + mp.label + '</span>' +
         '<strong style="color:' + (net >= 0 ? 'var(--success)' : 'var(--danger)') + '">' + formatCurrency(net) +
         (mp.income > 0 ? ' · ' + mp.rate + '% saved' : '') + '</strong></div>' +
-        '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + formatCurrency(mp.income) + ' in − ' + formatCurrency(mp.spent) + ' spent this ' + mp.label + '</div></div>');
+        '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + detail + '</div>' +
+        '<button class="btn-link-inline" onclick="navigate(\'settings\')" style="margin-top:4px">🎯 Set a savings goal</button></div>');
     } else {
       goalRows.push('<div class="sg-item"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + '</span>' +
         '<button class="btn-link-inline" onclick="navigate(\'log\')">Log spending →</button></div>');
@@ -3249,8 +3260,9 @@ function enrichedData() {
       avgDailySpend: (() => { const sp = days.filter(d => d.spent > 0); return sp.length ? Math.round(sp.reduce((s, d) => s + d.spent, 0) / sp.length) : 0; })(),
       money: (() => {
         const mp = getMoneyPeriod();
-        if (!mp.income && !mp.spent) return null;
-        return { cadence: mp.cad, thisPeriodIncome: mp.income, thisPeriodSpent: mp.spent, thisPeriodNet: mp.net, savingsRatePct: mp.rate };
+        const sg = (state.data.profile && state.data.profile.savingsGoal) || 0;
+        if (!mp.income && !mp.spent && !sg) return null;
+        return { cadence: mp.cad, thisPeriodIncome: mp.income, thisPeriodSpent: mp.spent, thisPeriodNet: mp.net, savingsRatePct: mp.rate, savingsGoal: sg || null, savingsGoalMet: sg ? mp.net >= sg : null };
       })(),
       avgWaterGallons: (() => { const w = days.filter(d => d.water > 0); return w.length ? +(w.reduce((s, d) => s + d.water, 0) / w.length).toFixed(2) : 0; })(),
       thisWeekStats: stats
@@ -3303,6 +3315,7 @@ async function saveGoals(e) {
   const emailEl = document.getElementById('g-email'); if (emailEl) state.data.profile.email = emailEl.value.trim();
   const phoneEl = document.getElementById('g-phone'); if (phoneEl) state.data.profile.phone = phoneEl.value.trim();
   const cadEl = document.getElementById('g-cadence'); if (cadEl) state.data.profile.incomeCadence = cadEl.value === 'weekly' ? 'weekly' : 'monthly';
+  const savEl = document.getElementById('g-savings'); if (savEl) state.data.profile.savingsGoal = parseFloat(savEl.value) || 0;
   await saveData();
   showToast('Saved! 🎯', 'success');
   navigate('dashboard');
@@ -4748,7 +4761,8 @@ function renderSettingsPage() {
     (isPillarOn('money') ? '<div class="form-row"><div class="form-group"><label>💰 How often do you set your income?</label>' +
       '<select id="g-cadence"><option value="monthly"' + (moneyCadence()==='monthly'?' selected':'') + '>Monthly — set it once a month</option>' +
       '<option value="weekly"' + (moneyCadence()==='weekly'?' selected':'') + '>Weekly — set it once a week</option></select></div>' +
-      '<div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:14px"><span style="font-size:12.5px;color:var(--text-muted);line-height:1.4">You log <strong>spending every day</strong>; income is set per period.</span></div></div>' : '') +
+      '<div class="form-group"><label>🎯 Savings goal per ' + moneyPeriodLabel() + ' ($)</label>' +
+      '<input type="number" id="g-savings" min="0" step="50" placeholder="e.g. 500" value="' + (p.savingsGoal || '') + '"></div></div>' : '') +
     '<div class="form-row">' +
     (isPillarOn('networking') ? '<div class="form-group"><label>' + netP.icon + ' ' + escapeHtml(netP.label) + ' per week</label>' +
       '<input type="number" id="g-net" min="0" value="' + (p.weeklyNetworkGoal||3) + '"></div>' : '<input type="hidden" id="g-net" value="' + (p.weeklyNetworkGoal||0) + '">') +
