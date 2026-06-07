@@ -1654,6 +1654,48 @@ async function fetchCoachInsight(force) {
   }
 }
 
+// ── Today's Game Plan: the coach tells you what to DO (works from day one) ──
+function renderGamePlanCard() {
+  if (!state.hasApiKey) return '';
+  const cached = state.data.gamePlan;
+  const body = (cached && cached.date === todayStr() && cached.text)
+    ? '<div class="di-text plan-text">' + renderMarkdown(cached.text) + '</div>'
+    : '<div class="di-loading"><div class="spinner"></div><span>Building today\'s plan…</span></div>';
+  return '<div class="card insight-daily plan-card">' +
+    '<div class="di-head"><span class="di-icon">🎯</span><span class="di-title">Today\'s Game Plan</span>' +
+    '<button class="di-refresh" onclick="fetchGamePlan(true)" title="New plan">↻</button></div>' +
+    '<div class="di-body" id="plan-body">' + body + '</div></div>';
+}
+// Auto-generate once per day (cached in data.gamePlan)
+function maybeGeneratePlan() {
+  if (!state.hasApiKey) return;
+  const c = state.data.gamePlan;
+  if (c && c.date === todayStr() && c.text) return;
+  return fetchGamePlan(false);
+}
+async function fetchGamePlan(force) {
+  if (state._planLoading) return;
+  if (!state.hasApiKey) { showToast('Connect Claude in Settings first.', 'error'); return; }
+  state._planLoading = true;
+  const setBody = (html) => { const b = document.getElementById('plan-body'); if (b) b.innerHTML = html; };
+  if (force) setBody('<div class="di-loading"><div class="spinner"></div><span>Thinking…</span></div>');
+  try {
+    const r = await fetch('/api/plan', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ data: enrichedData() }) });
+    const j = await r.json();
+    if (!r.ok || !j.plan) {
+      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect Claude in Settings to get your plan.' : 'Couldn\'t build it — tap ↻ to retry.') + '</div>');
+      return;
+    }
+    state.data.gamePlan = { date: todayStr(), text: j.plan };
+    await saveData();
+    setBody('<div class="di-text plan-text">' + renderMarkdown(j.plan) + '</div>');
+  } catch {
+    setBody('<div class="di-empty">Connection error — tap ↻ to retry.</div>');
+  } finally {
+    state._planLoading = false;
+  }
+}
+
 // ── Patterns: the signature feature — one cross-pillar connection a day ──
 const PATTERNS_MIN_DAYS = 3;
 const PATTERNS_REFRESH_DAYS = 3; // auto-refresh cadence (controls AI cost); ↻ forces a fresh one anytime
@@ -2103,12 +2145,13 @@ function renderDashboard() {
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p></div>' +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">📤 Share my week</button>' : '') +
     '</div>' +
-    renderReminderBanner() + renderQuoteCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
+    renderReminderBanner() + renderQuoteCard() + renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
 
   setTimeout(animateCounters, 120);
   if (showIncomeChart) initIncomeChart(sortedWeeks);
   if (showGymChart)    initGymChart(days);
   if ((state.data.weights || []).length >= 2) initWeightChart();
+  maybeGeneratePlan();
   maybeGenerateInsight();
   maybeGeneratePatterns();
 }

@@ -1075,6 +1075,19 @@ body {
 .di-loading { display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: 14px; }
 .di-empty { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
 
+/* ─── Today's Game Plan (action card) ─────────────────── */
+.plan-card {
+  background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(59,130,246,0.05));
+  border: 1px solid rgba(16,185,129,0.32);
+}
+.plan-card .di-title { color: #10b981; }
+.plan-card .di-refresh:hover { border-color: #10b981; color: #10b981; }
+.plan-text { font-size: 14.5px; line-height: 1.6; }
+.plan-text strong { color: var(--text); font-weight: 800; }
+.plan-text ul { margin: 8px 0 2px; padding-left: 20px; }
+.plan-text li { margin: 6px 0; }
+.plan-text p { margin: 4px 0 8px; }
+
 /* ─── Patterns (signature cross-pillar card) ─────────────────── */
 .patterns-card {
   background: linear-gradient(135deg, rgba(45,212,191,0.12), rgba(59,130,246,0.05));

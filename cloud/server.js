@@ -324,6 +324,24 @@ app.post('/api/insight', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message || 'Insight failed' }); }
 });
 
+// ── Today's Game Plan: concrete next actions (works from day one — fixes cold start) ──
+app.post('/api/plan', async (req, res) => {
+  if (!aiGuard(req, res)) return;
+  try {
+    const client = new Anthropic({ apiKey: getApiKey() });
+    const system = `You are this person's personal coach and strategist. From their goals and tracking data, give them a short, concrete GAME PLAN for TODAY — the specific next actions that move them toward their goals.
+Rules:
+- Open with ONE short bold line naming today's #1 focus.
+- Then 2–4 SPECIFIC actions they can do TODAY as a markdown bullet list; start each with a verb and tie it to their real goals/targets/numbers when possible.
+- If they're brand new with little or no data, give an encouraging concrete starter plan for today.
+- Practical and specific — never generic filler or motivational fluff. ~90 words total. Output only the focus line + the bullets (markdown).`;
+    const msg = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 320, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'My goals and tracking data:\n\n```json\n' + JSON.stringify(req.body.data, null, 2) + '\n```\n\nWhat is my game plan for today?' }] });
+    const plan = ((msg.content && msg.content[0] && msg.content[0].text) || '').trim();
+    if (!plan) return res.status(502).json({ error: 'No plan generated.' });
+    res.json({ plan });
+  } catch (e) { res.status(500).json({ error: e.message || 'Plan failed' }); }
+});
+
 // ── Patterns: ONE cross-domain connection only a whole-life app could see ──
 app.post('/api/patterns', async (req, res) => {
   if (!aiGuard(req, res)) return;
