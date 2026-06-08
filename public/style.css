@@ -70,7 +70,7 @@ body {
   background: var(--bg);
   color: var(--text);
   display: flex;
-  min-height: 100vh;
+  min-height: 100vh; min-height: 100dvh;
 }
 
 /* ─── Sidebar ─────────────────────────────────── */
@@ -140,7 +140,7 @@ body {
   margin-left: var(--sidebar-width);
   flex: 1;
   padding: 32px;
-  min-height: 100vh;
+  min-height: 100vh; min-height: 100dvh;
   background: var(--bg);
   position: relative;
   isolation: isolate;
@@ -618,7 +618,10 @@ body {
 .modal-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.75);
-  display: flex; align-items: center; justify-content: center;
+  display: flex;                              /* box uses margin:auto → centers when it fits */
+  overflow-y: auto;                           /* …and scrolls when the popup is taller than the screen */
+  -webkit-overflow-scrolling: touch;
+  padding: 20px;
   z-index: 10000;
   backdrop-filter: blur(6px);
   animation: fadeIn 0.3s ease;
@@ -631,6 +634,7 @@ body {
   padding: 32px;
   width: 400px;
   max-width: 90vw;
+  margin: auto;                               /* centers when it fits; scrolls (no clipping) when tall */
   text-align: center;
   box-shadow: 0 0 80px rgba(59,130,246,0.15), var(--shadow-lg);
   animation: slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1);
@@ -1037,7 +1041,7 @@ body {
 .ob-preset-desc { font-size: 12px; color: var(--text-muted); }
 
 /* ─── Onboarding Wizard ───────────────────────── */
-.onboard-wizard { max-width: 560px; width: 94vw; text-align: left; max-height: 90vh; overflow-y: auto; }
+.onboard-wizard { max-width: 560px; width: 94vw; text-align: left; max-height: 90vh; max-height: 90dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .onboard-progress { display: flex; align-items: center; gap: 6px; margin-bottom: 18px; }
 .ob-dot { width: 28px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.12); transition: background 0.3s; }
 .ob-dot-on { background: var(--primary); }
@@ -1259,7 +1263,7 @@ body {
   .sidebar-footer { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: none; }
   .user-chip { margin-bottom: 0; flex: 1; min-width: 0; }
   .btn-demo { width: auto; white-space: nowrap; }
-  .main { margin-left: 0; padding: 18px 14px; max-width: 100%; min-width: 0; overflow-x: hidden; }
+  .main { margin-left: 0; padding: 18px 14px 100px; max-width: 100%; min-width: 0; overflow-x: hidden; }
   .page-title { font-size: 22px; }
   /* Anything that could be wider than the phone scrolls inside its own card */
   .card { max-width: 100%; }
