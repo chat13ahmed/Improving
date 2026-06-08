@@ -161,7 +161,13 @@ app.post('/api/signup', async (req, res) => {
     const id = await DB.createUser({ username, pw_salt: salt, pw_hash: hash, sec_question: sq, sec_salt: ss, sec_hash: sh });
     await DB.saveData(id, defaultData(), 1);
     res.json({ token: signJwt({ sub: id, username }, JWT_SECRET), username, hasSecurity: !!sq });
-  } catch (e) { res.status(500).json({ error: 'Sign up failed' }); }
+  } catch (e) {
+    // Backstop the unique-username check against a race (two signups at once)
+    if (e && (e.code === '23505' || /unique/i.test(String(e.message || '')))) {
+      return res.status(409).json({ error: 'That username is already taken.' });
+    }
+    res.status(500).json({ error: 'Sign up failed' });
+  }
 });
 
 app.post('/api/login', async (req, res) => {

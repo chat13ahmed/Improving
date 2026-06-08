@@ -312,6 +312,10 @@ if (P) {
     ok('DB createUser returns id', !!id);
     const found = await DBm.findUserByName('TUSER');
     ok('DB findUserByName case-insensitive', !!found && found.username === 'tuser');
+    let dupBlocked = false;
+    try { await DBm.createUser({ username: 'tuser', pw_salt: 's', pw_hash: 'h', sec_question: null, sec_salt: null, sec_hash: null }); }
+    catch { dupBlocked = true; }
+    ok('DB blocks duplicate username (unique constraint)', dupBlocked === true);
     await DBm.saveData(id, { profile: { name: 'X' }, days: [1] }, 1);
     const d1 = await DBm.getData(id);
     ok('DB saveData/getData round-trip', !!d1 && d1.version === 1 && d1.data.profile.name === 'X' && d1.data.days.length === 1);
