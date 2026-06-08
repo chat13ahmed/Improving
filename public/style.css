@@ -1512,7 +1512,9 @@ body.auth-active .fab-btn { display: none !important; }
 
 #auth-screen {
   position: fixed; inset: 0; z-index: 20000;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;                              /* card uses margin:auto → centers when it fits */
+  overflow-y: auto;                           /* …and scrolls when the form is taller than the screen */
+  -webkit-overflow-scrolling: touch;
   padding: 24px;
   background: var(--bg);
   isolation: isolate;
@@ -1531,6 +1533,7 @@ body.auth-active .fab-btn { display: none !important; }
 }
 .auth-card {
   width: 100%; max-width: 400px;
+  margin: auto;                               /* centers when it fits; allows scroll when taller */
   background: var(--card);
   border: 1px solid var(--border-bright);
   border-radius: var(--radius);
