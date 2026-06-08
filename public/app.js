@@ -1041,6 +1041,48 @@ function getMoneyPeriod() {
   const spent = periodSpending(cad, key);
   return { cad, key, label: moneyPeriodLabel(cad), income, spent, net: income - spent, rate: income > 0 ? Math.round((income - spent) / income * 100) : 0 };
 }
+// Leftover savings from all PRIOR periods — this rolls forward into the next period's
+// available money ("add the savings to the next income").
+function getCarryover() {
+  const cad = moneyCadence();
+  const curKey = currentPeriodKey(cad);
+  const keys = new Set();
+  if (cad === 'weekly') (state.data.weeks || []).forEach(w => { if (w.income > 0) keys.add(w.weekStart); });
+  else Object.keys(state.data.incomes || {}).forEach(k => { if (k.length === (cad === 'daily' ? 10 : 7)) keys.add(k); });
+  (state.data.days || []).forEach(d => { if (d.spent > 0) keys.add(periodKeyFor(d.date, cad)); });
+  let carry = 0;
+  keys.forEach(k => { if (k < curKey) carry += getPeriodIncome(cad, k) - periodSpending(cad, k); });
+  return Math.round(carry);
+}
+// Everything the money "circle" needs: this period + savings rolled forward
+function getMoneyCircle() {
+  const mp = getMoneyPeriod();
+  const carryover = getCarryover();
+  const available = carryover + mp.income;     // last savings + this period's income
+  const savedTotal = available - mp.spent;     // total saved now (carryover + this period's net)
+  const spentFrac = available > 0 ? Math.min(1, mp.spent / available) : (mp.spent > 0 ? 1 : 0);
+  return { label: mp.label, income: mp.income, spent: mp.spent, net: mp.net, carryover, available, savedTotal, spentFrac };
+}
+// Donut: spending (red) vs savings (green) out of available money, with savings rolled forward
+function renderMoneyCircleCard() {
+  if (!isPillarOn('money')) return '';
+  const c = getMoneyCircle();
+  if (!(c.income > 0 || c.spent > 0 || c.carryover !== 0)) return '';
+  const deg = Math.round(c.spentFrac * 360);
+  const ring = 'conic-gradient(var(--danger) 0deg ' + deg + 'deg, var(--success) ' + deg + 'deg 360deg)';
+  const neg = c.savedTotal < 0;
+  return '<div class="card money-circle-card">' +
+    '<h3 class="card-title">💰 This ' + c.label + ' — money flow</h3>' +
+    '<div class="mc-ring" style="background:' + ring + '">' +
+    '<div class="mc-hole"><div class="mc-saved' + (neg ? ' mc-neg' : '') + '">' + formatCurrency(c.savedTotal) + '</div>' +
+    '<div class="mc-saved-label">' + (neg ? 'overspent' : 'saved') + '</div></div></div>' +
+    '<div class="mc-legend">' +
+    '<span><i class="mc-dot mc-red"></i>Spent ' + formatCurrency(c.spent) + '</span>' +
+    '<span><i class="mc-dot mc-green"></i>Saved ' + formatCurrency(Math.max(0, c.savedTotal)) + '</span></div>' +
+    '<div class="mc-caption">' + (c.carryover ? formatCurrency(c.carryover) + ' saved before + ' : '') +
+    formatCurrency(c.income) + ' in − ' + formatCurrency(c.spent) + ' spent this ' + c.label + '</div>' +
+    '</div>';
+}
 
 function getGymStreak() {
   const sorted = [...state.data.days].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -2170,7 +2212,7 @@ function renderDashboard() {
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p></div>' +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">📤 Share my week</button>' : '') +
     '</div>' +
-    renderReminderBanner() + renderQuoteCard() + renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
+    renderReminderBanner() + renderQuoteCard() + renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderMoneyCircleCard() + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
 
   setTimeout(animateCounters, 120);
   if (showIncomeChart) initIncomeChart(sortedWeeks);

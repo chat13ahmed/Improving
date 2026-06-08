@@ -1147,6 +1147,19 @@ body {
 .net-hint:empty { display:none; }
 .period-set { display:flex; align-items:center; justify-content:space-between; gap:10px; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:10px; padding:11px 14px; font-size:15px; margin-bottom:6px; }
 
+/* ─── Money flow donut ─────────────────── */
+.money-circle-card { text-align: center; }
+.mc-ring { width: 180px; height: 180px; border-radius: 50%; margin: 10px auto 16px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); }
+.mc-hole { width: 132px; height: 132px; border-radius: 50%; background: var(--card); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.mc-saved { font-size: 27px; font-weight: 900; color: var(--success); line-height: 1.1; }
+.mc-saved.mc-neg { color: var(--danger); }
+.mc-saved-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-muted); margin-top: 3px; }
+.mc-legend { display: flex; gap: 20px; justify-content: center; font-size: 13.5px; color: var(--text-muted); flex-wrap: wrap; }
+.mc-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.mc-dot.mc-red { background: var(--danger); }
+.mc-dot.mc-green { background: var(--success); }
+.mc-caption { font-size: 12px; color: var(--text-muted); margin-top: 12px; line-height: 1.5; }
+
 /* ─── Weigh-in + Weight Trend ─────────────────── */
 .weigh-section { border-color: var(--money-border); }
 .weigh-section:hover { box-shadow: 0 0 20px var(--money-glow); }

@@ -59,7 +59,7 @@ function loadApp(fieldValues) {
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
     ' loggingStreak, weekShareStats, weekShareTiles, getWeekStats, getWeekStart, daysSince,' +
-    ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending });';
+    ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -212,6 +212,16 @@ A.setPeriodIncome('daily', _today, 150);
 ok('setPeriodIncome daily → incomes[date]', A.state.data.incomes[_today] === 150);
 const _dp = A.getMoneyPeriod();
 ok('getMoneyPeriod daily net', _dp.label === 'day' && _dp.income === 150 && _dp.spent === 20 && _dp.net === 130);
+// Carryover: prior period savings roll into the next period's available money
+const _cm = new Date().toISOString().slice(0, 7);
+const _lm = (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); })();
+A.state.data = { profile: { pillars: dp, incomeCadence: 'monthly' }, weeks: [], weights: [],
+  incomes: { [_lm]: 1000, [_cm]: 2000 },
+  days: [{ date: _lm + '-15', spent: 400 }, { date: new Date().toISOString().split('T')[0], spent: 500 }] };
+ok('carryover = prior period net (1000−400)', A.getCarryover() === 600);
+const _circ = A.getMoneyCircle();
+ok('money circle rolls savings forward', _circ.carryover === 600 && _circ.income === 2000 && _circ.spent === 500 && _circ.available === 2600 && _circ.savedTotal === 2100);
+ok('money circle spent fraction', Math.abs(_circ.spentFrac - (500 / 2600)) < 0.001);
 
 // Weekly score only counts enabled pillars (no crash, 0..100)
 A.state.data = { profile: { pillars: dp, gymDaysPerWeek: 5, weeklyNetworkGoal: 3, weeklyIncomeGoal: 1000, weeklyReadGoal: 100 }, days: [], weeks: [], weights: [] };
