@@ -2380,15 +2380,27 @@ function renderLogToday(editDay) {
       '<textarea id="net-notes" rows="2" placeholder="Who / what / where…">' + netNotes + '</textarea></div>' +
       '</div>'; })() : '') +
 
-    // AMOUNT PILLAR (money slot)
-    (isPillarOn('money') ? (() => { const pc = pillar('money'); return
-      '<div class="today-section money-section">' +
-      '<div class="today-section-header money-header">' + pc.icon + ' ' + escapeHtml(pc.label) + '</div>' +
-      '<div class="form-group"><label>💸 Spent today <span style="font-weight:400;color:var(--text-muted)">($ — what you spent today)</span></label>' +
-      '<input type="number" id="money-spent" min="0" step="0.01" placeholder="0" value="' + daySpent + '" oninput="updateNetHint()" style="font-size:20px;font-weight:800"></div>' +
-      '<div class="form-group"><label>What did you do today? <span style="font-weight:400;color:var(--text-muted)">(money moves — optional)</span></label>' +
-      '<textarea id="money-acts" rows="2" placeholder="e.g. closed a deal, sent invoices, picked up a shift…">' + moneyActs + '</textarea></div>' +
-      '</div>'; })() : '') +
+    // MONEY PILLAR — daily spending + this period's income, together in one block
+    (isPillarOn('money') ? (() => {
+      const pc = pillar('money');
+      const cad = moneyCadence(), key = currentPeriodKey(cad), label = moneyPeriodLabel(cad);
+      const income = getPeriodIncome(cad, key), isSet = income > 0;
+      return '<div class="today-section money-section">' +
+        '<div class="today-section-header money-header">' + pc.icon + ' ' + escapeHtml(pc.label) + ' & Spending</div>' +
+        '<div class="form-group"><label>💸 Spent today <span style="font-weight:400;color:var(--text-muted)">($ — what you spent today)</span></label>' +
+        '<input type="number" id="money-spent" min="0" step="0.01" placeholder="0" value="' + daySpent + '" oninput="updateNetHint()" style="font-size:20px;font-weight:800;border-color:var(--danger)"></div>' +
+        // This period's income (set once, not asked when editing a past day)
+        (!isEditing ?
+          (isSet ? '<div id="period-income-set" class="period-set"><span>💰 ' + escapeHtml(pc.label) + ' this ' + label + ': <strong>' + formatCurrency(income) + '</strong></span>' +
+                   '<button type="button" class="btn-link" onclick="editPeriodIncome()">Update</button></div>' : '') +
+          '<div class="form-group" id="period-income-wrap"' + (isSet ? ' style="display:none"' : '') + '>' +
+          '<label>💰 ' + escapeHtml(pc.label) + ' this ' + label + ' <span style="font-weight:400;color:var(--text-muted)">($ — set once, update when you get paid)</span></label>' +
+          '<input type="number" id="period-income" min="0" step="0.01" placeholder="0" value="' + (income || '') + '" oninput="updateNetHint()" style="font-size:20px;font-weight:800;border-color:var(--accent)"></div>' +
+          '<div id="net-hint" class="net-hint"></div>'
+          : '') +
+        '<div class="form-group"><label>What did you do today? <span style="font-weight:400;color:var(--text-muted)">(money moves — optional)</span></label>' +
+        '<textarea id="money-acts" rows="2" placeholder="e.g. closed a deal, sent invoices, picked up a shift…">' + moneyActs + '</textarea></div>' +
+        '</div>'; })() : '') +
 
     // READING PILLAR (reading slot)
     (isPillarOn('reading') ? (() => {
@@ -2439,9 +2451,6 @@ function renderLogToday(editDay) {
     '<span class="weigh-unit">' + weightUnitPref() + '</span>' +
     '</div></div></div>' +
 
-    // WEEKLY INCOME (only if money pillar on and not editing)
-    (!isEditing && isPillarOn('money') ? renderWeeklyIncomeInline() : '') +
-
     '<div class="form-group" style="margin-top:8px"><label>Overall notes for today <span style="font-weight:400;color:var(--text-muted)">(what happened, how you felt — anything)</span></label>' +
     '<textarea id="day-notes" rows="3" placeholder="Share everything about your day — wins, struggles, ideas, how you felt…">' + escapeHtml(globalNotes) + '</textarea></div>' +
 
@@ -2453,29 +2462,6 @@ function renderLogToday(editDay) {
   updateNetHint(); // show the period income − spending net summary right away
 }
 
-// Periodic income input (weekly or monthly per the user's cadence) — income changes
-// far less often than spending, so we ask for it per period, not every day.
-function renderWeeklyIncomeInline() {
-  const cad = moneyCadence();
-  const key = currentPeriodKey(cad);
-  const label = moneyPeriodLabel(cad);
-  const pc = pillar('money');
-  const income = getPeriodIncome(cad, key);
-  const isSet = income > 0;
-  return '<div class="today-section money-section" style="border-color:var(--accent)">' +
-    '<div class="today-section-header money-header">💰 ' + escapeHtml(pc.label) + ' this ' + label + '</div>' +
-    // Once income is set for this period, collapse to a compact line so it's not in the way daily.
-    (isSet ? '<div id="period-income-set" class="period-set">' +
-      '<span>' + escapeHtml(pc.label) + ' this ' + label + ': <strong>' + formatCurrency(income) + '</strong></span>' +
-      '<button type="button" class="btn-link" onclick="editPeriodIncome()">Update</button></div>' : '') +
-    '<div class="form-group" id="period-income-wrap"' + (isSet ? ' style="display:none"' : '') + '>' +
-    '<label>How much did you make this ' + label + '? <span style="font-weight:400;color:var(--text-muted)">(optional — set it once, update when you get paid)</span></label>' +
-    '<input type="number" id="period-income" min="0" step="0.01" placeholder="0" value="' + (income || '') + '" ' +
-    'oninput="updateNetHint()" style="font-size:22px;font-weight:800;padding:12px 16px;border-color:var(--accent)"></div>' +
-    '<div id="net-hint" class="net-hint"></div>' +
-    '<div class="rem-note" style="margin-top:8px">💡 You log spending each day above; income is set per ' + label + '. Change weekly/monthly in Settings.</div>' +
-    '</div>';
-}
 // Reveal the income input when the user wants to update an already-set period
 function editPeriodIncome() {
   const wrap = document.getElementById('period-income-wrap');
