@@ -618,10 +618,10 @@ body {
 .modal-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.75);
-  display: flex;                              /* box uses margin:auto → centers when it fits */
-  overflow-y: auto;                           /* …and scrolls when the popup is taller than the screen */
+  display: block;                             /* block + overflow scroll = reliable (box is centered via margin:auto) */
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 20px;
+  padding: 24px 20px 48px;
   z-index: 10000;
   backdrop-filter: blur(6px);
   animation: fadeIn 0.3s ease;
@@ -1516,17 +1516,17 @@ body.auth-active .fab-btn { display: none !important; }
 
 #auth-screen {
   position: fixed; inset: 0; z-index: 20000;
-  display: flex;                              /* card uses margin:auto → centers when it fits */
-  overflow-y: auto;                           /* …and scrolls when the form is taller than the screen */
+  display: block;                             /* block + overflow scroll = reliable everywhere (no flex clipping) */
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 24px;
+  padding: 24px 24px 48px;
   background: var(--bg);
   isolation: isolate;
   animation: fadeIn 0.3s ease;
 }
 #auth-screen::before {
   content: '';
-  position: absolute; inset: -20%;
+  position: fixed; inset: -10%;
   z-index: -1; pointer-events: none;
   background:
     radial-gradient(ellipse at 82% 8%, rgba(249,115,22,0.24) 0%, transparent 55%),
@@ -1537,7 +1537,7 @@ body.auth-active .fab-btn { display: none !important; }
 }
 .auth-card {
   width: 100%; max-width: 400px;
-  margin: auto;                               /* centers when it fits; allows scroll when taller */
+  margin: 0 auto;                             /* horizontal center; flows top-down so it always scrolls */
   background: var(--card);
   border: 1px solid var(--border-bright);
   border-radius: var(--radius);
