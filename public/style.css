@@ -141,13 +141,30 @@ body {
   flex: 1;
   padding: 32px;
   min-height: 100vh;
-  background:
-    radial-gradient(ellipse 70% 55% at 92% -10%, rgba(249,115,22,0.17) 0%, transparent 60%),  /* orange — energy */
-    radial-gradient(ellipse 60% 50% at 108% 35%, rgba(236,72,153,0.11) 0%, transparent 55%),  /* pink — drive */
-    radial-gradient(ellipse 85% 60% at -8% 108%, rgba(239,68,68,0.13) 0%, transparent 55%),   /* red — fire */
-    radial-gradient(ellipse 55% 45% at 12% 4%, rgba(245,158,11,0.08) 0%, transparent 50%),    /* amber — warmth */
-    var(--bg);
+  background: var(--bg);
+  position: relative;
+  isolation: isolate;
 }
+/* Living gradient — warm "fire" glows that slowly drift & breathe for an alive, energetic feel */
+.main::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 55% at 92% 0%, rgba(249,115,22,0.17) 0%, transparent 60%),   /* orange — energy */
+    radial-gradient(ellipse 60% 50% at 108% 35%, rgba(236,72,153,0.11) 0%, transparent 55%), /* pink — drive */
+    radial-gradient(ellipse 85% 60% at 0% 100%, rgba(239,68,68,0.13) 0%, transparent 55%),   /* red — fire */
+    radial-gradient(ellipse 55% 45% at 12% 4%, rgba(245,158,11,0.08) 0%, transparent 50%);   /* amber — warmth */
+  animation: bgDrift 26s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes bgDrift {
+  from { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+  to   { transform: translate3d(-3%, 2.5%, 0) scale(1.1) rotate(2.5deg); }
+}
+@media (prefers-reduced-motion: reduce) { .main::before, #auth-screen::before { animation: none !important; } }
 .page-header { margin-bottom: 28px; }
 .page-title  { font-size: 26px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
 .page-sub    { color: var(--text-muted); margin-top: 4px; font-size: 14px; }
@@ -1461,12 +1478,20 @@ body.auth-active .fab-btn { display: none !important; }
   position: fixed; inset: 0; z-index: 20000;
   display: flex; align-items: center; justify-content: center;
   padding: 24px;
-  background:
-    radial-gradient(ellipse at 82% 8%, rgba(249,115,22,0.22) 0%, transparent 55%),
-    radial-gradient(ellipse at 12% 88%, rgba(236,72,153,0.16) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 120%, rgba(239,68,68,0.10) 0%, transparent 55%),
-    var(--bg);
+  background: var(--bg);
+  isolation: isolate;
   animation: fadeIn 0.3s ease;
+}
+#auth-screen::before {
+  content: '';
+  position: absolute; inset: -20%;
+  z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(ellipse at 82% 8%, rgba(249,115,22,0.24) 0%, transparent 55%),
+    radial-gradient(ellipse at 12% 88%, rgba(236,72,153,0.18) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 120%, rgba(239,68,68,0.12) 0%, transparent 55%);
+  animation: bgDrift 22s ease-in-out infinite alternate;
+  will-change: transform;
 }
 .auth-card {
   width: 100%; max-width: 400px;
