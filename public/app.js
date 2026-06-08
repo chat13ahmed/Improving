@@ -1875,6 +1875,38 @@ function loggingStreak() {
   while (set.has(d.toISOString().split('T')[0])) { n++; d.setDate(d.getDate() - 1); }
   return n;
 }
+// Longest run of consecutive logged days ever (computed from history — your record)
+function bestStreak() {
+  const dates = [...new Set((state.data.days || []).map(d => d.date))].sort();
+  let best = 0, run = 0, prev = null;
+  for (const ds of dates) {
+    run = (prev && (Date.parse(ds + 'T00:00:00') - Date.parse(prev + 'T00:00:00')) === 86400000) ? run + 1 : 1;
+    if (run > best) best = run;
+    prev = ds;
+  }
+  return best;
+}
+// Prominent streak card — the 'don't break the chain' pressure (resets the count, never the data)
+function renderStreakCard() {
+  const days = state.data.days || [];
+  if (days.length === 0) return '';
+  const cur = loggingStreak();
+  const best = bestStreak();
+  const loggedToday = days.some(d => d.date === todayStr());
+  let msg, urgent = false;
+  if (loggedToday) {
+    msg = cur >= 2 ? '🔥 ' + cur + ' days strong — keep the chain going!' : '✅ Logged today! Come back tomorrow to build your streak.';
+  } else if (cur >= 1) {
+    msg = '⚠️ Log today to keep your ' + cur + '-day streak alive!'; urgent = true;
+  } else {
+    msg = best >= 3 ? 'You reached ' + best + ' days before — start a new streak today!' : 'Log today to start your streak 🔥'; urgent = true;
+  }
+  return '<div class="card streak-card' + (urgent ? ' streak-urgent' : '') + '">' +
+    '<div class="streak-flame">🔥</div>' +
+    '<div class="streak-main"><div class="streak-num">' + cur + '</div><div class="streak-unit">day' + (cur === 1 ? '' : 's') + ' streak</div></div>' +
+    '<div class="streak-msg">' + msg + (best > 0 ? '<div class="streak-best">🏆 Best: ' + best + ' day' + (best === 1 ? '' : 's') + '</div>' : '') + '</div>' +
+    '</div>';
+}
 function weekShareStats() {
   const wkStart = getWeekStart(todayStr()), t = todayStr();
   const inWeek = (state.data.days || []).filter(d => d.date >= wkStart && d.date <= t);
@@ -2220,7 +2252,7 @@ function renderDashboard() {
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p></div>' +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">📤 Share my week</button>' : '') +
     '</div>' +
-    renderReminderBanner() + renderQuoteCard() + renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderMoneyCircleCard() + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
+    renderStreakCard() + renderReminderBanner() + renderQuoteCard() + renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderMoneyCircleCard() + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
 
   setTimeout(animateCounters, 120);
   if (showIncomeChart) initIncomeChart(sortedWeeks);

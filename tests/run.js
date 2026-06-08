@@ -58,7 +58,7 @@ function loadApp(fieldValues) {
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
-    ' loggingStreak, weekShareStats, weekShareTiles, getWeekStats, getWeekStart, daysSince,' +
+    ' loggingStreak, bestStreak, weekShareStats, weekShareTiles, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
@@ -169,6 +169,12 @@ A.state.data = { profile: { pillars: dp }, weeks: [], weights: [], days: [
 ok('loggingStreak counts consecutive incl today', A.loggingStreak() === 3);
 A.state.data.days = [{ date: _sd2, gym: { done: true } }, { date: _sd1, gym: { done: true } }]; // today not logged yet
 ok('loggingStreak counts through yesterday when today blank', A.loggingStreak() === 2);
+// best streak = longest consecutive run ever (record), gap resets the run
+A.state.data = { profile: { pillars: dp }, weeks: [], weights: [], days: [
+  { date: '2026-06-01' }, { date: '2026-06-02' }, { date: '2026-06-03' }, { date: '2026-06-05' }, { date: '2026-06-06' } ] };
+ok('bestStreak = longest run (3, gap resets)', A.bestStreak() === 3);
+ok('bestStreak single day = 1', (() => { A.state.data.days = [{ date: '2026-06-01' }]; return A.bestStreak() === 1; })());
+ok('bestStreak empty = 0', (() => { A.state.data.days = []; return A.bestStreak() === 0; })());
 A.state.data.days = [{ date: _sd0, gym: { done: true }, reading: { pages: 15 }, networking: { count: 3 }, water: 1.5 }];
 const _ws = A.weekShareStats();
 ok('weekShareStats reads today', _ws.daysLogged === 1 && _ws.workouts === 1 && _ws.pages === 15 && _ws.connections === 3);

@@ -1147,6 +1147,17 @@ body {
 .net-hint:empty { display:none; }
 .period-set { display:flex; align-items:center; justify-content:space-between; gap:10px; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:10px; padding:11px 14px; font-size:15px; margin-bottom:6px; }
 
+/* ─── Streak (don't break the chain) ─────────────────── */
+.streak-card { display: flex; align-items: center; gap: 16px; background: linear-gradient(135deg, rgba(249,115,22,0.15), rgba(239,68,68,0.05)); border: 1px solid rgba(249,115,22,0.38); }
+.streak-card.streak-urgent { border-color: rgba(239,68,68,0.55); box-shadow: 0 0 22px rgba(239,68,68,0.12); }
+.streak-flame { font-size: 40px; line-height: 1; }
+.streak-main { text-align: center; min-width: 72px; }
+.streak-num { font-size: 44px; font-weight: 900; color: #f97316; line-height: 1; }
+.streak-unit { font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-top: 3px; }
+.streak-msg { flex: 1; font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.4; }
+.streak-best { font-size: 12.5px; color: var(--text-muted); font-weight: 500; margin-top: 5px; }
+@media (max-width: 520px) { .streak-flame { font-size: 32px; } .streak-num { font-size: 38px; } .streak-msg { font-size: 14px; } }
+
 /* ─── Money flow donut ─────────────────── */
 .money-circle-card { text-align: center; }
 .mc-ring { width: 180px; height: 180px; border-radius: 50%; margin: 10px auto 16px; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); }
