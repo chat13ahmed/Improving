@@ -1147,6 +1147,17 @@ body {
 .net-hint:empty { display:none; }
 .period-set { display:flex; align-items:center; justify-content:space-between; gap:10px; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:10px; padding:11px 14px; font-size:15px; margin-bottom:6px; }
 
+/* ─── Demo preview banner ─────────────────── */
+#preview-banner {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 9000;
+  background: linear-gradient(135deg, #f97316, #ef4444); color: #fff;
+  text-align: center; padding: 10px 14px; font-size: 13.5px; box-shadow: 0 -2px 14px rgba(0,0,0,0.35);
+}
+#preview-banner button {
+  margin-left: 8px; background: rgba(255,255,255,0.22); color: #fff; border: 1px solid rgba(255,255,255,0.5);
+  border-radius: 8px; padding: 5px 12px; font-weight: 700; font-size: 13px; cursor: pointer;
+}
+
 /* ─── Streak (don't break the chain) ─────────────────── */
 .streak-card { display: flex; align-items: center; gap: 16px; background: linear-gradient(135deg, rgba(249,115,22,0.15), rgba(239,68,68,0.05)); border: 1px solid rgba(249,115,22,0.38); }
 .streak-card.streak-urgent { border-color: rgba(239,68,68,0.55); box-shadow: 0 0 22px rgba(239,68,68,0.12); }

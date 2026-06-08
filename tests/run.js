@@ -59,7 +59,7 @@ function loadApp(fieldValues) {
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
     ' loggingStreak, bestStreak, weekShareStats, weekShareTiles, getWeekStats, getWeekStart, daysSince,' +
-    ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle });';
+    ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -228,6 +228,9 @@ ok('carryover = prior period net (1000−400)', A.getCarryover() === 600);
 const _circ = A.getMoneyCircle();
 ok('money circle rolls savings forward', _circ.carryover === 600 && _circ.income === 2000 && _circ.spent === 500 && _circ.available === 2600 && _circ.savedTotal === 2100);
 ok('money circle spent fraction', Math.abs(_circ.spentFrac - (500 / 2600)) < 0.001);
+// demo preview data shape
+const _demo = A.buildDemoData();
+ok('buildDemoData shape (21 days, profile, income, book)', _demo.days.length === 21 && !!_demo.profile && Object.keys(_demo.incomes).length >= 1 && _demo.books.length === 1 && _demo.days.every(d => !!d.date));
 
 // Weekly score only counts enabled pillars (no crash, 0..100)
 A.state.data = { profile: { pillars: dp, gymDaysPerWeek: 5, weeklyNetworkGoal: 3, weeklyIncomeGoal: 1000, weeklyReadGoal: 100 }, days: [], weeks: [], weights: [] };

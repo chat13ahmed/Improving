@@ -676,7 +676,9 @@ function renderAuthScreen(mode) {
     (isSignup ? 'Already have an account? <button class="btn-link" onclick="renderAuthScreen(\'login\')">Log in</button>'
               : 'New here? <button class="btn-link" onclick="renderAuthScreen(\'signup\')">Create an account</button>') +
     '<div class="auth-note">🔒 Your account is private — only you can see your data.</div>' +
-    '<div style="margin-top:10px"><a class="btn-link" href="about.html">What is Business Escalate? →</a></div>' +
+    '<div style="margin-top:10px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap">' +
+    '<button type="button" class="btn-link" onclick="startDemo()">👀 See a live demo</button>' +
+    '<a class="btn-link" href="about.html">What is Business Escalate? →</a></div>' +
     '</div>' +
     '</div>';
   document.body.appendChild(screen);
@@ -943,6 +945,7 @@ function navigate(page) {
 // (which reloaded the page and jumped you back to the top).
 let _saving = false, _saveAgain = false;
 async function saveData() {
+  if (state._previewMode) return; // demo preview — never persist
   if (_saving) { _saveAgain = true; return; }
   _saving = true;
   try {
@@ -3423,6 +3426,62 @@ async function clearApiKey() {
   showToast('Key removed.', 'success');
   renderCoachPage();
 }
+
+// ─────────────────────────────────────────────────────────────
+// DEMO PREVIEW  (show someone the app full of sample data — never saved)
+// ─────────────────────────────────────────────────────────────
+function buildDemoData() {
+  const days = [], today = new Date();
+  for (let i = 20; i >= 0; i--) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const date = d.toISOString().split('T')[0];
+    const weekend = d.getDay() === 0 || d.getDay() === 6;
+    days.push({
+      id: uid(), date,
+      gym: { done: Math.random() > 0.28, muscleGroup: ['Push', 'Pull', 'Legs', 'Full body'][i % 4], duration: 45 + Math.round(Math.random() * 30), notes: '' },
+      food: { rating: 3 + Math.round(Math.random() * 2), notes: '' },
+      networking: { count: weekend ? 0 : Math.round(Math.random() * 3), notes: '' },
+      money: { activities: weekend ? '' : 'Followed up with leads', income: 0 },
+      spent: Math.round(15 + Math.random() * (weekend ? 120 : 70)),
+      reading: { pages: Math.random() > 0.4 ? 10 + Math.round(Math.random() * 30) : 0, bookId: 'demo', bookTitle: 'Rich Dad Poor Dad', summary: '' },
+      water: Math.round((0.25 + Math.random() * 0.75) * 4) / 4,
+      calories: 2000 + Math.floor(Math.random() * 800), notes: ''
+    });
+  }
+  const incomes = {};
+  incomes[today.toISOString().slice(0, 7)] = 4200;
+  const pm = new Date(today); pm.setMonth(pm.getMonth() - 1);
+  incomes[pm.toISOString().slice(0, 7)] = 3900;
+  const weights = []; for (let i = 21; i >= 0; i -= 3) { const d = new Date(today); d.setDate(d.getDate() - i); weights.push({ date: d.toISOString().split('T')[0], kg: 80 - (21 - i) * 0.04 }); }
+  return {
+    profile: { name: 'Alex', firstName: 'Alex', pillars: defaultPillars(), gymDaysPerWeek: 5, weeklyNetworkGoal: 3, weeklyReadGoal: 100, savingsGoal: 800, incomeCadence: 'monthly',
+      nutrition: { age: 28, sex: 'male', heightCm: 180, weightKg: 80, heightUnit: 'ft', weightUnit: 'lbs', activity: 'active', goal: 'gain', strategy: 'muscle', mealsPerDay: 4 } },
+    days, weeks: [], incomes, weights,
+    books: [{ id: 'demo', title: 'Rich Dad Poor Dad', author: 'Robert Kiyosaki', status: 'reading' }],
+    contacts: [{ id: uid(), name: 'Jordan Lee', status: 'lead', starred: true, notes: 'Met at the gym' }],
+    ideas: [{ id: uid(), title: 'Weekend car-detailing side hustle', status: 'active', notes: '' }]
+  };
+}
+async function startDemo() {
+  state._previewMode = true;
+  state.token = null;
+  state.user = 'Demo';
+  state.data = buildDemoData();
+  try { const ks = await fetch('/api/settings').then(r => r.json()); state.hasApiKey = !!ks.hasKey; } catch { state.hasApiKey = false; }
+  document.getElementById('auth-screen')?.remove();
+  document.body.classList.remove('auth-active');
+  applyNavVisibility();
+  injectFAB();
+  navigate('dashboard');
+  if (!document.getElementById('preview-banner')) {
+    const b = document.createElement('div');
+    b.id = 'preview-banner';
+    b.innerHTML = '👀 <strong>Demo preview</strong> — sample data, nothing is saved. ' +
+      '<button onclick="exitDemo()">Create your account →</button>';
+    document.body.appendChild(b);
+  }
+}
+function exitDemo() { state._previewMode = false; location.reload(); }
 
 // ─────────────────────────────────────────────────────────────
 // QUICK-LOG FAB  (floating button on all pages)
