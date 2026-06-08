@@ -205,6 +205,13 @@ A.setPeriodIncome('weekly', _wKey, 800);
 ok('setPeriodIncome weekly → weeks[]', (A.state.data.weeks.find(w => w.weekStart === _wKey) || {}).income === 800);
 const _wp = A.getMoneyPeriod();
 ok('getMoneyPeriod weekly net', _wp.label === 'week' && _wp.income === 800 && _wp.spent === 25 && _wp.net === 775);
+// daily cadence — income asked per day, keyed by full date
+ok('periodKeyFor daily = full date', A.periodKeyFor(_today, 'daily') === _today);
+A.state.data = { profile: { pillars: dp, incomeCadence: 'daily' }, weeks: [], weights: [], incomes: {}, days: [{ date: _today, spent: 20 }] };
+A.setPeriodIncome('daily', _today, 150);
+ok('setPeriodIncome daily → incomes[date]', A.state.data.incomes[_today] === 150);
+const _dp = A.getMoneyPeriod();
+ok('getMoneyPeriod daily net', _dp.label === 'day' && _dp.income === 150 && _dp.spent === 20 && _dp.net === 130);
 
 // Weekly score only counts enabled pillars (no crash, 0..100)
 A.state.data = { profile: { pillars: dp, gymDaysPerWeek: 5, weeklyNetworkGoal: 3, weeklyIncomeGoal: 1000, weeklyReadGoal: 100 }, days: [], weeks: [], weights: [] };

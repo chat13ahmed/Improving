@@ -992,11 +992,16 @@ function getWeekStats() {
   return { gymDays, avgFood, networkCount, weekIncome, weekExpenses, weekNet, readPages, readDays, waterTotal, avgWater, waterToday };
 }
 
-// ── Money model: spending is daily (day.spent); income is set per period ──
-// Cadence is the user's choice — weekly or monthly (default monthly).
-function moneyCadence() { return (state.data.profile && state.data.profile.incomeCadence) === 'weekly' ? 'weekly' : 'monthly'; }
-function moneyPeriodLabel(cad) { return (cad || moneyCadence()) === 'weekly' ? 'week' : 'month'; }
-function periodKeyFor(dateStr, cad) { return (cad || moneyCadence()) === 'weekly' ? getWeekStart(dateStr) : String(dateStr).slice(0, 7); } // weekStart or 'YYYY-MM'
+// ── Money model: spending is logged daily (day.spent); income is set per period ──
+// Cadence is the user's choice based on how they get paid — daily, weekly, or monthly.
+function moneyCadence() { const c = state.data.profile && state.data.profile.incomeCadence; return (c === 'weekly' || c === 'daily') ? c : 'monthly'; }
+function moneyPeriodLabel(cad) { cad = cad || moneyCadence(); return cad === 'weekly' ? 'week' : cad === 'daily' ? 'day' : 'month'; }
+function periodKeyFor(dateStr, cad) {
+  cad = cad || moneyCadence();
+  if (cad === 'weekly') return getWeekStart(dateStr);
+  if (cad === 'daily') return String(dateStr).slice(0, 10); // the day itself (YYYY-MM-DD)
+  return String(dateStr).slice(0, 7);                       // the month (YYYY-MM)
+}
 function currentPeriodKey(cad) { return periodKeyFor(todayStr(), cad || moneyCadence()); }
 function getPeriodIncome(cad, key) {
   cad = cad || moneyCadence();
@@ -3300,7 +3305,7 @@ async function saveGoals(e) {
   const ageEl = document.getElementById('g-age');     if (ageEl)   state.data.profile.age = parseInt(ageEl.value) || '';
   const emailEl = document.getElementById('g-email'); if (emailEl) state.data.profile.email = emailEl.value.trim();
   const phoneEl = document.getElementById('g-phone'); if (phoneEl) state.data.profile.phone = phoneEl.value.trim();
-  const cadEl = document.getElementById('g-cadence'); if (cadEl) state.data.profile.incomeCadence = cadEl.value === 'weekly' ? 'weekly' : 'monthly';
+  const cadEl = document.getElementById('g-cadence'); if (cadEl) state.data.profile.incomeCadence = ['weekly', 'daily', 'monthly'].includes(cadEl.value) ? cadEl.value : 'monthly';
   const savEl = document.getElementById('g-savings'); if (savEl) state.data.profile.savingsGoal = parseFloat(savEl.value) || 0;
   await saveData();
   showToast('Saved! 🎯', 'success');
@@ -4056,6 +4061,7 @@ function showOnboarding() {
     areas: { gym: true, food: true, networking: true, money: true, reading: true },
     goals: { gymDaysPerWeek: p.gymDaysPerWeek || 5, weeklyNetworkGoal: p.weeklyNetworkGoal || 3, weeklyIncomeGoal: p.weeklyIncomeGoal || '', weeklyReadGoal: p.weeklyReadGoal || '' },
     jobTitle: p.jobTitle || '',
+    cadence: p.incomeCadence || 'monthly',
     nut: { heightUnit: 'cm', weightUnit: 'lbs', heightCm: '', weightKg: '', activity: 'moderate', goal: 'gain', mealsPerDay: 3, strategy: 'muscle' }
   };
   renderOnboardStep();
@@ -4102,8 +4108,15 @@ function renderOnboardStep() {
     if (f.areas.gym) parts.push('<div class="form-group"><label>💪 Fitness — gym days per week</label><input type="number" id="ob-gym" min="1" max="7" value="' + (f.goals.gymDaysPerWeek || 5) + '"></div>');
     if (f.areas.networking) parts.push('<div class="form-group"><label>🤝 Networking — new connections per week</label><input type="number" id="ob-net" min="0" value="' + (f.goals.weeklyNetworkGoal || 3) + '"></div>');
     if (f.areas.money) parts.push(
+      '<div class="form-group"><label>💰 How do you get paid?</label>' +
+      '<select id="ob-cadence">' +
+      '<option value="monthly"' + (f.cadence === 'monthly' ? ' selected' : '') + '>Monthly</option>' +
+      '<option value="weekly"' + (f.cadence === 'weekly' ? ' selected' : '') + '>Weekly</option>' +
+      '<option value="daily"' + (f.cadence === 'daily' ? ' selected' : '') + '>Daily</option>' +
+      '</select>' +
+      '<span style="font-size:12px;color:var(--text-muted);display:block;margin-top:5px">We\'ll ask your income on that schedule — and you\'ll log spending every day.</span></div>' +
       '<div class="form-row">' +
-      '<div class="form-group"><label>💰 Income — weekly goal ($)</label><input type="number" id="ob-income" min="0" step="50" placeholder="e.g. 1200" value="' + (f.goals.weeklyIncomeGoal || '') + '"></div>' +
+      '<div class="form-group"><label>💰 Income goal ($) <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label><input type="number" id="ob-income" min="0" step="50" placeholder="e.g. 1200" value="' + (f.goals.weeklyIncomeGoal || '') + '"></div>' +
       '<div class="form-group"><label>Your job / role <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label><input type="text" id="ob-job" placeholder="e.g. Sales Rep" value="' + escapeHtml(f.jobTitle) + '"></div>' +
       '</div>');
     if (f.areas.reading) parts.push('<div class="form-group"><label>📚 Reading — pages per week</label><input type="number" id="ob-read" min="0" step="10" placeholder="e.g. 100" value="' + (f.goals.weeklyReadGoal || '') + '"></div>');
@@ -4178,6 +4191,7 @@ function captureOnboard() {
     if (document.getElementById('ob-gym'))    f.goals.gymDaysPerWeek = parseInt(document.getElementById('ob-gym').value) || 5;
     if (document.getElementById('ob-net'))    f.goals.weeklyNetworkGoal = parseInt(document.getElementById('ob-net').value) || 0;
     if (document.getElementById('ob-income')) f.goals.weeklyIncomeGoal = parseFloat(document.getElementById('ob-income').value) || '';
+    if (document.getElementById('ob-cadence')) f.cadence = document.getElementById('ob-cadence').value || f.cadence;
     if (document.getElementById('ob-job'))    f.jobTitle = document.getElementById('ob-job').value.trim();
     if (document.getElementById('ob-read'))   f.goals.weeklyReadGoal = parseInt(document.getElementById('ob-read').value) || '';
     if (document.getElementById('ob-weight')) {
@@ -4231,6 +4245,7 @@ async function onboardFinish() {
   p.gymDaysPerWeek = f.goals.gymDaysPerWeek || 5;
   p.weeklyNetworkGoal = f.goals.weeklyNetworkGoal || 0;
   p.weeklyIncomeGoal = f.goals.weeklyIncomeGoal || 0;
+  if (f.areas.money) p.incomeCadence = ['weekly', 'daily', 'monthly'].includes(f.cadence) ? f.cadence : 'monthly';
   p.weeklyReadGoal = f.goals.weeklyReadGoal || 0;
   if (f.jobTitle) p.jobTitle = f.jobTitle;
   if (f.areas.food && f.nut.heightCm && f.nut.weightKg && f.age) {
@@ -4744,9 +4759,10 @@ function renderSettingsPage() {
     (isPillarOn('money') ? '<div class="form-group"><label>' + moneyP.icon + ' Weekly ' + escapeHtml(moneyP.label) + ' goal ($)</label>' +
       '<input type="number" id="g-income" min="0" step="50" placeholder="e.g. 1200" value="' + (p.weeklyIncomeGoal||'') + '"></div>' : '<input type="hidden" id="g-income" value="' + (p.weeklyIncomeGoal||0) + '">') +
     '</div>' +
-    (isPillarOn('money') ? '<div class="form-row"><div class="form-group"><label>💰 How often do you set your income?</label>' +
-      '<select id="g-cadence"><option value="monthly"' + (moneyCadence()==='monthly'?' selected':'') + '>Monthly — set it once a month</option>' +
-      '<option value="weekly"' + (moneyCadence()==='weekly'?' selected':'') + '>Weekly — set it once a week</option></select></div>' +
+    (isPillarOn('money') ? '<div class="form-row"><div class="form-group"><label>💰 How often do you get paid?</label>' +
+      '<select id="g-cadence"><option value="monthly"' + (moneyCadence()==='monthly'?' selected':'') + '>Monthly — set income once a month</option>' +
+      '<option value="weekly"' + (moneyCadence()==='weekly'?' selected':'') + '>Weekly — set income once a week</option>' +
+      '<option value="daily"' + (moneyCadence()==='daily'?' selected':'') + '>Daily — set income each day</option></select></div>' +
       '<div class="form-group"><label>🎯 Savings goal per ' + moneyPeriodLabel() + ' ($)</label>' +
       '<input type="number" id="g-savings" min="0" step="50" placeholder="e.g. 500" value="' + (p.savingsGoal || '') + '"></div></div>' : '') +
     '<div class="form-row">' +
