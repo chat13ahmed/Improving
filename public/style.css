@@ -145,11 +145,12 @@ body {
   position: relative;
   isolation: isolate;
 }
-/* Living gradient — warm "fire" glows that slowly drift & breathe for an alive, energetic feel */
+/* Living gradient — warm "fire" glows. FIXED to the viewport (not the full page
+   height) with a translate-only animation, so it never repaints during scroll. */
 .main::before {
   content: '';
-  position: absolute;
-  inset: -20%;
+  position: fixed;
+  inset: -12%;
   z-index: -1;
   pointer-events: none;
   background:
@@ -157,12 +158,12 @@ body {
     radial-gradient(ellipse 60% 50% at 108% 35%, rgba(236,72,153,0.11) 0%, transparent 55%), /* pink — drive */
     radial-gradient(ellipse 85% 60% at 0% 100%, rgba(239,68,68,0.13) 0%, transparent 55%),   /* red — fire */
     radial-gradient(ellipse 55% 45% at 12% 4%, rgba(245,158,11,0.08) 0%, transparent 50%);   /* amber — warmth */
-  animation: bgDrift 26s ease-in-out infinite alternate;
+  animation: bgDrift 32s ease-in-out infinite alternate;
   will-change: transform;
 }
 @keyframes bgDrift {
-  from { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
-  to   { transform: translate3d(-3%, 2.5%, 0) scale(1.1) rotate(2.5deg); }
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-4%, 3%, 0); }
 }
 @media (prefers-reduced-motion: reduce) { .main::before, #auth-screen::before { animation: none !important; } }
 .page-header { margin-bottom: 28px; }

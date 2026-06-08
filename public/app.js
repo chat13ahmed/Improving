@@ -928,7 +928,14 @@ function navigate(page) {
 // ─────────────────────────────────────────────────────────────
 // DATA HELPERS
 // ─────────────────────────────────────────────────────────────
+// Serialize saves: only one POST in flight at a time. Concurrent calls (e.g. the
+// daily AI cards all caching at once) coalesce into a single follow-up save with the
+// latest state + fresh version — preventing version races that caused false 409s
+// (which reloaded the page and jumped you back to the top).
+let _saving = false, _saveAgain = false;
 async function saveData() {
+  if (_saving) { _saveAgain = true; return; }
+  _saving = true;
   try {
     const res = await fetch('/api/data', {
       method: 'POST', headers: authHeaders(),
@@ -938,7 +945,9 @@ async function saveData() {
     else if (res.ok) { const j = await res.json().catch(() => null); if (j && j.version) state._dataVersion = j.version; }
     // other errors: keep local changes; the next save will retry
   } catch { /* offline — local state preserved, retried on next save */ }
+  _saving = false;
   renderXPBar();
+  if (_saveAgain) { _saveAgain = false; saveData(); } // flush latest state with the updated version
 }
 // Another device (or the server) changed this account's data since we loaded it.
 // Reload the latest instead of overwriting — prevents silent data loss.
