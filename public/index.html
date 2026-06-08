@@ -53,9 +53,7 @@
         <span class="nav-icon">⚙️</span><span>Settings</span>
       </a>
     </nav>
-    <div class="sidebar-footer">
-      <button class="btn-demo" onclick="loadSampleData()">📦 Load Demo Data</button>
-    </div>
+    <div class="sidebar-footer"></div>
   </aside>
 
   <main class="main" id="main">
@@ -65,7 +63,7 @@
     </div>
   </main>
 
-  <script src="app.js?v=34"></script>
+  <script src="app.js?v=35"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
