@@ -29,10 +29,12 @@ function sqliteImpl() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
         email TEXT UNIQUE,
+        phone TEXT,
         pw_salt TEXT NOT NULL, pw_hash TEXT NOT NULL,
         sec_question TEXT, sec_salt TEXT, sec_hash TEXT,
         created_at TEXT DEFAULT (datetime('now'))
       )`);
+      try { db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch {} // migrate older DBs
       db.exec(`CREATE TABLE IF NOT EXISTS user_data (
         user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
         data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1,
@@ -47,11 +49,13 @@ function sqliteImpl() {
       )`);
     },
     async createUser(u) {
-      const r = db.prepare('INSERT INTO users(username,pw_salt,pw_hash,sec_question,sec_salt,sec_hash) VALUES(?,?,?,?,?,?)')
-        .run(u.username, u.pw_salt, u.pw_hash, u.sec_question, u.sec_salt, u.sec_hash);
+      const r = db.prepare('INSERT INTO users(username,email,phone,pw_salt,pw_hash,sec_question,sec_salt,sec_hash) VALUES(?,?,?,?,?,?,?,?)')
+        .run(u.username, u.email || null, u.phone || null, u.pw_salt, u.pw_hash, u.sec_question, u.sec_salt, u.sec_hash);
       return Number(r.lastInsertRowid);
     },
     async findUserByName(name) { return db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(name) || null; },
+    async findUserByEmail(email) { return email ? (db.prepare('SELECT * FROM users WHERE email = ? COLLATE NOCASE').get(email) || null) : null; },
+    async findUserByPhone(phone) { return phone ? (db.prepare('SELECT * FROM users WHERE phone = ?').get(phone) || null) : null; },
     async findUserById(id) { return db.prepare('SELECT * FROM users WHERE id = ?').get(id) || null; },
     async updatePassword(id, salt, hash) { db.prepare('UPDATE users SET pw_salt=?, pw_hash=? WHERE id=?').run(salt, hash, id); },
     async setSecurity(id, q, salt, hash) { db.prepare('UPDATE users SET sec_question=?, sec_salt=?, sec_hash=? WHERE id=?').run(q, salt, hash, id); },
@@ -89,19 +93,22 @@ function pgImpl() {
   return {
     kind: 'postgres',
     async ensureSchema() {
-      await q(`CREATE TABLE IF NOT EXISTS users (id BIGSERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, email TEXT UNIQUE,
+      await q(`CREATE TABLE IF NOT EXISTS users (id BIGSERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, email TEXT UNIQUE, phone TEXT,
                pw_salt TEXT NOT NULL, pw_hash TEXT NOT NULL, sec_question TEXT, sec_salt TEXT, sec_hash TEXT, created_at TIMESTAMPTZ DEFAULT now())`);
+      await q('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT'); // migrate older DBs
       await q(`CREATE TABLE IF NOT EXISTS user_data (user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
                data JSONB NOT NULL, version INTEGER NOT NULL DEFAULT 1, updated_at TIMESTAMPTZ DEFAULT now())`);
       await q(`CREATE TABLE IF NOT EXISTS push_subscriptions (id BIGSERIAL PRIMARY KEY, user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
                endpoint TEXT UNIQUE NOT NULL, sub JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT now())`);
     },
     async createUser(u) {
-      const r = await q('INSERT INTO users(username,pw_salt,pw_hash,sec_question,sec_salt,sec_hash) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',
-        [u.username, u.pw_salt, u.pw_hash, u.sec_question, u.sec_salt, u.sec_hash]);
+      const r = await q('INSERT INTO users(username,email,phone,pw_salt,pw_hash,sec_question,sec_salt,sec_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
+        [u.username, u.email || null, u.phone || null, u.pw_salt, u.pw_hash, u.sec_question, u.sec_salt, u.sec_hash]);
       return r.rows[0].id;
     },
     async findUserByName(name) { const r = await q('SELECT * FROM users WHERE lower(username)=lower($1)', [name]); return r.rows[0] || null; },
+    async findUserByEmail(email) { if (!email) return null; const r = await q('SELECT * FROM users WHERE lower(email)=lower($1)', [email]); return r.rows[0] || null; },
+    async findUserByPhone(phone) { if (!phone) return null; const r = await q('SELECT * FROM users WHERE phone=$1', [phone]); return r.rows[0] || null; },
     async findUserById(id) { const r = await q('SELECT * FROM users WHERE id=$1', [id]); return r.rows[0] || null; },
     async updatePassword(id, salt, hash) { await q('UPDATE users SET pw_salt=$1, pw_hash=$2 WHERE id=$3', [salt, hash, id]); },
     async setSecurity(id, ques, salt, hash) { await q('UPDATE users SET sec_question=$1, sec_salt=$2, sec_hash=$3 WHERE id=$4', [ques, salt, hash, id]); },
@@ -130,6 +137,8 @@ module.exports = {
   kind: () => (impl ? impl.kind : 'uninitialized'),
   createUser: (u) => impl.createUser(u),
   findUserByName: (n) => impl.findUserByName(n),
+  findUserByEmail: (e) => impl.findUserByEmail(e),
+  findUserByPhone: (p) => impl.findUserByPhone(p),
   findUserById: (i) => impl.findUserById(i),
   updatePassword: (i, s, h) => impl.updatePassword(i, s, h),
   setSecurity: (i, q, s, h) => impl.setSecurity(i, q, s, h),

@@ -316,6 +316,15 @@ if (P) {
     try { await DBm.createUser({ username: 'tuser', pw_salt: 's', pw_hash: 'h', sec_question: null, sec_salt: null, sec_hash: null }); }
     catch { dupBlocked = true; }
     ok('DB blocks duplicate username (unique constraint)', dupBlocked === true);
+    // email + phone: one account per person
+    await DBm.createUser({ username: 'emailer', email: 'a@b.com', phone: '+15551234', pw_salt: 's', pw_hash: 'h', sec_question: null, sec_salt: null, sec_hash: null });
+    ok('DB findUserByEmail (case-insensitive)', (await DBm.findUserByEmail('A@B.COM'))?.username === 'emailer');
+    ok('DB findUserByPhone', (await DBm.findUserByPhone('+15551234'))?.username === 'emailer');
+    ok('DB findUserByEmail missing → null', (await DBm.findUserByEmail('none@x.com')) === null);
+    let dupEmail = false;
+    try { await DBm.createUser({ username: 'emailer2', email: 'a@b.com', pw_salt: 's', pw_hash: 'h', sec_question: null, sec_salt: null, sec_hash: null }); }
+    catch { dupEmail = true; }
+    ok('DB blocks duplicate email (unique constraint)', dupEmail === true);
     await DBm.saveData(id, { profile: { name: 'X' }, days: [1] }, 1);
     const d1 = await DBm.getData(id);
     ok('DB saveData/getData round-trip', !!d1 && d1.version === 1 && d1.data.profile.name === 'X' && d1.data.days.length === 1);
@@ -338,7 +347,7 @@ if (P) {
     ok('DB deletePushSub works', (await DBm.allPushSubs()).length === 0);
     // analytics reads
     const allU = await DBm.allUsers();
-    ok('DB allUsers returns rows with created_at', allU.length === 1 && allU[0].username === 'tuser' && !!allU[0].created_at);
+    ok('DB allUsers returns rows with created_at', allU.length >= 1 && allU.some(u => u.username === 'tuser') && allU.every(u => !!u.created_at));
     const allD = await DBm.allUserData();
     ok('DB allUserData returns parsed data', allD.length === 1 && String(allD[0].user_id) === String(id) && typeof allD[0].data === 'object');
     // conditional metadata save (cron path): writes only on version match, never bumps, never clobbers

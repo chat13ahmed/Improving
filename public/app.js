@@ -652,6 +652,12 @@ function renderAuthScreen(mode) {
     '<form id="auth-form" onsubmit="' + (isSignup ? 'doSignup' : 'doLogin') + '(event)">' +
     '<div class="auth-field"><label>Username</label>' +
     '<input type="text" id="auth-username" autocomplete="username" placeholder="Your username" autofocus></div>' +
+    (isSignup
+      ? '<div class="auth-field"><label>Email</label>' +
+        '<input type="email" id="auth-email" autocomplete="email" placeholder="you@email.com"></div>' +
+        '<div class="auth-field"><label>Phone <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>' +
+        '<input type="tel" id="auth-phone" autocomplete="tel" placeholder="+1 555 123 4567"></div>'
+      : '') +
     '<div class="auth-field"><label>Password</label>' +
     '<input type="password" id="auth-password" autocomplete="' + (isSignup ? 'new-password' : 'current-password') + '" placeholder="' + (isSignup ? 'At least 6 characters' : 'Your password') + '"></div>' +
     (isSignup
@@ -730,9 +736,12 @@ async function doSignup(e) {
   const btn = e.target.querySelector('button[type=submit]');
   const username = document.getElementById('auth-username').value.trim();
   const password = document.getElementById('auth-password').value;
+  const email = (document.getElementById('auth-email')?.value || '').trim();
+  const phone = (document.getElementById('auth-phone')?.value || '').trim();
   const securityQuestion = document.getElementById('auth-secq')?.value || '';
   const securityAnswer = document.getElementById('auth-seca')?.value.trim() || '';
   if (username.length < 3) { authError('Username must be at least 3 characters.'); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { authError('Please enter a valid email — one account per email.'); return; }
   if (password.length < 6) { authError('Password must be at least 6 characters.'); return; }
   if (securityAnswer && securityAnswer.length < 2) { authError('Your security answer is too short (or leave it blank).'); return; }
   // Lockout nudge — make skipping a deliberate choice
@@ -742,7 +751,7 @@ async function doSignup(e) {
   }
   authError(''); if (btn) btn.disabled = true;
   try {
-    const res = await authFetch('/api/signup', { username, password, securityQuestion, securityAnswer });
+    const res = await authFetch('/api/signup', { username, password, email, phone, securityQuestion, securityAnswer });
     const j = await res.json();
     if (!res.ok) { authError(j.error || 'Sign up failed.'); return; }
     state.token = j.token; state.user = j.username; state.hasSecurity = !!j.hasSecurity; localStorage.setItem('be_token', j.token);
@@ -4135,10 +4144,6 @@ function renderOnboardStep() {
       '<div class="form-group"><label>Age</label><input type="number" id="ob-age" min="13" max="100" value="' + (f.age || '') + '" placeholder="28"></div>' +
       '<div class="form-group"><label>Sex <span style="font-weight:400;color:var(--text-muted)">(for nutrition math)</span></label>' +
       '<select id="ob-sex"><option value="male"' + (f.sex === 'male' ? ' selected' : '') + '>Male</option><option value="female"' + (f.sex === 'female' ? ' selected' : '') + '>Female</option></select></div>' +
-      '</div>' +
-      '<div class="form-row">' +
-      '<div class="form-group"><label>Email</label><input type="email" id="ob-email" value="' + escapeHtml(f.email) + '" placeholder="you@email.com" autocomplete="email"></div>' +
-      '<div class="form-group"><label>Phone <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label><input type="tel" id="ob-phone" value="' + escapeHtml(f.phone) + '" placeholder="+1 555 123 4567" autocomplete="tel"></div>' +
       '</div>';
   } else if (f.step === 2) {
     title = 'What do you want to develop?';
@@ -4236,8 +4241,7 @@ function captureOnboard() {
     f.lastName = (document.getElementById('ob-last')?.value || '').trim();
     f.age = parseInt(document.getElementById('ob-age')?.value) || '';
     f.sex = document.getElementById('ob-sex')?.value || f.sex;
-    f.email = (document.getElementById('ob-email')?.value || '').trim();
-    f.phone = (document.getElementById('ob-phone')?.value || '').trim();
+    // email & phone are now collected at signup (and seeded into the profile)
   } else if (f.step === 3) {
     if (document.getElementById('ob-gym'))    f.goals.gymDaysPerWeek = parseInt(document.getElementById('ob-gym').value) || 5;
     if (document.getElementById('ob-net'))    f.goals.weeklyNetworkGoal = parseInt(document.getElementById('ob-net').value) || 0;

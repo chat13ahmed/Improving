@@ -149,22 +149,29 @@ app.post('/api/signup', async (req, res) => {
   try {
     const username = (req.body.username || '').trim();
     const password = req.body.password || '';
+    const email = (req.body.email || '').trim().toLowerCase();
+    const phone = (req.body.phone || '').trim();
     const securityQuestion = (req.body.securityQuestion || '').trim();
     const securityAnswer = (req.body.securityAnswer || '').trim();
     if (username.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters.' });
     if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'Please enter a valid email.' });
     if (securityAnswer && securityAnswer.length < 2) return res.status(400).json({ error: 'Your security answer is too short (or leave it blank).' });
+    // One account per person — username, email, and phone must each be unused
     if (await DB.findUserByName(username)) return res.status(409).json({ error: 'That username is already taken.' });
+    if (await DB.findUserByEmail(email)) return res.status(409).json({ error: 'An account already exists with that email.' });
+    if (phone && await DB.findUserByPhone(phone)) return res.status(409).json({ error: 'An account already exists with that phone number.' });
     const { salt, hash } = hashPassword(password);
     let sq = null, ss = null, sh = null;
     if (securityQuestion && securityAnswer.length >= 2) { const s = hashPassword(normalizeAnswer(securityAnswer)); sq = securityQuestion; ss = s.salt; sh = s.hash; }
-    const id = await DB.createUser({ username, pw_salt: salt, pw_hash: hash, sec_question: sq, sec_salt: ss, sec_hash: sh });
-    await DB.saveData(id, defaultData(), 1);
+    const id = await DB.createUser({ username, email, phone: phone || null, pw_salt: salt, pw_hash: hash, sec_question: sq, sec_salt: ss, sec_hash: sh });
+    const seed = defaultData(); seed.profile = { ...(seed.profile || {}), email, phone };
+    await DB.saveData(id, seed, 1);
     res.json({ token: signJwt({ sub: id, username }, JWT_SECRET), username, hasSecurity: !!sq });
   } catch (e) {
-    // Backstop the unique-username check against a race (two signups at once)
+    // Backstop the unique checks against a race (two signups at once)
     if (e && (e.code === '23505' || /unique/i.test(String(e.message || '')))) {
-      return res.status(409).json({ error: 'That username is already taken.' });
+      return res.status(409).json({ error: 'That username or email is already taken.' });
     }
     res.status(500).json({ error: 'Sign up failed' });
   }

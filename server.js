@@ -156,18 +156,26 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.post('/api/signup', (req, res) => {
   const username = (req.body.username || '').trim();
   const password = req.body.password || '';
+  const email = (req.body.email || '').trim().toLowerCase();
+  const phone = (req.body.phone || '').trim();
   const securityQuestion = (req.body.securityQuestion || '').trim();
   const securityAnswer = (req.body.securityAnswer || '').trim();
   if (username.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters.' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'Please enter a valid email.' });
   // Security question is OPTIONAL — only validate it if an answer was provided
   if (securityAnswer && securityAnswer.length < 2) return res.status(400).json({ error: 'Your security answer is too short (or leave it blank).' });
   const accounts = readAccounts();
+  // One account per person — username, email, and phone must each be unused
   if (accounts.some(a => a.username.toLowerCase() === username.toLowerCase()))
     return res.status(409).json({ error: 'That username is already taken.' });
+  if (accounts.some(a => (a.email || '').toLowerCase() === email))
+    return res.status(409).json({ error: 'An account already exists with that email.' });
+  if (phone && accounts.some(a => a.phone === phone))
+    return res.status(409).json({ error: 'An account already exists with that phone number.' });
   const id = newId();
   const { salt, hash } = hashPassword(password);
-  const account = { id, username, salt, hash, createdAt: new Date().toISOString() };
+  const account = { id, username, email, phone, salt, hash, createdAt: new Date().toISOString() };
   if (securityQuestion && securityAnswer.length >= 2) {
     const sec = hashPassword(normalizeAnswer(securityAnswer));
     account.securityQuestion = securityQuestion; account.secSalt = sec.salt; account.secHash = sec.hash;
@@ -180,6 +188,7 @@ app.post('/api/signup', (req, res) => {
   if (accounts.length === 1 && fs.existsSync(LEGACY_DATA_FILE)) {
     try { seed = JSON.parse(fs.readFileSync(LEGACY_DATA_FILE, 'utf8')); } catch {}
   }
+  seed.profile = { ...(seed.profile || {}), email, phone };
   writeData(id, seed);
 
   const token = newToken();
