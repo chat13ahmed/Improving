@@ -192,7 +192,7 @@ ok('weekStats net goes negative when overspending', A.getWeekStats().weekNet ===
 
 // Patterns AI-cost throttle helper
 ok('daysSince today ≈ 0', A.daysSince(new Date().toISOString().split('T')[0]) < 1);
-ok('daysSince 5 days ago ≈ 5', Math.round(A.daysSince(new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0])) === 5);
+ok('daysSince ~5 days ago (4–6, time-independent)', (() => { const v = A.daysSince(new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0]); return v >= 4 && v <= 6; })());
 ok('daysSince empty = Infinity', A.daysSince('') === Infinity);
 
 // Money redesign: daily spending + periodic income (weekly or monthly)
