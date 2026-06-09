@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Escalate — icon exporter</title>
+<style>
+  body { background:#0F1117; color:#eef1f7; font-family:-apple-system,Segoe UI,Roboto,sans-serif; text-align:center; padding:40px 20px; }
+  h1 { font-weight:800; }
+  p { color:#9aa3b2; max-width:520px; margin:8px auto 24px; line-height:1.6; }
+  canvas { background:transparent; border-radius:24px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+  .row { margin-top:24px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+  button { background:linear-gradient(135deg,#3b82f6,#a855f7); color:#fff; border:none; border-radius:12px; padding:14px 22px; font-size:15px; font-weight:700; cursor:pointer; }
+  button:hover { filter:brightness(1.08); }
+</style>
+</head>
+<body>
+  <h1>⛰️ Escalate icon</h1>
+  <p>This is your app icon. Click a button to download a PNG, then upload the <b>512</b> one to PWABuilder (or the stores). No other software needed.</p>
+  <canvas id="c" width="320" height="320"></canvas>
+  <div class="row">
+    <button onclick="download(512)">⬇ Download 512×512 (for stores)</button>
+    <button onclick="download(192)">⬇ Download 192×192</button>
+    <button onclick="download(1024)">⬇ Download 1024×1024</button>
+  </div>
+
+<script>
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs><linearGradient id="bg" x1="0" y1="1" x2="1" y2="0">
+    <stop offset="0" stop-color="#FB923C"/><stop offset="0.45" stop-color="#EF4444"/><stop offset="1" stop-color="#A855F7"/>
+  </linearGradient></defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <line x1="120" y1="404" x2="404" y2="148" stroke="#ffffff" stroke-opacity="0.45" stroke-width="22" stroke-linecap="round"/>
+  <path d="M120 372 H192 V300 H264 V228 H336 V156" fill="none" stroke="#ffffff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M300 192 L336 156 L372 192" fill="none" stroke="#ffffff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+const img = new Image();
+img.onload = () => { const ctx = document.getElementById('c').getContext('2d'); ctx.clearRect(0,0,320,320); ctx.drawImage(img, 0, 0, 320, 320); };
+img.src = 'data:image/svg+xml;base64,' + btoa(svg);
+
+function download(size) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = size;
+  cv.getContext('2d').drawImage(img, 0, 0, size, size);
+  cv.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'escalate-icon-' + size + '.png'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }, 'image/png');
+}
+</script>
+</body>
+</html>

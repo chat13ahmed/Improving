@@ -1,10 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Escalate">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#3B82F6"/>
-      <stop offset="1" stop-color="#1D4ED8"/>
+    <linearGradient id="bg" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#FB923C"/>
+      <stop offset="0.45" stop-color="#EF4444"/>
+      <stop offset="1" stop-color="#A855F7"/>
     </linearGradient>
   </defs>
-  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#g)"/>
-  <path d="M300 50 L160 290 H250 L210 462 L368 222 H278 Z" fill="#fff"/>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <!-- escalator handrail (subtle diagonal) -->
+  <line x1="120" y1="404" x2="404" y2="148" stroke="#ffffff" stroke-opacity="0.45" stroke-width="22" stroke-linecap="round"/>
+  <!-- ascending steps -->
+  <path d="M120 372 H192 V300 H264 V228 H336 V156" fill="none" stroke="#ffffff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- up arrowhead at the top step -->
+  <path d="M300 192 L336 156 L372 192" fill="none" stroke="#ffffff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
