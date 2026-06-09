@@ -4559,7 +4559,8 @@ async function toggleCheck(id) {
 async function addReminder() {
   const label = (document.getElementById('rem-label')?.value || '').trim();
   const time = document.getElementById('rem-time')?.value || '';
-  const date = document.getElementById('rem-date')?.value || ''; // optional: a specific future day
+  const repeat = !!document.getElementById('rem-repeat')?.checked;
+  const date = repeat ? '' : (document.getElementById('rem-date')?.value || todayStr()); // defaults to today; blank (repeat) = daily
   if (!label || !time) { showToast('Add a label and a time.', 'error'); return; }
   if (date && date < todayStr()) { showToast('Pick today or a future date.', 'error'); return; }
   ensureChecklistData();
@@ -4751,10 +4752,11 @@ function renderChecklistPage() {
     '<div class="rem-add">' +
     '<input type="text" id="rem-label" placeholder="Reminder (e.g. Call the dentist)">' +
     '<input type="time" id="rem-time" value="20:00">' +
-    '<input type="date" id="rem-date" min="' + todayStr() + '" title="Optional — pick a day for a one-time reminder; leave blank for daily">' +
+    '<input type="date" id="rem-date" value="' + todayStr() + '" min="' + todayStr() + '" title="The day for this reminder — tap to pick another day (defaults to today)">' +
     '<button type="button" class="btn btn-primary" onclick="addReminder()">+ Add</button>' +
     '</div>' +
-    '<div class="rem-note">📅 Leave the date blank for a <strong>daily</strong> reminder, or pick a day for a <strong>one-time</strong> reminder (set it days in advance).</div>' +
+    '<label class="rem-repeat-row"><input type="checkbox" id="rem-repeat" onchange="document.getElementById(\'rem-date\').disabled=this.checked"> 🔁 Repeat every day</label>' +
+    '<div class="rem-note">📅 Defaults to <strong>today</strong> — tap the date to pick any day ahead. Or check <strong>Repeat every day</strong> for a daily reminder.</div>' +
     '<div class="rem-note">💡 Reminders nudge you while the app is open. On a phone, add it to your home screen and allow notifications for the best results.</div>' +
     '</div>' +
     renderNudgeCard();

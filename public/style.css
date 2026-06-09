@@ -1241,6 +1241,9 @@ body {
 .rem-add input[type="time"], .rem-add input[type="date"] { padding: 9px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: rgba(0,0,0,0.35); color: var(--text); font-size: 14px; outline: none; }
 .rem-add input:focus { border-color: var(--accent); }
 .rem-when { font-size: 11px; color: #2dd4bf; font-weight: 700; white-space: nowrap; }
+.rem-repeat-row { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--text-muted); margin: 10px 0 2px; cursor: pointer; user-select: none; }
+.rem-repeat-row input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+.rem-add input:disabled { opacity: 0.4; }
 .rem-note { font-size: 12px; color: var(--text-muted); margin-top: 14px; line-height: 1.5; }
 .rem-notif-on { font-size: 12px; font-weight: 700; color: var(--success); }
 
