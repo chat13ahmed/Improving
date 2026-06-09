@@ -17,8 +17,12 @@ async function sendPush(subscription, payload) {
   return wp().sendNotification(subscription, JSON.stringify(payload));
 }
 // Pure: should this reminder fire at the given local time/date? (testable)
+// r.date (optional, 'YYYY-MM-DD') = a one-time reminder scheduled for that day;
+// no date = daily recurring.
 function isReminderDue(r, hhmm, date) {
-  return !!r && r.enabled && r._lastFired !== date && (r.time || '99:99') <= hhmm;
+  if (!r || !r.enabled || r._lastFired === date) return false;
+  if (r.date && date < r.date) return false;       // scheduled for a future day — not yet
+  return (r.time || '99:99') <= hhmm;
 }
 // The user's local wall-clock, given a tz offset in minutes (local = UTC + tz)
 function userLocal(tzMin, nowMs) {

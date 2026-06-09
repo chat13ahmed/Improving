@@ -4559,9 +4559,11 @@ async function toggleCheck(id) {
 async function addReminder() {
   const label = (document.getElementById('rem-label')?.value || '').trim();
   const time = document.getElementById('rem-time')?.value || '';
+  const date = document.getElementById('rem-date')?.value || ''; // optional: a specific future day
   if (!label || !time) { showToast('Add a label and a time.', 'error'); return; }
+  if (date && date < todayStr()) { showToast('Pick today or a future date.', 'error'); return; }
   ensureChecklistData();
-  state.data.reminders.push({ id: uid(), label, time, enabled: true, _lastFired: '' });
+  state.data.reminders.push({ id: uid(), label, time, date, enabled: true, _lastFired: '' });
   await saveData();
   renderChecklistPage();
 }
@@ -4622,8 +4624,11 @@ async function sendTestPush() {
 }
 
 // Pure: is this reminder due to fire right now? (testable)
+// r.date (optional) = one-time reminder for that day; no date = daily.
 function reminderDue(r, hhmm, today) {
-  return !!r && r.enabled && r._lastFired !== today && (r.time || '99:99') <= hhmm;
+  if (!r || !r.enabled || r._lastFired === today) return false;
+  if (r.date && today < r.date) return false;     // scheduled for a future day
+  return (r.time || '99:99') <= hhmm;
 }
 function isPushSubscribed() { return !!(state.data && state.data.profile && state.data.profile.pushSubscribed); }
 function fireReminder(r) {
@@ -4640,7 +4645,7 @@ function checkReminders() {
   const hhmm = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
   const today = todayStr();
   let changed = false;
-  (state.data.reminders || []).forEach(r => { if (reminderDue(r, hhmm, today)) { r._lastFired = today; changed = true; fireReminder(r); } });
+  (state.data.reminders || []).forEach(r => { if (reminderDue(r, hhmm, today)) { r._lastFired = today; if (r.date) r.enabled = false; changed = true; fireReminder(r); } });
   if (changed) saveData();
 }
 let _reminderTimer = null;
@@ -4717,7 +4722,7 @@ function renderChecklistPage() {
   const remRows = reminders.length
     ? reminders.map(r => '<div class="rem-row' + (r.enabled ? '' : ' rem-off') + '">' +
         '<span class="rem-time">' + escapeHtml(r.time) + '</span>' +
-        '<span class="rem-label">' + escapeHtml(r.label) + '</span>' +
+        '<span class="rem-label">' + escapeHtml(r.label) + (r.date ? ' <span class="rem-when">📅 ' + fmtDateShort(r.date) + '</span>' : '') + '</span>' +
         '<label class="pc-toggle"><input type="checkbox" ' + (r.enabled ? 'checked' : '') + ' onchange="toggleReminder(\'' + r.id + '\')"><span class="pc-slider"></span></label>' +
         '<button type="button" class="chk-del" onclick="deleteReminder(\'' + r.id + '\')" title="Remove">🗑️</button>' +
         '</div>').join('')
@@ -4744,10 +4749,12 @@ function renderChecklistPage() {
     '<h3 class="card-title" style="margin-bottom:0">⏰ Reminders</h3>' + notifBtn + '</div>' +
     '<div class="rem-list">' + remRows + '</div>' +
     '<div class="rem-add">' +
-    '<input type="text" id="rem-label" placeholder="Reminder (e.g. Log your day)">' +
+    '<input type="text" id="rem-label" placeholder="Reminder (e.g. Call the dentist)">' +
     '<input type="time" id="rem-time" value="20:00">' +
+    '<input type="date" id="rem-date" min="' + todayStr() + '" title="Optional — pick a day for a one-time reminder; leave blank for daily">' +
     '<button type="button" class="btn btn-primary" onclick="addReminder()">+ Add</button>' +
     '</div>' +
+    '<div class="rem-note">📅 Leave the date blank for a <strong>daily</strong> reminder, or pick a day for a <strong>one-time</strong> reminder (set it days in advance).</div>' +
     '<div class="rem-note">💡 Reminders nudge you while the app is open. On a phone, add it to your home screen and allow notifications for the best results.</div>' +
     '</div>' +
     renderNudgeCard();

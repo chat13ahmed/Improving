@@ -155,6 +155,8 @@ ok('reminderDue: due (past time, enabled, unfired)', A.reminderDue({ enabled: tr
 ok('reminderDue: not due (future time)', A.reminderDue({ enabled: true, _lastFired: '', time: '23:00' }, '09:00', _t) === false);
 ok('reminderDue: already fired today', A.reminderDue({ enabled: true, _lastFired: _t, time: '08:00' }, '09:00', _t) === false);
 ok('reminderDue: disabled', A.reminderDue({ enabled: false, _lastFired: '', time: '08:00' }, '09:00', _t) === false);
+ok('reminderDue: dated future not due', A.reminderDue({ enabled: true, _lastFired: '', time: '08:00', date: '2099-01-01' }, '09:00', _t) === false);
+ok('reminderDue: dated today is due', A.reminderDue({ enabled: true, _lastFired: '', time: '08:00', date: _t }, '09:00', _t) === true);
 A.state.data = { profile: {}, days: [], weeks: [], weights: [] };
 A.ensureChecklistData();
 ok('ensureChecklistData creates the fields', Array.isArray(A.state.data.checklist) && Array.isArray(A.state.data.reminders) && typeof A.state.data.checkDone === 'object');
@@ -308,6 +310,8 @@ if (P) {
   ok('push due (past time)', P.isReminderDue({ enabled: true, _lastFired: '', time: '08:00' }, '09:00', '2026-06-03') === true);
   ok('push not due (future time)', P.isReminderDue({ enabled: true, _lastFired: '', time: '10:00' }, '09:00', '2026-06-03') === false);
   ok('push not due (fired today)', P.isReminderDue({ enabled: true, _lastFired: '2026-06-03', time: '08:00' }, '09:00', '2026-06-03') === false);
+  ok('push dated reminder fires on its day', P.isReminderDue({ enabled: true, _lastFired: '', time: '08:00', date: '2026-06-03' }, '09:00', '2026-06-03') === true);
+  ok('push dated reminder not before its day', P.isReminderDue({ enabled: true, _lastFired: '', time: '08:00', date: '2026-06-10' }, '09:00', '2026-06-03') === false);
   const ul = P.userLocal(120, Date.UTC(2026, 5, 3, 18, 30)); // 18:30 UTC + 2h → 20:30 local
   ok('push userLocal applies tz offset', ul.hhmm === '20:30' && ul.date === '2026-06-03');
   ok('push configured() false without VAPID env', P.configured() === false);

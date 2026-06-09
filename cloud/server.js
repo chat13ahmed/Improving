@@ -512,7 +512,7 @@ app.post('/api/cron/tick', async (req, res) => {
           try { await push.sendPush(sub, { title: '⏰ ' + r.label, body: 'Business Escalate', url: './', tag: r.id }); sent++; }
           catch (e) { if (e && (e.statusCode === 404 || e.statusCode === 410)) { try { await DB.deletePushSub(sub.endpoint); } catch {} } }
         }
-        r._lastFired = local.date; changed = true;
+        r._lastFired = local.date; if (r.date) r.enabled = false; changed = true; // one-time dated reminder is done
       }
 
       // 2) Daily streak nudge — once/day, evening, only if they haven't logged today
