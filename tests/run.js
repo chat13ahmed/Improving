@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -104,6 +104,15 @@ ok('unitToGrams mL ≈ g (liquid)', A.unitToGrams(500, 'ml') === 500);
 ok('unitToGrams litre = 1000 g', A.unitToGrams(1, 'l') === 1000);
 ok('unitToGrams oz = 28.35 g', Math.abs(A.unitToGrams(2, 'oz') - 56.7) < 0.001);
 ok('unitToGrams serving uses food.sg', A.unitToGrams(2, 'serving', { sg: 118 }) === 236);
+
+// Nutrition advice (instant, rule-based coaching)
+const _nt = { calories: 3000, protein: { g: 160 }, carbs: { g: 300 }, fat: { g: 80 } };
+ok('advice: no target → empty', A.nutritionAdvice({ kcal: 500, p: 20 }, null) === '');
+ok('advice: low protein when calories used', /protein-heavy/.test(A.nutritionAdvice({ kcal: 2000, p: 50, c: 250, f: 60 }, _nt)));
+ok('advice: targets hit', /Targets hit/.test(A.nutritionAdvice({ kcal: 2900, p: 170, c: 280, f: 75 }, _nt)));
+ok('advice: over calories warns', /over your target/.test(A.nutritionAdvice({ kcal: 3300, p: 160, c: 300, f: 80 }, _nt)));
+ok('advice: protein hit with cals left', /Protein goal hit/.test(A.nutritionAdvice({ kcal: 1800, p: 165, c: 180, f: 50 }, _nt)));
+ok('advice: early progress shows remaining', /to go/.test(A.nutritionAdvice({ kcal: 600, p: 30, c: 60, f: 20 }, _nt)));
 
 // Pillars
 const dp = A.defaultPillars();

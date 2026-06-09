@@ -1498,16 +1498,36 @@ function renderFoodLogList() {
   ).join('') + '</div>';
 }
 
+// Instant, rule-based nutrition coaching based on what they've eaten vs. their targets
+function nutritionAdvice(eaten, nut) {
+  if (!nut || !nut.calories) return '';
+  const kcal = eaten.kcal || 0, p = eaten.p || 0, c = eaten.c || 0, f = eaten.f || 0;
+  const pG = nut.protein.g, cG = nut.carbs.g, fG = nut.fat.g;
+  const calLeft = Math.round(nut.calories - kcal);
+  const pLeft = Math.round(pG - p);
+  const calPct = kcal / nut.calories;
+  const pPct = pG ? p / pG : 1;
+  if (calPct >= 1.08) return '⚠️ ' + Math.abs(calLeft) + ' cal over your target today — keep anything else light, and get a walk in.';
+  if (calPct >= 0.95 && pPct >= 1) return '🎯 Targets hit — calories and protein both on point. Strong day!';
+  if (pPct >= 1 && calLeft > 50) return '💪 Protein goal hit (' + Math.round(p) + 'g)! You have ' + calLeft + ' cal left — keep it clean.';
+  if (calPct >= 0.6 && pPct < 0.6) return '🥩 Low on protein — only ' + Math.round(p) + 'g of ' + pG + 'g. Make your next bite protein-heavy: chicken, eggs, Greek yogurt, or a shake.';
+  if (fG && f > fG * 1.25) return '🧈 Over on fat (' + Math.round(f) + 'g of ' + fG + 'g) — favor lean protein & veggies the rest of the day.';
+  if (cG && c > cG * 1.25 && pPct < 0.9) return '🍞 Carbs are high (' + Math.round(c) + 'g) and protein is lagging — swap a carb for protein next meal.';
+  if (calLeft > 0) return '🍽️ ' + calLeft + ' cal and ' + Math.max(0, pLeft) + 'g protein to go — aim for ~' + Math.max(5, Math.round(Math.max(0, pLeft) / 2)) + 'g protein next meal.';
+  return '';
+}
 function renderFoodLogTotals() {
   const t = foodLogTotals(state._foodLog);
   if (!t.kcal) return '';
   const nut = getNutrition();
   const pTarget = nut ? nut.protein.g : 0;
+  const advice = nutritionAdvice(t, nut);
   return '<div class="food-log-total">' +
     'Logged: <b>' + Math.round(t.kcal).toLocaleString() + ' cal</b> · ' +
     '<b class="mp">' + Math.round(t.p) + 'g</b> protein' + (pTarget ? ' / ' + pTarget + 'g' : '') + ' · ' +
     '<b class="mc">' + Math.round(t.c) + 'g</b> carbs · <b class="mf">' + Math.round(t.f) + 'g</b> fat' +
-    '</div>';
+    '</div>' +
+    (advice ? '<div class="food-advice">' + advice + '</div>' : '');
 }
 
 function addFoodToLog() {
