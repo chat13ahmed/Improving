@@ -645,7 +645,7 @@ function renderAuthScreen(mode) {
   screen.innerHTML =
     '<div class="auth-card">' +
     '<div class="auth-brand"><span class="brand-icon">⚡</span><div>' +
-    '<div class="auth-title">Business Escalate</div><div class="auth-sub">Life Progress</div></div></div>' +
+    '<div class="auth-title">Escalate</div><div class="auth-sub">Life Progress</div></div></div>' +
     '<div class="auth-hook">' +
     '<div class="auth-hook-title">🔗 See what connects your life</div>' +
     '<div class="auth-hook-sub">One place for your gym, money, nutrition, reading and habits — with an AI coach that watches every area at once and reveals how they pull on each other.</div>' +
@@ -683,7 +683,7 @@ function renderAuthScreen(mode) {
     '<div class="auth-note">🔒 Your account is private — only you can see your data.</div>' +
     '<div style="margin-top:10px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap">' +
     '<button type="button" class="btn-link" onclick="startDemo()">👀 See a live demo</button>' +
-    '<a class="btn-link" href="about.html">What is Business Escalate? →</a></div>' +
+    '<a class="btn-link" href="about.html">What is Escalate? →</a></div>' +
     '</div>' +
     '</div>';
   document.body.appendChild(screen);
@@ -1001,7 +1001,7 @@ function renderPaywall() {
   s.innerHTML =
     '<div class="auth-card" style="text-align:center">' +
     '<div class="auth-brand" style="justify-content:center"><span class="brand-icon">⚡</span><div>' +
-    '<div class="auth-title">Your free trial has ended</div><div class="auth-sub">Business Escalate Pro</div></div></div>' +
+    '<div class="auth-title">Your free trial has ended</div><div class="auth-sub">Escalate Pro</div></div></div>' +
     '<p style="color:var(--text-muted);line-height:1.6;margin:6px 0 18px">Keep your streak, your AI coach, and all your progress. Subscribe to unlock the full app.</p>' +
     '<div style="font-size:32px;font-weight:900;color:var(--text);line-height:1.1">' + escapeHtml(state.priceLabel || '$7.99/mo') + '</div>' +
     '<div style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Cancel anytime</div>' +
@@ -1999,7 +1999,7 @@ function buildWeekCardBlob() {
 
     x.textAlign = 'center';
     x.fillStyle = '#eef1f7'; x.font = '700 46px ' + FONT;
-    x.fillText('⚡ Business Escalate', cx, 180);
+    x.fillText('⚡ Escalate', cx, 180);
 
     const s = weekShareStats();
     if (s.streak >= 2) {
@@ -2034,7 +2034,7 @@ function buildWeekCardBlob() {
     fg.addColorStop(0, '#2dd4bf'); fg.addColorStop(1, '#3b82f6');
     x.fillStyle = fg; x.font = '800 54px ' + FONT; x.fillText('🔗 See what connects your life', cx, H - 240);
     x.fillStyle = '#9aa3b2'; x.font = '500 42px ' + FONT; x.fillText('One app for your whole life', cx, H - 165);
-    x.fillStyle = '#eef1f7'; x.font = '700 44px ' + FONT; x.fillText('Business Escalate', cx, H - 95);
+    x.fillStyle = '#eef1f7'; x.font = '700 44px ' + FONT; x.fillText('Escalate', cx, H - 95);
 
     cv.toBlob(b => resolve(b), 'image/png');
   });
@@ -2046,7 +2046,7 @@ async function shareMyWeek() {
     if (!blob) { showToast('Could not create the card.', 'error'); return; }
     const file = new File([blob], 'my-week.png', { type: 'image/png' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'My week on Business Escalate', text: 'See what connects your life 🔗' });
+      await navigator.share({ files: [file], title: 'My week on Escalate', text: 'See what connects your life 🔗' });
     } else {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = 'my-week.png'; a.click();
@@ -4482,7 +4482,7 @@ async function importData(input) {
     const parsed = JSON.parse(await file.text());
     const data = (parsed && parsed.data) ? parsed.data : parsed; // accept wrapped or raw
     if (!data || typeof data !== 'object' || !('days' in data) || !('profile' in data)) {
-      showToast('That doesn\'t look like a Business Escalate backup.', 'error'); input.value = ''; return;
+      showToast('That doesn\'t look like a Escalate backup.', 'error'); input.value = ''; return;
     }
     if (!confirm('Import this backup? It will REPLACE all current data for this account.')) { input.value = ''; return; }
     data.profile = data.profile || {};
@@ -4638,7 +4638,7 @@ function fireReminder(r) {
   // If the device is subscribed to server push, the cron already delivers this
   // reminder — don't also raise a local system notification (would double-notify).
   if (!isPushSubscribed() && 'Notification' in window && Notification.permission === 'granted') {
-    try { new Notification('⏰ ' + (name ? name + ', ' : '') + r.label, { body: 'Business Escalate', tag: r.id }); } catch {}
+    try { new Notification('⏰ ' + (name ? name + ', ' : '') + r.label, { body: 'Escalate', tag: r.id }); } catch {}
   }
 }
 function checkReminders() {
@@ -4905,7 +4905,7 @@ function renderAdminStatsCard() {
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
     '<h3 class="card-title" style="margin-bottom:0">📊 Your app — live numbers</h3>' +
     '<button class="btn btn-outline btn-sm" onclick="loadAdminStats()">↻ Refresh</button></div>' +
-    '<p class="card-sub">Owner only. How many people use Business Escalate and how active they are.</p>' +
+    '<p class="card-sub">Owner only. How many people use Escalate and how active they are.</p>' +
     '<div id="admin-stats" class="admin-grid"><div class="di-loading"><div class="spinner"></div><span>Loading…</span></div></div>' +
     '<div id="admin-recent"></div></div>';
 }

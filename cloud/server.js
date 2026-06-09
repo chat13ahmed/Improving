@@ -1,5 +1,5 @@
 /*
- * Business Escalate — CLOUD backend (Phase 1)
+ * Escalate — CLOUD backend (Phase 1)
  * ------------------------------------------------------------------
  * Multi-user backend with a real database:
  *   • SQLite locally (zero install) → Postgres in the cloud (see db.js)
@@ -509,7 +509,7 @@ app.post('/api/cron/tick', async (req, res) => {
       for (const r of (data.reminders || [])) {
         if (!push.isReminderDue(r, local.hhmm, local.date)) continue;
         for (const sub of byUser[uid]) {
-          try { await push.sendPush(sub, { title: '⏰ ' + r.label, body: 'Business Escalate', url: './', tag: r.id }); sent++; }
+          try { await push.sendPush(sub, { title: '⏰ ' + r.label, body: 'Escalate', url: './', tag: r.id }); sent++; }
           catch (e) { if (e && (e.statusCode === 404 || e.statusCode === 410)) { try { await DB.deletePushSub(sub.endpoint); } catch {} } }
         }
         r._lastFired = local.date; if (r.date) r.enabled = false; changed = true; // one-time dated reminder is done
@@ -539,7 +539,7 @@ app.get(/^(?!\/api\/).*/, (req, res) => res.sendFile(path.join(CLIENT_DIR, 'inde
 
 if (require.main === module) {
   DB.init()
-    .then(() => app.listen(PORT, () => console.log('Business Escalate cloud server on :' + PORT + ' (db: ' + DB.kind() + ')')))
+    .then(() => app.listen(PORT, () => console.log('Escalate cloud server on :' + PORT + ' (db: ' + DB.kind() + ')')))
     .catch(err => { console.error('Startup failed:', err.message); process.exit(1); });
 }
 

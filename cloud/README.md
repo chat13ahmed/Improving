@@ -1,4 +1,4 @@
-# Business Escalate — Cloud Backend
+# Escalate — Cloud Backend
 
 Phase 1 of the cloud plan (`../docs/CLOUD_SYNC_PLAN.md`). A deployable,
 multi-user backend: **Postgres + JWT auth + server-side AI**, with the same

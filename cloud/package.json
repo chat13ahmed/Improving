@@ -1,7 +1,7 @@
 {
   "name": "business-escalate-cloud",
   "version": "1.0.0",
-  "description": "Cloud backend for Business Escalate (Postgres + JWT + server-side AI).",
+  "description": "Cloud backend for Escalate (Postgres + JWT + server-side AI).",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

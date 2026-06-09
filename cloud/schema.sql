@@ -1,4 +1,4 @@
--- Business Escalate cloud schema (also auto-created on first boot by ensureSchema()).
+-- Escalate cloud schema (also auto-created on first boot by ensureSchema()).
 CREATE TABLE IF NOT EXISTS users (
   id           BIGSERIAL PRIMARY KEY,
   username     TEXT UNIQUE NOT NULL,

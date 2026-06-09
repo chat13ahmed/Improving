@@ -507,7 +507,7 @@ Rules: warm, direct, no fluff or generic filler; use their actual data. If the w
 });
 
 app.listen(PORT, HOST, () => {
-  console.log(`Business Escalate server ready on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
+  console.log(`Escalate server ready on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
   if (HOST === '0.0.0.0') console.log('LAN mode: open http://<your-computer-IP>:' + PORT + ' from a phone on the same Wi-Fi');
   console.log(`Data stored in: ${BASE_DIR}`);
 });

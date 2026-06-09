@@ -1,4 +1,4 @@
-/* Business Escalate service worker — makes the app installable & offline-capable.
+/* Escalate service worker — makes the app installable & offline-capable.
    Strategy: network-first for the app shell (so edits are picked up online,
    cache is the offline fallback). API calls and writes are never cached. */
 const CACHE = 'be-shell-v1';
@@ -20,8 +20,8 @@ self.addEventListener('activate', (e) => {
 // Web push: show the notification (works even when the app is closed)
 self.addEventListener('push', (e) => {
   let data = {};
-  try { data = e.data ? e.data.json() : {}; } catch { data = { title: 'Business Escalate', body: (e.data && e.data.text()) || '' }; }
-  const title = data.title || 'Business Escalate';
+  try { data = e.data ? e.data.json() : {}; } catch { data = { title: 'Escalate', body: (e.data && e.data.text()) || '' }; }
+  const title = data.title || 'Escalate';
   const options = {
     body: data.body || '',
     icon: 'icon.svg',
