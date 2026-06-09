@@ -125,7 +125,8 @@ function aiAllowed(key) {
 // ── App ──
 const app = express();
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(CLIENT_DIR));
+// dotfiles: 'allow' so /.well-known/assetlinks.json (Android app verification) is served
+app.use(express.static(CLIENT_DIR, { dotfiles: 'allow' }));
 
 function tokenFrom(req) {
   const a = req.headers.authorization || '';
