@@ -165,7 +165,7 @@ app.post('/api/signup', async (req, res) => {
     let sq = null, ss = null, sh = null;
     if (securityQuestion && securityAnswer.length >= 2) { const s = hashPassword(normalizeAnswer(securityAnswer)); sq = securityQuestion; ss = s.salt; sh = s.hash; }
     const id = await DB.createUser({ username, email, phone: phone || null, pw_salt: salt, pw_hash: hash, sec_question: sq, sec_salt: ss, sec_hash: sh });
-    const seed = defaultData(); seed.profile = { ...(seed.profile || {}), email, phone };
+    const seed = defaultData(); seed.profile = { ...(seed.profile || {}), email, phone, trialEnds: Date.now() + 14 * 86400000, pro: false };
     await DB.saveData(id, seed, 1);
     res.json({ token: signJwt({ sub: id, username }, JWT_SECRET), username, hasSecurity: !!sq });
   } catch (e) {
@@ -278,7 +278,22 @@ app.post('/api/data', requireAuth, async (req, res) => {
 
 // ── AI (server-side key, rate-limited; no user key required) ──
 app.get('/api/key-status', (req, res) => res.json({ hasKey: !!getApiKey() }));
-app.get('/api/settings', (req, res) => res.json({ hasKey: !!getApiKey(), keyPreview: '' }));
+app.get('/api/settings', (req, res) => res.json({ hasKey: !!getApiKey(), keyPreview: '', payLink: process.env.STRIPE_PAYMENT_LINK || '', price: process.env.PRICE_LABEL || '$7.99/mo' }));
+
+// Owner-only: activate (or revoke) Pro for a user after they pay
+app.post('/api/admin/grant-pro', requireAuth, async (req, res) => {
+  if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });
+  try {
+    const u = await DB.findUserByName((req.body.username || '').trim());
+    if (!u) return res.status(404).json({ error: 'No account with that username.' });
+    const d = await DB.getData(u.id);
+    if (!d || !d.data) return res.status(404).json({ error: 'No data for that user.' });
+    d.data.profile = d.data.profile || {};
+    d.data.profile.pro = req.body.pro !== false;
+    await DB.saveData(u.id, d.data, d.version + 1);
+    res.json({ success: true, username: u.username, pro: d.data.profile.pro });
+  } catch (e) { res.status(500).json({ error: 'Failed to update.' }); }
+});
 app.post('/api/settings', (req, res) => res.json({ success: true }));
 
 function aiGuard(req, res) {

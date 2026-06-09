@@ -591,10 +591,15 @@ async function startApp() {
     state.data = await dataRes.json();
     state._dataVersion = parseInt(dataRes.headers.get('X-Data-Version'), 10) || 1;
     state.hasApiKey = ks.hasKey;
+    state.payLink = ks.payLink || '';
+    state.priceLabel = ks.price || '$7.99/mo';
+    state.paymentsLive = !!ks.payLink;       // paywall only turns on once a Stripe link is set
   } catch {
     state.data = { profile: { name: '', gymDaysPerWeek: 5, weeklyIncomeGoal: 0, weeklyNetworkGoal: 3 }, days: [], weeks: [], ideas: [] };
     state._dataVersion = 1;
   }
+  // Subscription gate: once payments are live, lock the app after the free trial ends
+  if (subStatus().locked) { renderPaywall(); return; }
   if (!state.data.profile)   state.data.profile   = { name: '', gymDaysPerWeek: 5, weeklyIncomeGoal: 0, weeklyNetworkGoal: 3 };
   if (!state.data.days)     state.data.days     = [];
   if (!state.data.weeks)    state.data.weeks    = [];
@@ -971,6 +976,46 @@ async function reloadAfterConflict() {
     showToast('Your data changed on another device — reloaded the latest. Re-enter your last change if it’s missing.', 'error');
     navigate(state.page || 'dashboard');
   } catch { /* leave local state as-is */ }
+}
+
+// ── Free trial + subscription gate ──
+function subStatus() {
+  const p = (state.data && state.data.profile) || {};
+  const pro = !!p.pro || !!state.isOwner;             // owner always has full access
+  const trialEnds = Number(p.trialEnds) || 0;
+  const trialing = !pro && trialEnds > Date.now();
+  const daysLeft = trialing ? Math.max(1, Math.ceil((trialEnds - Date.now()) / 86400000)) : 0;
+  const expired = !pro && trialEnds > 0 && trialEnds <= Date.now();
+  const locked = !!state.paymentsLive && expired;     // only lock once a payment link is configured
+  return { pro, trialing, daysLeft, expired, locked };
+}
+function goSubscribe() {
+  if (state.payLink) window.open(state.payLink, '_blank');
+  else showToast('Payments are being set up — hang tight!', 'error');
+}
+function renderPaywall() {
+  document.getElementById('auth-screen')?.remove();
+  document.body.classList.add('auth-active');
+  const s = document.createElement('div');
+  s.id = 'auth-screen';
+  s.innerHTML =
+    '<div class="auth-card" style="text-align:center">' +
+    '<div class="auth-brand" style="justify-content:center"><span class="brand-icon">⚡</span><div>' +
+    '<div class="auth-title">Your free trial has ended</div><div class="auth-sub">Business Escalate Pro</div></div></div>' +
+    '<p style="color:var(--text-muted);line-height:1.6;margin:6px 0 18px">Keep your streak, your AI coach, and all your progress. Subscribe to unlock the full app.</p>' +
+    '<div style="font-size:32px;font-weight:900;color:var(--text);line-height:1.1">' + escapeHtml(state.priceLabel || '$7.99/mo') + '</div>' +
+    '<div style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Cancel anytime</div>' +
+    '<button class="btn btn-primary auth-submit" onclick="goSubscribe()">⭐ Subscribe</button>' +
+    '<div class="auth-foot"><button class="btn-link" onclick="location.reload()">I just subscribed — refresh</button>' +
+    '<div style="margin-top:10px"><button class="btn-link" onclick="logout()">Log out</button></div></div>' +
+    '</div>';
+  document.body.appendChild(s);
+}
+function renderTrialBanner() {
+  const s = subStatus();
+  if (!s.trialing) return '';
+  return '<div class="trial-banner">🎁 <strong>' + s.daysLeft + ' day' + (s.daysLeft === 1 ? '' : 's') + ' left</strong> in your free trial' +
+    (state.paymentsLive ? ' · <button type="button" class="btn-link" onclick="goSubscribe()">Subscribe</button>' : '') + '</div>';
 }
 
 function todayStr() { return new Date().toISOString().split('T')[0]; }
@@ -2255,7 +2300,7 @@ function renderDashboard() {
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p></div>' +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">📤 Share my week</button>' : '') +
     '</div>' +
-    renderStreakCard() + renderReminderBanner() + renderQuoteCard() + renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderMoneyCircleCard() + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
+    renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard() + renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderMoneyCircleCard() + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
 
   setTimeout(animateCounters, 120);
   if (showIncomeChart) initIncomeChart(sortedWeeks);
@@ -4826,7 +4871,22 @@ function renderOwnerCard() {
     '<div class="form-group"><label>Message</label>' +
     '<textarea id="bc-body" rows="2" maxlength="300" placeholder="e.g. Don\'t forget to log your day — keep the streak alive!"></textarea></div>' +
     '<button type="button" class="btn btn-primary" onclick="sendBroadcast()">📣 Send to everyone</button>' +
+    '<hr style="border:none;border-top:1px solid var(--border);margin:18px 0">' +
+    '<h3 class="card-title" style="margin-bottom:6px">⭐ Activate a subscriber</h3>' +
+    '<p class="card-sub">After someone pays, enter their username here to unlock Pro for their account.</p>' +
+    '<div class="rem-add"><input type="text" id="pro-user" placeholder="their username">' +
+    '<button type="button" class="btn btn-primary" onclick="grantPro()">Grant Pro</button></div>' +
     '</div>';
+}
+async function grantPro() {
+  const username = (document.getElementById('pro-user').value || '').trim();
+  if (!username) { showToast('Enter a username.', 'error'); return; }
+  try {
+    const r = await fetch('/api/admin/grant-pro', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ username, pro: true }) });
+    const j = await r.json();
+    if (r.ok) { showToast('✅ ' + j.username + ' is now Pro.', 'success'); document.getElementById('pro-user').value = ''; }
+    else showToast(j.error || 'Could not update.', 'error');
+  } catch { showToast('Could not update.', 'error'); }
 }
 
 // Owner-only live analytics — so you can SEE if people actually use it

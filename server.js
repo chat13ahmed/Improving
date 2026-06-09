@@ -188,7 +188,7 @@ app.post('/api/signup', (req, res) => {
   if (accounts.length === 1 && fs.existsSync(LEGACY_DATA_FILE)) {
     try { seed = JSON.parse(fs.readFileSync(LEGACY_DATA_FILE, 'utf8')); } catch {}
   }
-  seed.profile = { ...(seed.profile || {}), email, phone };
+  seed.profile = { ...(seed.profile || {}), email, phone, trialEnds: Date.now() + 14 * 86400000, pro: false };
   writeData(id, seed);
 
   const token = newToken();

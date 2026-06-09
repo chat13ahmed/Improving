@@ -59,7 +59,7 @@ function loadApp(fieldValues) {
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
     ' loggingStreak, bestStreak, weekShareStats, weekShareTiles, getWeekStats, getWeekStart, daysSince,' +
-    ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData });';
+    ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -231,6 +231,21 @@ ok('money circle spent fraction', Math.abs(_circ.spentFrac - (500 / 2600)) < 0.0
 // demo preview data shape
 const _demo = A.buildDemoData();
 ok('buildDemoData shape (21 days, profile, income, book)', _demo.days.length === 21 && !!_demo.profile && Object.keys(_demo.incomes).length >= 1 && _demo.books.length === 1 && _demo.days.every(d => !!d.date));
+
+// subscription gate (free trial → paywall)
+A.state.isOwner = false; A.state.paymentsLive = true;
+A.state.data = { profile: { pro: false, trialEnds: Date.now() + 5 * 86400000 } };
+ok('trial active → not locked, days left', (() => { const s = A.subStatus(); return s.trialing && s.daysLeft >= 4 && s.daysLeft <= 5 && !s.locked; })());
+A.state.data = { profile: { pro: false, trialEnds: Date.now() - 86400000 } };
+ok('trial expired + payments live → locked', A.subStatus().locked === true);
+A.state.paymentsLive = false;
+ok('expired but payments off → NOT locked (no lockout before Stripe)', A.subStatus().locked === false);
+A.state.paymentsLive = true;
+A.state.data = { profile: { pro: true, trialEnds: Date.now() - 86400000 } };
+ok('pro user → never locked', A.subStatus().pro === true && A.subStatus().locked === false);
+A.state.isOwner = true; A.state.data = { profile: { trialEnds: Date.now() - 999999999 } };
+ok('owner → always pro/unlocked', A.subStatus().pro === true && A.subStatus().locked === false);
+A.state.isOwner = false; A.state.paymentsLive = false;
 
 // Weekly score only counts enabled pillars (no crash, 0..100)
 A.state.data = { profile: { pillars: dp, gymDaysPerWeek: 5, weeklyNetworkGoal: 3, weeklyIncomeGoal: 1000, weeklyReadGoal: 100 }, days: [], weeks: [], weights: [] };

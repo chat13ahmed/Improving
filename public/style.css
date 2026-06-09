@@ -1151,6 +1151,14 @@ body {
 .net-hint:empty { display:none; }
 .period-set { display:flex; align-items:center; justify-content:space-between; gap:10px; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:10px; padding:11px 14px; font-size:15px; margin-bottom:6px; }
 
+/* ─── Free-trial banner ─────────────────── */
+.trial-banner {
+  background: linear-gradient(135deg, rgba(124,92,255,0.16), rgba(59,130,246,0.08));
+  border: 1px solid rgba(124,92,255,0.35); border-radius: var(--radius-sm);
+  padding: 11px 16px; margin-bottom: 16px; font-size: 14px; color: var(--text); text-align: center;
+}
+.trial-banner .btn-link { font-size: 14px; font-weight: 700; }
+
 /* ─── Demo preview banner ─────────────────── */
 #preview-banner {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 9000;
