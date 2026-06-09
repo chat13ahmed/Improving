@@ -270,6 +270,10 @@ function sanitizeHtml(html) {
 function escapeHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+// Attribute-safe (also escapes quotes) — for placing user text in value="…"
+function escapeAttr(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 // Render markdown safely; falls back to plain text if the lib didn't load
 function renderMarkdown(text) {
   if (typeof marked !== 'undefined') return sanitizeHtml(marked.parse(text));
@@ -1682,24 +1686,64 @@ function logMyMeal(id) {
   showToast('Logged ' + m.name, 'success');
 }
 
-// Create-a-meal form (manual macro entry)
+// ── Meal builder: ingredient rows that auto-sum to the meal's macros ──
+function blankIng() { return { id: uid(), name: '', amount: '', kcal: 0, p: 0, c: 0, f: 0 }; }
+function mealDraftTotals() {
+  return (state._mealDraft || []).reduce((t, x) => ({
+    kcal: t.kcal + (+x.kcal || 0), p: t.p + (+x.p || 0), c: t.c + (+x.c || 0), f: t.f + (+x.f || 0)
+  }), { kcal: 0, p: 0, c: 0, f: 0 });
+}
+function renderIngredientRows() {
+  return (state._mealDraft || []).map(x =>
+    '<div class="ing-row">' +
+    '<input class="ing-name" type="text" placeholder="Ingredient (e.g. banana)" value="' + escapeAttr(x.name) + '" oninput="updateIng(\'' + x.id + '\',\'name\',this.value)">' +
+    '<input class="ing-amt" type="text" placeholder="amount" value="' + escapeAttr(x.amount) + '" oninput="updateIng(\'' + x.id + '\',\'amount\',this.value)">' +
+    '<input class="ing-m" type="number" min="0" inputmode="numeric" placeholder="cal" value="' + (x.kcal || '') + '" oninput="updateIng(\'' + x.id + '\',\'kcal\',this.value)">' +
+    '<input class="ing-m" type="number" min="0" inputmode="numeric" placeholder="P" value="' + (x.p || '') + '" oninput="updateIng(\'' + x.id + '\',\'p\',this.value)">' +
+    '<input class="ing-m" type="number" min="0" inputmode="numeric" placeholder="C" value="' + (x.c || '') + '" oninput="updateIng(\'' + x.id + '\',\'c\',this.value)">' +
+    '<input class="ing-m" type="number" min="0" inputmode="numeric" placeholder="F" value="' + (x.f || '') + '" oninput="updateIng(\'' + x.id + '\',\'f\',this.value)">' +
+    '<button type="button" class="ing-x" title="Remove ingredient" onclick="removeIng(\'' + x.id + '\')">✕</button>' +
+    '</div>').join('');
+}
+function updateIng(id, field, val) {
+  const it = (state._mealDraft || []).find(x => x.id === id); if (!it) return;
+  if (field === 'name' || field === 'amount') it[field] = val;
+  else it[field] = Math.max(0, parseFloat(val) || 0);
+  updateMealTotalLine();
+}
+function updateMealTotalLine() {
+  const el = document.getElementById('mm-total'); if (!el) return;
+  const t = mealDraftTotals();
+  el.innerHTML = 'Meal total: <b>' + Math.round(t.kcal) + '</b> cal · <b class="mp">' + Math.round(t.p) + 'g</b> P · <b class="mc">' + Math.round(t.c) + 'g</b> C · <b class="mf">' + Math.round(t.f) + 'g</b> F';
+}
+function addIng() {
+  state._mealDraft = state._mealDraft || [];
+  state._mealDraft.push(blankIng());
+  const el = document.getElementById('ing-rows'); if (el) el.innerHTML = renderIngredientRows();
+  updateMealTotalLine();
+}
+function removeIng(id) {
+  state._mealDraft = (state._mealDraft || []).filter(x => x.id !== id);
+  if (!state._mealDraft.length) state._mealDraft.push(blankIng());
+  const el = document.getElementById('ing-rows'); if (el) el.innerHTML = renderIngredientRows();
+  updateMealTotalLine();
+}
+// Create-a-meal form (ingredient-by-ingredient; macros auto-sum)
 function openMyMealForm() {
   document.getElementById('my-meal-modal')?.remove();
+  state._mealDraft = [blankIng(), blankIng()];
   const modal = document.createElement('div');
   modal.id = 'my-meal-modal';
   modal.className = 'modal-overlay';
   modal.innerHTML =
-    '<div class="modal-box" style="max-width:440px;text-align:left">' +
+    '<div class="modal-box meal-builder-box" style="max-width:600px;text-align:left">' +
     '<div class="modal-badge">🍱 New meal</div>' +
-    '<p style="font-size:14px;color:var(--text-muted);margin-bottom:16px">Save a meal once with its macros, then log it any day with one tap.</p>' +
+    '<p style="font-size:14px;color:var(--text-muted);margin-bottom:14px">Build a meal from its ingredients — we add up the macros for you. Put in the amount (e.g. "1 banana", "20 g") and fill in whatever you know; blanks count as zero.</p>' +
     '<div class="form-group"><label>Meal name <span style="color:var(--danger)">*</span></label>' +
-    '<input type="text" id="mm-name" placeholder="e.g. My protein oatmeal" autocomplete="off"></div>' +
-    '<div class="mm-grid">' +
-    '<div class="form-group"><label>Calories</label><input type="number" id="mm-kcal" min="0" step="1" placeholder="520"></div>' +
-    '<div class="form-group"><label>Protein (g)</label><input type="number" id="mm-p" min="0" step="1" placeholder="38"></div>' +
-    '<div class="form-group"><label>Carbs (g)</label><input type="number" id="mm-c" min="0" step="1" placeholder="60"></div>' +
-    '<div class="form-group"><label>Fat (g)</label><input type="number" id="mm-f" min="0" step="1" placeholder="12"></div>' +
-    '</div>' +
+    '<input type="text" id="mm-name" placeholder="e.g. Açaí bowl" autocomplete="off"></div>' +
+    '<div id="ing-rows">' + renderIngredientRows() + '</div>' +
+    '<button type="button" class="btn btn-outline btn-sm" style="margin-top:8px" onclick="addIng()">＋ Add ingredient</button>' +
+    '<div id="mm-total" class="mm-total"></div>' +
     '<label class="mm-share"><input type="checkbox" id="mm-share"> Also share to 🌍 Community so other members can use it</label>' +
     '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">' +
     '<button class="btn btn-outline" onclick="document.getElementById(\'my-meal-modal\').remove()">Cancel</button>' +
@@ -1707,14 +1751,20 @@ function openMyMealForm() {
     '</div></div>';
   document.body.appendChild(modal);
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  updateMealTotalLine();
   setTimeout(() => document.getElementById('mm-name')?.focus(), 50);
 }
 async function saveMyMeal() {
   const name = (document.getElementById('mm-name')?.value || '').trim();
   if (!name) { showToast('Give the meal a name.', 'error'); return; }
-  const num = id => Math.max(0, Math.round(parseFloat(document.getElementById(id)?.value) || 0));
-  const meal = { id: uid(), name: name.slice(0, 80), kcal: num('mm-kcal'), p: num('mm-p'), c: num('mm-c'), f: num('mm-f') };
-  if (!meal.kcal && !meal.p && !meal.c && !meal.f) { showToast('Add at least some macros.', 'error'); return; }
+  const ings = (state._mealDraft || []).map(x => ({
+    name: (x.name || '').trim().slice(0, 60), amount: (x.amount || '').trim().slice(0, 30),
+    kcal: Math.max(0, Math.round(+x.kcal || 0)), p: Math.max(0, Math.round(+x.p || 0)),
+    c: Math.max(0, Math.round(+x.c || 0)), f: Math.max(0, Math.round(+x.f || 0))
+  })).filter(x => x.name || x.kcal || x.p || x.c || x.f);
+  if (!ings.length) { showToast('Add at least one ingredient.', 'error'); return; }
+  const t = ings.reduce((a, x) => ({ kcal: a.kcal + x.kcal, p: a.p + x.p, c: a.c + x.c, f: a.f + x.f }), { kcal: 0, p: 0, c: 0, f: 0 });
+  const meal = { id: uid(), name: name.slice(0, 80), ingredients: ings, kcal: t.kcal, p: t.p, c: t.c, f: t.f };
   const share = document.getElementById('mm-share')?.checked;
   if (!state.data.meals) state.data.meals = [];
   state.data.meals.unshift(meal);
@@ -1743,7 +1793,7 @@ function openManageMeals() {
     '<div class="modal-badge">🍱 My meals</div>' +
     (meals.length ? '<div class="manage-list">' + meals.map(m =>
       '<div class="comm-item"><div class="comm-main"><div class="comm-name">' + escapeHtml(m.name) + '</div>' +
-      '<div class="comm-macros">' + macroLine(m) + '</div></div>' +
+      '<div class="comm-macros">' + macroLine(m) + '</div>' + ingredientLines(m) + '</div>' +
       '<div class="comm-actions">' +
       '<button type="button" class="btn btn-outline btn-sm" onclick="shareMyMeal(\'' + m.id + '\')">🌍 Share</button>' +
       '<button type="button" class="comm-x" title="Delete" onclick="deleteMyMeal(\'' + m.id + '\')">🗑</button>' +
@@ -1763,7 +1813,7 @@ async function shareMyMeal(id) {
   try {
     const author = (state.data.profile && (state.data.profile.firstName || state.data.profile.name)) || state.user || '';
     const res = await fetch('/api/community/meals', { method: 'POST', headers: authHeaders(),
-      body: JSON.stringify({ name: m.name, kcal: m.kcal, p: m.p, c: m.c, f: m.f, author }) });
+      body: JSON.stringify({ name: m.name, kcal: m.kcal, p: m.p, c: m.c, f: m.f, ingredients: m.ingredients || [], author }) });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) { showToast(j.error || 'Could not share — are you signed in and online?', 'error'); return; }
     showToast('Shared "' + m.name + '" to Community 🌍', 'success');
@@ -1807,13 +1857,29 @@ async function loadCommunityMeals() {
     listEl.innerHTML = renderCommunityList(state._community);
   } catch { listEl.innerHTML = '<div class="my-meals-empty">You appear to be offline.</div>'; }
 }
+// Expandable recipe breakdown (ingredient + amount + whatever macros are known)
+function ingredientLines(m) {
+  if (!m.ingredients || !m.ingredients.length) return '';
+  const rows = m.ingredients.map(ig => {
+    const parts = [];
+    if (ig.kcal) parts.push(ig.kcal + ' cal');
+    if (ig.p) parts.push(ig.p + 'g P');
+    if (ig.c) parts.push(ig.c + 'g C');
+    if (ig.f) parts.push(ig.f + 'g F');
+    const amt = ig.amount ? ' <span class="ing-amt-tag">' + escapeHtml(ig.amount) + '</span>' : '';
+    return '<li><b>' + escapeHtml(ig.name || 'item') + '</b>' + amt + (parts.length ? ' — ' + parts.join(' · ') : '') + '</li>';
+  }).join('');
+  const n = m.ingredients.length;
+  return '<details class="comm-recipe"><summary>🧾 Recipe · ' + n + ' ingredient' + (n > 1 ? 's' : '') + '</summary><ul>' + rows + '</ul></details>';
+}
 function renderCommunityList(meals) {
   if (!meals.length) return '<div class="my-meals-empty">No shared meals yet. Be the first — save a meal and tick "share".</div>';
   return meals.map(m =>
     '<div class="comm-item">' +
     '<div class="comm-main"><div class="comm-name">' + escapeHtml(m.name) + '</div>' +
     '<div class="comm-macros">' + macroLine(m) + '</div>' +
-    '<div class="comm-meta">by ' + escapeHtml(m.author || 'Someone') + (m.uses ? ' · used by ' + m.uses : '') + '</div></div>' +
+    '<div class="comm-meta">by ' + escapeHtml(m.author || 'Someone') + (m.uses ? ' · used by ' + m.uses : '') + '</div>' +
+    ingredientLines(m) + '</div>' +
     '<div class="comm-actions">' +
     '<button type="button" class="btn btn-primary btn-sm" onclick="addCommunityMeal(' + m.id + ')">＋ Add</button>' +
     (m.mine
@@ -1827,7 +1893,7 @@ async function addCommunityMeal(id) {
   if (!m) return;
   if (!state.data.meals) state.data.meals = [];
   if (state.data.meals.some(x => (x.name || '').toLowerCase() === (m.name || '').toLowerCase())) { showToast('Already in your meals.', 'success'); return; }
-  state.data.meals.unshift({ id: uid(), name: m.name, kcal: m.kcal, p: m.p, c: m.c, f: m.f, fromCommunity: true });
+  state.data.meals.unshift({ id: uid(), name: m.name, kcal: m.kcal, p: m.p, c: m.c, f: m.f, ingredients: m.ingredients || [], fromCommunity: true });
   await saveData();
   fetch('/api/community/meals/' + id + '/use', { method: 'POST', headers: authHeaders() }).catch(() => {});
   showToast('Added "' + m.name + '" to My Meals', 'success');

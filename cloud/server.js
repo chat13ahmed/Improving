@@ -435,11 +435,29 @@ app.post('/api/push/test', requireAuth, async (req, res) => {
 // meals, so a bad entry can never silently poison anyone's macro math) ──
 function cleanMeal(b) {
   const num = (x, max) => Math.max(0, Math.min(max, Math.round(Number(x) || 0)));
+  // Ingredients (a recipe breakdown). When present, the meal's totals are the
+  // sum of the parts — never trust client-sent totals over the itemized math.
+  let ingredients = [];
+  if (Array.isArray(b.ingredients)) {
+    ingredients = b.ingredients.slice(0, 40).map(it => ({
+      name: String(it.name || '').trim().slice(0, 60),
+      amount: String(it.amount || '').trim().slice(0, 30),
+      kcal: num(it.kcal, 20000), p: num(it.p, 2000), c: num(it.c, 2000), f: num(it.f, 2000)
+    })).filter(it => it.name || it.kcal || it.p || it.c || it.f);
+  }
+  let kcal, p, c, f;
+  if (ingredients.length) {
+    kcal = ingredients.reduce((s, x) => s + x.kcal, 0);
+    p = ingredients.reduce((s, x) => s + x.p, 0);
+    c = ingredients.reduce((s, x) => s + x.c, 0);
+    f = ingredients.reduce((s, x) => s + x.f, 0);
+  } else {
+    kcal = num(b.kcal, 20000); p = num(b.p, 2000); c = num(b.c, 2000); f = num(b.f, 2000);
+  }
   return {
-    name: String(b.name || '').trim().slice(0, 80),
-    kcal: num(b.kcal, 20000), p: num(b.p, 2000), c: num(b.c, 2000), f: num(b.f, 2000),
+    name: String(b.name || '').trim().slice(0, 80), kcal, p, c, f,
     servings: Math.max(1, Math.min(50, Math.round(Number(b.servings) || 1))),
-    notes: String(b.notes || '').trim().slice(0, 500)
+    notes: String(b.notes || '').trim().slice(0, 500), ingredients
   };
 }
 app.get('/api/community/meals', requireAuth, async (req, res) => {
@@ -447,7 +465,8 @@ app.get('/api/community/meals', requireAuth, async (req, res) => {
     const rows = await DB.listSharedMeals(String(req.query.q || '').slice(0, 60));
     res.json({ meals: rows.map(m => ({
       id: m.id, name: m.name, kcal: m.kcal, p: m.p, c: m.c, f: m.f, servings: m.servings,
-      notes: m.notes || '', uses: m.uses || 0, author: m.author_name || 'Someone',
+      notes: m.notes || '', ingredients: Array.isArray(m.ingredients) ? m.ingredients : [],
+      uses: m.uses || 0, author: m.author_name || 'Someone',
       mine: String(m.user_id) === String(req.userId)
     })) });
   } catch (e) { res.status(500).json({ error: 'Could not load community meals' }); }

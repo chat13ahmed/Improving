@@ -314,6 +314,16 @@ if (C) {
   ok('cleanMeal clamps absurd values', C.cleanMeal({ name: 'x', kcal: 9e9, p: -5 }).kcal === 20000 && C.cleanMeal({ name: 'x', p: -5 }).p === 0);
   ok('cleanMeal caps long name to 80', C.cleanMeal({ name: 'a'.repeat(200) }).name.length === 80);
   ok('cleanMeal servings floor 1', C.cleanMeal({ name: 'x', servings: 0 }).servings === 1);
+  // Recipe meals: totals are summed from ingredients (client-sent totals are ignored)
+  const acai = C.cleanMeal({ name: 'Açaí bowl', kcal: 9999, p: 9999, ingredients: [
+    { name: 'Açaí', amount: '250g', kcal: 250, p: 20, c: 10, f: 15 },
+    { name: 'Banana', amount: '1', p: 10 },
+    { name: 'Strawberry', amount: '3', kcal: 50 },
+    { name: 'Blueberry', amount: '20 g', c: 13 }
+  ] });
+  ok('cleanMeal sums ingredient macros', acai.kcal === 300 && acai.p === 30 && acai.c === 23 && acai.f === 15);
+  ok('cleanMeal keeps the ingredient list + amounts', acai.ingredients.length === 4 && acai.ingredients[0].name === 'Açaí' && acai.ingredients[0].amount === '250g');
+  ok('cleanMeal drops fully-empty ingredient rows', C.cleanMeal({ name: 'x', ingredients: [{ name: '', kcal: 0 }, { name: 'Egg', kcal: 70 }] }).ingredients.length === 1);
   // Owner gate for the broadcast tool (reads OWNER_USERNAMES env dynamically)
   process.env.OWNER_USERNAMES = 'Ahmed, partner';
   ok('isOwner matches (case-insensitive)', C.isOwner('ahmed') === true && C.isOwner('AHMED') === true);
@@ -418,8 +428,11 @@ if (P) {
     const afterBad = await DBm.getData(id);
     ok('saveDataMeta refuses on version mismatch (no clobber)', badMeta === false && afterBad.data.days[0] === 'real');
     // ── community shared meals ──
-    const mid = await DBm.createSharedMeal({ user_id: id, author_name: 'Ahmed', name: 'Oatmeal Bowl', kcal: 520, p: 38, c: 60, f: 12, servings: 1, notes: '' });
+    const mid = await DBm.createSharedMeal({ user_id: id, author_name: 'Ahmed', name: 'Oatmeal Bowl', kcal: 520, p: 38, c: 60, f: 12, servings: 1, notes: '',
+      ingredients: [{ name: 'Oats', amount: '80g', kcal: 300, p: 10, c: 50, f: 5 }, { name: 'Whey', amount: '1 scoop', kcal: 120, p: 24 }] });
     ok('DB createSharedMeal returns id', !!mid);
+    const oat0 = (await DBm.listSharedMeals('oatmeal'))[0];
+    ok('DB shared meal stores + returns ingredients', Array.isArray(oat0.ingredients) && oat0.ingredients.length === 2 && oat0.ingredients[0].name === 'Oats' && oat0.ingredients[0].amount === '80g');
     await DBm.createSharedMeal({ user_id: id, author_name: 'Ahmed', name: 'Chicken Wrap', kcal: 600, p: 45, c: 50, f: 18 });
     let feed = await DBm.listSharedMeals('');
     ok('DB listSharedMeals returns shared meals', feed.length === 2 && feed.some(m => m.name === 'Oatmeal Bowl'));

@@ -1543,6 +1543,26 @@ body {
 .comm-x { background: none; border: none; cursor: pointer; font-size: 15px; opacity: 0.6; padding: 4px 6px; border-radius: 6px; }
 .comm-x:hover { opacity: 1; background: rgba(255,255,255,0.06); }
 
+/* Meal builder (ingredient rows) */
+.ing-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; }
+.ing-row input { padding: 8px; font-size: 13px; }
+.ing-name { flex: 3 1 150px; }
+.ing-amt { flex: 2 1 90px; }
+.ing-row .ing-m { flex: 1 1 52px; min-width: 46px; text-align: center; }
+.ing-x { flex: 0 0 auto; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 15px; padding: 4px 6px; }
+.ing-x:hover { color: var(--danger); }
+.mm-total { margin-top: 12px; padding: 10px 14px; border-radius: var(--radius-sm); background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); font-size: 14px; color: var(--text-muted); }
+.mm-total b { color: var(--text); font-weight: 800; }
+.mm-total b.mp { color: var(--success); } .mm-total b.mc { color: var(--accent); } .mm-total b.mf { color: #A78BFA; }
+/* Recipe breakdown (community + manage) */
+.comm-recipe { margin-top: 6px; }
+.comm-recipe summary { cursor: pointer; font-size: 12px; font-weight: 700; color: var(--accent); list-style: none; }
+.comm-recipe summary::-webkit-details-marker { display: none; }
+.comm-recipe ul { margin: 6px 0 2px; padding-left: 18px; }
+.comm-recipe li { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+.comm-recipe li b { color: var(--text); }
+.ing-amt-tag { font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 6px; }
+
 @media (max-width: 640px) {
   .food-item { grid-template-columns: 1fr auto; row-gap: 4px; }
   .fi-macros { grid-column: 1 / -1; }
