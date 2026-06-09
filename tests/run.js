@@ -339,6 +339,16 @@ if (P) {
   ok('nudge disabled when off', P.isNudgeDue({ hhmm: '21:00', date: D, loggedToday: false, lastNudge: '', enabled: false }) === false);
   ok('nudge respects custom hour', P.isNudgeDue({ hhmm: '08:00', date: D, loggedToday: false, lastNudge: '', nudgeHour: 8 }) === true);
   ok('nudge default hour is 19', P.isNudgeDue({ hhmm: '18:59', date: D, loggedToday: false, lastNudge: '' }) === false);
+
+  // Protein nudge gate (evening, logged food, short on protein)
+  ok('protein nudge due (short by ≥25g, past hour)', P.isProteinNudgeDue({ hhmm: '19:30', date: D, loggedFood: true, eatenProtein: 90, targetProtein: 160, lastNudge: '' }) === true);
+  ok('protein nudge not due before the hour', P.isProteinNudgeDue({ hhmm: '15:00', date: D, loggedFood: true, eatenProtein: 90, targetProtein: 160, lastNudge: '' }) === false);
+  ok('protein nudge not due when close to target', P.isProteinNudgeDue({ hhmm: '20:00', date: D, loggedFood: true, eatenProtein: 140, targetProtein: 160, lastNudge: '' }) === false);
+  ok('protein nudge not due if no food logged', P.isProteinNudgeDue({ hhmm: '20:00', date: D, loggedFood: false, eatenProtein: 0, targetProtein: 160, lastNudge: '' }) === false);
+  ok('protein nudge not due without a target', P.isProteinNudgeDue({ hhmm: '20:00', date: D, loggedFood: true, eatenProtein: 0, targetProtein: 0, lastNudge: '' }) === false);
+  ok('protein nudge not due if already nudged today', P.isProteinNudgeDue({ hhmm: '20:00', date: D, loggedFood: true, eatenProtein: 90, targetProtein: 160, lastNudge: D }) === false);
+  ok('protein nudge disabled when off', P.isProteinNudgeDue({ hhmm: '20:00', date: D, loggedFood: true, eatenProtein: 90, targetProtein: 160, lastNudge: '', enabled: false }) === false);
+  ok('protein nudge respects custom hour', P.isProteinNudgeDue({ hhmm: '17:00', date: D, loggedFood: true, eatenProtein: 90, targetProtein: 160, lastNudge: '', hour: 17 }) === true);
 }
 
 // ─────────────────────────────────────────────────────────────

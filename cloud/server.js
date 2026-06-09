@@ -527,6 +527,21 @@ app.post('/api/cron/tick', async (req, res) => {
         data._lastNudge = local.date; changed = true;
       }
 
+      // 3) Protein nudge — evening, if they logged food today but are short on protein.
+      // Uses a tiny client-maintained snapshot so it works before a full day-save.
+      const tn = data._todayNutrition;
+      if (tn && tn.date === local.date && push.isProteinNudgeDue({
+        enabled: profile.proteinNudge, hhmm: local.hhmm, date: local.date, hour: profile.nudgeHour,
+        lastNudge: data._lastProteinNudge, eatenProtein: tn.eatenP, targetProtein: tn.targetP, loggedFood: tn.loggedFood
+      })) {
+        const gap = Math.round((tn.targetP || 0) - (tn.eatenP || 0));
+        for (const sub of byUser[uid]) {
+          try { await push.sendPush(sub, { title: '🥩 Protein check', body: "You're " + gap + "g short on protein today — still time for a shake or some chicken.", url: './', tag: 'protein-nudge' }); sent++; }
+          catch (e) { if (e && (e.statusCode === 404 || e.statusCode === 410)) { try { await DB.deletePushSub(sub.endpoint); } catch {} } }
+        }
+        data._lastProteinNudge = local.date; changed = true;
+      }
+
       // Conditional metadata write: only if the client hasn't saved since we read.
       // Never bumps the version, so it can't clobber user data or force client conflicts.
       if (changed) await DB.saveDataMeta(uid, data, d.version);

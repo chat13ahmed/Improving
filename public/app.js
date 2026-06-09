@@ -1544,6 +1544,7 @@ function addFoodToLog() {
   if (pick) pick.value = '';
   const q = document.getElementById('food-qty'); if (q) q.value = '';
   refreshFoodLog();
+  persistFoodNudgeState();
   if (pick) pick.focus();
 }
 
@@ -1570,6 +1571,7 @@ async function estimateFoodWithAI() {
     if (pick) pick.value = '';
     const q = document.getElementById('food-qty'); if (q) q.value = '';
     refreshFoodLog();
+    persistFoodNudgeState();
     showToast('Added "' + j.name + '" (AI estimate) ✨', 'success');
   } catch {
     showToast('Could not reach the server.', 'error');
@@ -1581,6 +1583,7 @@ async function estimateFoodWithAI() {
 function removeFoodFromLog(id) {
   state._foodLog = (state._foodLog || []).filter(x => x.id !== id);
   refreshFoodLog();
+  persistFoodNudgeState();
 }
 
 // Distinct foods you've logged before, most recent first (for quick-add chips)
@@ -1604,6 +1607,7 @@ function quickAddRecent(i) {
   if (!state._foodLog) state._foodLog = [];
   state._foodLog.push({ id: uid(), name: f.name, grams: f.grams, unit: f.unit, qty: f.qty, kcal: f.kcal, p: f.p, c: f.c, f: f.f, ai: f.ai });
   refreshFoodLog();
+  persistFoodNudgeState();
   showToast('Added ' + f.name, 'success');
 }
 
@@ -1616,6 +1620,22 @@ function refreshFoodLog() {
   const calEl = document.getElementById('calories-eaten');
   if (calEl && t.kcal > 0) calEl.value = Math.round(t.kcal);
   updateCaloriesRemaining();
+}
+
+// Keep a tiny, always-current snapshot of today's protein progress in the saved
+// data, so the server can send an evening "you're short on protein" push even
+// when the app is closed (and before the user does a full day-save).
+function persistFoodNudgeState() {
+  if (!state.data) return;
+  const nut = getNutrition();
+  const t = foodLogTotals(state._foodLog);
+  state.data._todayNutrition = {
+    date: todayStr(),
+    eatenP: Math.round(t.p),
+    targetP: nut ? nut.protein.g : 0,
+    loggedFood: (state._foodLog || []).length > 0
+  };
+  saveData();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -4711,6 +4731,7 @@ function renderChecklistCard() {
 function renderNudgeCard() {
   const p = state.data.profile || {};
   const on = p.dailyNudge !== false; // default ON
+  const proteinOn = p.proteinNudge !== false; // default ON
   const hour = Number.isFinite(+p.nudgeHour) ? +p.nudgeHour : 19;
   const fmt = h => ((h % 12) || 12) + ':00 ' + (h < 12 ? 'AM' : 'PM');
   const opts = Array.from({ length: 24 }, (_, h) => '<option value="' + h + '"' + (h === hour ? ' selected' : '') + '>' + fmt(h) + '</option>').join('');
@@ -4722,7 +4743,19 @@ function renderNudgeCard() {
     '<div class="rem-add"><label style="align-self:center;color:var(--text-muted);font-size:14px;white-space:nowrap">Remind me at</label>' +
     '<select id="nudge-hour" onchange="setNudgeHour(this.value)"' + (on ? '' : ' disabled') + '>' + opts + '</select></div>' +
     '<div class="rem-note">📱 Needs notifications enabled (above). Sent at most once a day, only if you haven\'t logged yet.</div>' +
+    '<div style="height:1px;background:var(--border);margin:16px 0"></div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+    '<h3 class="card-title" style="margin-bottom:0">🥩 Protein reminder</h3>' +
+    '<label class="pc-toggle"><input type="checkbox" ' + (proteinOn ? 'checked' : '') + ' onchange="toggleProteinNudge()"><span class="pc-slider"></span></label></div>' +
+    '<p class="card-sub" style="margin-bottom:0">Logged food but came up short on protein? Around your reminder time we\'ll let you know there\'s still time for a shake — so you hit your target. (Needs nutrition set up.)</p>' +
     '</div>';
+}
+async function toggleProteinNudge() {
+  const p = state.data.profile = state.data.profile || {};
+  p.proteinNudge = !(p.proteinNudge !== false);
+  if (p.proteinNudge) p.tz = -new Date().getTimezoneOffset();
+  await saveData();
+  renderChecklistPage();
 }
 async function toggleDailyNudge() {
   const p = state.data.profile = state.data.profile || {};

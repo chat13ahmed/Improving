@@ -43,4 +43,20 @@ function isNudgeDue(opts) {
   const hour = Number.isFinite(+o.nudgeHour) ? +o.nudgeHour : 19;
   return (o.hhmm || '00:00') >= (String(hour).padStart(2, '0') + ':00');
 }
-module.exports = { sendPush, configured, isReminderDue, userLocal, isNudgeDue };
+// Pure: should the evening protein nudge fire? Once/day, in the evening, only if
+// the user logged food today but is meaningfully short on their protein target.
+// Short = under 80% of target AND at least 25g away (so we don't nag when close
+// or when the target is tiny). (testable)
+function isProteinNudgeDue(opts) {
+  const o = opts || {};
+  if (o.enabled === false) return false;          // user turned it off (default on)
+  if (!o.loggedFood) return false;                // logged nothing — the streak nudge covers that
+  if (o.lastNudge === o.date) return false;       // already nudged today
+  const target = +o.targetProtein || 0;
+  const eaten = +o.eatenProtein || 0;
+  if (target <= 0) return false;                  // no protein target set up yet
+  const hour = Number.isFinite(+o.hour) ? +o.hour : 19;
+  if ((o.hhmm || '00:00') < String(hour).padStart(2, '0') + ':00') return false;
+  return (target - eaten) >= 25 && eaten < target * 0.8;
+}
+module.exports = { sendPush, configured, isReminderDue, userLocal, isNudgeDue, isProteinNudgeDue };
