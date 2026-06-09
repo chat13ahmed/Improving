@@ -1315,6 +1315,19 @@ function foodMacros(food, grams) {
     f: Math.round(food.f * r * 10) / 10
   };
 }
+// Convert a logged amount to grams. mL/L assume a liquid (≈ water density); oz is a weight ounce.
+const FOOD_UNIT_G = { g: 1, ml: 1, l: 1000, oz: 28.35 };
+function unitToGrams(qty, unit, food) {
+  if (unit === 'serving') return qty * ((food && food.sg) || 100);
+  return qty * (FOOD_UNIT_G[unit] || 1);
+}
+function foodUnitLabel(u) { return ({ g: 'g', ml: 'mL', l: 'L', oz: 'oz', serving: 'serving' })[u] || 'g'; }
+function foodAmountLabel(x) {
+  const u = x.unit || 'g';
+  if (u === 'g') return x.grams + ' g';
+  const qty = (x.qty != null ? x.qty : x.grams);
+  return (u === 'ml' || u === 'l') ? (qty + ' ' + foodUnitLabel(u)) : (qty + ' ' + foodUnitLabel(u) + ' · ' + x.grams + 'g');
+}
 function findFood(name) {
   if (!name) return null;
   const q = name.trim().toLowerCase();
@@ -1455,7 +1468,7 @@ function renderLogNutritionSection(eatenVal) {
     '<div class="food-add-row">' +
     '<input type="text" list="food-datalist" id="food-pick" placeholder="Search a food (e.g. chicken breast)…" autocomplete="off" onkeydown="if(event.key===\'Enter\'){event.preventDefault();document.getElementById(\'food-qty\').focus();}">' +
     '<input type="number" id="food-qty" min="0" step="1" placeholder="amount" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addFoodToLog();}">' +
-    '<select id="food-unit"><option value="g">grams</option><option value="serving">serving(s)</option></select>' +
+    '<select id="food-unit"><option value="g">grams</option><option value="ml">mL</option><option value="l">litres</option><option value="oz">oz</option><option value="serving">serving(s)</option></select>' +
     '<button type="button" class="btn btn-outline food-add-btn" onclick="addFoodToLog()">+ Add</button>' +
     '<button type="button" class="btn btn-outline food-ai-btn" id="food-ai-btn" onclick="estimateFoodWithAI()" title="Estimate macros with AI for any food">✨ AI</button>' +
     '</div>' + datalist +
@@ -1478,7 +1491,7 @@ function renderFoodLogList() {
   return '<div class="food-log-items">' + log.map(x =>
     '<div class="food-item">' +
     '<div class="fi-name">' + escapeHtml(x.name) + (x.ai ? ' <span class="fi-ai" title="Estimated with AI">✨</span>' : '') + '</div>' +
-    '<div class="fi-amt">' + x.grams + ' g</div>' +
+    '<div class="fi-amt">' + foodAmountLabel(x) + '</div>' +
     '<div class="fi-macros"><b>' + x.kcal + '</b> cal · <b class="mp">' + x.p + 'g</b> · <b class="mc">' + x.c + 'g</b> · <b class="mf">' + x.f + 'g</b></div>' +
     '<button type="button" class="fi-remove" onclick="removeFoodFromLog(\'' + x.id + '\')" title="Remove">✕</button>' +
     '</div>'
@@ -1504,7 +1517,7 @@ function addFoodToLog() {
   const unit = document.getElementById('food-unit')?.value || 'g';
   if (!food) { showToast('Pick a food from the list.', 'error'); return; }
   if (qty <= 0) { showToast('Enter an amount.', 'error'); return; }
-  const grams = unit === 'serving' ? qty * food.sg : qty;
+  const grams = unitToGrams(qty, unit, food);
   const m = foodMacros(food, grams);
   if (!state._foodLog) state._foodLog = [];
   state._foodLog.push({ id: uid(), name: food.n, grams: Math.round(grams), unit, qty, kcal: m.kcal, p: m.p, c: m.c, f: m.f });

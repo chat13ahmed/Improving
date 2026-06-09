@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -98,6 +98,12 @@ const tot = A.foodLogTotals([A.foodMacros(banana, banana.sg), A.foodMacros(rice,
 approx('example total calories ~407', tot.kcal, 407, 4);
 approx('example total protein ~40.7g', tot.p, 40.7, 0.6);
 eq('foodLogTotals empty', A.foodLogTotals([]), { kcal: 0, p: 0, c: 0, f: 0 });
+// Food amount units → grams
+ok('unitToGrams g', A.unitToGrams(150, 'g') === 150);
+ok('unitToGrams mL ≈ g (liquid)', A.unitToGrams(500, 'ml') === 500);
+ok('unitToGrams litre = 1000 g', A.unitToGrams(1, 'l') === 1000);
+ok('unitToGrams oz = 28.35 g', Math.abs(A.unitToGrams(2, 'oz') - 56.7) < 0.001);
+ok('unitToGrams serving uses food.sg', A.unitToGrams(2, 'serving', { sg: 118 }) === 236);
 
 // Pillars
 const dp = A.defaultPillars();
