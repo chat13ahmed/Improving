@@ -47,6 +47,15 @@ function sqliteImpl() {
         sub TEXT NOT NULL,
         created_at TEXT DEFAULT (datetime('now'))
       )`);
+      db.exec(`CREATE TABLE IF NOT EXISTS shared_meals (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        author_name TEXT, name TEXT NOT NULL,
+        kcal REAL DEFAULT 0, p REAL DEFAULT 0, c REAL DEFAULT 0, f REAL DEFAULT 0,
+        servings INTEGER DEFAULT 1, notes TEXT,
+        uses INTEGER DEFAULT 0, flags INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now'))
+      )`);
     },
     async createUser(u) {
       const r = db.prepare('INSERT INTO users(username,email,phone,pw_salt,pw_hash,sec_question,sec_salt,sec_hash) VALUES(?,?,?,?,?,?,?,?)')
@@ -81,7 +90,26 @@ function sqliteImpl() {
     async deletePushSub(endpoint) { db.prepare('DELETE FROM push_subscriptions WHERE endpoint=?').run(endpoint); },
     async allPushSubs() { return db.prepare('SELECT user_id, sub FROM push_subscriptions').all().map(r => ({ user_id: r.user_id, sub: JSON.parse(r.sub) })); },
     async allUsers() { return db.prepare('SELECT id, username, created_at FROM users').all(); },
-    async allUserData() { return db.prepare('SELECT user_id, data FROM user_data').all().map(r => ({ user_id: r.user_id, data: JSON.parse(r.data) })); }
+    async allUserData() { return db.prepare('SELECT user_id, data FROM user_data').all().map(r => ({ user_id: r.user_id, data: JSON.parse(r.data) })); },
+    // ── Community meals ──
+    async createSharedMeal(m) {
+      const r = db.prepare('INSERT INTO shared_meals(user_id,author_name,name,kcal,p,c,f,servings,notes) VALUES(?,?,?,?,?,?,?,?,?)')
+        .run(m.user_id, m.author_name || null, m.name, m.kcal || 0, m.p || 0, m.c || 0, m.f || 0, m.servings || 1, m.notes || null);
+      return Number(r.lastInsertRowid);
+    },
+    async listSharedMeals(qstr) {
+      const ql = (qstr || '').toLowerCase();
+      return db.prepare(`SELECT id,user_id,author_name,name,kcal,p,c,f,servings,notes,uses,flags,created_at
+        FROM shared_meals WHERE flags < 5 AND (? = '' OR lower(name) LIKE ?)
+        ORDER BY uses DESC, id DESC LIMIT 120`).all(ql, '%' + ql + '%');
+    },
+    async incSharedMealUse(id) { db.prepare('UPDATE shared_meals SET uses = uses + 1 WHERE id=?').run(id); },
+    async flagSharedMeal(id) { db.prepare('UPDATE shared_meals SET flags = flags + 1 WHERE id=?').run(id); },
+    async deleteSharedMeal(id, userId, force) {
+      const r = force ? db.prepare('DELETE FROM shared_meals WHERE id=?').run(id)
+                      : db.prepare('DELETE FROM shared_meals WHERE id=? AND user_id=?').run(id, userId);
+      return r.changes > 0;
+    }
   };
 }
 
@@ -100,6 +128,9 @@ function pgImpl() {
                data JSONB NOT NULL, version INTEGER NOT NULL DEFAULT 1, updated_at TIMESTAMPTZ DEFAULT now())`);
       await q(`CREATE TABLE IF NOT EXISTS push_subscriptions (id BIGSERIAL PRIMARY KEY, user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
                endpoint TEXT UNIQUE NOT NULL, sub JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT now())`);
+      await q(`CREATE TABLE IF NOT EXISTS shared_meals (id BIGSERIAL PRIMARY KEY, user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+               author_name TEXT, name TEXT NOT NULL, kcal REAL DEFAULT 0, p REAL DEFAULT 0, c REAL DEFAULT 0, f REAL DEFAULT 0,
+               servings INTEGER DEFAULT 1, notes TEXT, uses INTEGER DEFAULT 0, flags INTEGER DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now())`);
     },
     async createUser(u) {
       const r = await q('INSERT INTO users(username,email,phone,pw_salt,pw_hash,sec_question,sec_salt,sec_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
@@ -128,7 +159,27 @@ function pgImpl() {
     async deletePushSub(endpoint) { await q('DELETE FROM push_subscriptions WHERE endpoint=$1', [endpoint]); },
     async allPushSubs() { const r = await q('SELECT user_id, sub FROM push_subscriptions', []); return r.rows.map(x => ({ user_id: x.user_id, sub: x.sub })); },
     async allUsers() { const r = await q('SELECT id, username, created_at FROM users', []); return r.rows; },
-    async allUserData() { const r = await q('SELECT user_id, data FROM user_data', []); return r.rows.map(x => ({ user_id: x.user_id, data: x.data })); }
+    async allUserData() { const r = await q('SELECT user_id, data FROM user_data', []); return r.rows.map(x => ({ user_id: x.user_id, data: x.data })); },
+    // ── Community meals ──
+    async createSharedMeal(m) {
+      const r = await q('INSERT INTO shared_meals(user_id,author_name,name,kcal,p,c,f,servings,notes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
+        [m.user_id, m.author_name || null, m.name, m.kcal || 0, m.p || 0, m.c || 0, m.f || 0, m.servings || 1, m.notes || null]);
+      return r.rows[0].id;
+    },
+    async listSharedMeals(qstr) {
+      const ql = (qstr || '').toLowerCase();
+      const r = await q(`SELECT id,user_id,author_name,name,kcal,p,c,f,servings,notes,uses,flags,created_at
+        FROM shared_meals WHERE flags < 5 AND ($1 = '' OR lower(name) LIKE $2)
+        ORDER BY uses DESC, id DESC LIMIT 120`, [ql, '%' + ql + '%']);
+      return r.rows;
+    },
+    async incSharedMealUse(id) { await q('UPDATE shared_meals SET uses = uses + 1 WHERE id=$1', [id]); },
+    async flagSharedMeal(id) { await q('UPDATE shared_meals SET flags = flags + 1 WHERE id=$1', [id]); },
+    async deleteSharedMeal(id, userId, force) {
+      const r = force ? await q('DELETE FROM shared_meals WHERE id=$1', [id])
+                      : await q('DELETE FROM shared_meals WHERE id=$1 AND user_id=$2', [id, userId]);
+      return r.rowCount > 0;
+    }
   };
 }
 
@@ -149,5 +200,10 @@ module.exports = {
   deletePushSub: (e) => impl.deletePushSub(e),
   allPushSubs: () => impl.allPushSubs(),
   allUsers: () => impl.allUsers(),
-  allUserData: () => impl.allUserData()
+  allUserData: () => impl.allUserData(),
+  createSharedMeal: (m) => impl.createSharedMeal(m),
+  listSharedMeals: (q) => impl.listSharedMeals(q),
+  incSharedMealUse: (i) => impl.incSharedMealUse(i),
+  flagSharedMeal: (i) => impl.flagSharedMeal(i),
+  deleteSharedMeal: (i, u, f) => impl.deleteSharedMeal(i, u, f)
 };

@@ -1321,12 +1321,15 @@ function unitToGrams(qty, unit, food) {
   if (unit === 'serving') return qty * ((food && food.sg) || 100);
   return qty * (FOOD_UNIT_G[unit] || 1);
 }
-function foodUnitLabel(u) { return ({ g: 'g', ml: 'mL', l: 'L', oz: 'oz', serving: 'serving' })[u] || 'g'; }
+function foodUnitLabel(u) { return ({ g: 'g', ml: 'mL', l: 'L', oz: 'oz', serving: 'serving', meal: 'meal' })[u] || 'g'; }
 function foodAmountLabel(x) {
   const u = x.unit || 'g';
   if (u === 'g') return x.grams + ' g';
   const qty = (x.qty != null ? x.qty : x.grams);
-  return (u === 'ml' || u === 'l') ? (qty + ' ' + foodUnitLabel(u)) : (qty + ' ' + foodUnitLabel(u) + ' · ' + x.grams + 'g');
+  // mL/L/meal (or anything with no gram weight) just show the count + unit
+  return (u === 'ml' || u === 'l' || u === 'meal' || !x.grams)
+    ? (qty + ' ' + foodUnitLabel(u))
+    : (qty + ' ' + foodUnitLabel(u) + ' · ' + x.grams + 'g');
 }
 function findFood(name) {
   if (!name) return null;
@@ -1474,6 +1477,7 @@ function renderLogNutritionSection(eatenVal) {
     '</div>' + datalist +
     '<div class="food-ai-hint">Not in the list? Type any food (e.g. "homemade chicken burrito") and hit ✨ AI to estimate it.</div>' +
     recentRow +
+    renderMyMealsRow() +
     '<div id="food-log-list">' + renderFoodLogList() + '</div>' +
     '<div id="food-log-totals">' + renderFoodLogTotals() + '</div>' +
     '</div>' +
@@ -1636,6 +1640,211 @@ function persistFoodNudgeState() {
     loggedFood: (state._foodLog || []).length > 0
   };
   saveData();
+}
+
+// ─────────────────────────────────────────────────────────────
+// MY MEALS (personal saved meals) + COMMUNITY MEALS (shared feed)
+// ─────────────────────────────────────────────────────────────
+function macroLine(m) {
+  return '<b>' + Math.round(m.kcal || 0) + '</b> cal · <b class="mp">' + Math.round(m.p || 0) + 'g</b> P · ' +
+    '<b class="mc">' + Math.round(m.c || 0) + 'g</b> C · <b class="mf">' + Math.round(m.f || 0) + 'g</b> F';
+}
+// The "My meals" strip inside the food logger
+function renderMyMealsRow() {
+  const meals = state.data.meals || [];
+  const chips = meals.slice(0, 12).map(m =>
+    '<button type="button" class="meal-chip" onclick="logMyMeal(\'' + m.id + '\')" title="Tap to log this meal">' +
+    '<span class="meal-chip-name">' + escapeHtml(m.name) + '</span>' +
+    '<span class="meal-chip-macros">' + Math.round(m.kcal || 0) + ' cal · ' + Math.round(m.p || 0) + 'p</span>' +
+    '</button>').join('');
+  return '<div class="my-meals" id="my-meals-row">' +
+    '<div class="my-meals-head"><span class="recent-foods-label">🍱 My meals</span>' +
+    '<div class="my-meals-actions">' +
+    '<button type="button" class="btn-link" onclick="openMyMealForm()">＋ New</button>' +
+    '<button type="button" class="btn-link" onclick="openCommunityMeals()">🌍 Community</button>' +
+    (meals.length ? '<button type="button" class="btn-link" onclick="openManageMeals()">Manage</button>' : '') +
+    '</div></div>' +
+    (meals.length
+      ? '<div class="meal-chips">' + chips + '</div>'
+      : '<div class="my-meals-empty">Save a meal once (name + macros) and log it with one tap. Tap <b>＋ New</b>, or browse <b>🌍 Community</b>.</div>') +
+    '</div>';
+}
+function refreshMyMeals() { const el = document.getElementById('my-meals-row'); if (el) el.outerHTML = renderMyMealsRow(); }
+
+// Log a saved meal straight into today's food log
+function logMyMeal(id) {
+  const m = (state.data.meals || []).find(x => x.id === id);
+  if (!m) return;
+  if (!state._foodLog) state._foodLog = [];
+  state._foodLog.push({ id: uid(), name: m.name, grams: 0, unit: 'meal', qty: 1, kcal: m.kcal, p: m.p, c: m.c, f: m.f });
+  refreshFoodLog();
+  persistFoodNudgeState();
+  showToast('Logged ' + m.name, 'success');
+}
+
+// Create-a-meal form (manual macro entry)
+function openMyMealForm() {
+  document.getElementById('my-meal-modal')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'my-meal-modal';
+  modal.className = 'modal-overlay';
+  modal.innerHTML =
+    '<div class="modal-box" style="max-width:440px;text-align:left">' +
+    '<div class="modal-badge">🍱 New meal</div>' +
+    '<p style="font-size:14px;color:var(--text-muted);margin-bottom:16px">Save a meal once with its macros, then log it any day with one tap.</p>' +
+    '<div class="form-group"><label>Meal name <span style="color:var(--danger)">*</span></label>' +
+    '<input type="text" id="mm-name" placeholder="e.g. My protein oatmeal" autocomplete="off"></div>' +
+    '<div class="mm-grid">' +
+    '<div class="form-group"><label>Calories</label><input type="number" id="mm-kcal" min="0" step="1" placeholder="520"></div>' +
+    '<div class="form-group"><label>Protein (g)</label><input type="number" id="mm-p" min="0" step="1" placeholder="38"></div>' +
+    '<div class="form-group"><label>Carbs (g)</label><input type="number" id="mm-c" min="0" step="1" placeholder="60"></div>' +
+    '<div class="form-group"><label>Fat (g)</label><input type="number" id="mm-f" min="0" step="1" placeholder="12"></div>' +
+    '</div>' +
+    '<label class="mm-share"><input type="checkbox" id="mm-share"> Also share to 🌍 Community so other members can use it</label>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">' +
+    '<button class="btn btn-outline" onclick="document.getElementById(\'my-meal-modal\').remove()">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="saveMyMeal()">Save meal</button>' +
+    '</div></div>';
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  setTimeout(() => document.getElementById('mm-name')?.focus(), 50);
+}
+async function saveMyMeal() {
+  const name = (document.getElementById('mm-name')?.value || '').trim();
+  if (!name) { showToast('Give the meal a name.', 'error'); return; }
+  const num = id => Math.max(0, Math.round(parseFloat(document.getElementById(id)?.value) || 0));
+  const meal = { id: uid(), name: name.slice(0, 80), kcal: num('mm-kcal'), p: num('mm-p'), c: num('mm-c'), f: num('mm-f') };
+  if (!meal.kcal && !meal.p && !meal.c && !meal.f) { showToast('Add at least some macros.', 'error'); return; }
+  const share = document.getElementById('mm-share')?.checked;
+  if (!state.data.meals) state.data.meals = [];
+  state.data.meals.unshift(meal);
+  await saveData();
+  document.getElementById('my-meal-modal')?.remove();
+  showToast('Saved "' + meal.name + '" to My Meals', 'success');
+  refreshMyMeals();
+  if (share) shareMyMeal(meal.id);
+}
+async function deleteMyMeal(id) {
+  state.data.meals = (state.data.meals || []).filter(x => x.id !== id);
+  await saveData();
+  document.getElementById('manage-meals-modal')?.remove();
+  refreshMyMeals();
+  showToast('Deleted.', 'success');
+}
+// Manage saved meals (share / delete)
+function openManageMeals() {
+  document.getElementById('manage-meals-modal')?.remove();
+  const meals = state.data.meals || [];
+  const modal = document.createElement('div');
+  modal.id = 'manage-meals-modal';
+  modal.className = 'modal-overlay';
+  modal.innerHTML =
+    '<div class="modal-box" style="max-width:500px;text-align:left">' +
+    '<div class="modal-badge">🍱 My meals</div>' +
+    (meals.length ? '<div class="manage-list">' + meals.map(m =>
+      '<div class="comm-item"><div class="comm-main"><div class="comm-name">' + escapeHtml(m.name) + '</div>' +
+      '<div class="comm-macros">' + macroLine(m) + '</div></div>' +
+      '<div class="comm-actions">' +
+      '<button type="button" class="btn btn-outline btn-sm" onclick="shareMyMeal(\'' + m.id + '\')">🌍 Share</button>' +
+      '<button type="button" class="comm-x" title="Delete" onclick="deleteMyMeal(\'' + m.id + '\')">🗑</button>' +
+      '</div></div>').join('') + '</div>'
+      : '<p style="color:var(--text-muted);font-size:14px">No saved meals yet.</p>') +
+    '<div style="display:flex;gap:10px;justify-content:space-between;margin-top:16px">' +
+    '<button class="btn btn-outline" onclick="document.getElementById(\'manage-meals-modal\').remove();openMyMealForm()">＋ New meal</button>' +
+    '<button class="btn btn-primary" onclick="document.getElementById(\'manage-meals-modal\').remove()">Done</button>' +
+    '</div></div>';
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+// Share one of my meals to the community feed (cloud only)
+async function shareMyMeal(id) {
+  const m = (state.data.meals || []).find(x => x.id === id);
+  if (!m) return;
+  try {
+    const author = (state.data.profile && (state.data.profile.firstName || state.data.profile.name)) || state.user || '';
+    const res = await fetch('/api/community/meals', { method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ name: m.name, kcal: m.kcal, p: m.p, c: m.c, f: m.f, author }) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) { showToast(j.error || 'Could not share — are you signed in and online?', 'error'); return; }
+    showToast('Shared "' + m.name + '" to Community 🌍', 'success');
+  } catch { showToast('Could not reach the community (needs to be online).', 'error'); }
+}
+
+// ── Community feed ──
+let _commTimer = null;
+function debouncedCommunitySearch() { clearTimeout(_commTimer); _commTimer = setTimeout(loadCommunityMeals, 300); }
+function openCommunityMeals() {
+  document.getElementById('community-modal')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'community-modal';
+  modal.className = 'modal-overlay';
+  modal.innerHTML =
+    '<div class="modal-box community-box" style="max-width:560px;text-align:left">' +
+    '<div class="modal-badge">🌍 Community meals</div>' +
+    '<p style="font-size:13px;color:var(--text-muted);margin:6px 0 12px">Meals shared by other members. Tap <b>Add</b> to copy one into your own meals, then log it any day. These are member-submitted — give the numbers a sanity check.</p>' +
+    '<div class="food-add-row" style="margin-bottom:10px">' +
+    '<input type="text" id="comm-q" placeholder="Search meals (e.g. oatmeal)…" autocomplete="off" oninput="debouncedCommunitySearch()">' +
+    '<button type="button" class="btn btn-outline" onclick="loadCommunityMeals()">Search</button>' +
+    '</div>' +
+    '<div id="comm-list"><div class="my-meals-empty">Loading…</div></div>' +
+    '<div style="display:flex;justify-content:flex-end;margin-top:14px">' +
+    '<button class="btn btn-outline" onclick="document.getElementById(\'community-modal\').remove()">Close</button>' +
+    '</div></div>';
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  loadCommunityMeals();
+}
+async function loadCommunityMeals() {
+  const listEl = document.getElementById('comm-list');
+  if (!listEl) return;
+  const q = (document.getElementById('comm-q')?.value || '').trim();
+  listEl.innerHTML = '<div class="my-meals-empty">Loading…</div>';
+  try {
+    const res = await fetch('/api/community/meals?q=' + encodeURIComponent(q), { headers: authHeaders() });
+    if (!res.ok) { listEl.innerHTML = '<div class="my-meals-empty">' + (res.status === 401 ? 'Please sign in to see community meals.' : 'Could not load — try again.') + '</div>'; return; }
+    const j = await res.json();
+    state._community = j.meals || [];
+    listEl.innerHTML = renderCommunityList(state._community);
+  } catch { listEl.innerHTML = '<div class="my-meals-empty">You appear to be offline.</div>'; }
+}
+function renderCommunityList(meals) {
+  if (!meals.length) return '<div class="my-meals-empty">No shared meals yet. Be the first — save a meal and tick "share".</div>';
+  return meals.map(m =>
+    '<div class="comm-item">' +
+    '<div class="comm-main"><div class="comm-name">' + escapeHtml(m.name) + '</div>' +
+    '<div class="comm-macros">' + macroLine(m) + '</div>' +
+    '<div class="comm-meta">by ' + escapeHtml(m.author || 'Someone') + (m.uses ? ' · used by ' + m.uses : '') + '</div></div>' +
+    '<div class="comm-actions">' +
+    '<button type="button" class="btn btn-primary btn-sm" onclick="addCommunityMeal(' + m.id + ')">＋ Add</button>' +
+    (m.mine
+      ? '<button type="button" class="comm-x" title="Remove" onclick="removeCommunityMeal(' + m.id + ')">🗑</button>'
+      : '<button type="button" class="comm-x" title="Report" onclick="reportCommunityMeal(' + m.id + ')">⚐</button>') +
+    '</div></div>'
+  ).join('');
+}
+async function addCommunityMeal(id) {
+  const m = (state._community || []).find(x => x.id === id);
+  if (!m) return;
+  if (!state.data.meals) state.data.meals = [];
+  if (state.data.meals.some(x => (x.name || '').toLowerCase() === (m.name || '').toLowerCase())) { showToast('Already in your meals.', 'success'); return; }
+  state.data.meals.unshift({ id: uid(), name: m.name, kcal: m.kcal, p: m.p, c: m.c, f: m.f, fromCommunity: true });
+  await saveData();
+  fetch('/api/community/meals/' + id + '/use', { method: 'POST', headers: authHeaders() }).catch(() => {});
+  showToast('Added "' + m.name + '" to My Meals', 'success');
+  refreshMyMeals();
+}
+async function reportCommunityMeal(id) {
+  if (!confirm('Report this meal as wrong or inappropriate? It gets hidden automatically once enough members report it.')) return;
+  fetch('/api/community/meals/' + id + '/report', { method: 'POST', headers: authHeaders() }).catch(() => {});
+  showToast('Reported — thanks for keeping it clean.', 'success');
+}
+async function removeCommunityMeal(id) {
+  if (!confirm('Remove this shared meal from the community?')) return;
+  try {
+    const res = await fetch('/api/community/meals/' + id, { method: 'DELETE', headers: authHeaders() });
+    if (res.ok) { showToast('Removed.', 'success'); loadCommunityMeals(); }
+    else showToast('Could not remove.', 'error');
+  } catch { showToast('Could not reach the server.', 'error'); }
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -26,7 +26,7 @@ const CLIENT_DIR = process.env.CLIENT_DIR || path.join(__dirname, '..', 'public'
 
 // ── Shared helpers (mirrors the desktop server) ──
 function defaultData() {
-  return { profile: { name: '', gymDaysPerWeek: 5, weeklyIncomeGoal: 0, weeklyNetworkGoal: 3 }, days: [], weeks: [], ideas: [], contacts: [], books: [], weights: [] };
+  return { profile: { name: '', gymDaysPerWeek: 5, weeklyIncomeGoal: 0, weeklyNetworkGoal: 3 }, days: [], weeks: [], ideas: [], contacts: [], books: [], weights: [], meals: [] };
 }
 function normalizeAnswer(a) { return String(a || '').trim().toLowerCase().replace(/\s+/g, ' '); }
 function hashPassword(password, salt) {
@@ -430,6 +430,60 @@ app.post('/api/push/test', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Send failed' }); }
 });
 
+// ── Community Meals (user-shared, copyable; deliberately NOT merged into the
+// verified food database — they're a browsable library you copy into your own
+// meals, so a bad entry can never silently poison anyone's macro math) ──
+function cleanMeal(b) {
+  const num = (x, max) => Math.max(0, Math.min(max, Math.round(Number(x) || 0)));
+  return {
+    name: String(b.name || '').trim().slice(0, 80),
+    kcal: num(b.kcal, 20000), p: num(b.p, 2000), c: num(b.c, 2000), f: num(b.f, 2000),
+    servings: Math.max(1, Math.min(50, Math.round(Number(b.servings) || 1))),
+    notes: String(b.notes || '').trim().slice(0, 500)
+  };
+}
+app.get('/api/community/meals', requireAuth, async (req, res) => {
+  try {
+    const rows = await DB.listSharedMeals(String(req.query.q || '').slice(0, 60));
+    res.json({ meals: rows.map(m => ({
+      id: m.id, name: m.name, kcal: m.kcal, p: m.p, c: m.c, f: m.f, servings: m.servings,
+      notes: m.notes || '', uses: m.uses || 0, author: m.author_name || 'Someone',
+      mine: String(m.user_id) === String(req.userId)
+    })) });
+  } catch (e) { res.status(500).json({ error: 'Could not load community meals' }); }
+});
+app.post('/api/community/meals', requireAuth, async (req, res) => {
+  try {
+    const m = cleanMeal(req.body || {});
+    if (!m.name) return res.status(400).json({ error: 'Give the meal a name.' });
+    if (m.kcal <= 0 && m.p <= 0 && m.c <= 0 && m.f <= 0) return res.status(400).json({ error: 'Add at least some macros.' });
+    const author = String(req.body.author || req.username || '').trim().slice(0, 40);
+    const id = await DB.createSharedMeal({ user_id: req.userId, author_name: author, ...m });
+    res.json({ success: true, id });
+  } catch (e) { res.status(500).json({ error: 'Could not share meal' }); }
+});
+app.post('/api/community/meals/:id/use', requireAuth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'bad id' });
+  try { await DB.incSharedMealUse(id); res.json({ success: true }); }
+  catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+app.post('/api/community/meals/:id/report', requireAuth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'bad id' });
+  try { await DB.flagSharedMeal(id); res.json({ success: true }); }
+  catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+app.delete('/api/community/meals/:id', requireAuth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'bad id' });
+  try {
+    const ok = await DB.deleteSharedMeal(id, req.userId, isOwner(req.username));
+    if (!ok) return res.status(403).json({ error: 'Not allowed.' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+
 // Owner-only: how many devices a broadcast would reach.
 app.get('/api/admin/reach', requireAuth, async (req, res) => {
   if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });
@@ -559,4 +613,4 @@ if (require.main === module) {
     .catch(err => { console.error('Startup failed:', err.message); process.exit(1); });
 }
 
-module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner };
+module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner, cleanMeal };

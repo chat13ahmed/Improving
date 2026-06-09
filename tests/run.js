@@ -307,7 +307,13 @@ if (C) {
   ok('cloud verifyPassword wrong', C.verifyPassword('nope', h.salt, h.hash) === false);
   eq('cloud parseFoodEstimate', C.parseFoodEstimate('{"name":"Egg","grams":50,"calories":72,"protein":6,"carbs":0.4,"fat":5}'), { name: 'Egg', grams: 50, kcal: 72, p: 6, c: 0.4, f: 5 });
   ok('cloud buildSystemPrompt mentions water', /WATER/.test(C.buildSystemPrompt({ pillars: { gym: { enabled: true } } })));
-  eq('cloud defaultData shape', Object.keys(C.defaultData()).sort(), ['books', 'contacts', 'days', 'ideas', 'profile', 'weeks', 'weights']);
+  eq('cloud defaultData shape', Object.keys(C.defaultData()).sort(), ['books', 'contacts', 'days', 'ideas', 'meals', 'profile', 'weeks', 'weights']);
+  // Community meal sanitizer
+  const cm = C.cleanMeal({ name: '  Protein Bowl  ', kcal: '650.4', p: 55, c: '40', f: 20, servings: 2, notes: 'tasty' });
+  ok('cleanMeal trims + rounds', cm.name === 'Protein Bowl' && cm.kcal === 650 && cm.c === 40 && cm.servings === 2);
+  ok('cleanMeal clamps absurd values', C.cleanMeal({ name: 'x', kcal: 9e9, p: -5 }).kcal === 20000 && C.cleanMeal({ name: 'x', p: -5 }).p === 0);
+  ok('cleanMeal caps long name to 80', C.cleanMeal({ name: 'a'.repeat(200) }).name.length === 80);
+  ok('cleanMeal servings floor 1', C.cleanMeal({ name: 'x', servings: 0 }).servings === 1);
   // Owner gate for the broadcast tool (reads OWNER_USERNAMES env dynamically)
   process.env.OWNER_USERNAMES = 'Ahmed, partner';
   ok('isOwner matches (case-insensitive)', C.isOwner('ahmed') === true && C.isOwner('AHMED') === true);
@@ -411,6 +417,21 @@ if (P) {
     const badMeta = await DBm.saveDataMeta(id, { days: ['STALE'] }, 99);
     const afterBad = await DBm.getData(id);
     ok('saveDataMeta refuses on version mismatch (no clobber)', badMeta === false && afterBad.data.days[0] === 'real');
+    // ── community shared meals ──
+    const mid = await DBm.createSharedMeal({ user_id: id, author_name: 'Ahmed', name: 'Oatmeal Bowl', kcal: 520, p: 38, c: 60, f: 12, servings: 1, notes: '' });
+    ok('DB createSharedMeal returns id', !!mid);
+    await DBm.createSharedMeal({ user_id: id, author_name: 'Ahmed', name: 'Chicken Wrap', kcal: 600, p: 45, c: 50, f: 18 });
+    let feed = await DBm.listSharedMeals('');
+    ok('DB listSharedMeals returns shared meals', feed.length === 2 && feed.some(m => m.name === 'Oatmeal Bowl'));
+    ok('DB listSharedMeals search filters by name', (await DBm.listSharedMeals('wrap')).length === 1);
+    await DBm.incSharedMealUse(mid); await DBm.incSharedMealUse(mid);
+    ok('DB incSharedMealUse counts uses', (await DBm.listSharedMeals('oatmeal'))[0].uses === 2);
+    for (let i = 0; i < 5; i++) await DBm.flagSharedMeal(mid);
+    ok('DB flagged meal (≥5) hidden from feed', (await DBm.listSharedMeals('oatmeal')).length === 0);
+    const delMine = await DBm.deleteSharedMeal(mid, 99999, false); // wrong user → no delete
+    ok('DB deleteSharedMeal blocks non-author', delMine === false);
+    const delForce = await DBm.deleteSharedMeal(mid, id, false); // author → deletes
+    ok('DB deleteSharedMeal author removes own', delForce === true && (await DBm.listSharedMeals('')).length === 1);
   } catch (e) { failures.push('cloud DB (sqlite) — ' + e.message); }
 
   // ── report ──
