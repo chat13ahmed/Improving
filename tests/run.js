@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -88,6 +88,17 @@ const bal = A.computeNutrition({ age: 30, sex: 'female', heightCm: 165, weightKg
 ok('balanced split 30/40/30', bal.protein.pct === 30 && bal.carbs.pct === 40 && bal.fat.pct === 30);
 eq('incomplete nutrition → null', A.computeNutrition({ age: 0 }), null);
 eq('mealLabels fallback length', A.mealLabels(2).length, 2);
+// Healthiest meal split (bigger mains, lighter snacks, protein kept up)
+const _plan5 = A.distributeMeals(2100, 168, 210, 70, A.mealLabels(5)); // Breakfast, Snack, Lunch, Snack, Dinner
+ok('distribute: one entry per meal', _plan5.length === 5);
+ok('distribute: snack lighter than a main', _plan5[1].calories < _plan5[0].calories);
+ok('distribute: protein kept up in snacks', _plan5[1].protein >= _plan5[0].protein * 0.7);
+approx('distribute: protein sums ~ total', _plan5.reduce((s, m) => s + m.protein, 0), 168, 6);
+approx('distribute: calories sum ~ total', _plan5.reduce((s, m) => s + m.calories, 0), 2100, 120);
+const _plan3 = A.distributeMeals(1800, 150, 180, 60, A.mealLabels(3));
+ok('distribute: 3 mains are even', _plan3[0].calories === _plan3[1].calories && _plan3[1].calories === _plan3[2].calories);
+ok('distribute: any number of meals (8) works', A.distributeMeals(2400, 180, 240, 80, A.mealLabels(8)).length === 8);
+ok('computeNutrition exposes a meal plan', Array.isArray(nut.meals.plan) && nut.meals.plan.length === 5 && nut.meals.plan[0].calories > 0);
 
 // Goal status (pure)
 const _wg = { kind: 'weight', start: 180, target: 170, deadline: '2026-07-10', createdAt: '2026-06-10' };

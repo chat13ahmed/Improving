@@ -1359,6 +1359,23 @@ function mealLabels(count) {
   return map[count] || Array.from({ length: count }, (_, i) => 'Meal ' + (i + 1));
 }
 
+// Healthiest split: bigger main meals, lighter snacks, with protein kept up at
+// every meal (an even-ish protein spread supports muscle synthesis). Returns a
+// per-meal plan { label, calories, protein, carbs, fat }.
+function mealCalWeight(label) { return /snack/i.test(label) ? 0.6 : 1; }
+function mealProteinWeight(label) { return /snack/i.test(label) ? 0.85 : 1; }
+function distributeMeals(totalCal, totalP, totalC, totalF, labels) {
+  const ls = (labels && labels.length) ? labels : ['Meal 1'];
+  const cw = ls.map(mealCalWeight), pw = ls.map(mealProteinWeight);
+  const cwS = cw.reduce((a, b) => a + b, 0) || 1, pwS = pw.reduce((a, b) => a + b, 0) || 1;
+  return ls.map((label, i) => {
+    const protein = Math.round(totalP * pw[i] / pwS);
+    const carbs = Math.round(totalC * cw[i] / cwS);
+    const fat = Math.round(totalF * cw[i] / cwS);
+    return { label, protein, carbs, fat, calories: Math.round(protein * 4 + carbs * 4 + fat * 9) };
+  });
+}
+
 // Compute calories (Mifflin-St Jeor BMR → TDEE → goal) and a macro split.
 function computeNutrition(n) {
   if (!n) return null;
@@ -1368,7 +1385,7 @@ function computeNutrition(n) {
   const activity = ACTIVITY_FACTORS[n.activity] ? n.activity : 'moderate';
   const goal = NUTRITION_GOALS[n.goal] ? n.goal : 'maintain';
   const strategy = n.strategy === 'balanced' ? 'balanced' : 'muscle';
-  const mealsPerDay = [3, 4, 5, 6].includes(+n.mealsPerDay) ? +n.mealsPerDay : 3;
+  const mealsPerDay = Math.max(1, Math.min(12, parseInt(n.mealsPerDay) || 3)); // any number of meals
 
   const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === 'female' ? -161 : 5);
   const tdee = bmr * ACTIVITY_FACTORS[activity].mult;
@@ -1398,6 +1415,8 @@ function computeNutrition(n) {
   const meals = {
     count: mealsPerDay,
     labels: mealLabels(mealsPerDay),
+    plan: distributeMeals(calories, protein.g, carbs.g, fat.g, mealLabels(mealsPerDay)),
+    // even-split fallbacks (kept for older callers)
     calories: Math.round(calories / mealsPerDay),
     protein: Math.round(protein.g / mealsPerDay),
     carbs: Math.round(carbs.g / mealsPerDay),
@@ -1443,16 +1462,16 @@ function updateCaloriesRemaining() {
 // Log-page nutrition block: targets + food logger + calories eaten + remaining
 // The daily calorie + macro target, split across the number of meals they chose
 function renderMealPlan(nut) {
-  if (!nut || !nut.meals || !nut.meals.count) return '';
+  if (!nut || !nut.meals || !nut.meals.plan) return '';
   const m = nut.meals;
   return '<div class="meal-plan">' +
-    '<div class="meal-plan-head">Your ' + m.count + '-meal split — aim for about this each meal</div>' +
+    '<div class="meal-plan-head">Your ' + m.count + '-meal plan — bigger mains, lighter snacks, protein kept up</div>' +
     '<div class="meal-plan-grid">' +
-    m.labels.map(function (lbl) {
+    m.plan.map(function (mm) {
       return '<div class="meal-plan-card">' +
-        '<div class="mpc-name">' + escapeHtml(lbl) + '</div>' +
-        '<div class="mpc-cal">' + m.calories.toLocaleString() + ' <span>cal</span></div>' +
-        '<div class="mpc-macros"><b class="mp">' + m.protein + 'g</b> P · <b class="mc">' + m.carbs + 'g</b> C · <b class="mf">' + m.fat + 'g</b> F</div>' +
+        '<div class="mpc-name">' + escapeHtml(mm.label) + '</div>' +
+        '<div class="mpc-cal">' + mm.calories.toLocaleString() + ' <span>cal</span></div>' +
+        '<div class="mpc-macros"><b class="mp">' + mm.protein + 'g</b> P · <b class="mc">' + mm.carbs + 'g</b> C · <b class="mf">' + mm.fat + 'g</b> F</div>' +
         '</div>';
     }).join('') +
     '</div></div>';
@@ -1528,15 +1547,16 @@ function renderFoodLogByMeal() {
   const nut = getNutrition();
   const count = (nut && nut.meals && nut.meals.count) ? nut.meals.count : 1;
   const labels = (nut && nut.meals) ? nut.meals.labels : ['Meals'];
-  const per = (nut && nut.meals) ? nut.meals : null;
+  const plan = (nut && nut.meals && nut.meals.plan) ? nut.meals.plan : null;
   const slotOf = x => Math.min(Math.max(0, x.meal || 0), count - 1);
   let html = '';
   for (let i = 0; i < count; i++) {
     const foods = log.filter(x => slotOf(x) === i);
     const t = foodLogTotals(foods);
-    const calStr = Math.round(t.kcal) + (per ? ' / ' + per.calories : '') + ' cal';
-    const pStr = Math.round(t.p) + (per ? ' / ' + per.protein : '') + 'g P';
-    const over = per && t.kcal > per.calories * 1.05;
+    const pm = plan ? plan[i] : null; // this meal's own target (healthiest split)
+    const calStr = Math.round(t.kcal) + (pm ? ' / ' + pm.calories : '') + ' cal';
+    const pStr = Math.round(t.p) + (pm ? ' / ' + pm.protein : '') + 'g P';
+    const over = pm && t.kcal > pm.calories * 1.05;
     const name = labels[i] || ('Meal ' + (i + 1));
     html += '<div class="meal-slot">' +
       '<div class="meal-slot-head">' +
@@ -4842,7 +4862,7 @@ function renderOnboardStep() {
         '<div class="form-group"><label>Activity level</label><select id="ob-activity">' + Object.entries(ACTIVITY_FACTORS).map(([k, v]) => '<option value="' + k + '"' + (n.activity === k ? ' selected' : '') + '>' + v.label + '</option>').join('') + '</select></div>' +
         '<div class="form-row">' +
         '<div class="form-group"><label>Goal</label><select id="ob-ngoal">' + Object.entries(NUTRITION_GOALS).map(([k, v]) => '<option value="' + k + '"' + (n.goal === k ? ' selected' : '') + '>' + v.label + '</option>').join('') + '</select></div>' +
-        '<div class="form-group"><label>Meals per day</label><select id="ob-meals">' + [3, 4, 5, 6].map(m => '<option value="' + m + '"' + (n.mealsPerDay === m ? ' selected' : '') + '>' + m + ' meals</option>').join('') + '</select></div>' +
+        '<div class="form-group"><label>Meals per day</label><select id="ob-meals">' + [3, 4, 5, 6, 7, 8].map(m => '<option value="' + m + '"' + (n.mealsPerDay === m ? ' selected' : '') + '>' + m + ' meals</option>').join('') + '</select></div>' +
         '</div></div>');
     }
     if (!parts.length) parts.push('<p style="color:var(--text-muted)">Nothing to configure — hit Finish and start logging!</p>');
@@ -5072,7 +5092,7 @@ function renderNutritionSettingsCard() {
     '</div>' +
     '<div class="form-group"><label>Meals per day <span style="font-weight:400;color:var(--text-muted)">(we\'ll split your targets across them)</span></label>' +
     '<select id="nut-meals">' +
-    [3, 4, 5, 6].map(m => '<option value="' + m + '"' + ((+(n.mealsPerDay) || 3) === m ? ' selected' : '') + '>' + m + ' meals a day</option>').join('') +
+    [3, 4, 5, 6, 7, 8].map(m => '<option value="' + m + '"' + ((+(n.mealsPerDay) || 3) === m ? ' selected' : '') + '>' + m + ' meals a day</option>').join('') +
     '</select></div>' +
     '<button type="submit" class="btn btn-primary">Calculate & Save</button>' +
     '</form>' +
