@@ -1570,6 +1570,12 @@ body {
 .mpc-plate { font-size: 11px; color: var(--text-muted); margin-top: 6px; padding-top: 5px; border-top: 1px dashed var(--border); line-height: 1.4; }
 .meal-plan-note { margin-top: 10px; font-size: 12.5px; color: var(--text-muted); line-height: 1.55; }
 .meal-plan-note b { color: var(--text); font-weight: 700; }
+/* Time-aware meal focus */
+.meal-focus { margin: 12px 0 6px; padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid rgba(59,130,246,0.30); background: linear-gradient(135deg, rgba(59,130,246,0.08), transparent); }
+.mf-now { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: var(--primary); margin-bottom: 4px; }
+.mf-line { font-size: 14px; color: var(--text); line-height: 1.5; }
+.mf-line b { font-weight: 800; }
+.mf-btn { margin-top: 10px; }
 
 /* Autosave indicator (Log page) */
 .autosave-status { font-size: 12.5px; font-weight: 600; color: var(--text-muted); margin-right: auto; align-self: center; opacity: 0; transition: opacity 0.2s; }

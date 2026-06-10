@@ -1499,6 +1499,46 @@ function renderMealPlan(nut) {
     '<div class="meal-plan-note">At <b>every</b> meal: a palm of <b>protein</b>, ½ plate <b>veg or fruit</b>, a fist of <b>healthy carbs</b> (rice, oats, potatoes, whole grains), a thumb of <b>healthy fats</b> (nuts, olive oil, avocado).</div>' +
     '</div>';
 }
+// Which meal is "now" — spread the meals across the waking window (testable)
+function currentMealIndex(count, hour, startHour, endHour) {
+  const c = count || 1;
+  const s = (startHour == null) ? 7 : startHour, e = (endHour == null) ? 21 : endHour;
+  if (hour < s) return 0;
+  if (hour >= e) return c - 1;
+  const slot = Math.floor((hour - s) / ((e - s) / c));
+  return Math.max(0, Math.min(c - 1, slot));
+}
+// Time-aware "what to eat right now" banner on the Log page
+function renderMealFocus(nut) {
+  if (!nut || !nut.meals || !nut.meals.plan || !nut.meals.plan.length) return '';
+  const count = nut.meals.count;
+  const i = currentMealIndex(count, new Date().getHours());
+  const pm = nut.meals.plan[i];
+  const label = pm.label;
+  const today = state.data.days.find(d => d.date === todayStr());
+  const log = (state.page === 'log' && state._foodLog) ? state._foodLog : ((today && today.foodLog) || []);
+  const t = foodLogTotals(log.filter(x => Math.min(Math.max(0, x.meal || 0), count - 1) === i));
+  const calLeft = Math.max(0, pm.calories - Math.round(t.kcal));
+  const pLeft = Math.max(0, pm.protein - Math.round(t.p));
+  const done = t.kcal >= pm.calories * 0.9;
+  const body = done
+    ? escapeHtml(label) + ' is on point — ' + Math.round(t.kcal).toLocaleString() + ' / ' + pm.calories.toLocaleString() + ' cal logged. Nice.'
+    : (t.kcal > 0
+      ? '<b>' + calLeft.toLocaleString() + ' cal</b> and <b>' + pLeft + 'g protein</b> left for ' + escapeHtml(label.toLowerCase()) + ' — ' + mealPlateHint(label) + '.'
+      : 'Aim for <b>' + pm.calories.toLocaleString() + ' cal · ' + pm.protein + 'g protein</b> — ' + mealPlateHint(label) + '.');
+  return '<div class="meal-focus">' +
+    '<div class="mf-now">Right now · ' + escapeHtml(label) + '</div>' +
+    '<div class="mf-line">' + body + '</div>' +
+    (done ? '' : '<button type="button" class="btn btn-primary btn-sm mf-btn" onclick="focusMeal(' + i + ')">Log ' + escapeHtml(label.toLowerCase()) + '</button>') +
+    '</div>';
+}
+function focusMeal(i) {
+  const sel = document.getElementById('food-meal');
+  if (sel) sel.value = String(i);
+  document.querySelector('.food-logger')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const pick = document.getElementById('food-pick');
+  if (pick) setTimeout(() => pick.focus(), 300);
+}
 function renderLogNutritionSection(eatenVal) {
   const nut = getNutrition();
   if (!nut) {
@@ -1527,6 +1567,7 @@ function renderLogNutritionSection(eatenVal) {
     '<button type="button" class="btn-link" onclick="navigate(\'settings\')">Edit</button>' +
     '</div>' +
     renderMealPlan(nut) +
+    renderMealFocus(nut) +
 
     // Food logger
     '<div class="food-logger">' +
@@ -1535,7 +1576,7 @@ function renderLogNutritionSection(eatenVal) {
     '<input type="text" list="food-datalist" id="food-pick" placeholder="Search a food (e.g. chicken breast)…" autocomplete="off" onkeydown="if(event.key===\'Enter\'){event.preventDefault();document.getElementById(\'food-qty\').focus();}">' +
     '<input type="number" id="food-qty" min="0" step="1" placeholder="amount" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addFoodToLog();}">' +
     '<select id="food-unit"><option value="g">grams</option><option value="ml">mL</option><option value="l">litres</option><option value="oz">oz</option><option value="serving">serving(s)</option></select>' +
-    '<select id="food-meal" title="Add to which meal">' + nut.meals.labels.map(function (lbl, i) { return '<option value="' + i + '">' + escapeHtml(lbl) + '</option>'; }).join('') + '</select>' +
+    '<select id="food-meal" title="Add to which meal">' + nut.meals.labels.map(function (lbl, i) { return '<option value="' + i + '"' + (i === currentMealIndex(nut.meals.count, new Date().getHours()) ? ' selected' : '') + '>' + escapeHtml(lbl) + '</option>'; }).join('') + '</select>' +
     '<button type="button" class="btn btn-outline food-add-btn" onclick="addFoodToLog()">+ Add</button>' +
     '<button type="button" class="btn btn-outline food-ai-btn" id="food-ai-btn" onclick="estimateFoodWithAI()" title="Estimate macros with AI for any food">AI</button>' +
     '</div>' + datalist +

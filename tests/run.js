@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -109,6 +109,13 @@ const _grp = A.groupFoodsByMeal([
 ok('groupFoodsByMeal: groups only used meals', _grp.length === 2 && _grp[0].index === 0 && _grp[1].index === 2);
 ok('groupFoodsByMeal: per-meal calories sum', _grp[0].kcal === 230 && _grp[1].kcal === 530);
 ok('groupFoodsByMeal: empty → []', A.groupFoodsByMeal([]).length === 0);
+// Time-aware "which meal now"
+ok('currentMealIndex: breakfast in the morning', A.currentMealIndex(3, 8) === 0);
+ok('currentMealIndex: lunch midday', A.currentMealIndex(3, 13) === 1);
+ok('currentMealIndex: dinner in the evening', A.currentMealIndex(3, 19) === 2);
+ok('currentMealIndex: before waking → first meal', A.currentMealIndex(3, 5) === 0);
+ok('currentMealIndex: late night → last meal', A.currentMealIndex(3, 23) === 2);
+ok('currentMealIndex: 5 meals midday → lunch slot', A.currentMealIndex(5, 13) === 2);
 
 // Goal status (pure)
 const _wg = { kind: 'weight', start: 180, target: 170, deadline: '2026-07-10', createdAt: '2026-06-10' };
