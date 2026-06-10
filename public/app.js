@@ -58,57 +58,57 @@ const SECURITY_QUESTIONS = [
 //   reading    → reading  "Pages + summary, with a book tracker"
 // ─────────────────────────────────────────────────────────────
 const PILLAR_META = {
-  gym:        { type: 'boolean', cls: 'gym',     defaultLabel: 'Gym',        defaultIcon: '💪', goalKey: 'gymDaysPerWeek',   measures: 'Did you do it? — builds a daily streak' },
-  food:       { type: 'rating',  cls: 'food',    defaultLabel: 'Food',       defaultIcon: '🥗', goalKey: null,               measures: 'Quality rating from 1 to 5' },
-  networking: { type: 'count',   cls: 'network', defaultLabel: 'Networking', defaultIcon: '🤝', goalKey: 'weeklyNetworkGoal', measures: 'How many today? — a daily count' },
-  money:      { type: 'amount',  cls: 'money',   defaultLabel: 'Income',     defaultIcon: '💰', goalKey: 'weeklyIncomeGoal', measures: 'A dollar amount + what you did' },
-  reading:    { type: 'reading', cls: 'read',    defaultLabel: 'Reading',    defaultIcon: '📚', goalKey: 'weeklyReadGoal',   measures: 'Pages read + a summary, with a book tracker' }
+  gym:        { type: 'boolean', cls: 'gym',     defaultLabel: 'Gym',        defaultIcon: '', goalKey: 'gymDaysPerWeek',   measures: 'Did you do it? — builds a daily streak' },
+  food:       { type: 'rating',  cls: 'food',    defaultLabel: 'Food',       defaultIcon: '', goalKey: null,               measures: 'Quality rating from 1 to 5' },
+  networking: { type: 'count',   cls: 'network', defaultLabel: 'Networking', defaultIcon: '', goalKey: 'weeklyNetworkGoal', measures: 'How many today? — a daily count' },
+  money:      { type: 'amount',  cls: 'money',   defaultLabel: 'Income',     defaultIcon: '', goalKey: 'weeklyIncomeGoal', measures: 'A dollar amount + what you did' },
+  reading:    { type: 'reading', cls: 'read',    defaultLabel: 'Reading',    defaultIcon: '', goalKey: 'weeklyReadGoal',   measures: 'Pages read + a summary, with a book tracker' }
 };
 const PILLAR_IDS = ['gym', 'food', 'networking', 'money', 'reading'];
 
 const PILLAR_PRESETS = {
   sales: {
-    name: '💼 Sales Hustler', desc: 'Gym · Food · Networking · Income · Reading',
+    name: 'Sales Hustler', desc: 'Gym · Food · Networking · Income · Reading',
     pillars: {
-      gym:        { enabled: true, label: 'Gym',        icon: '💪' },
-      food:       { enabled: true, label: 'Food',       icon: '🥗' },
-      networking: { enabled: true, label: 'Networking', icon: '🤝' },
-      money:      { enabled: true, label: 'Income',     icon: '💰' },
-      reading:    { enabled: true, label: 'Reading',    icon: '📚' }
+      gym:        { enabled: true, label: 'Gym',        icon: '' },
+      food:       { enabled: true, label: 'Food',       icon: '' },
+      networking: { enabled: true, label: 'Networking', icon: '' },
+      money:      { enabled: true, label: 'Income',     icon: '' },
+      reading:    { enabled: true, label: 'Reading',    icon: '' }
     }
   },
   student: {
-    name: '🎓 Student', desc: 'Study · Sleep · Practice · — · Reading',
+    name: 'Student', desc: 'Study · Sleep · Practice · — · Reading',
     pillars: {
-      gym:        { enabled: true,  label: 'Study Session', icon: '📖' },
-      food:       { enabled: true,  label: 'Sleep Quality', icon: '😴' },
-      networking: { enabled: true,  label: 'Practice Qs',   icon: '✏️' },
-      money:      { enabled: false, label: 'Income',        icon: '💰' },
-      reading:    { enabled: true,  label: 'Reading',       icon: '📚' }
+      gym:        { enabled: true,  label: 'Study Session', icon: '' },
+      food:       { enabled: true,  label: 'Sleep Quality', icon: '' },
+      networking: { enabled: true,  label: 'Practice Qs',   icon: '' },
+      money:      { enabled: false, label: 'Income',        icon: '' },
+      reading:    { enabled: true,  label: 'Reading',       icon: '' }
     }
   },
   creator: {
-    name: '🎨 Creator', desc: 'Create · Energy · Posts · Revenue · Learning',
+    name: 'Creator', desc: 'Create · Energy · Posts · Revenue · Learning',
     pillars: {
-      gym:        { enabled: true, label: 'Create',   icon: '🎨' },
-      food:       { enabled: true, label: 'Energy',   icon: '⚡' },
-      networking: { enabled: true, label: 'Posts Out', icon: '📣' },
-      money:      { enabled: true, label: 'Revenue',  icon: '💰' },
-      reading:    { enabled: true, label: 'Learning', icon: '📚' }
+      gym:        { enabled: true, label: 'Create',   icon: '' },
+      food:       { enabled: true, label: 'Energy',   icon: '' },
+      networking: { enabled: true, label: 'Posts Out', icon: '' },
+      money:      { enabled: true, label: 'Revenue',  icon: '' },
+      reading:    { enabled: true, label: 'Learning', icon: '' }
     }
   },
   health: {
-    name: '🧘 Health & Wellness', desc: 'Exercise · Diet · Water · — · Reading',
+    name: 'Health & Wellness', desc: 'Exercise · Diet · Water · — · Reading',
     pillars: {
-      gym:        { enabled: true,  label: 'Exercise',  icon: '🏃' },
-      food:       { enabled: true,  label: 'Diet',      icon: '🥗' },
-      networking: { enabled: true,  label: 'Water (glasses)', icon: '💧' },
-      money:      { enabled: false, label: 'Income',    icon: '💰' },
-      reading:    { enabled: true,  label: 'Reading',   icon: '📚' }
+      gym:        { enabled: true,  label: 'Exercise',  icon: '' },
+      food:       { enabled: true,  label: 'Diet',      icon: '' },
+      networking: { enabled: true,  label: 'Water (glasses)', icon: '' },
+      money:      { enabled: false, label: 'Income',    icon: '' },
+      reading:    { enabled: true,  label: 'Reading',   icon: '' }
     }
   },
   custom: {
-    name: '⚙️ Build My Own', desc: 'Start from the defaults and rename everything',
+    name: 'Build My Own', desc: 'Start from the defaults and rename everything',
     pillars: null // means: keep current / defaults
   }
 };
@@ -136,7 +136,7 @@ function enabledPillars() { return PILLAR_IDS.map(pillar).filter(p => p.enabled)
 // ─────────────────────────────────────────────────────────────
 const ANALYSES = [
   {
-    id: 'overall', icon: '⚡', title: 'My Full Life Audit',
+    id: 'overall', icon: '', title: 'My Full Life Audit',
     desc: 'See how all your areas connect and what to focus on first',
     prompt: () => {
       const stats = getWeekStats();
@@ -156,7 +156,7 @@ const ANALYSES = [
     }
   },
   {
-    id: 'gym', icon: '💪', title: 'Optimize My Training',
+    id: 'gym', icon: '', title: 'Optimize My Training',
     desc: 'Build more muscle faster based on your workout consistency and patterns',
     prompt: () => {
       const gymDays = state.data.days.filter(d => d.gym?.done).length;
@@ -171,7 +171,7 @@ const ANALYSES = [
     }
   },
   {
-    id: 'network', icon: '🤝', title: 'Network Into Opportunities',
+    id: 'network', icon: '', title: 'Network Into Opportunities',
     desc: 'Turn your connections into real money, partnerships, and career growth',
     prompt: () => {
       const totalConnections = state.data.days.reduce((s, d) => s + (d.networking?.count || 0), 0);
@@ -185,7 +185,7 @@ const ANALYSES = [
     }
   },
   {
-    id: 'money', icon: '💰', title: 'Stack More Income',
+    id: 'money', icon: '', title: 'Stack More Income',
     desc: 'Maximize your commission + find other income streams to build real wealth',
     prompt: () => {
       const avg = getWeeklyAvg(state.data.weeks, 4);
@@ -323,11 +323,11 @@ function renderXPBar() {
   let el = document.getElementById('xp-bar-wrap');
   const html = `<div id="xp-bar-wrap" class="xp-bar-wrap">
     <div class="xp-top">
-      <span class="xp-label" style="color:${lvl.color}">⚡ Lv.${lvl.level} ${lvl.label}</span>
+      <span class="xp-label" style="color:${lvl.color}">Lv.${lvl.level} ${lvl.label}</span>
       <span class="xp-pts">${xp.toLocaleString()} XP</span>
     </div>
     <div class="xp-track"><div class="xp-fill" style="width:${lvl.pct}%;background:${lvl.color};box-shadow:0 0 8px ${lvl.color}44"></div></div>
-    <div class="xp-next">${toNext > 0 ? toNext + ' XP to ' + lvl.nextLabel : '🏆 MAX LEVEL'}</div>
+    <div class="xp-next">${toNext > 0 ? toNext + ' XP to ' + lvl.nextLabel : 'MAX LEVEL'}</div>
   </div>`;
   if (el) { el.outerHTML = html; }
   else {
@@ -347,7 +347,7 @@ function renderQuoteCard() {
   return '<div class="quote-card">' +
     '<span class="quote-mark">"</span>' +
     '<div class="quote-text">' + q.text + '</div>' +
-    '<div class="quote-author">— ' + q.author + ' &nbsp;·&nbsp; <span style="color:var(--text-muted)">Today\'s Fuel ⚡</span></div>' +
+    '<div class="quote-author">— ' + q.author + ' &nbsp;·&nbsp; <span style="color:var(--text-muted)">Today\'s Fuel </span></div>' +
     '</div>';
 }
 
@@ -355,25 +355,25 @@ function renderQuoteCard() {
 // ACHIEVEMENTS
 // ─────────────────────────────────────────────────────────────
 const ACHIEVEMENT_DEFS = [
-  { id: 'first_log',    icon: '📝', title: 'First Step',      desc: 'Log your first day',                    cat: 'general', check: d => d.days.length >= 1 },
-  { id: 'days_7',       icon: '🌟', title: 'Tracker',         desc: 'Log 7 days total',                      cat: 'general', check: d => d.days.length >= 7 },
-  { id: 'days_30',      icon: '🏅', title: 'Dedicated',       desc: 'Log 30 days total',                     cat: 'general', check: d => d.days.length >= 30 },
-  { id: 'days_100',     icon: '⚡', title: 'Unstoppable',     desc: 'Log 100 days total',                    cat: 'general', check: d => d.days.length >= 100 },
-  { id: 'first_gym',    icon: '🏋️', title: 'First Rep',       desc: 'Log your first workout',                cat: 'gym',     check: d => d.days.some(x => x.gym?.done) },
-  { id: 'streak_3',     icon: '🔥', title: 'Streak Starter',  desc: '3-day gym streak',                      cat: 'gym',     check: d => getGymStreakFromData(d.days) >= 3 },
-  { id: 'streak_7',     icon: '💪', title: 'Week Warrior',    desc: '7-day gym streak',                      cat: 'gym',     check: d => getGymStreakFromData(d.days) >= 7 },
-  { id: 'streak_14',    icon: '🦾', title: 'Iron Will',       desc: '14-day gym streak',                     cat: 'gym',     check: d => getGymStreakFromData(d.days) >= 14 },
-  { id: 'workouts_30',  icon: '👑', title: 'Gym Royalty',     desc: '30 workouts logged',                    cat: 'gym',     check: d => d.days.filter(x => x.gym?.done).length >= 30 },
-  { id: 'clean_5',      icon: '🥗', title: 'Clean Eater',     desc: 'Food 4+ for 5 days straight',           cat: 'food',    check: d => hasFoodStreakOf(d.days, 4, 5) },
-  { id: 'log_7',        icon: '🌿', title: 'Fuel Machine',    desc: 'Log 7 consecutive days',                cat: 'food',    check: d => hasLogStreakOf(d.days, 7) },
-  { id: 'net_10',       icon: '🤝', title: 'Connector',       desc: '10 total connections',                  cat: 'network', check: d => d.days.reduce((s,x)=>s+(x.networking?.count||0),0) >= 10 },
-  { id: 'net_25',       icon: '🌐', title: 'Networker',       desc: '25 total connections',                  cat: 'network', check: d => d.days.reduce((s,x)=>s+(x.networking?.count||0),0) >= 25 },
-  { id: 'net_50',       icon: '🏆', title: 'Power Player',    desc: '50 total connections',                  cat: 'network', check: d => d.days.reduce((s,x)=>s+(x.networking?.count||0),0) >= 50 },
-  { id: 'first_income', icon: '💰', title: 'First Win',       desc: 'Log your first weekly income',          cat: 'money',   check: d => d.weeks.some(w => w.income > 0) },
-  { id: 'hit_goal',     icon: '🎯', title: 'Goal Crusher',    desc: 'Hit your weekly income goal',           cat: 'money',   check: d => d.profile.weeklyIncomeGoal > 0 && d.weeks.some(w => w.income >= d.profile.weeklyIncomeGoal) },
-  { id: 'hit_goal_3',   icon: '🚀', title: 'On a Roll',       desc: 'Hit income goal 3 times',               cat: 'money',   check: d => d.profile.weeklyIncomeGoal > 0 && d.weeks.filter(w => w.income >= d.profile.weeklyIncomeGoal).length >= 3 },
-  { id: 'ideas_3',      icon: '💡', title: 'Visionary',       desc: 'Add 3+ business ideas',                cat: 'general', check: d => d.ideas.length >= 3 },
-  { id: 'idea_active',  icon: '🛠️', title: 'Builder',         desc: 'Have an active business idea',          cat: 'general', check: d => d.ideas.some(i => i.status === 'active') }
+  { id: 'first_log',    icon: '', title: 'First Step',      desc: 'Log your first day',                    cat: 'general', check: d => d.days.length >= 1 },
+  { id: 'days_7',       icon: '', title: 'Tracker',         desc: 'Log 7 days total',                      cat: 'general', check: d => d.days.length >= 7 },
+  { id: 'days_30',      icon: '', title: 'Dedicated',       desc: 'Log 30 days total',                     cat: 'general', check: d => d.days.length >= 30 },
+  { id: 'days_100',     icon: '', title: 'Unstoppable',     desc: 'Log 100 days total',                    cat: 'general', check: d => d.days.length >= 100 },
+  { id: 'first_gym',    icon: '', title: 'First Rep',       desc: 'Log your first workout',                cat: 'gym',     check: d => d.days.some(x => x.gym?.done) },
+  { id: 'streak_3',     icon: '', title: 'Streak Starter',  desc: '3-day gym streak',                      cat: 'gym',     check: d => getGymStreakFromData(d.days) >= 3 },
+  { id: 'streak_7',     icon: '', title: 'Week Warrior',    desc: '7-day gym streak',                      cat: 'gym',     check: d => getGymStreakFromData(d.days) >= 7 },
+  { id: 'streak_14',    icon: '', title: 'Iron Will',       desc: '14-day gym streak',                     cat: 'gym',     check: d => getGymStreakFromData(d.days) >= 14 },
+  { id: 'workouts_30',  icon: '', title: 'Gym Royalty',     desc: '30 workouts logged',                    cat: 'gym',     check: d => d.days.filter(x => x.gym?.done).length >= 30 },
+  { id: 'clean_5',      icon: '', title: 'Clean Eater',     desc: 'Food 4+ for 5 days straight',           cat: 'food',    check: d => hasFoodStreakOf(d.days, 4, 5) },
+  { id: 'log_7',        icon: '', title: 'Fuel Machine',    desc: 'Log 7 consecutive days',                cat: 'food',    check: d => hasLogStreakOf(d.days, 7) },
+  { id: 'net_10',       icon: '', title: 'Connector',       desc: '10 total connections',                  cat: 'network', check: d => d.days.reduce((s,x)=>s+(x.networking?.count||0),0) >= 10 },
+  { id: 'net_25',       icon: '', title: 'Networker',       desc: '25 total connections',                  cat: 'network', check: d => d.days.reduce((s,x)=>s+(x.networking?.count||0),0) >= 25 },
+  { id: 'net_50',       icon: '', title: 'Power Player',    desc: '50 total connections',                  cat: 'network', check: d => d.days.reduce((s,x)=>s+(x.networking?.count||0),0) >= 50 },
+  { id: 'first_income', icon: '', title: 'First Win',       desc: 'Log your first weekly income',          cat: 'money',   check: d => d.weeks.some(w => w.income > 0) },
+  { id: 'hit_goal',     icon: '', title: 'Goal Crusher',    desc: 'Hit your weekly income goal',           cat: 'money',   check: d => d.profile.weeklyIncomeGoal > 0 && d.weeks.some(w => w.income >= d.profile.weeklyIncomeGoal) },
+  { id: 'hit_goal_3',   icon: '', title: 'On a Roll',       desc: 'Hit income goal 3 times',               cat: 'money',   check: d => d.profile.weeklyIncomeGoal > 0 && d.weeks.filter(w => w.income >= d.profile.weeklyIncomeGoal).length >= 3 },
+  { id: 'ideas_3',      icon: '', title: 'Visionary',       desc: 'Add 3+ business ideas',                cat: 'general', check: d => d.ideas.length >= 3 },
+  { id: 'idea_active',  icon: '', title: 'Builder',         desc: 'Have an active business idea',          cat: 'general', check: d => d.ideas.some(i => i.status === 'active') }
 ];
 
 function computeAchievements() {
@@ -427,14 +427,14 @@ function renderAchievementsSection() {
 
   const badge = (a, isLocked) =>
     '<div class="ach-badge ' + (isLocked ? 'ach-locked' : 'ach-earned') + '" title="' + a.desc + '">' +
-    '<div class="ach-icon">' + (isLocked ? '🔒' : a.icon) + '</div>' +
+    '<div class="ach-icon">' + (isLocked ? '' : a.icon) + '</div>' +
     '<div class="ach-name">' + a.title + '</div>' +
     '<div class="ach-desc">' + a.desc + '</div>' +
     '</div>';
 
   return '<div class="card">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">' +
-    '<h3 class="card-title" style="margin-bottom:0">🏆 Achievements</h3>' +
+    '<h3 class="card-title" style="margin-bottom:0">Achievements</h3>' +
     '<span style="font-size:13px;color:var(--text-muted)">' + earned.length + '/' + all.length + ' · ' + pct + '% complete</span>' +
     '</div>' +
     '<div class="ach-progress-bar"><div style="width:' + pct + '%;background:linear-gradient(90deg,var(--primary),var(--accent));height:100%;border-radius:4px;transition:width 1s ease"></div></div>' +
@@ -496,7 +496,7 @@ function showWeeklyReview() {
   const score = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
 
   const scoreColor = score>=80?'#10B981':score>=60?'#F59E0B':score>=40?'#F97316':'#EF4444';
-  const scoreLabel = score>=80?'Crushing It 🔥':score>=60?'Solid Week 💪':score>=40?'Room to Grow 📈':'Time to Push ⚡';
+  const scoreLabel = score>=80?'Crushing It ':score>=60?'Solid Week ':score>=40?'Room to Grow ':'Time to Push ';
   const tips = [
     'You showed up this week. That\'s what separates you from 90% of people.',
     'Every connection you made this week is a seed. Water it with follow-ups.',
@@ -512,16 +512,16 @@ function showWeeklyReview() {
     el.id = 'weekly-modal';
     el.innerHTML =
       '<div class="modal-box">' +
-      '<div class="modal-badge">📊 Weekly Review</div>' +
+      '<div class="modal-badge">Weekly Review</div>' +
       '<div class="modal-score" style="color:' + scoreColor + '">' + score + '<span>%</span></div>' +
       '<div class="modal-score-label">' + scoreLabel + '</div>' +
       '<div class="review-grid">' +
-      '<div class="rv-item"><span>💪 Gym</span><strong>' + gymDays + '/' + profile.gymDaysPerWeek + ' days</strong></div>' +
-      '<div class="rv-item"><span>🥗 Food avg</span><strong>' + (avgFood>0?avgFood.toFixed(1)+'/5':'—') + '</strong></div>' +
-      '<div class="rv-item"><span>🤝 Network</span><strong>' + net + ' contacts</strong></div>' +
-      '<div class="rv-item"><span>💰 Income</span><strong>' + formatCurrency(inc) + '</strong></div>' +
+      '<div class="rv-item"><span>Gym</span><strong>' + gymDays + '/' + profile.gymDaysPerWeek + ' days</strong></div>' +
+      '<div class="rv-item"><span>Food avg</span><strong>' + (avgFood>0?avgFood.toFixed(1)+'/5':'—') + '</strong></div>' +
+      '<div class="rv-item"><span>Network</span><strong>' + net + ' contacts</strong></div>' +
+      '<div class="rv-item"><span>Income</span><strong>' + formatCurrency(inc) + '</strong></div>' +
       '</div>' +
-      '<div class="review-tip">💡 ' + tips[Math.floor(Math.random()*tips.length)] + '</div>' +
+      '<div class="review-tip">' + tips[Math.floor(Math.random()*tips.length)] + '</div>' +
       '<button class="btn btn-primary" style="width:100%;margin-top:16px" onclick="document.getElementById(\'weekly-modal\').remove()">Start the New Week →</button>' +
       '</div>';
     document.body.appendChild(el);
@@ -533,16 +533,16 @@ function showWeeklyReview() {
 // ─────────────────────────────────────────────────────────────
 function showStreakCelebration(streak) {
   const milestones = {
-    3:  { title: '🔥 3-Day Streak!',  sub: 'The habit is forming. Don\'t break it now!' },
-    7:  { title: '💪 7-Day Streak!',  sub: 'A full week of discipline. You\'re built different.' },
-    14: { title: '🦾 14-Day Streak!', sub: 'Two weeks. This is who you are now.' },
-    21: { title: '👑 21-Day Streak!', sub: '21 days — the habit is permanently yours.' },
-    30: { title: '⚡ 30-Day Streak!', sub: 'A full month. You are UNSTOPPABLE.' }
+    3:  { title: '3-Day Streak!',  sub: 'The habit is forming. Don\'t break it now!' },
+    7:  { title: '7-Day Streak!',  sub: 'A full week of discipline. You\'re built different.' },
+    14: { title: '14-Day Streak!', sub: 'Two weeks. This is who you are now.' },
+    21: { title: '21-Day Streak!', sub: '21 days — the habit is permanently yours.' },
+    30: { title: '30-Day Streak!', sub: 'A full month. You are UNSTOPPABLE.' }
   };
   const m = milestones[streak];
   if (!m) return;
 
-  const emojis = ['🔥','💪','⚡','🏆','✨','🎯','💥','🌟','👊','🦾'];
+  const emojis = ['','','','','','','','','',''];
   let particles = '';
   for (let i = 0; i < 28; i++) {
     const e = emojis[Math.floor(Math.random()*emojis.length)];
@@ -648,10 +648,10 @@ function renderAuthScreen(mode) {
   screen.id = 'auth-screen';
   screen.innerHTML =
     '<div class="auth-card">' +
-    '<div class="auth-brand"><span class="brand-icon">⚡</span><div>' +
+    '<div class="auth-brand"><span class="brand-icon"></span><div>' +
     '<div class="auth-title">Escalate</div><div class="auth-sub">Life Progress</div></div></div>' +
     '<div class="auth-hook">' +
-    '<div class="auth-hook-title">🔗 See what connects your life</div>' +
+    '<div class="auth-hook-title">See what connects your life</div>' +
     '<div class="auth-hook-sub">One place for your gym, money, nutrition, reading and habits — with an AI coach that watches every area at once and reveals how they pull on each other.</div>' +
     '</div>' +
     '<div class="auth-tabs">' +
@@ -674,19 +674,19 @@ function renderAuthScreen(mode) {
         '<select id="auth-secq">' + SECURITY_QUESTIONS.map(q => '<option value="' + escapeHtml(q) + '">' + escapeHtml(q) + '</option>').join('') + '</select></div>' +
         '<div class="auth-field"><label>Your answer <span style="font-weight:400;color:var(--text-muted)">(recommended)</span></label>' +
         '<input type="text" id="auth-seca" autocomplete="off" placeholder="So you can reset your password later"></div>' +
-        '<div class="auth-warn">⚠️ Without a security question, you can\'t recover your account if you forget your password.</div>'
+        '<div class="auth-warn">Without a security question, you can\'t recover your account if you forget your password.</div>'
       : '') +
     '<div class="auth-error" id="auth-error"></div>' +
     '<div class="auth-status" id="auth-status" style="display:none"></div>' +
-    '<button type="submit" class="btn btn-primary auth-submit">' + (isSignup ? '✨ Create Account' : '→ Log In') + '</button>' +
+    '<button type="submit" class="btn btn-primary auth-submit">' + (isSignup ? 'Create Account' : '→ Log In') + '</button>' +
     (!isSignup ? '<div class="auth-forgot"><button type="button" class="btn-link" onclick="renderForgotScreen()">Forgot password?</button></div>' : '') +
     '</form>' +
     '<div class="auth-foot">' +
     (isSignup ? 'Already have an account? <button class="btn-link" onclick="renderAuthScreen(\'login\')">Log in</button>'
               : 'New here? <button class="btn-link" onclick="renderAuthScreen(\'signup\')">Create an account</button>') +
-    '<div class="auth-note">🔒 Your account is private — only you can see your data.</div>' +
+    '<div class="auth-note">Your account is private — only you can see your data.</div>' +
     '<div style="margin-top:10px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap">' +
-    '<button type="button" class="btn-link" onclick="startDemo()">👀 See a live demo</button>' +
+    '<button type="button" class="btn-link" onclick="startDemo()">See a live demo</button>' +
     '<a class="btn-link" href="about.html">What is Escalate? →</a></div>' +
     '</div>' +
     '</div>';
@@ -705,7 +705,7 @@ function authStatus(msg) {
 // Auth requests can hit a sleeping free-tier server (cold start ~30–60s).
 // Show a friendly "waking up" note after a moment, and retry transient failures.
 async function authFetch(url, body) {
-  const slow = setTimeout(() => authStatus('⏳ Waking up the server… the first visit can take up to a minute on the free plan. Hang tight.'), 3500);
+  const slow = setTimeout(() => authStatus('Waking up the server… the first visit can take up to a minute on the free plan. Hang tight.'), 3500);
   try {
     let lastErr;
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -717,7 +717,7 @@ async function authFetch(url, body) {
         return res;
       } catch (err) {
         lastErr = err;
-        if (attempt < 2) { authStatus('⏳ Still waking up… retrying.'); await new Promise(r => setTimeout(r, 2000)); }
+        if (attempt < 2) { authStatus('Still waking up… retrying.'); await new Promise(r => setTimeout(r, 2000)); }
       }
     }
     throw lastErr;
@@ -737,7 +737,7 @@ async function doLogin(e) {
     if (!res.ok) { authError(j.error || 'Login failed.'); return; }
     state.token = j.token; state.user = j.username; state.hasSecurity = j.hasSecurity; localStorage.setItem('be_token', j.token);
     await startApp();
-    showToast('Welcome back, ' + j.username + '! 👋', 'success');
+    showToast('Welcome back, ' + j.username + '! ', 'success');
   } catch { authError('Could not reach the server — check your connection and try again.'); }
   finally { if (btn) btn.disabled = false; }
 }
@@ -757,7 +757,7 @@ async function doSignup(e) {
   if (securityAnswer && securityAnswer.length < 2) { authError('Your security answer is too short (or leave it blank).'); return; }
   // Lockout nudge — make skipping a deliberate choice
   if (!securityAnswer) {
-    const proceed = confirm("⚠️ No security question set.\n\nIf you forget your password, you won't be able to recover your account.\n\nPress OK to create it anyway, or Cancel to go back and add one.");
+    const proceed = confirm("No security question set.\n\nIf you forget your password, you won't be able to recover your account.\n\nPress OK to create it anyway, or Cancel to go back and add one.");
     if (!proceed) { document.getElementById('auth-seca')?.focus(); return; }
   }
   authError(''); if (btn) btn.disabled = true;
@@ -767,7 +767,7 @@ async function doSignup(e) {
     if (!res.ok) { authError(j.error || 'Sign up failed.'); return; }
     state.token = j.token; state.user = j.username; state.hasSecurity = !!j.hasSecurity; localStorage.setItem('be_token', j.token);
     await startApp();
-    showToast('Account created — welcome, ' + j.username + '! 🎉', 'success');
+    showToast('Account created — welcome, ' + j.username + '! ', 'success');
   } catch { authError('Could not reach the server — check your connection and try again.'); }
   finally { if (btn) btn.disabled = false; }
 }
@@ -784,7 +784,7 @@ function renderForgotScreen() {
   screen.id = 'auth-screen';
   screen.innerHTML =
     '<div class="auth-card">' +
-    '<div class="auth-brand"><span class="brand-icon">🔑</span><div>' +
+    '<div class="auth-brand"><span class="brand-icon"></span><div>' +
     '<div class="auth-title">Reset Password</div><div class="auth-sub">Answer your security question</div></div></div>' +
     (f.step === 1
       ? '<form id="auth-form" onsubmit="forgotFindAccount(event)">' +
@@ -794,13 +794,13 @@ function renderForgotScreen() {
         '<button type="submit" class="btn btn-primary auth-submit">Continue →</button>' +
         '</form>'
       : '<form id="auth-form" onsubmit="forgotReset(event)">' +
-        '<div class="forgot-q">🔒 ' + escapeHtml(f.question) + '</div>' +
+        '<div class="forgot-q">' + escapeHtml(f.question) + '</div>' +
         '<div class="auth-field"><label>Your answer</label>' +
         '<input type="text" id="forgot-answer" autocomplete="off" placeholder="Your answer" autofocus></div>' +
         '<div class="auth-field"><label>New password</label>' +
         '<input type="password" id="forgot-newpass" autocomplete="new-password" placeholder="At least 6 characters"></div>' +
         '<div class="auth-error" id="auth-error"></div>' +
-        '<button type="submit" class="btn btn-primary auth-submit">🔑 Reset Password</button>' +
+        '<button type="submit" class="btn btn-primary auth-submit">Reset Password</button>' +
         '</form>') +
     '<div class="auth-foot"><button class="btn-link" onclick="backToLogin()">← Back to log in</button></div>' +
     '</div>';
@@ -835,7 +835,7 @@ async function forgotReset(e) {
     if (!res.ok) { authError(j.error || 'Could not reset password.'); return; }
     state._forgot = null;
     renderAuthScreen('login');
-    showToast('Password reset! Log in with your new password. ✅', 'success');
+    showToast('Password reset! Log in with your new password. ', 'success');
   } catch { authError('Could not reach the server.'); }
 }
 
@@ -845,7 +845,7 @@ async function forgotReset(e) {
 function renderSecurityCard() {
   const hasSec = state.hasSecurity;
   return '<div class="card">' +
-    '<h3 class="card-title">🔒 Security & Password</h3>' +
+    '<h3 class="card-title">Security & Password</h3>' +
     '<form id="pw-form" onsubmit="changePassword(event)" style="margin-bottom:20px">' +
     '<div class="form-row">' +
     '<div class="form-group"><label>Current password</label><input type="password" id="pw-current" autocomplete="current-password" placeholder="Current password"></div>' +
@@ -879,7 +879,7 @@ async function changePassword(e) {
     const res = await fetch('/api/change-password', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ currentPassword, newPassword }) });
     const j = await res.json();
     if (!res.ok) { showToast(j.error || 'Could not change password.', 'error'); return; }
-    showToast('Password updated ✅', 'success');
+    showToast('Password updated ', 'success');
     document.getElementById('pw-current').value = ''; document.getElementById('pw-new').value = '';
   } catch { showToast('Could not reach the server.', 'error'); }
 }
@@ -895,7 +895,7 @@ async function setSecurity(e) {
     const j = await res.json();
     if (!res.ok) { showToast(j.error || 'Could not save.', 'error'); return; }
     state.hasSecurity = true;
-    showToast('Security question saved ✅', 'success');
+    showToast('Security question saved ', 'success');
     renderSettingsPage();
   } catch { showToast('Could not reach the server.', 'error'); }
 }
@@ -921,7 +921,7 @@ function renderUserChip() {
   chip.innerHTML =
     '<div class="user-chip-info"><span class="user-avatar">' + (state.user ? state.user.charAt(0).toUpperCase() : '?') + '</span>' +
     '<span class="user-name">' + escapeHtml(state.user || '') + '</span></div>' +
-    '<button class="user-logout" onclick="logout()" title="Log out">⎋</button>';
+    '<button class="user-logout" onclick="logout()" title="Log out"></button>';
   footer.prepend(chip);
 }
 
@@ -1004,12 +1004,12 @@ function renderPaywall() {
   s.id = 'auth-screen';
   s.innerHTML =
     '<div class="auth-card" style="text-align:center">' +
-    '<div class="auth-brand" style="justify-content:center"><span class="brand-icon">⚡</span><div>' +
+    '<div class="auth-brand" style="justify-content:center"><span class="brand-icon"></span><div>' +
     '<div class="auth-title">Your free trial has ended</div><div class="auth-sub">Escalate Pro</div></div></div>' +
     '<p style="color:var(--text-muted);line-height:1.6;margin:6px 0 18px">Keep your streak, your AI coach, and all your progress. Subscribe to unlock the full app.</p>' +
     '<div style="font-size:32px;font-weight:900;color:var(--text);line-height:1.1">' + escapeHtml(state.priceLabel || '$7.99/mo') + '</div>' +
     '<div style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Cancel anytime</div>' +
-    '<button class="btn btn-primary auth-submit" onclick="goSubscribe()">⭐ Subscribe</button>' +
+    '<button class="btn btn-primary auth-submit" onclick="goSubscribe()">Subscribe</button>' +
     '<div class="auth-foot"><button class="btn-link" onclick="location.reload()">I just subscribed — refresh</button>' +
     '<div style="margin-top:10px"><button class="btn-link" onclick="logout()">Log out</button></div></div>' +
     '</div>';
@@ -1018,7 +1018,7 @@ function renderPaywall() {
 function renderTrialBanner() {
   const s = subStatus();
   if (!s.trialing) return '';
-  return '<div class="trial-banner">🎁 <strong>' + s.daysLeft + ' day' + (s.daysLeft === 1 ? '' : 's') + ' left</strong> in your free trial' +
+  return '<div class="trial-banner"><strong>' + s.daysLeft + ' day' + (s.daysLeft === 1 ? '' : 's') + ' left</strong> in your free trial' +
     (state.paymentsLive ? ' · <button type="button" class="btn-link" onclick="goSubscribe()">Subscribe</button>' : '') + '</div>';
 }
 
@@ -1133,7 +1133,7 @@ function renderMoneyCircleCard() {
   const ring = 'conic-gradient(var(--danger) 0deg ' + deg + 'deg, var(--success) ' + deg + 'deg 360deg)';
   const neg = c.savedTotal < 0;
   return '<div class="card money-circle-card">' +
-    '<h3 class="card-title">💰 This ' + c.label + ' — money flow</h3>' +
+    '<h3 class="card-title">This ' + c.label + ' — money flow</h3>' +
     '<div class="mc-ring" style="background:' + ring + '">' +
     '<div class="mc-hole"><div class="mc-saved' + (neg ? ' mc-neg' : '') + '">' + formatCurrency(c.savedTotal) + '</div>' +
     '<div class="mc-saved-label">' + (neg ? 'overspent' : 'saved') + '</div></div></div>' +
@@ -1445,7 +1445,7 @@ function renderLogNutritionSection(eatenVal) {
   const nut = getNutrition();
   if (!nut) {
     return '<div class="nut-target-banner nut-target-empty">' +
-      '🍎 <span>Set up your calorie & macro targets to track what you eat</span>' +
+      '<span>Set up your calorie & macro targets to track what you eat</span>' +
       '<button type="button" class="btn-link" onclick="navigate(\'settings\')">Set up →</button>' +
       '</div>';
   }
@@ -1455,13 +1455,13 @@ function renderLogNutritionSection(eatenVal) {
   // Quick-add chips from foods you've logged before
   state._recentFoods = getRecentFoods(8);
   const recentRow = state._recentFoods.length
-    ? '<div class="recent-foods"><span class="recent-foods-label">⚡ Quick add</span>' +
+    ? '<div class="recent-foods"><span class="recent-foods-label">Quick add</span>' +
       state._recentFoods.map((f, i) => '<button type="button" class="recent-chip" onclick="quickAddRecent(' + i + ')">' + escapeHtml(f.name) + ' <b>' + f.grams + 'g</b></button>').join('') +
       '</div>'
     : '';
 
   return '<div class="today-section nut-section">' +
-    '<div class="today-section-header nut-header">🍎 Nutrition</div>' +
+    '<div class="today-section-header nut-header">Nutrition</div>' +
     '<div class="nut-target-line">' +
     '<span><b>Target:</b> ' + nut.calories.toLocaleString() + ' cal · ' +
     '<b class="mp">' + nut.protein.g + 'g</b> P · <b class="mc">' + nut.carbs.g + 'g</b> C · <b class="mf">' + nut.fat.g + 'g</b> F · ' +
@@ -1471,15 +1471,15 @@ function renderLogNutritionSection(eatenVal) {
 
     // Food logger
     '<div class="food-logger">' +
-    '<label class="food-logger-label">🍽️ What did you eat? <span style="font-weight:400;color:var(--text-muted)">Add foods and we\'ll count the macros</span></label>' +
+    '<label class="food-logger-label">What did you eat? <span style="font-weight:400;color:var(--text-muted)">Add foods and we\'ll count the macros</span></label>' +
     '<div class="food-add-row">' +
     '<input type="text" list="food-datalist" id="food-pick" placeholder="Search a food (e.g. chicken breast)…" autocomplete="off" onkeydown="if(event.key===\'Enter\'){event.preventDefault();document.getElementById(\'food-qty\').focus();}">' +
     '<input type="number" id="food-qty" min="0" step="1" placeholder="amount" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addFoodToLog();}">' +
     '<select id="food-unit"><option value="g">grams</option><option value="ml">mL</option><option value="l">litres</option><option value="oz">oz</option><option value="serving">serving(s)</option></select>' +
     '<button type="button" class="btn btn-outline food-add-btn" onclick="addFoodToLog()">+ Add</button>' +
-    '<button type="button" class="btn btn-outline food-ai-btn" id="food-ai-btn" onclick="estimateFoodWithAI()" title="Estimate macros with AI for any food">✨ AI</button>' +
+    '<button type="button" class="btn btn-outline food-ai-btn" id="food-ai-btn" onclick="estimateFoodWithAI()" title="Estimate macros with AI for any food">AI</button>' +
     '</div>' + datalist +
-    '<div class="food-ai-hint">Not in the list? Type any food (e.g. "homemade chicken burrito") and hit ✨ AI to estimate it.</div>' +
+    '<div class="food-ai-hint">Not in the list? Type any food (e.g. "homemade chicken burrito") and hit AI to estimate it.</div>' +
     recentRow +
     renderMyMealsRow() +
     '<div id="food-log-list">' + renderFoodLogList() + '</div>' +
@@ -1498,7 +1498,7 @@ function renderFoodLogList() {
   if (!log.length) return '<div class="food-log-empty">No foods added yet — search above to add what you ate.</div>';
   return '<div class="food-log-items">' + log.map(x =>
     '<div class="food-item">' +
-    '<div class="fi-name">' + escapeHtml(x.name) + (x.ai ? ' <span class="fi-ai" title="Estimated with AI">✨</span>' : '') + '</div>' +
+    '<div class="fi-name">' + escapeHtml(x.name) + (x.ai ? ' <span class="fi-ai" title="Estimated with AI"></span>' : '') + '</div>' +
     '<div class="fi-amt">' + foodAmountLabel(x) + '</div>' +
     '<div class="fi-macros"><b>' + x.kcal + '</b> cal · <b class="mp">' + x.p + 'g</b> · <b class="mc">' + x.c + 'g</b> · <b class="mf">' + x.f + 'g</b></div>' +
     '<button type="button" class="fi-remove" onclick="removeFoodFromLog(\'' + x.id + '\')" title="Remove">✕</button>' +
@@ -1515,13 +1515,13 @@ function nutritionAdvice(eaten, nut) {
   const pLeft = Math.round(pG - p);
   const calPct = kcal / nut.calories;
   const pPct = pG ? p / pG : 1;
-  if (calPct >= 1.08) return '⚠️ ' + Math.abs(calLeft) + ' cal over your target today — keep anything else light, and get a walk in.';
-  if (calPct >= 0.95 && pPct >= 1) return '🎯 Targets hit — calories and protein both on point. Strong day!';
-  if (pPct >= 1 && calLeft > 50) return '💪 Protein goal hit (' + Math.round(p) + 'g)! You have ' + calLeft + ' cal left — keep it clean.';
-  if (calPct >= 0.6 && pPct < 0.6) return '🥩 Low on protein — only ' + Math.round(p) + 'g of ' + pG + 'g. Make your next bite protein-heavy: chicken, eggs, Greek yogurt, or a shake.';
-  if (fG && f > fG * 1.25) return '🧈 Over on fat (' + Math.round(f) + 'g of ' + fG + 'g) — favor lean protein & veggies the rest of the day.';
-  if (cG && c > cG * 1.25 && pPct < 0.9) return '🍞 Carbs are high (' + Math.round(c) + 'g) and protein is lagging — swap a carb for protein next meal.';
-  if (calLeft > 0) return '🍽️ ' + calLeft + ' cal and ' + Math.max(0, pLeft) + 'g protein to go — aim for ~' + Math.max(5, Math.round(Math.max(0, pLeft) / 2)) + 'g protein next meal.';
+  if (calPct >= 1.08) return '' + Math.abs(calLeft) + ' cal over your target today — keep anything else light, and get a walk in.';
+  if (calPct >= 0.95 && pPct >= 1) return 'Targets hit — calories and protein both on point. Strong day!';
+  if (pPct >= 1 && calLeft > 50) return 'Protein goal hit (' + Math.round(p) + 'g)! You have ' + calLeft + ' cal left — keep it clean.';
+  if (calPct >= 0.6 && pPct < 0.6) return 'Low on protein — only ' + Math.round(p) + 'g of ' + pG + 'g. Make your next bite protein-heavy: chicken, eggs, Greek yogurt, or a shake.';
+  if (fG && f > fG * 1.25) return 'Over on fat (' + Math.round(f) + 'g of ' + fG + 'g) — favor lean protein & veggies the rest of the day.';
+  if (cG && c > cG * 1.25 && pPct < 0.9) return 'Carbs are high (' + Math.round(c) + 'g) and protein is lagging — swap a carb for protein next meal.';
+  if (calLeft > 0) return '' + calLeft + ' cal and ' + Math.max(0, pLeft) + 'g protein to go — aim for ~' + Math.max(5, Math.round(Math.max(0, pLeft) / 2)) + 'g protein next meal.';
   return '';
 }
 function renderFoodLogTotals() {
@@ -1562,7 +1562,7 @@ async function estimateFoodWithAI() {
   if (!desc) { showToast('Type what you ate first (e.g. "homemade chicken burrito").', 'error'); return; }
   const btn = document.getElementById('food-ai-btn');
   const original = btn ? btn.innerHTML : '';
-  if (btn) { btn.disabled = true; btn.innerHTML = '⏳…'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '…'; }
   // Fold any quantity the user entered into the description for the AI
   const qty = parseFloat(document.getElementById('food-qty')?.value) || 0;
   const unit = document.getElementById('food-unit')?.value || 'g';
@@ -1580,7 +1580,7 @@ async function estimateFoodWithAI() {
     const q = document.getElementById('food-qty'); if (q) q.value = '';
     refreshFoodLog();
     persistFoodNudgeState();
-    showToast('Added "' + j.name + '" (AI estimate) ✨', 'success');
+    showToast('Added "' + j.name + '" (AI estimate) ', 'success');
   } catch {
     showToast('Could not reach the server.', 'error');
   } finally {
@@ -1663,15 +1663,15 @@ function renderMyMealsRow() {
     '<span class="meal-chip-macros">' + Math.round(m.kcal || 0) + ' cal · ' + Math.round(m.p || 0) + 'p</span></span>' +
     '</button>').join('');
   return '<div class="my-meals" id="my-meals-row">' +
-    '<div class="my-meals-head"><span class="recent-foods-label">🍱 My meals</span>' +
+    '<div class="my-meals-head"><span class="recent-foods-label">My meals</span>' +
     '<div class="my-meals-actions">' +
     '<button type="button" class="btn-link" onclick="openMyMealForm()">＋ New</button>' +
-    '<button type="button" class="btn-link" onclick="openCommunityMeals()">🌍 Community</button>' +
+    '<button type="button" class="btn-link" onclick="openCommunityMeals()">Community</button>' +
     (meals.length ? '<button type="button" class="btn-link" onclick="openManageMeals()">Manage</button>' : '') +
     '</div></div>' +
     (meals.length
       ? '<div class="meal-chips">' + chips + '</div>'
-      : '<div class="my-meals-empty">Save a meal once (name + macros) and log it with one tap. Tap <b>＋ New</b>, or browse <b>🌍 Community</b>.</div>') +
+      : '<div class="my-meals-empty">Save a meal once (name + macros) and log it with one tap. Tap <b>＋ New</b>, or browse <b>Community</b>.</div>') +
     '</div>';
 }
 function refreshMyMeals() { const el = document.getElementById('my-meals-row'); if (el) el.outerHTML = renderMyMealsRow(); }
@@ -1758,7 +1758,7 @@ function renderMealPhotoControl() {
     return '<div class="mm-photo-preview"><img src="' + state._mealPhoto + '" alt="meal photo">' +
       '<button type="button" class="btn btn-outline btn-sm" onclick="clearMealPhoto()">✕ Remove photo</button></div>';
   }
-  return '<label class="btn btn-outline btn-sm mm-photo-btn">📷 Add a photo' +
+  return '<label class="btn btn-outline btn-sm mm-photo-btn">Add a photo' +
     '<input type="file" accept="image/*" style="display:none" onchange="onMealPhotoPick(this)"></label>';
 }
 async function onMealPhotoPick(input) {
@@ -1783,7 +1783,7 @@ function openMyMealForm() {
   modal.className = 'modal-overlay';
   modal.innerHTML =
     '<div class="modal-box meal-builder-box" style="max-width:600px;text-align:left">' +
-    '<div class="modal-badge">🍱 New meal</div>' +
+    '<div class="modal-badge">New meal</div>' +
     '<p style="font-size:14px;color:var(--text-muted);margin-bottom:14px">Build a meal from its ingredients — we add up the macros for you. Put in the amount (e.g. "1 banana", "20 g") and fill in whatever you know; blanks count as zero.</p>' +
     '<div class="form-group"><label>Meal name <span style="color:var(--danger)">*</span></label>' +
     '<input type="text" id="mm-name" placeholder="e.g. Açaí bowl" autocomplete="off"></div>' +
@@ -1791,7 +1791,7 @@ function openMyMealForm() {
     '<button type="button" class="btn btn-outline btn-sm" style="margin-top:8px" onclick="addIng()">＋ Add ingredient</button>' +
     '<div id="mm-total" class="mm-total"></div>' +
     '<div id="mm-photo" class="mm-photo">' + renderMealPhotoControl() + '</div>' +
-    '<label class="mm-share"><input type="checkbox" id="mm-share"> Also share to 🌍 Community so other members can use it</label>' +
+    '<label class="mm-share"><input type="checkbox" id="mm-share"> Also share to Community so other members can use it</label>' +
     '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">' +
     '<button class="btn btn-outline" onclick="document.getElementById(\'my-meal-modal\').remove()">Cancel</button>' +
     '<button class="btn btn-primary" onclick="saveMyMeal()">Save meal</button>' +
@@ -1837,14 +1837,14 @@ function openManageMeals() {
   modal.className = 'modal-overlay';
   modal.innerHTML =
     '<div class="modal-box" style="max-width:500px;text-align:left">' +
-    '<div class="modal-badge">🍱 My meals</div>' +
+    '<div class="modal-badge">My meals</div>' +
     (meals.length ? '<div class="manage-list">' + meals.map(m =>
       '<div class="comm-item">' + (m.photo ? '<img class="comm-photo" src="' + m.photo + '" alt="">' : '') +
       '<div class="comm-main"><div class="comm-name">' + escapeHtml(m.name) + '</div>' +
       '<div class="comm-macros">' + macroLine(m) + '</div>' + ingredientLines(m) + '</div>' +
       '<div class="comm-actions">' +
-      '<button type="button" class="btn btn-outline btn-sm" onclick="shareMyMeal(\'' + m.id + '\')">🌍 Share</button>' +
-      '<button type="button" class="comm-x" title="Delete" onclick="deleteMyMeal(\'' + m.id + '\')">🗑</button>' +
+      '<button type="button" class="btn btn-outline btn-sm" onclick="shareMyMeal(\'' + m.id + '\')">Share</button>' +
+      '<button type="button" class="comm-x" title="Delete" onclick="deleteMyMeal(\'' + m.id + '\')">✕</button>' +
       '</div></div>').join('') + '</div>'
       : '<p style="color:var(--text-muted);font-size:14px">No saved meals yet.</p>') +
     '<div style="display:flex;gap:10px;justify-content:space-between;margin-top:16px">' +
@@ -1864,7 +1864,7 @@ async function shareMyMeal(id) {
       body: JSON.stringify({ name: m.name, kcal: m.kcal, p: m.p, c: m.c, f: m.f, ingredients: m.ingredients || [], photo: m.photo || '', author }) });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) { showToast(j.error || 'Could not share — are you signed in and online?', 'error'); return; }
-    showToast('Shared "' + m.name + '" to Community 🌍', 'success');
+    showToast('Shared "' + m.name + '" to Community ', 'success');
   } catch { showToast('Could not reach the community (needs to be online).', 'error'); }
 }
 
@@ -1878,7 +1878,7 @@ function openCommunityMeals() {
   modal.className = 'modal-overlay';
   modal.innerHTML =
     '<div class="modal-box community-box" style="max-width:560px;text-align:left">' +
-    '<div class="modal-badge">🌍 Community meals</div>' +
+    '<div class="modal-badge">Community meals</div>' +
     '<p style="font-size:13px;color:var(--text-muted);margin:6px 0 12px">Meals shared by other members. Tap <b>Add</b> to copy one into your own meals, then log it any day. These are member-submitted — give the numbers a sanity check.</p>' +
     '<div class="food-add-row" style="margin-bottom:10px">' +
     '<input type="text" id="comm-q" placeholder="Search meals (e.g. oatmeal)…" autocomplete="off" oninput="debouncedCommunitySearch()">' +
@@ -1918,7 +1918,7 @@ function ingredientLines(m) {
     return '<li><b>' + escapeHtml(ig.name || 'item') + '</b>' + amt + (parts.length ? ' — ' + parts.join(' · ') : '') + '</li>';
   }).join('');
   const n = m.ingredients.length;
-  return '<details class="comm-recipe"><summary>🧾 Recipe · ' + n + ' ingredient' + (n > 1 ? 's' : '') + '</summary><ul>' + rows + '</ul></details>';
+  return '<details class="comm-recipe"><summary>Recipe · ' + n + ' ingredient' + (n > 1 ? 's' : '') + '</summary><ul>' + rows + '</ul></details>';
 }
 function renderCommunityList(meals) {
   if (!meals.length) return '<div class="my-meals-empty">No shared meals yet. Be the first — save a meal and tick "share".</div>';
@@ -1932,8 +1932,8 @@ function renderCommunityList(meals) {
     '<div class="comm-actions">' +
     '<button type="button" class="btn btn-primary btn-sm" onclick="addCommunityMeal(' + m.id + ')">＋ Add</button>' +
     (m.mine
-      ? '<button type="button" class="comm-x" title="Remove" onclick="removeCommunityMeal(' + m.id + ')">🗑</button>'
-      : '<button type="button" class="comm-x" title="Report" onclick="reportCommunityMeal(' + m.id + ')">⚐</button>') +
+      ? '<button type="button" class="comm-x" title="Remove" onclick="removeCommunityMeal(' + m.id + ')">✕</button>'
+      : '<button type="button" class="comm-x comm-report" title="Report" onclick="reportCommunityMeal(' + m.id + ')">Report</button>') +
     '</div></div>'
   ).join('');
 }
@@ -1996,8 +1996,8 @@ function renderReminderBanner() {
   const streak = getGymStreak();
   const urgent = streak >= 3 && isPillarOn('gym');
   const msg = urgent
-    ? '🔥 ' + streak + '-day ' + escapeHtml(pillar('gym').label) + ' streak at risk — log today to keep it alive!'
-    : '📝 You haven\'t logged today yet.';
+    ? '' + streak + '-day ' + escapeHtml(pillar('gym').label) + ' streak at risk — log today to keep it alive!'
+    : 'You haven\'t logged today yet.';
   return '<div class="reminder-banner' + (urgent ? ' reminder-urgent' : '') + '">' +
     '<span>' + msg + '</span>' +
     '<button class="btn btn-primary" onclick="navigate(\'log\')" style="padding:6px 18px;font-size:13px;flex-shrink:0">Log Now →</button>' +
@@ -2028,7 +2028,7 @@ function renderFocusCard(thisWeek, lastWeek) {
 
   return '<div class="focus-card card">' +
     '<div class="focus-header">' +
-    '<div><div class="focus-label">🎯 Focus This Week</div>' +
+    '<div><div class="focus-label">Focus This Week</div>' +
     '<div class="focus-area">' + lowest.icon + ' ' + lowest.name + ' — ' + Math.round(lowest.pct) + '% of goal</div></div>' +
     '<div class="focus-bar-wrap"><div class="focus-bar" style="width:' + Math.min(100, lowest.pct) + '%;background:' + color + '"></div></div>' +
     '</div>' +
@@ -2059,14 +2059,14 @@ function renderHydrationStrip(stats) {
   const avg = stats.avgWater || 0;
   const pct = Math.min(100, Math.round((today / 1) * 100)); // 1 gal/day reference
   return '<div class="hydration-strip">' +
-    '<span class="hyd-icon">💧</span>' +
+    '<span class="hyd-icon"></span>' +
     '<div class="hyd-info">' +
     '<div class="hyd-title">Hydration</div>' +
     '<div class="hyd-sub">' + (today > 0 ? '<strong>' + today + ' gal</strong> today' : 'Not logged today') +
       (avg > 0 ? ' · avg ' + avg.toFixed(2) + ' gal/day this week' : '') + '</div>' +
     '</div>' +
     '<div class="hyd-bar-wrap"><div class="hyd-bar" style="width:' + pct + '%"></div></div>' +
-    '<button class="btn btn-outline hyd-btn" onclick="navigate(\'log\')">💧 Log water</button>' +
+    '<button class="btn btn-outline hyd-btn" onclick="navigate(\'log\')">Log water</button>' +
     '</div>';
 }
 
@@ -2081,15 +2081,15 @@ function renderRecentNotesCard() {
   const items = recent.map(d => {
     const bits = [];
     if (d.notes)              bits.push(escapeHtml(clip(d.notes, 220)));
-    if (d.reading?.summary)   bits.push('<span class="rn-tag">📚</span> ' + escapeHtml(clip(d.reading.summary, 160)));
-    if (d.money?.activities)  bits.push('<span class="rn-tag">💰</span> ' + escapeHtml(clip(d.money.activities, 120)));
+    if (d.reading?.summary)   bits.push('<span class="rn-tag"></span> ' + escapeHtml(clip(d.reading.summary, 160)));
+    if (d.money?.activities)  bits.push('<span class="rn-tag"></span> ' + escapeHtml(clip(d.money.activities, 120)));
     return '<div class="rn-item">' +
-      '<div class="rn-date">' + fmtDate(d.date) + (d.water > 0 ? '<span class="rn-water">💧 ' + d.water + ' gal</span>' : '') + '</div>' +
+      '<div class="rn-date">' + fmtDate(d.date) + (d.water > 0 ? '<span class="rn-water">' + d.water + ' gal</span>' : '') + '</div>' +
       '<div class="rn-text">' + bits.join('<br>') + '</div>' +
       '</div>';
   }).join('');
   return '<div class="card recent-notes-card">' +
-    '<h3 class="card-title">📔 Looking Back — Your Recent Notes</h3>' +
+    '<h3 class="card-title">Looking Back — Your Recent Notes</h3>' +
     '<p class="card-sub">What you wrote on previous days — so your story stays with you.</p>' +
     '<div class="rn-list">' + items + '</div>' +
     '</div>';
@@ -2103,12 +2103,12 @@ function renderCoachInsightCard() {
   let body;
   if (state.data.days.length === 0) {
     body = '<div class="di-empty">Log your first day and I\'ll start sharing a personalized insight here each morning.</div>';
-    return '<div class="card insight-daily"><div class="di-head"><span class="di-icon">🧠</span><span class="di-title">Your Daily Coach Insight</span></div><div class="di-body" id="di-body">' + body + '</div></div>';
+    return '<div class="card insight-daily"><div class="di-head"><span class="di-icon"></span><span class="di-title">Your Daily Coach Insight</span></div><div class="di-body" id="di-body">' + body + '</div></div>';
   }
   if (cached && cached.date === today && cached.text) body = '<div class="di-text">' + escapeHtml(cached.text) + '</div>';
   else body = '<div class="di-loading"><div class="spinner"></div><span>Reading your data…</span></div>';
   return '<div class="card insight-daily">' +
-    '<div class="di-head"><span class="di-icon">🧠</span><span class="di-title">Your Daily Coach Insight</span>' +
+    '<div class="di-head"><span class="di-icon"></span><span class="di-title">Your Daily Coach Insight</span>' +
     '<button class="di-refresh" onclick="fetchCoachInsight(true)" title="New insight">↻</button></div>' +
     '<div class="di-body" id="di-body">' + body + '</div></div>';
 }
@@ -2152,7 +2152,7 @@ function renderGamePlanCard() {
     ? '<div class="di-text plan-text">' + renderMarkdown(cached.text) + '</div>'
     : '<div class="di-loading"><div class="spinner"></div><span>Building today\'s plan…</span></div>';
   return '<div class="card insight-daily plan-card">' +
-    '<div class="di-head"><span class="di-icon">🎯</span><span class="di-title">Today\'s Game Plan</span>' +
+    '<div class="di-head"><span class="di-icon"></span><span class="di-title">Today\'s Game Plan</span>' +
     '<button class="di-refresh" onclick="fetchGamePlan(true)" title="New plan">↻</button></div>' +
     '<div class="di-body" id="plan-body">' + body + '</div></div>';
 }
@@ -2208,7 +2208,7 @@ function renderPatternsCard() {
     body = '<div class="di-loading"><div class="spinner"></div><span>Connecting the dots across your life…</span></div>';
   }
   return '<div class="card insight-daily patterns-card">' +
-    '<div class="di-head"><span class="di-icon">🔗</span><span class="di-title">Patterns — what connects in your life</span>' +
+    '<div class="di-head"><span class="di-icon"></span><span class="di-title">Patterns — what connects in your life</span>' +
     (days.length >= PATTERNS_MIN_DAYS ? '<button class="di-refresh" onclick="fetchPatterns(true)" title="Find a new pattern">↻</button>' : '') +
     '</div><div class="di-body" id="pat-body">' + body + '</div></div>';
 }
@@ -2259,11 +2259,11 @@ function renderReviewCard() {
     body = '<div class="review-cta"><p class="review-sub">' +
       (isSunday ? 'It\'s review day. See your week decoded across every pillar — wins, the one pattern that mattered, and your focus for next week.'
                 : 'Get your week decoded across every pillar: your wins, the one pattern that mattered, and your single focus for next week.') +
-      '</p><button class="btn btn-primary" onclick="fetchReview(true)">📋 Generate this week\'s review</button></div>';
+      '</p><button class="btn btn-primary" onclick="fetchReview(true)">Generate this week\'s review</button></div>';
   }
   return '<div class="card review-card' + (isSunday && !hasThisWeek ? ' review-due' : '') + '">' +
-    '<div class="di-head"><span class="di-icon">📋</span><span class="di-title">Weekly Life Review</span>' +
-    '<button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="shareMyWeek()">📤 Share</button></div>' +
+    '<div class="di-head"><span class="di-icon"></span><span class="di-title">Weekly Life Review</span>' +
+    '<button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="shareMyWeek()">Share</button></div>' +
     '<div class="di-body" id="rev-body">' + body + '</div></div>';
 }
 async function fetchReview() {
@@ -2320,16 +2320,16 @@ function renderStreakCard() {
   const loggedToday = days.some(d => d.date === todayStr());
   let msg, urgent = false;
   if (loggedToday) {
-    msg = cur >= 2 ? '🔥 ' + cur + ' days strong — keep the chain going!' : '✅ Logged today! Come back tomorrow to build your streak.';
+    msg = cur >= 2 ? '' + cur + ' days strong — keep the chain going!' : 'Logged today! Come back tomorrow to build your streak.';
   } else if (cur >= 1) {
-    msg = '⚠️ Log today to keep your ' + cur + '-day streak alive!'; urgent = true;
+    msg = 'Log today to keep your ' + cur + '-day streak alive!'; urgent = true;
   } else {
-    msg = best >= 3 ? 'You reached ' + best + ' days before — start a new streak today!' : 'Log today to start your streak 🔥'; urgent = true;
+    msg = best >= 3 ? 'You reached ' + best + ' days before — start a new streak today!' : 'Log today to start your streak '; urgent = true;
   }
   return '<div class="card streak-card' + (urgent ? ' streak-urgent' : '') + '">' +
-    '<div class="streak-flame">🔥</div>' +
+    '<div class="streak-flame"></div>' +
     '<div class="streak-main"><div class="streak-num">' + cur + '</div><div class="streak-unit">day' + (cur === 1 ? '' : 's') + ' streak</div></div>' +
-    '<div class="streak-msg">' + msg + (best > 0 ? '<div class="streak-best">🏆 Best: ' + best + ' day' + (best === 1 ? '' : 's') + '</div>' : '') + '</div>' +
+    '<div class="streak-msg">' + msg + (best > 0 ? '<div class="streak-best">Best: ' + best + ' day' + (best === 1 ? '' : 's') + '</div>' : '') + '</div>' +
     '</div>';
 }
 function weekShareStats() {
@@ -2347,11 +2347,11 @@ function weekShareStats() {
 }
 // Up to 4 brag-worthy, non-sensitive stats from enabled pillars (no $ amounts)
 function weekShareTiles(s) {
-  const tiles = [{ icon: '✅', value: s.daysLogged + '/7', label: 'Days logged' }];
-  if (isPillarOn('gym') && s.workouts) tiles.push({ icon: '🏋️', value: s.workouts, label: 'Workouts' });
-  if (isPillarOn('reading') && s.pages) tiles.push({ icon: '📚', value: s.pages, label: 'Pages read' });
-  if (isPillarOn('networking') && s.connections) tiles.push({ icon: '🤝', value: s.connections, label: 'Connections' });
-  if (tiles.length < 4 && s.water) tiles.push({ icon: '💧', value: s.water, label: 'Gal water' });
+  const tiles = [{ icon: '', value: s.daysLogged + '/7', label: 'Days logged' }];
+  if (isPillarOn('gym') && s.workouts) tiles.push({ icon: '', value: s.workouts, label: 'Workouts' });
+  if (isPillarOn('reading') && s.pages) tiles.push({ icon: '', value: s.pages, label: 'Pages read' });
+  if (isPillarOn('networking') && s.connections) tiles.push({ icon: '', value: s.connections, label: 'Connections' });
+  if (tiles.length < 4 && s.water) tiles.push({ icon: '', value: s.water, label: 'Gal water' });
   return tiles.slice(0, 4);
 }
 function buildWeekCardBlob() {
@@ -2376,11 +2376,11 @@ function buildWeekCardBlob() {
 
     x.textAlign = 'center';
     x.fillStyle = '#eef1f7'; x.font = '700 46px ' + FONT;
-    x.fillText('⚡ Escalate', cx, 180);
+    x.fillText('Escalate', cx, 180);
 
     const s = weekShareStats();
     if (s.streak >= 2) {
-      x.font = '800 110px sans-serif'; x.fillText('🔥', cx, 470);
+      x.font = '800 110px sans-serif'; x.fillText('', cx, 470);
       const ng = x.createLinearGradient(cx - 220, 0, cx + 220, 0);
       ng.addColorStop(0, '#2dd4bf'); ng.addColorStop(1, '#3b82f6');
       x.fillStyle = ng; x.font = '900 260px ' + FONT; x.fillText(String(s.streak), cx, 730);
@@ -2409,7 +2409,7 @@ function buildWeekCardBlob() {
 
     const fg = x.createLinearGradient(cx - 320, 0, cx + 320, 0);
     fg.addColorStop(0, '#2dd4bf'); fg.addColorStop(1, '#3b82f6');
-    x.fillStyle = fg; x.font = '800 54px ' + FONT; x.fillText('🔗 See what connects your life', cx, H - 240);
+    x.fillStyle = fg; x.font = '800 54px ' + FONT; x.fillText('See what connects your life', cx, H - 240);
     x.fillStyle = '#9aa3b2'; x.font = '500 42px ' + FONT; x.fillText('One app for your whole life', cx, H - 165);
     x.fillStyle = '#eef1f7'; x.font = '700 44px ' + FONT; x.fillText('Escalate', cx, H - 95);
 
@@ -2423,12 +2423,12 @@ async function shareMyWeek() {
     if (!blob) { showToast('Could not create the card.', 'error'); return; }
     const file = new File([blob], 'my-week.png', { type: 'image/png' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'My week on Escalate', text: 'See what connects your life 🔗' });
+      await navigator.share({ files: [file], title: 'My week on Escalate', text: 'See what connects your life ' });
     } else {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = 'my-week.png'; a.click();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
-      showToast('Card saved — post it to your story 🔥', 'success');
+      showToast('Card saved — post it to your story ', 'success');
     }
   } catch (e) {
     if (e && e.name === 'AbortError') return; // user dismissed the share sheet
@@ -2443,7 +2443,7 @@ function renderWeightTrend() {
   const unit = weightUnitPref();
   const cur = kgToDisplay(ws[ws.length - 1].kg);
   if (ws.length === 1) {
-    return '<div class="card weight-card"><h3 class="card-title" style="margin-bottom:8px">⚖️ Weight</h3>' +
+    return '<div class="card weight-card"><h3 class="card-title" style="margin-bottom:8px">Weight</h3>' +
       '<div class="weight-now">' + cur.toFixed(1) + ' ' + unit + '</div>' +
       '<div class="weight-sub">Log your weight again to start seeing your trend.</div></div>';
   }
@@ -2452,7 +2452,7 @@ function renderWeightTrend() {
   const chTxt = (change > 0 ? '+' : '') + change.toFixed(1) + ' ' + unit + ' since ' + fmtDateShort(ws[0].date);
   return '<div class="card weight-card">' +
     '<div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
-    '<h3 class="card-title" style="margin-bottom:0">⚖️ Weight Trend</h3>' +
+    '<h3 class="card-title" style="margin-bottom:0">Weight Trend</h3>' +
     '<div><span class="weight-now-inline">' + cur.toFixed(1) + ' ' + unit + '</span> <span class="' + chCls + '">' + chTxt + '</span></div>' +
     '</div>' +
     '<div class="chart-wrap" style="margin-top:14px"><canvas id="weightChart"></canvas></div></div>';
@@ -2488,7 +2488,7 @@ function pillarCardHtml(id, ctx) {
       '<div class="pillar-body">' +
       '<div class="pillar-title">' + label + '</div>' +
       '<div class="pillar-value"><span class="anim-count" data-val="' + stats.gymDays + '">0</span><span>' + (goal ? '/' + goal + ' days' : ' days') + '</span></div>' +
-      '<div class="pillar-sub">this week' + (streak > 1 ? ' · <strong>' + streak + ' day streak 🔥</strong>' : '') + ' ' + wowArrow(stats.gymDays, lastStats.gymDays) + '</div>' +
+      '<div class="pillar-sub">this week' + (streak > 1 ? ' · <strong>' + streak + ' day streak </strong>' : '') + ' ' + wowArrow(stats.gymDays, lastStats.gymDays) + '</div>' +
       '</div>' +
       (goal ? '<div class="pillar-badge gym-badge anim-count" data-val="' + Math.round((stats.gymDays / goal) * 100) + '" data-suffix="%">0%</div>' : '') +
       '</div>';
@@ -2538,7 +2538,7 @@ function pillarCardHtml(id, ctx) {
       '<div class="pillar-body">' +
       '<div class="pillar-title">' + label + '</div>' +
       '<div class="pillar-value"><span class="anim-count" data-val="' + stats.readPages + '">0</span><span> pages</span></div>' +
-      '<div class="pillar-sub">' + stats.readDays + ' days this week' + (streak > 1 ? ' · <strong>' + streak + ' day streak 🔥</strong>' : '') + '</div>' +
+      '<div class="pillar-sub">' + stats.readDays + ' days this week' + (streak > 1 ? ' · <strong>' + streak + ' day streak </strong>' : '') + '</div>' +
       (ab ? '<div class="pillar-sub" style="margin-top:4px;font-style:italic;color:var(--read-color)">' + escapeHtml(ab.title.length > 22 ? ab.title.slice(0, 22) + '…' : ab.title) + '</div>' : '') +
       '</div></div>';
   }
@@ -2560,7 +2560,7 @@ function renderDashboard() {
 
   // Score color
   const scoreColor = score >= 80 ? 'var(--success)' : score >= 60 ? 'var(--accent)' : score >= 40 ? 'var(--warning)' : 'var(--danger)';
-  const scoreLabel = score >= 80 ? 'Crushing It 🔥' : score >= 60 ? 'Solid Week 💪' : score >= 40 ? 'Room to Grow 📈' : 'Time to Push ⚡';
+  const scoreLabel = score >= 80 ? 'Crushing It ' : score >= 60 ? 'Solid Week ' : score >= 40 ? 'Room to Grow ' : 'Time to Push ';
 
   // Pillar cards — generated from the live config (only enabled ones)
   const cardCtx = { stats, lastStats, profile, avgIncome, gymStreak: streak, readStreak: getReadingStreak() };
@@ -2584,18 +2584,18 @@ function renderDashboard() {
     if (sGoal > 0) {
       // Savings goal with a progress bar — net toward the target
       const net = mp.net;
-      goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>💰 Save this ' + mp.label + '</span>' +
+      goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>Save this ' + mp.label + '</span>' +
         '<strong>' + formatCurrency(Math.max(0, net)) + ' / ' + formatCurrency(sGoal) + '</strong></div>' +
         goalBar(Math.max(0, net), sGoal) +
         '<div style="font-size:12px;color:var(--text-muted);margin-top:4px">' + detail +
-        (net >= sGoal ? ' · 🎉 goal hit!' : ' · ' + formatCurrency(sGoal - net) + ' to go') + '</div></div>');
+        (net >= sGoal ? ' · goal hit!' : ' · ' + formatCurrency(sGoal - net) + ' to go') + '</div></div>');
     } else if (mp.income > 0 || mp.spent > 0) {
       const net = mp.net;
       goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>' + pc.icon + ' Net this ' + mp.label + '</span>' +
         '<strong style="color:' + (net >= 0 ? 'var(--success)' : 'var(--danger)') + '">' + formatCurrency(net) +
         (mp.income > 0 ? ' · ' + mp.rate + '% saved' : '') + '</strong></div>' +
         '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + detail + '</div>' +
-        '<button class="btn-link-inline" onclick="navigate(\'settings\')" style="margin-top:4px">🎯 Set a savings goal</button></div>');
+        '<button class="btn-link-inline" onclick="navigate(\'settings\')" style="margin-top:4px">Set a savings goal</button></div>');
     } else {
       goalRows.push('<div class="sg-item"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + '</span>' +
         '<button class="btn-link-inline" onclick="navigate(\'log\')">Log spending →</button></div>');
@@ -2633,7 +2633,7 @@ function renderDashboard() {
     '<div class="score-right">' +
     '<div class="score-label">' + scoreLabel + '</div>' +
     '<div class="score-sub">Weekly consistency score across your ' + onCount + ' active pillar' + (onCount === 1 ? '' : 's') + '</div>' +
-    '<button class="btn btn-outline" style="margin-top:12px;padding:7px 14px;font-size:13px" onclick="navigate(\'log\')">📝 Log Today</button>' +
+    '<button class="btn btn-outline" style="margin-top:12px;padding:7px 14px;font-size:13px" onclick="navigate(\'log\')">Log Today</button>' +
     '</div>' +
     '<div class="score-goals">' +
     goalRows.join('') +
@@ -2659,11 +2659,11 @@ function renderDashboard() {
       (chartCards ? '<div class="charts-row">' + chartCards + '</div>' : '') +
       '<div class="card"><h3 class="card-title">Recent Days</h3>' + renderRecentDaysTable(sortedDays.slice(0, 7)) + '</div>';
   } else {
-    chartsHtml = '<div class="empty-state"><div class="empty-icon">⚡</div>' +
+    chartsHtml = '<div class="empty-state"><div class="empty-icon"></div>' +
       '<h3>Start tracking your life progress</h3>' +
       '<p>Log your first day to start building data across your ' + enabledPillars().length + ' pillars.</p>' +
       '<div class="empty-actions">' +
-      '<button class="btn btn-primary" onclick="navigate(\'log\')">📝 Log Today</button>' +
+      '<button class="btn btn-primary" onclick="navigate(\'log\')">Log Today</button>' +
       '</div></div>';
   }
 
@@ -2675,7 +2675,7 @@ function renderDashboard() {
     '<div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
     '<div><h2 class="page-title">Dashboard</h2>' +
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p></div>' +
-    (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">📤 Share my week</button>' : '') +
+    (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">Share my week</button>' : '') +
     '</div>' +
     renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard() + renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderMoneyCircleCard() + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
 
@@ -2716,8 +2716,8 @@ function renderRecentDaysTable(days) {
       '<td>' + netCell + '</td>' +
       '<td>' + moneyCell + '</td>' +
       '<td class="action-cell">' +
-      '<button class="btn-sm" onclick="editDay(\'' + d.id + '\')">✏️</button>' +
-      '<button class="btn-sm btn-sm-danger" onclick="deleteDay(\'' + d.id + '\')">🗑️</button>' +
+      '<button class="btn-sm" onclick="editDay(\'' + d.id + '\')"></button>' +
+      '<button class="btn-sm btn-sm-danger" onclick="deleteDay(\'' + d.id + '\')"></button>' +
       '</td></tr>';
   }).join('');
   return '<table class="table"><thead><tr><th>Date</th><th>' + pillar('gym').icon + ' ' + escapeHtml(pillar('gym').label) + '</th><th>' + pillar('food').icon + ' ' + escapeHtml(pillar('food').label) + '</th><th>' + pillar('networking').icon + ' ' + escapeHtml(pillar('networking').label) + '</th><th>' + pillar('money').icon + ' ' + escapeHtml(pillar('money').label) + '</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
@@ -2779,7 +2779,7 @@ function renderPrevNoteBanner() {
   if (!n || !n.text) return '';
   const when = n.isYesterday ? 'Yesterday' : fmtDate(n.date);
   const txt = n.text.length > 220 ? n.text.slice(0, 220) + '…' : n.text;
-  return '<div class="prev-note-banner">📔 <strong>' + when + ' you wrote:</strong> ' + escapeHtml(txt) + '</div>';
+  return '<div class="prev-note-banner"><strong>' + when + ' you wrote:</strong> ' + escapeHtml(txt) + '</div>';
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2810,7 +2810,7 @@ function renderLogToday(editDay) {
   const weighInVal = existingWeight ? Math.round(kgToDisplay(existingWeight.kg) * 10) / 10 : '';
 
   const editBanner = isEditing
-    ? '<div class="edit-banner">✏️ Editing ' + fmtDate(d.date) + '<button class="btn-link" onclick="navigate(\'history\')">Cancel</button></div>'
+    ? '<div class="edit-banner">Editing ' + fmtDate(d.date) + '<button class="btn-link" onclick="navigate(\'history\')">Cancel</button></div>'
     : '';
 
   // Gentle continuity: remind them what they wrote yesterday while logging
@@ -2822,8 +2822,8 @@ function renderLogToday(editDay) {
 
   const gymToggle =
     '<div class="gym-toggle">' +
-    '<button type="button" class="gym-btn' + (gymDone === true ? ' active gym-yes' : '') + '" onclick="setGymDone(true)">' + (gymIsDefault ? '💪 I Worked Out' : '✅ Did it') + '</button>' +
-    '<button type="button" class="gym-btn' + (gymDone === false ? ' active gym-no' : '') + '" onclick="setGymDone(false)">' + (gymIsDefault ? '😴 Rest Day' : '⛔ Not today') + '</button>' +
+    '<button type="button" class="gym-btn' + (gymDone === true ? ' active gym-yes' : '') + '" onclick="setGymDone(true)">' + (gymIsDefault ? 'I Worked Out' : 'Did it') + '</button>' +
+    '<button type="button" class="gym-btn' + (gymDone === false ? ' active gym-no' : '') + '" onclick="setGymDone(false)">' + (gymIsDefault ? 'Rest Day' : 'Not today') + '</button>' +
     '</div>';
 
   const gymDetails =
@@ -2908,14 +2908,14 @@ function renderLogToday(editDay) {
       const income = getPeriodIncome(cad, key), isSet = income > 0;
       return '<div class="today-section money-section">' +
         '<div class="today-section-header money-header">' + pc.icon + ' ' + escapeHtml(pc.label) + ' & Spending</div>' +
-        '<div class="form-group"><label>💸 Spent today <span style="font-weight:400;color:var(--text-muted)">($ — what you spent today)</span></label>' +
+        '<div class="form-group"><label>Spent today <span style="font-weight:400;color:var(--text-muted)">($ — what you spent today)</span></label>' +
         '<input type="number" id="money-spent" min="0" step="0.01" placeholder="0" value="' + daySpent + '" oninput="updateNetHint()" style="font-size:20px;font-weight:800;border-color:var(--danger)"></div>' +
         // This period's income (set once, not asked when editing a past day)
         (!isEditing ?
-          (isSet ? '<div id="period-income-set" class="period-set"><span>💰 ' + escapeHtml(pc.label) + ' this ' + label + ': <strong>' + formatCurrency(income) + '</strong></span>' +
+          (isSet ? '<div id="period-income-set" class="period-set"><span>' + escapeHtml(pc.label) + ' this ' + label + ': <strong>' + formatCurrency(income) + '</strong></span>' +
                    '<button type="button" class="btn-link" onclick="editPeriodIncome()">Update</button></div>' : '') +
           '<div class="form-group" id="period-income-wrap"' + (isSet ? ' style="display:none"' : '') + '>' +
-          '<label>💰 ' + escapeHtml(pc.label) + ' this ' + label + ' <span style="font-weight:400;color:var(--text-muted)">($ — set once, update when you get paid)</span></label>' +
+          '<label>' + escapeHtml(pc.label) + ' this ' + label + ' <span style="font-weight:400;color:var(--text-muted)">($ — set once, update when you get paid)</span></label>' +
           '<input type="number" id="period-income" min="0" step="0.01" placeholder="0" value="' + (income || '') + '" oninput="updateNetHint()" style="font-size:20px;font-weight:800;border-color:var(--accent)"></div>' +
           '<div id="net-hint" class="net-hint"></div>'
           : '') +
@@ -2932,12 +2932,12 @@ function renderLogToday(editDay) {
       return '<div class="today-section read-section">' +
         '<div class="today-section-header read-header">' + pc.icon + ' ' + escapeHtml(pc.label) + '</div>' +
         (ab
-          ? '<div class="current-book-label">📖 ' + escapeHtml(ab.title) + (ab.author ? ' · ' + escapeHtml(ab.author) : '') + '</div>' +
+          ? '<div class="current-book-label">' + escapeHtml(ab.title) + (ab.author ? ' · ' + escapeHtml(ab.author) : '') + '</div>' +
             '<div class="form-row">' +
             '<div class="form-group"><label>Pages read today</label>' +
             '<input type="number" id="read-pages" min="0" step="1" placeholder="0" value="' + rPages + '" style="font-size:20px;font-weight:800"></div>' +
             '<div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:16px">' +
-            '<button type="button" class="btn btn-outline" style="font-size:12px" onclick="showAddBookModal(true)">✏️ Change Book</button>' +
+            '<button type="button" class="btn btn-outline" style="font-size:12px" onclick="showAddBookModal(true)">Change Book</button>' +
             '</div></div>' +
             '<div class="form-group"><label>What did you read? <span style="font-weight:400;color:var(--text-muted)">(summary — helps you retain it)</span></label>' +
             '<textarea id="read-summary" rows="3" placeholder="e.g. Learned the difference between assets and liabilities. The author argues that buying your own home is a liability, not an asset…">' + escapeHtml(rSummary) + '</textarea></div>'
@@ -2950,7 +2950,7 @@ function renderLogToday(editDay) {
 
     // WATER (always shown — everyone tracks hydration, in gallons)
     '<div class="today-section water-section">' +
-    '<div class="today-section-header water-header">💧 Water</div>' +
+    '<div class="today-section-header water-header">Water</div>' +
     '<div class="form-group">' +
     '<label>How much water did you drink today? <span style="font-weight:400;color:var(--text-muted)">(gallons)</span></label>' +
     '<div class="water-input-row">' +
@@ -2960,12 +2960,12 @@ function renderLogToday(editDay) {
     [0.25, 0.5, 0.75, 1].map(g => '<button type="button" class="water-chip" onclick="setWater(' + g + ')">' + g + '</button>').join('') +
     '</div>' +
     '</div>' +
-    '<div class="water-hint">💡 A common daily target is about ½–1 gallon.</div>' +
+    '<div class="water-hint">A common daily target is about ½–1 gallon.</div>' +
     '</div></div>' +
 
     // WEIGH-IN (optional — tracks bodyweight over time)
     '<div class="today-section weigh-section">' +
-    '<div class="today-section-header weigh-header">⚖️ Weigh-in</div>' +
+    '<div class="today-section-header weigh-header">Weigh-in</div>' +
     '<div class="form-group"><label>Today\'s weight <span style="font-weight:400;color:var(--text-muted)">(optional — builds your weight trend)</span></label>' +
     '<div class="weigh-row">' +
     '<input type="number" id="weigh-in" min="0" step="0.1" placeholder="' + (weightUnitPref() === 'lbs' ? '170' : '77') + '" value="' + weighInVal + '" style="font-size:20px;font-weight:800;max-width:160px">' +
@@ -2977,7 +2977,7 @@ function renderLogToday(editDay) {
 
     '<div class="form-actions">' +
     (isEditing ? '<button type="button" class="btn btn-outline" onclick="navigate(\'history\')" style="margin-right:12px">Cancel</button>' : '') +
-    '<button type="submit" class="btn btn-primary btn-lg">' + (isEditing ? '💾 Update Day' : '💾 Save Today') + '</button>' +
+    '<button type="submit" class="btn btn-primary btn-lg">' + (isEditing ? 'Update Day' : 'Save Today') + '</button>' +
     '</div>' +
     '</form></div>';
   updateNetHint(); // show the period income − spending net summary right away
@@ -3139,7 +3139,7 @@ async function submitDay(e) {
     }
   }
 
-  showToast(state._editDayId ? 'Day updated! ✅' : 'Today logged! 🎉', 'success');
+  showToast(state._editDayId ? 'Day updated! ' : 'Today logged! ', 'success');
   navigate('dashboard');
 }
 
@@ -3176,16 +3176,16 @@ function renderIdeasPage() {
     '<div class="idea-card-top">' +
     '<div class="idea-title">' + idea.title + '</div>' +
     '<span class="idea-status-badge ' + idea.status + '">' +
-    (idea.status === 'active' ? '🚀 Active' : idea.status === 'exploring' ? '🔍 Exploring' : '❌ Dropped') +
+    (idea.status === 'active' ? 'Active' : idea.status === 'exploring' ? 'Exploring' : 'Dropped') +
     '</span>' +
     '</div>' +
     (idea.description ? '<div class="idea-desc">' + idea.description + '</div>' : '') +
-    (idea.notes ? '<div class="idea-notes">📝 ' + idea.notes + '</div>' : '') +
+    (idea.notes ? '<div class="idea-notes">' + idea.notes + '</div>' : '') +
     '<div class="idea-actions">' +
-    (idea.status !== 'active'    ? '<button class="btn-sm" onclick="setIdeaStatus(\'' + idea.id + '\',\'active\')">🚀 Go Active</button>' : '') +
-    (idea.status !== 'exploring' ? '<button class="btn-sm" onclick="setIdeaStatus(\'' + idea.id + '\',\'exploring\')">🔍 Exploring</button>' : '') +
+    (idea.status !== 'active'    ? '<button class="btn-sm" onclick="setIdeaStatus(\'' + idea.id + '\',\'active\')">Go Active</button>' : '') +
+    (idea.status !== 'exploring' ? '<button class="btn-sm" onclick="setIdeaStatus(\'' + idea.id + '\',\'exploring\')">Exploring</button>' : '') +
     (idea.status !== 'dropped'   ? '<button class="btn-sm btn-sm-danger" onclick="setIdeaStatus(\'' + idea.id + '\',\'dropped\')">Drop</button>' : '') +
-    '<button class="btn-sm btn-sm-danger" onclick="deleteIdea(\'' + idea.id + '\')">🗑️</button>' +
+    '<button class="btn-sm btn-sm-danger" onclick="deleteIdea(\'' + idea.id + '\')"></button>' +
     '</div></div>';
 
   const section = (title, list) => list.length === 0 ? '' :
@@ -3199,7 +3199,7 @@ function renderIdeasPage() {
     '</div>' +
 
     '<div class="card">' +
-    '<h3 class="card-title">💡 Add New Idea</h3>' +
+    '<h3 class="card-title">Add New Idea</h3>' +
     '<form id="idea-form" onsubmit="addIdea(event)">' +
     '<div class="form-group"><label>Idea title <span style="color:var(--danger)">*</span></label>' +
     '<input type="text" id="idea-title" placeholder="e.g. Start a referral program at the gym · Sell solar panels on weekends · Launch an online sales course" required></div>' +
@@ -3207,22 +3207,22 @@ function renderIdeasPage() {
     '<textarea id="idea-desc" rows="2" placeholder="How it works, estimated income, what you need to start…"></textarea></div>' +
     '<div class="form-group"><label>Status</label>' +
     '<select id="idea-status">' +
-    '<option value="exploring">🔍 Exploring — thinking about it</option>' +
-    '<option value="active">🚀 Active — already working on it</option>' +
+    '<option value="exploring">Exploring — thinking about it</option>' +
+    '<option value="active">Active — already working on it</option>' +
     '</select></div>' +
     '<button type="submit" class="btn btn-primary">+ Add Idea</button>' +
     '</form></div>' +
 
     (ideas.length === 0
       ? '<div class="empty-state small"><p>No ideas yet. Add your first one above, or ask the AI Coach for income stream ideas.</p></div>'
-      : section('🚀 Active', active) + section('🔍 Exploring', exploring) + section('❌ Dropped', dropped)) +
+      : section('Active', active) + section('Exploring', exploring) + section('Dropped', dropped)) +
 
     (state.hasApiKey && ideas.length > 0
       ? '<div class="card" style="margin-top:4px">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
-        '<div><h3 class="card-title" style="margin-bottom:4px">🤖 Analyze My Ideas</h3>' +
+        '<div><h3 class="card-title" style="margin-bottom:4px">Analyze My Ideas</h3>' +
         '<p style="font-size:13px;color:var(--text-muted)">Ask Claude which idea has the best potential for your situation</p></div>' +
-        '<button class="btn btn-primary" id="btn-ideas-ai" onclick="analyzeIdeas()">✨ Ask Coach</button></div>' +
+        '<button class="btn btn-primary" id="btn-ideas-ai" onclick="analyzeIdeas()">Ask Coach</button></div>' +
         '<div class="insight-result hidden" id="result-ideas"></div></div>'
       : '');
 }
@@ -3268,7 +3268,7 @@ async function analyzeIdeas() {
     '## 3. Best Long-Term Play\nWhich idea, if developed over 6–12 months, could become a significant second income?\n\n' +
     '## 4. Warning: Skip This One\nIs there any idea here that\'s unlikely to work for my situation? Why?\n\n' +
     '## 5. One Idea I\'m Missing\nBased on my profile and these ideas, what\'s one obvious income stream I haven\'t listed?';
-  await streamAnalysis(question, resultEl, btn, '✨ Ask Coach');
+  await streamAnalysis(question, resultEl, btn, 'Ask Coach');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -3293,11 +3293,11 @@ function renderContactsPage() {
     const isOverdue = c.followUpDate && c.followUpDate < today && !['closed','dropped'].includes(c.status);
     const isToday   = c.followUpDate && c.followUpDate === today && !['closed','dropped'].includes(c.status);
     const followUpBadge = isOverdue
-      ? '<span class="fu-badge fu-overdue">⚠️ Follow-up overdue</span>'
+      ? '<span class="fu-badge fu-overdue">Follow-up overdue</span>'
       : isToday
-        ? '<span class="fu-badge fu-today">📅 Follow up today</span>'
+        ? '<span class="fu-badge fu-today">Follow up today</span>'
         : c.followUpDate
-          ? '<span class="fu-badge fu-upcoming">🗓️ ' + fmtDate(c.followUpDate) + '</span>'
+          ? '<span class="fu-badge fu-upcoming">' + fmtDate(c.followUpDate) + '</span>'
           : '';
     const statusStyle = 'background:' + (statusColors[c.status] || 'var(--text-muted)') + '22;color:' + (statusColors[c.status] || 'var(--text-muted)') + ';border:1px solid ' + (statusColors[c.status] || 'var(--text-muted)') + '44';
     const catStyle = 'background:' + (catColors[c.category] || 'var(--text-muted)') + '22;color:' + (catColors[c.category] || 'var(--text-muted)');
@@ -3305,16 +3305,16 @@ function renderContactsPage() {
     return '<div class="contact-card' + (isOverdue ? ' contact-overdue' : isToday ? ' contact-today' : '') + (c.starred ? ' contact-starred' : '') + '">' +
       '<div class="contact-top">' +
       '<div class="contact-name">' +
-      '<button class="star-btn' + (c.starred ? ' starred' : '') + '" onclick="toggleStar(\'' + c.id + '\')" title="' + (c.starred ? 'Unpin contact' : 'Pin contact') + '">' + (c.starred ? '⭐' : '☆') + '</button>' +
+      '<button class="star-btn' + (c.starred ? ' starred' : '') + '" onclick="toggleStar(\'' + c.id + '\')" title="' + (c.starred ? 'Unpin contact' : 'Pin contact') + '">' + (c.starred ? '' : '☆') + '</button>' +
       c.name + '</div>' +
       '<div class="contact-badges">' +
       '<span class="contact-badge" style="' + catStyle + '">' + (c.category || 'contact') + '</span>' +
       '<span class="contact-badge" style="' + statusStyle + '">' + (c.status || 'new') + '</span>' +
       '</div>' +
       '</div>' +
-      (c.role ? '<div class="contact-role">💼 ' + c.role + '</div>' : '') +
-      (c.met  ? '<div class="contact-met">📍 ' + c.met + '</div>' : '') +
-      (c.phone || c.social ? '<div class="contact-info">' + (c.phone ? '📞 ' + c.phone + '  ' : '') + (c.social ? '📲 ' + c.social : '') + '</div>' : '') +
+      (c.role ? '<div class="contact-role">' + c.role + '</div>' : '') +
+      (c.met  ? '<div class="contact-met">' + c.met + '</div>' : '') +
+      (c.phone || c.social ? '<div class="contact-info">' + (c.phone ? '' + c.phone + '  ' : '') + (c.social ? '' + c.social : '') + '</div>' : '') +
       (c.notes ? '<div class="contact-notes">' + c.notes + '</div>' : '') +
       followUpBadge +
       '<div class="contact-actions">' +
@@ -3322,9 +3322,9 @@ function renderContactsPage() {
         ['new','contacted','warm','closing','closed','dropped'].map(s =>
           '<option value="' + s + '"' + (c.status === s ? ' selected' : '') + '>' + s.charAt(0).toUpperCase() + s.slice(1) + '</option>'
         ).join('') + '</select>' : '') +
-      '<button class="btn-sm" onclick="showSetFollowUp(\'' + c.id + '\')">📅 Follow-up</button>' +
-      '<button class="btn-sm" onclick="editContact(\'' + c.id + '\')">✏️ Edit</button>' +
-      '<button class="btn-sm btn-sm-danger" onclick="deleteContact(\'' + c.id + '\')">🗑️</button>' +
+      '<button class="btn-sm" onclick="showSetFollowUp(\'' + c.id + '\')">Follow-up</button>' +
+      '<button class="btn-sm" onclick="editContact(\'' + c.id + '\')">Edit</button>' +
+      '<button class="btn-sm btn-sm-danger" onclick="deleteContact(\'' + c.id + '\')"></button>' +
       '</div></div>';
   }
 
@@ -3336,9 +3336,9 @@ function renderContactsPage() {
   const statsBar = contacts.length > 0
     ? '<div class="contacts-stats">' +
       '<div class="cs-item"><span>Total</span><strong>' + contacts.length + '</strong></div>' +
-      '<div class="cs-item"><span>🔥 Follow-ups due</span><strong style="color:' + (overdue.length + dueToday.length > 0 ? 'var(--danger)' : 'var(--success)') + '">' + (overdue.length + dueToday.length) + '</strong></div>' +
-      '<div class="cs-item"><span>🌡️ Warm leads</span><strong>' + contacts.filter(c=>c.status==='warm'||c.status==='closing').length + '</strong></div>' +
-      '<div class="cs-item"><span>✅ Clients</span><strong>' + contacts.filter(c=>c.status==='closed').length + '</strong></div>' +
+      '<div class="cs-item"><span>Follow-ups due</span><strong style="color:' + (overdue.length + dueToday.length > 0 ? 'var(--danger)' : 'var(--success)') + '">' + (overdue.length + dueToday.length) + '</strong></div>' +
+      '<div class="cs-item"><span>Warm leads</span><strong>' + contacts.filter(c=>c.status==='warm'||c.status==='closing').length + '</strong></div>' +
+      '<div class="cs-item"><span>Clients</span><strong>' + contacts.filter(c=>c.status==='closed').length + '</strong></div>' +
       '</div>'
     : '';
 
@@ -3346,7 +3346,7 @@ function renderContactsPage() {
   const addForm =
     '<div class="card" id="add-contact-wrap">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
-    '<h3 class="card-title" style="margin-bottom:0">➕ Add Contact</h3>' +
+    '<h3 class="card-title" style="margin-bottom:0">Add Contact</h3>' +
     '<button class="btn-link" onclick="toggleAddContact()">Hide form</button>' +
     '</div>' +
     '<form id="contact-form" onsubmit="addContact(event)">' +
@@ -3360,7 +3360,7 @@ function renderContactsPage() {
     '<div class="form-group"><label>Where / how you met</label>' +
     '<input type="text" id="c-met" placeholder="At the gym · LinkedIn · Networking event"></div>' +
     '<div class="form-group"><label>Category</label>' +
-    '<select id="c-cat"><option value="prospect">💰 Prospect</option><option value="referral">🤝 Referral source</option><option value="client">✅ Client</option><option value="partner">🚀 Partner</option><option value="friend">👋 Friend</option></select>' +
+    '<select id="c-cat"><option value="prospect">Prospect</option><option value="referral">Referral source</option><option value="client">Client</option><option value="partner">Partner</option><option value="friend">Friend</option></select>' +
     '</div></div>' +
     '<div class="form-row">' +
     '<div class="form-group"><label>Phone</label><input type="text" id="c-phone" placeholder="555-1234"></div>' +
@@ -3380,11 +3380,11 @@ function renderContactsPage() {
     statsBar + addForm +
     (contacts.length === 0
       ? '<div class="empty-state small"><p>No contacts yet. Add your first one above — start with someone you met at the gym this week.</p></div>'
-      : section('⚠️ Overdue Follow-ups', overdue, 'cst-danger') +
-        section('📅 Follow Up Today', dueToday, 'cst-today') +
-        section('📋 Upcoming Follow-ups', upcoming, '') +
-        section('👥 Other Contacts', rest, '') +
-        section('✅ Closed / Dropped', closed, 'cst-muted'));
+      : section('Overdue Follow-ups', overdue, 'cst-danger') +
+        section('Follow Up Today', dueToday, 'cst-today') +
+        section('Upcoming Follow-ups', upcoming, '') +
+        section('Other Contacts', rest, '') +
+        section('Closed / Dropped', closed, 'cst-muted'));
 }
 
 function toggleAddContact() {
@@ -3411,7 +3411,7 @@ async function addContact(e) {
   };
   state.data.contacts.push(contact);
   await saveData();
-  showToast(name + ' added to contacts! 👥', 'success');
+  showToast(name + ' added to contacts! ', 'success');
   renderContactsPage();
 }
 
@@ -3421,7 +3421,7 @@ async function updateContactStatus(id, status) {
   c.status = status;
   await saveData();
   updateNavBadges();
-  if (status === 'closed') showToast('🎉 Marked as client! Great work!', 'success');
+  if (status === 'closed') showToast('Marked as client! Great work!', 'success');
   else showToast('Status updated.', 'success');
 }
 
@@ -3433,7 +3433,7 @@ function showSetFollowUp(id) {
   modal.id = 'fup-modal';
   modal.className = 'modal-overlay';
   modal.innerHTML = `<div class="modal-box" style="max-width:340px;text-align:left">
-    <div class="modal-badge">📅 Set Follow-Up Date</div>
+    <div class="modal-badge">Set Follow-Up Date</div>
     <p style="font-size:14px;color:var(--text-muted);margin-bottom:16px">For <strong style="color:var(--text)">${escapeHtml(c.name)}</strong></p>
     <div class="form-group">
       <label>Date</label>
@@ -3457,7 +3457,7 @@ async function saveFollowUp(id) {
   c.followUpDate = date;
   await saveData();
   document.getElementById('fup-modal')?.remove();
-  showToast('Follow-up set for ' + fmtDate(date) + ' ✅', 'success');
+  showToast('Follow-up set for ' + fmtDate(date) + ' ', 'success');
   renderContactsPage();
 }
 
@@ -3499,7 +3499,7 @@ function editContact(id) {
     c.dealValue   = parseFloat(document.getElementById('c-deal').value) || 0;
     c.notes       = document.getElementById('c-notes').value.trim();
     await saveData();
-    showToast(c.name + ' updated ✅', 'success');
+    showToast(c.name + ' updated ', 'success');
     renderContactsPage();
   };
   document.getElementById('add-contact-wrap').scrollIntoView({ behavior: 'smooth' });
@@ -3537,9 +3537,9 @@ function renderHistoryPage() {
   const summaryHtml = days.length > 0
     ? '<div class="history-summary">' +
       '<div class="hs-item"><span>Days Logged</span><strong>' + days.length + '</strong></div>' +
-      '<div class="hs-item"><span>Gym Workouts</span><strong>' + gymTotal + ' days 💪</strong></div>' +
-      '<div class="hs-item"><span>Avg Food Rating</span><strong>' + (foodAvg > 0 ? foodAvg.toFixed(1) + '/5 🥗' : '—') + '</strong></div>' +
-      '<div class="hs-item"><span>Total Connections</span><strong>' + netTotal + ' 🤝</strong></div>' +
+      '<div class="hs-item"><span>Gym Workouts</span><strong>' + gymTotal + ' days </strong></div>' +
+      '<div class="hs-item"><span>Avg Food Rating</span><strong>' + (foodAvg > 0 ? foodAvg.toFixed(1) + '/5 ' : '—') + '</strong></div>' +
+      '<div class="hs-item"><span>Total Connections</span><strong>' + netTotal + ' </strong></div>' +
       '</div>'
     : '';
 
@@ -3554,8 +3554,8 @@ function renderHistoryPage() {
     '<p class="page-sub">All your logged days</p></div>' +
     summaryHtml +
     '<div class="view-toggle-row">' +
-    '<button class="view-btn' + (view==='list'?' view-active':'') + '" onclick="switchHistoryView(\'list\')">📋 List</button>' +
-    '<button class="view-btn' + (view==='calendar'?' view-active':'') + '" onclick="switchHistoryView(\'calendar\')">📅 Calendar</button>' +
+    '<button class="view-btn' + (view==='list'?' view-active':'') + '" onclick="switchHistoryView(\'list\')">List</button>' +
+    '<button class="view-btn' + (view==='calendar'?' view-active':'') + '" onclick="switchHistoryView(\'calendar\')">Calendar</button>' +
     '</div>' +
     (view === 'calendar'
       ? '<div id="cal-container">' + renderHistoryCalendar() + '</div>'
@@ -3591,8 +3591,8 @@ function renderHistoryRows(days) {
       '<td>' + netCell + '</td>' +
       '<td>' + moneyCell + '</td>' +
       '<td class="action-cell">' +
-      '<button class="btn-sm" onclick="editDay(\'' + d.id + '\')">✏️ Edit</button>' +
-      '<button class="btn-sm btn-sm-danger" onclick="deleteDay(\'' + d.id + '\')">🗑️</button>' +
+      '<button class="btn-sm" onclick="editDay(\'' + d.id + '\')">Edit</button>' +
+      '<button class="btn-sm btn-sm-danger" onclick="deleteDay(\'' + d.id + '\')"></button>' +
       '</td></tr>';
   }).join('');
   return '<table class="table"><thead><tr><th>Date</th><th>' + pillar('gym').icon + ' ' + escapeHtml(pillar('gym').label) + '</th><th>' + pillar('food').icon + ' ' + escapeHtml(pillar('food').label) + '</th><th>' + pillar('networking').icon + ' ' + escapeHtml(pillar('networking').label) + '</th><th>' + pillar('money').icon + ' ' + escapeHtml(pillar('money').label) + '</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
@@ -3619,22 +3619,22 @@ function applyHistoryFilter() {
 // ─────────────────────────────────────────────────────────────
 function renderCoachPage() {
   const keyBanner = !state.hasApiKey
-    ? '<div class="api-key-banner"><span class="api-key-icon">🔑</span><div style="flex:1">' +
+    ? '<div class="api-key-banner"><span class="api-key-icon"></span><div style="flex:1">' +
       '<h3>Connect Claude AI to unlock your coach</h3>' +
       '<p>Get your free API key at <strong>console.anthropic.com</strong> → API Keys</p>' +
       '<div style="display:flex;gap:10px;margin-top:10px;align-items:center">' +
       '<input type="password" id="api-key-input" placeholder="sk-ant-api03-…" style="flex:1;padding:10px 14px;border:1.5px solid var(--accent);border-radius:8px;font-size:14px;font-family:monospace;background:#fff;outline:none">' +
-      '<button class="btn btn-primary" onclick="saveApiKey()">💾 Save Key</button></div>' +
+      '<button class="btn btn-primary" onclick="saveApiKey()">Save Key</button></div>' +
       '<p style="margin-top:8px;font-size:12px;color:var(--text-muted)">Stored only on your computer.</p></div></div>'
     : '<div style="background:var(--success-bg);border:1px solid #b8e0cc;border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;font-size:13px;color:var(--success);display:flex;justify-content:space-between;align-items:center">' +
-      '<span>✅ AI Coach is ready</span>' +
+      '<span>AI Coach is ready</span>' +
       '<button onclick="clearApiKey()" style="background:none;border:none;font-size:12px;color:var(--text-muted);cursor:pointer">Change key</button></div>';
 
   const cards = ANALYSES.map(a =>
     '<div class="insight-card card">' +
     '<div class="insight-card-header"><span class="insight-icon">' + a.icon + '</span><div>' +
     '<h3>' + a.title + '</h3><p>' + a.desc + '</p></div></div>' +
-    '<button class="btn btn-primary" id="btn-' + a.id + '" onclick="runAnalysis(\'' + a.id + '\')"' + (!state.hasApiKey ? ' disabled' : '') + '>✨ Ask Coach</button>' +
+    '<button class="btn btn-primary" id="btn-' + a.id + '" onclick="runAnalysis(\'' + a.id + '\')"' + (!state.hasApiKey ? ' disabled' : '') + '>Ask Coach</button>' +
     '<div class="insight-result hidden" id="result-' + a.id + '"></div>' +
     '</div>'
   ).join('');
@@ -3645,10 +3645,10 @@ function renderCoachPage() {
     keyBanner +
     '<div class="insights-grid">' + cards + '</div>' +
     '<div class="card custom-question-card">' +
-    '<h3 class="card-title">💬 Ask Anything</h3>' +
+    '<h3 class="card-title">Ask Anything</h3>' +
     '<p class="card-sub">Ask your coach anything — "How do I stay consistent at the gym?", "What side business fits my skills?", "Why is my income inconsistent?", "How do I meet more people?"</p>' +
     '<div class="form-group"><textarea id="custom-question" rows="3" placeholder="Type your question here…"></textarea></div>' +
-    '<button class="btn btn-primary" onclick="runCustomAnalysis()"' + (!state.hasApiKey ? ' disabled' : '') + '>✨ Ask Coach</button>' +
+    '<button class="btn btn-primary" onclick="runCustomAnalysis()"' + (!state.hasApiKey ? ' disabled' : '') + '>Ask Coach</button>' +
     '<div class="insight-result hidden" id="result-custom"></div>' +
     '</div>';
 }
@@ -3658,7 +3658,7 @@ function renderCoachPage() {
 // ─────────────────────────────────────────────────────────────
 async function streamAnalysis(question, resultEl, btn, btnText) {
   btn.disabled = true;
-  btn.textContent = '⏳ Streaming…';
+  btn.textContent = 'Streaming…';
   resultEl.className = 'insight-result stream-active';
   resultEl.innerHTML = '<div class="stream-output"></div><span class="stream-cursor"></span>';
   const outputEl = resultEl.querySelector('.stream-output');
@@ -3674,7 +3674,7 @@ async function streamAnalysis(question, resultEl, btn, btnText) {
     if (!resp.ok) {
       const j = await resp.json().catch(() => ({ error: 'Request failed' }));
       resultEl.className = 'insight-result error';
-      resultEl.innerHTML = '<p class="error-msg">⚠️ ' + (j.error === 'NO_KEY' ? 'No API key — add one in Settings.' : (j.error || 'Request failed')) + '</p>';
+      resultEl.innerHTML = '<p class="error-msg">' + (j.error === 'NO_KEY' ? 'No API key — add one in Settings.' : (j.error || 'Request failed')) + '</p>';
       return;
     }
 
@@ -3702,7 +3702,7 @@ async function streamAnalysis(question, resultEl, btn, btnText) {
           const json = JSON.parse(payload);
           if (json.error) {
             resultEl.className = 'insight-result error';
-            resultEl.innerHTML = '<p class="error-msg">⚠️ ' + (json.error === 'NO_KEY' ? 'No API key — add one in Settings.' : json.error) + '</p>';
+            resultEl.innerHTML = '<p class="error-msg">' + (json.error === 'NO_KEY' ? 'No API key — add one in Settings.' : json.error) + '</p>';
             btn.disabled = false; btn.textContent = btnText;
             return;
           }
@@ -3713,7 +3713,7 @@ async function streamAnalysis(question, resultEl, btn, btnText) {
     if (fullText) { resultEl.className = 'insight-result visible'; resultEl.innerHTML = renderMarkdown(fullText); }
   } catch {
     resultEl.className = 'insight-result error';
-    resultEl.innerHTML = '<p class="error-msg">⚠️ Connection error.</p>';
+    resultEl.innerHTML = '<p class="error-msg">Connection error.</p>';
   } finally {
     btn.disabled = false; btn.textContent = btnText;
   }
@@ -3724,7 +3724,7 @@ async function runAnalysis(type) {
   if (!a) return;
   const btn = document.getElementById('btn-' + type);
   const res = document.getElementById('result-' + type);
-  await streamAnalysis(a.prompt(), res, btn, '✨ Ask Coach');
+  await streamAnalysis(a.prompt(), res, btn, 'Ask Coach');
 }
 
 async function runCustomAnalysis() {
@@ -3732,7 +3732,7 @@ async function runCustomAnalysis() {
   if (!q) { showToast('Type your question first.', 'error'); return; }
   const res = document.getElementById('result-custom');
   const btn = document.querySelector('.custom-question-card .btn');
-  await streamAnalysis(q, res, btn, '✨ Ask Coach');
+  await streamAnalysis(q, res, btn, 'Ask Coach');
 }
 
 function enrichedData() {
@@ -3804,7 +3804,7 @@ function renderGoalSettings() {
     '<input type="text" id="g-name" placeholder="Your name" value="' + escapeHtml(p.name || '') + '"></div>' +
     '<div class="form-actions">' +
     '<button type="button" class="btn btn-outline" onclick="navigate(\'dashboard\')" style="margin-right:12px">Cancel</button>' +
-    '<button type="submit" class="btn btn-primary btn-lg">💾 Save Goals</button>' +
+    '<button type="submit" class="btn btn-primary btn-lg">Save Goals</button>' +
     '</div></form></div>';
 }
 
@@ -3824,7 +3824,7 @@ async function saveGoals(e) {
   const cadEl = document.getElementById('g-cadence'); if (cadEl) state.data.profile.incomeCadence = ['weekly', 'daily', 'monthly'].includes(cadEl.value) ? cadEl.value : 'monthly';
   const savEl = document.getElementById('g-savings'); if (savEl) state.data.profile.savingsGoal = parseFloat(savEl.value) || 0;
   await saveData();
-  showToast('Saved! 🎯', 'success');
+  showToast('Saved! ', 'success');
   navigate('dashboard');
 }
 
@@ -3837,7 +3837,7 @@ async function saveApiKey() {
   if (!k.startsWith('sk-ant-')) { showToast('Key should start with sk-ant-', 'error'); return; }
   try {
     const j = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: k }) }).then(r => r.json());
-    if (j.success) { state.hasApiKey = true; showToast('AI Coach unlocked! ✅', 'success'); renderCoachPage(); }
+    if (j.success) { state.hasApiKey = true; showToast('AI Coach unlocked! ', 'success'); renderCoachPage(); }
   } catch { showToast('Could not save key.', 'error'); }
 }
 
@@ -3898,7 +3898,7 @@ async function startDemo() {
   if (!document.getElementById('preview-banner')) {
     const b = document.createElement('div');
     b.id = 'preview-banner';
-    b.innerHTML = '👀 <strong>Demo preview</strong> — sample data, nothing is saved. ' +
+    b.innerHTML = '<strong>Demo preview</strong> — sample data, nothing is saved. ' +
       '<button onclick="exitDemo()">Create your account →</button>';
     document.body.appendChild(b);
   }
@@ -3912,7 +3912,7 @@ function injectFAB() {
   document.querySelector('.fab-btn')?.remove();
   const fab = document.createElement('button');
   fab.className = 'fab-btn';
-  fab.innerHTML = '⚡';
+  fab.innerHTML = '＋';
   fab.title = 'Quick log today';
   fab.onclick = showQuickLog;
   document.body.appendChild(fab);
@@ -3952,17 +3952,17 @@ function showQuickLog() {
   overlay.className = 'modal-overlay';
   overlay.innerHTML =
     '<div class="modal-box quick-log-box">' +
-    '<div class="modal-badge">⚡ Quick Log — Today, ' + new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'}) + '</div>' +
-    (streak > 1 ? '<div class="ql-streak">🔥 ' + streak + '-day streak — keep it going!</div>' : '') +
+    '<div class="modal-badge">Quick Log — Today, ' + new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'}) + '</div>' +
+    (streak > 1 ? '<div class="ql-streak">' + streak + '-day streak — keep it going!</div>' : '') +
     renderPrevNoteBanner() +
-    (smartFilled ? '<div class="ql-smart">✨ Smart-filled from your recent days — tweak anything, then Save.</div>' : '') +
+    (smartFilled ? '<div class="ql-smart">Smart-filled from your recent days — tweak anything, then Save.</div>' : '') +
 
     (isPillarOn('gym') ?
     '<div class="ql-section">' +
     '<div class="ql-label">' + gymP.icon + ' ' + escapeHtml(gymP.label) + ' today?</div>' +
     '<div class="ql-gym-row">' +
-    '<button type="button" class="ql-gym-btn' + (existing?.gym?.done===true?' ql-active-yes':'') + '" id="ql-gym-yes" onclick="qlSetGym(true)">' + (gymIsDefault ? '✅ Yes, I worked out' : '✅ Yes, did it') + '</button>' +
-    '<button type="button" class="ql-gym-btn' + (existing?.gym?.done===false?' ql-active-no':'') + '" id="ql-gym-no"  onclick="qlSetGym(false)">' + (gymIsDefault ? '😴 Rest day' : '⛔ Not today') + '</button>' +
+    '<button type="button" class="ql-gym-btn' + (existing?.gym?.done===true?' ql-active-yes':'') + '" id="ql-gym-yes" onclick="qlSetGym(true)">' + (gymIsDefault ? 'Yes, I worked out' : 'Yes, did it') + '</button>' +
+    '<button type="button" class="ql-gym-btn' + (existing?.gym?.done===false?' ql-active-no':'') + '" id="ql-gym-no"  onclick="qlSetGym(false)">' + (gymIsDefault ? 'Rest day' : 'Not today') + '</button>' +
     '</div></div>' : '') +
 
     (isPillarOn('food') ?
@@ -3986,29 +3986,29 @@ function showQuickLog() {
 
     (isPillarOn('money') ?
     '<div class="ql-section">' +
-    '<div class="ql-label">💸 Spent today — $</div>' +
+    '<div class="ql-label">Spent today — $</div>' +
     '<input type="number" id="ql-spent" class="ql-input" min="0" step="0.01" placeholder="0" value="' + ((existing && existing.spent) || '') + '">' +
     '</div>' : '') +
 
     '<div class="ql-section">' +
-    '<div class="ql-label">💧 Water — gallons today</div>' +
+    '<div class="ql-label">Water — gallons today</div>' +
     '<input type="number" id="ql-water" class="ql-input" min="0" step="0.25" placeholder="e.g. 0.5" value="' + waterVal + '">' +
     '</div>' +
 
     (getNutrition() ?
     '<div class="ql-section">' +
-    '<div class="ql-label">🍽️ Calories eaten today <span style="font-weight:400;color:var(--text-muted)">(target ' + getNutrition().calories.toLocaleString() + ')</span></div>' +
+    '<div class="ql-label">Calories eaten today <span style="font-weight:400;color:var(--text-muted)">(target ' + getNutrition().calories.toLocaleString() + ')</span></div>' +
     '<input type="number" id="ql-calories" class="ql-input" min="0" step="10" placeholder="e.g. 2200" value="' + (existing?.calories || '') + '">' +
     '</div>' : '') +
 
     '<div class="ql-section">' +
-    '<div class="ql-label">⚖️ Weigh-in <span style="font-weight:400;color:var(--text-muted)">(' + weightUnitPref() + ', optional)</span></div>' +
+    '<div class="ql-label">Weigh-in <span style="font-weight:400;color:var(--text-muted)">(' + weightUnitPref() + ', optional)</span></div>' +
     '<input type="number" id="ql-weigh" class="ql-input" min="0" step="0.1" placeholder="' + (weightUnitPref()==='lbs'?'170':'77') + '" value="' + weighVal + '">' +
     '</div>' +
 
     '<div class="ql-actions">' +
     '<button class="btn btn-outline" onclick="document.getElementById(\'quick-log-overlay\').remove()">Cancel</button>' +
-    '<button class="btn btn-primary" onclick="submitQuickLog()">💾 Save Log</button>' +
+    '<button class="btn btn-primary" onclick="submitQuickLog()">Save Log</button>' +
     '</div></div>';
 
   document.body.appendChild(overlay);
@@ -4086,7 +4086,7 @@ async function submitQuickLog() {
     if ([3,7,14,21,30].includes(newStreak)) setTimeout(() => showStreakCelebration(newStreak), 400);
   }
 
-  showToast('Logged! ⚡', 'success');
+  showToast('Logged! ', 'success');
   if (state.page === 'dashboard') renderDashboard();
 }
 
@@ -4186,25 +4186,25 @@ function renderReadingPage() {
 
   const statsBar = readingDays.length > 0
     ? '<div class="reading-stats">' +
-      '<div class="rs-item"><span>📖 Total Pages</span><strong>' + totalPages.toLocaleString() + '</strong></div>' +
-      '<div class="rs-item"><span>📅 Days Read</span><strong>' + readingDays.length + '</strong></div>' +
-      '<div class="rs-item"><span>📊 Avg / Day</span><strong>' + avgPages + ' pages</strong></div>' +
-      '<div class="rs-item"><span>🔥 Streak</span><strong>' + (streak > 0 ? streak + ' days' : '—') + '</strong></div>' +
+      '<div class="rs-item"><span>Total Pages</span><strong>' + totalPages.toLocaleString() + '</strong></div>' +
+      '<div class="rs-item"><span>Days Read</span><strong>' + readingDays.length + '</strong></div>' +
+      '<div class="rs-item"><span>Avg / Day</span><strong>' + avgPages + ' pages</strong></div>' +
+      '<div class="rs-item"><span>Streak</span><strong>' + (streak > 0 ? streak + ' days' : '—') + '</strong></div>' +
       '</div>'
     : '';
 
   const bookCard = activeBook
     ? '<div class="card reading-book-card">' +
       '<div class="rbc-header">' +
-      '<div class="rbc-icon">📚</div>' +
+      '<div class="rbc-icon"></div>' +
       '<div class="rbc-info">' +
       '<div class="rbc-label">Currently Reading</div>' +
       '<div class="rbc-title">' + escapeHtml(activeBook.title) + '</div>' +
       (activeBook.author ? '<div class="rbc-author">by ' + escapeHtml(activeBook.author) + '</div>' : '') +
       '</div>' +
       '<div class="rbc-actions">' +
-      '<button class="btn-sm" onclick="showAddBookModal(true)">✏️ Change Book</button>' +
-      '<button class="btn btn-primary" style="font-size:12px;padding:6px 14px" onclick="finishBook(\'' + activeBook.id + '\')">✅ I Finished It!</button>' +
+      '<button class="btn-sm" onclick="showAddBookModal(true)">Change Book</button>' +
+      '<button class="btn btn-primary" style="font-size:12px;padding:6px 14px" onclick="finishBook(\'' + activeBook.id + '\')">I Finished It!</button>' +
       '</div></div>' +
       '<div class="rbc-progress">' +
       '<div class="rbc-progress-top">' +
@@ -4214,15 +4214,15 @@ function renderReadingPage() {
       (bookPct !== null ? '<div class="rbc-bar-track"><div class="rbc-bar-fill" style="width:' + bookPct + '%"></div></div>' : '') +
       '</div></div>'
     : '<div class="card reading-start-card">' +
-      '<div class="rsc-icon">📚</div>' +
+      '<div class="rsc-icon"></div>' +
       '<h3>What are you reading?</h3>' +
       '<p>Set your current book to track pages, build a reading streak, and get AI insights on your reading habit.</p>' +
-      '<button class="btn btn-primary" onclick="showAddBookModal(false)">📖 Set My Current Book</button>' +
+      '<button class="btn btn-primary" onclick="showAddBookModal(false)">Set My Current Book</button>' +
       '</div>';
 
   const historyCard = recentLogs.length > 0
     ? '<div class="card">' +
-      '<h3 class="card-title">📋 Reading Log</h3>' +
+      '<h3 class="card-title">Reading Log</h3>' +
       '<table class="table">' +
       '<thead><tr><th>Date</th><th>Book</th><th>Pages</th><th>Summary</th></tr></thead><tbody>' +
       recentLogs.map(d =>
@@ -4238,14 +4238,14 @@ function renderReadingPage() {
 
   const finishedCard = finished.length > 0
     ? '<div class="card">' +
-      '<h3 class="card-title">🏆 Books Finished (' + finished.length + ')</h3>' +
+      '<h3 class="card-title">Books Finished (' + finished.length + ')</h3>' +
       '<div class="finished-books-grid">' +
       finished.map(b =>
         '<div class="finished-book">' +
-        '<span class="fb-icon">📗</span>' +
+        '<span class="fb-icon"></span>' +
         '<div><div class="fb-title">' + escapeHtml(b.title) + '</div>' +
         (b.author ? '<div class="fb-date" style="color:var(--text-muted);font-size:12px">' + escapeHtml(b.author) + '</div>' : '') +
-        (b.finishedDate ? '<div class="fb-date">✅ ' + fmtDate(b.finishedDate) + '</div>' : '') +
+        (b.finishedDate ? '<div class="fb-date">' + fmtDate(b.finishedDate) + '</div>' : '') +
         '</div></div>'
       ).join('') +
       '</div></div>'
@@ -4266,7 +4266,7 @@ function showAddBookModal(isChanging) {
   modal.className = 'modal-overlay';
   modal.innerHTML =
     '<div class="modal-box" style="max-width:400px;text-align:left">' +
-    '<div class="modal-badge">📚 ' + (isChanging ? 'Change Book' : 'Start Reading') + '</div>' +
+    '<div class="modal-badge">' + (isChanging ? 'Change Book' : 'Start Reading') + '</div>' +
     '<p style="font-size:14px;color:var(--text-muted);margin-bottom:20px">' + (isChanging ? 'What are you reading now?' : 'What book are you starting?') + '</p>' +
     '<div class="form-group"><label>Book Title <span style="color:var(--danger)">*</span></label>' +
     '<input type="text" id="book-title-input" placeholder="e.g. Rich Dad Poor Dad" autocomplete="off"></div>' +
@@ -4276,7 +4276,7 @@ function showAddBookModal(isChanging) {
     '<input type="number" id="book-pages-total-input" min="1" placeholder="e.g. 336"></div>' +
     '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">' +
     '<button class="btn btn-outline" onclick="document.getElementById(\'add-book-modal\').remove()">Cancel</button>' +
-    '<button class="btn btn-primary" onclick="saveBook()">📚 Start Reading</button>' +
+    '<button class="btn btn-primary" onclick="saveBook()">Start Reading</button>' +
     '</div></div>';
   document.body.appendChild(modal);
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
@@ -4294,18 +4294,18 @@ async function saveBook() {
   state.data.books.push({ id: uid(), title, author, totalPages, startDate: todayStr(), status: 'reading', finishedDate: null });
   await saveData();
   document.getElementById('add-book-modal')?.remove();
-  showToast('📚 Now reading: ' + title, 'success');
+  showToast('Now reading: ' + title, 'success');
   renderReadingPage();
 }
 
 async function finishBook(id) {
   const book = (state.data.books || []).find(b => b.id === id);
   if (!book) return;
-  if (!confirm('Mark "' + book.title + '" as finished? 🎉\n\n+50 XP bonus!')) return;
+  if (!confirm('Mark "' + book.title + '" as finished? \n\n+50 XP bonus!')) return;
   book.status = 'finished';
   book.finishedDate = todayStr();
   await saveData();
-  showToast('🎉 Finished: ' + book.title + '! +50 XP!', 'success');
+  showToast('Finished: ' + book.title + '! +50 XP!', 'success');
   showStreakCelebration(0); // re-use celebration UI
   showAddBookModal(false);
 }
@@ -4352,7 +4352,7 @@ function showDayDetail(dateStr) {
   modal.className = 'modal-overlay';
   modal.innerHTML =
     '<div class="modal-box day-detail-box">' +
-    '<div class="modal-badge">📋 ' + fmtDate(dateStr) + '</div>' +
+    '<div class="modal-badge">' + fmtDate(dateStr) + '</div>' +
     '<div class="dd-grid">' +
     ddItem('gym',        gymLabel,   day.gym?.notes,        day.gym?.done) +
     ddItem('food',       foodLabel,  day.food?.notes,       day.food?.rating >= 4) +
@@ -4360,20 +4360,20 @@ function showDayDetail(dateStr) {
     ddItem('money',      moneyLabel, (day.spent > 0 ? formatCurrency(day.spent) + ' spent' : '') + (day.money?.activities ? (day.spent > 0 ? ' · ' : '') + day.money.activities : ''), day.spent > 0 || !!day.money?.activities) +
     ddItem('reading',    readLabel,  day.reading?.summary,  day.reading?.pages > 0) +
     '<div class="dd-item water' + (day.water > 0 ? ' dd-done' : '') + '">' +
-    '<span class="dd-icon">💧</span><div>' +
+    '<span class="dd-icon"></span><div>' +
     '<div class="dd-label" style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Water</div>' +
     '<div class="dd-label">' + waterLabel + '</div></div></div>' +
     '<div class="dd-item food' + (day.calories > 0 ? ' dd-done' : '') + '">' +
-    '<span class="dd-icon">🍽️</span><div>' +
+    '<span class="dd-icon"></span><div>' +
     '<div class="dd-label" style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Calories eaten</div>' +
     '<div class="dd-label">' + calLabel + '</div>' +
     (foodsNote ? '<div class="dd-notes">' + escapeHtml(foodsNote) + '</div>' : '') +
     '</div></div>' +
     '</div>' +
-    (day.notes ? '<div class="dd-global-notes">📝 ' + escapeHtml(day.notes) + '</div>' : '') +
+    (day.notes ? '<div class="dd-global-notes">' + escapeHtml(day.notes) + '</div>' : '') +
     '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">' +
     '<button class="btn btn-outline" onclick="document.getElementById(\'day-detail-modal\').remove()">Close</button>' +
-    '<button class="btn btn-primary" onclick="editDay(\'' + day.id + '\');document.getElementById(\'day-detail-modal\').remove()">✏️ Edit</button>' +
+    '<button class="btn btn-primary" onclick="editDay(\'' + day.id + '\');document.getElementById(\'day-detail-modal\').remove()">Edit</button>' +
     '</div></div>';
   document.body.appendChild(modal);
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
@@ -4401,12 +4401,12 @@ function pillarCustomizerCard() {
   }).join('');
 
   return '<div class="card">' +
-    '<h3 class="card-title">🧩 Customize Your Pillars</h3>' +
+    '<h3 class="card-title">Customize Your Pillars</h3>' +
     '<p class="card-sub">Track what matters to <em>you</em>. Pick a starting point below, then rename, re-icon, or switch off any pillar. Each slot measures a fixed kind of input (shown on the right) — so you can make it about anything.</p>' +
     '<div class="preset-grid">' + presetBtns + '</div>' +
     '<div class="pc-list-head"><span>On</span><span>Icon</span><span>Name</span><span>What it measures</span></div>' +
     '<div class="pc-list">' + rows + '</div>' +
-    '<button type="button" class="btn btn-primary" style="margin-top:8px" onclick="savePillars()">💾 Save Pillars</button>' +
+    '<button type="button" class="btn btn-primary" style="margin-top:8px" onclick="savePillars()">Save Pillars</button>' +
     '</div>';
 }
 
@@ -4440,7 +4440,7 @@ async function savePillars() {
   state.data.profile.onboarded = true;
   await saveData();
   applyNavVisibility();
-  showToast('Pillars saved! 🧩', 'success');
+  showToast('Pillars saved! ', 'success');
   renderSettingsPage();
 }
 
@@ -4451,11 +4451,11 @@ async function savePillars() {
 //   Step 3: tailored goals + nutrition details (if you chose Nutrition)
 // ─────────────────────────────────────────────────────────────
 const ONBOARD_AREAS = [
-  { id: 'gym',        icon: '💪', label: 'Fitness',          desc: 'Workouts & training consistency' },
-  { id: 'food',       icon: '🥗', label: 'Nutrition & Diet', desc: 'Food quality, calories & macros' },
-  { id: 'networking', icon: '🤝', label: 'Networking',       desc: 'Meeting people & building connections' },
-  { id: 'money',      icon: '💰', label: 'Income',           desc: 'Earnings & money-making activity' },
-  { id: 'reading',    icon: '📚', label: 'Reading',          desc: 'Daily reading habit & learning' }
+  { id: 'gym',        icon: '', label: 'Fitness',          desc: 'Workouts & training consistency' },
+  { id: 'food',       icon: '', label: 'Nutrition & Diet', desc: 'Food quality, calories & macros' },
+  { id: 'networking', icon: '', label: 'Networking',       desc: 'Meeting people & building connections' },
+  { id: 'money',      icon: '', label: 'Income',           desc: 'Earnings & money-making activity' },
+  { id: 'reading',    icon: '', label: 'Reading',          desc: 'Daily reading habit & learning' }
 ];
 
 function showOnboarding() {
@@ -4507,10 +4507,10 @@ function renderOnboardStep() {
     title = 'Set your goals';
     sub = 'Targets for what you chose — leave any blank if you\'re not sure yet.';
     const parts = [];
-    if (f.areas.gym) parts.push('<div class="form-group"><label>💪 Fitness — gym days per week</label><input type="number" id="ob-gym" min="1" max="7" value="' + (f.goals.gymDaysPerWeek || 5) + '"></div>');
-    if (f.areas.networking) parts.push('<div class="form-group"><label>🤝 Networking — new connections per week</label><input type="number" id="ob-net" min="0" value="' + (f.goals.weeklyNetworkGoal || 3) + '"></div>');
+    if (f.areas.gym) parts.push('<div class="form-group"><label>Fitness — gym days per week</label><input type="number" id="ob-gym" min="1" max="7" value="' + (f.goals.gymDaysPerWeek || 5) + '"></div>');
+    if (f.areas.networking) parts.push('<div class="form-group"><label>Networking — new connections per week</label><input type="number" id="ob-net" min="0" value="' + (f.goals.weeklyNetworkGoal || 3) + '"></div>');
     if (f.areas.money) parts.push(
-      '<div class="form-group"><label>💰 How do you get paid?</label>' +
+      '<div class="form-group"><label>How do you get paid?</label>' +
       '<select id="ob-cadence">' +
       '<option value="monthly"' + (f.cadence === 'monthly' ? ' selected' : '') + '>Monthly</option>' +
       '<option value="weekly"' + (f.cadence === 'weekly' ? ' selected' : '') + '>Weekly</option>' +
@@ -4518,10 +4518,10 @@ function renderOnboardStep() {
       '</select>' +
       '<span style="font-size:12px;color:var(--text-muted);display:block;margin-top:5px">We\'ll ask your income on that schedule — and you\'ll log spending every day.</span></div>' +
       '<div class="form-row">' +
-      '<div class="form-group"><label>💰 Income goal ($) <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label><input type="number" id="ob-income" min="0" step="50" placeholder="e.g. 1200" value="' + (f.goals.weeklyIncomeGoal || '') + '"></div>' +
+      '<div class="form-group"><label>Income goal ($) <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label><input type="number" id="ob-income" min="0" step="50" placeholder="e.g. 1200" value="' + (f.goals.weeklyIncomeGoal || '') + '"></div>' +
       '<div class="form-group"><label>Your job / role <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label><input type="text" id="ob-job" placeholder="e.g. Sales Rep" value="' + escapeHtml(f.jobTitle) + '"></div>' +
       '</div>');
-    if (f.areas.reading) parts.push('<div class="form-group"><label>📚 Reading — pages per week</label><input type="number" id="ob-read" min="0" step="10" placeholder="e.g. 100" value="' + (f.goals.weeklyReadGoal || '') + '"></div>');
+    if (f.areas.reading) parts.push('<div class="form-group"><label>Reading — pages per week</label><input type="number" id="ob-read" min="0" step="10" placeholder="e.g. 100" value="' + (f.goals.weeklyReadGoal || '') + '"></div>');
     if (f.areas.food) {
       const n = f.nut;
       const ftTotal = n.heightCm ? n.heightCm / IN_TO_CM : 0;
@@ -4530,7 +4530,7 @@ function renderOnboardStep() {
       const cmVal = (n.heightUnit === 'cm' && n.heightCm) ? Math.round(n.heightCm) : '';
       const wVal = n.weightKg ? (n.weightUnit === 'lbs' ? Math.round(n.weightKg / LBS_TO_KG) : Math.round(n.weightKg)) : '';
       parts.push(
-        '<div class="onboard-nut"><div class="onboard-section-label">🥗 Nutrition details <span style="font-weight:400;color:var(--text-muted)">(for your calorie & macro targets — optional)</span></div>' +
+        '<div class="onboard-nut"><div class="onboard-section-label">Nutrition details <span style="font-weight:400;color:var(--text-muted)">(for your calorie & macro targets — optional)</span></div>' +
         '<div class="form-row">' +
         '<div class="form-group"><label>Height</label><div class="nut-unit-row">' +
         '<select id="ob-hunit" onchange="obToggleHeightUnit()" style="max-width:92px"><option value="cm"' + (n.heightUnit === 'cm' ? ' selected' : '') + '>cm</option><option value="ft"' + (n.heightUnit === 'ft' ? ' selected' : '') + '>ft/in</option></select>' +
@@ -4562,7 +4562,7 @@ function renderOnboardStep() {
     '<div class="onboard-actions">' +
     (f.step > 1 ? '<button type="button" class="btn btn-outline" onclick="onboardBack()">← Back</button>'
                 : '<button type="button" class="btn btn-outline" onclick="skipOnboarding()">Skip setup</button>') +
-    (isLast ? '<button type="button" class="btn btn-primary" onclick="onboardFinish()">🚀 Finish</button>'
+    (isLast ? '<button type="button" class="btn btn-primary" onclick="onboardFinish()">Finish</button>'
             : '<button type="button" class="btn btn-primary" onclick="onboardNext()">Next →</button>') +
     '</div></div>';
   document.body.appendChild(modal);
@@ -4664,7 +4664,7 @@ async function onboardFinish() {
   document.getElementById('onboarding-modal')?.remove();
   applyNavVisibility();
   renderXPBar();
-  showToast('You\'re all set' + (p.firstName ? ', ' + p.firstName : '') + '! Let\'s get to work. 🚀', 'success');
+  showToast('You\'re all set' + (p.firstName ? ', ' + p.firstName : '') + '! Let\'s get to work. ', 'success');
   navigate('dashboard');
 }
 
@@ -4704,7 +4704,7 @@ function renderNutritionResults(nut) {
     '</div>'
   ).join('');
   const mealPlan = '<div class="meal-plan">' +
-    '<div class="meal-plan-head">🍽️ Split into ' + m.count + ' meals — about <strong>' + m.calories.toLocaleString() + ' cal</strong> each</div>' +
+    '<div class="meal-plan-head">Split into ' + m.count + ' meals — about <strong>' + m.calories.toLocaleString() + ' cal</strong> each</div>' +
     '<div class="meal-list">' + mealRows + '</div>' +
     '<div class="meal-legend"><b class="mp">P</b> protein · <b class="mc">C</b> carbs · <b class="mf">F</b> fat &nbsp;(per meal)</div>' +
     '</div>';
@@ -4719,7 +4719,7 @@ function renderNutritionResults(nut) {
     macro('mf', 'Fat', nut.fat) +
     '</div>' +
     mealPlan +
-    '<div class="nut-disclaimer">📐 Estimated with the Mifflin-St Jeor formula. Use it as a starting point and adjust to how your body responds.</div>' +
+    '<div class="nut-disclaimer">Estimated with the Mifflin-St Jeor formula. Use it as a starting point and adjust to how your body responds.</div>' +
     '</div>';
 }
 
@@ -4735,7 +4735,7 @@ function renderNutritionSettingsCard() {
   const sel = (v, opt) => v === opt ? ' selected' : '';
 
   return '<div class="card">' +
-    '<h3 class="card-title">🍎 Nutrition & Calorie Targets</h3>' +
+    '<h3 class="card-title">Nutrition & Calorie Targets</h3>' +
     '<p class="card-sub">Tell us a few things and we\'ll calculate how many calories you need each day — split into protein, carbs, and fat.</p>' +
     '<form id="nutrition-form" onsubmit="saveNutrition(event)">' +
     '<div class="form-row">' +
@@ -4774,7 +4774,7 @@ function renderNutritionSettingsCard() {
     '<select id="nut-meals">' +
     [3, 4, 5, 6].map(m => '<option value="' + m + '"' + ((+(n.mealsPerDay) || 3) === m ? ' selected' : '') + '>' + m + ' meals a day</option>').join('') +
     '</select></div>' +
-    '<button type="submit" class="btn btn-primary">🍎 Calculate & Save</button>' +
+    '<button type="submit" class="btn btn-primary">Calculate & Save</button>' +
     '</form>' +
     '<div id="nutrition-results-wrap">' + renderNutritionResults(computeNutrition(n)) + '</div>' +
     '</div>';
@@ -4814,7 +4814,7 @@ async function saveNutrition(e) {
     mealsPerDay: parseInt(document.getElementById('nut-meals').value) || 3
   };
   await saveData();
-  showToast('Nutrition targets updated! 🍎', 'success');
+  showToast('Nutrition targets updated! ', 'success');
   const wrap = document.getElementById('nutrition-results-wrap');
   if (wrap) wrap.innerHTML = renderNutritionResults(getNutrition());
 }
@@ -4834,7 +4834,7 @@ function downloadFile(filename, content, mime) {
 function exportData() {
   const payload = { app: 'business-escalate', version: 1, exportedAt: new Date().toISOString(), data: state.data };
   downloadFile('business-escalate-backup-' + todayStr() + '.json', JSON.stringify(payload, null, 2), 'application/json');
-  showToast('Backup downloaded ✅', 'success');
+  showToast('Backup downloaded ', 'success');
 }
 
 function exportDaysCSV() {
@@ -4847,7 +4847,7 @@ function exportDaysCSV() {
     d.reading && d.reading.pages || '', d.reading && d.reading.summary || '', d.water || '', d.calories || '', d.notes || ''
   ].map(esc).join(','));
   downloadFile('business-escalate-log-' + todayStr() + '.csv', header.join(',') + '\n' + rows.join('\n'), 'text/csv');
-  showToast('Daily log CSV downloaded ✅', 'success');
+  showToast('Daily log CSV downloaded ', 'success');
 }
 
 function triggerImport() { document.getElementById('import-file')?.click(); }
@@ -4869,7 +4869,7 @@ async function importData(input) {
     state.data = data;
     await saveData();
     input.value = '';
-    showToast('Backup imported! 🎉', 'success');
+    showToast('Backup imported! ', 'success');
     applyNavVisibility(); renderXPBar(); navigate('dashboard');
   } catch {
     showToast('Could not read that file — is it a valid backup?', 'error');
@@ -4880,15 +4880,15 @@ async function importData(input) {
 function renderBackupCard() {
   const n = state.data.days.length;
   return '<div class="card">' +
-    '<h3 class="card-title">💾 Backup & Data</h3>' +
+    '<h3 class="card-title">Backup & Data</h3>' +
     '<p class="card-sub">Your data is stored only on this computer. Export a backup regularly so you never lose it — you have <strong>' + n + '</strong> day' + (n === 1 ? '' : 's') + ' logged.</p>' +
     '<div class="backup-btns">' +
-    '<button class="btn btn-primary" onclick="exportData()">⬇️ Export backup (JSON)</button>' +
-    '<button class="btn btn-outline" onclick="exportDaysCSV()">📄 Export log (CSV)</button>' +
-    '<button class="btn btn-outline" onclick="triggerImport()">⬆️ Import backup</button>' +
+    '<button class="btn btn-primary" onclick="exportData()">Export backup (JSON)</button>' +
+    '<button class="btn btn-outline" onclick="exportDaysCSV()">Export log (CSV)</button>' +
+    '<button class="btn btn-outline" onclick="triggerImport()">Import backup</button>' +
     '<input type="file" id="import-file" accept="application/json,.json" style="display:none" onchange="importData(this)">' +
     '</div>' +
-    '<div class="backup-note">⚠️ Importing replaces this account\'s current data. Export first if you want a safety copy.</div>' +
+    '<div class="backup-note">Importing replaces this account\'s current data. Export first if you want a safety copy.</div>' +
     '</div>';
 }
 
@@ -4959,7 +4959,7 @@ async function enableNotifications() {
     const p = await Notification.requestPermission();
     if (p === 'granted') {
       const pushed = await subscribeToPush();
-      showToast(pushed ? 'Notifications on — you\'ll get reminders even when the app is closed 🔔' : 'Notifications on 🔔', 'success');
+      showToast(pushed ? 'Notifications on — you\'ll get reminders even when the app is closed ' : 'Notifications on ', 'success');
       try { if (!pushed) new Notification('Reminders enabled', { body: "We'll nudge you while the app is open." }); } catch {}
     } else showToast('Notifications blocked — turn them on in your browser settings.', 'error');
   } catch { showToast('Could not enable notifications.', 'error'); }
@@ -4996,7 +4996,7 @@ async function sendTestPush() {
   try {
     const r = await fetch('/api/push/test', { method: 'POST', headers: authHeaders() });
     const j = await r.json();
-    if (r.ok && j.sent > 0) showToast('Test sent — check your notifications 🔔', 'success');
+    if (r.ok && j.sent > 0) showToast('Test sent — check your notifications ', 'success');
     else showToast(j.error || 'Enable notifications first, then try again.', 'error');
   } catch { showToast('Could not send test.', 'error'); }
 }
@@ -5011,11 +5011,11 @@ function reminderDue(r, hhmm, today) {
 function isPushSubscribed() { return !!(state.data && state.data.profile && state.data.profile.pushSubscribed); }
 function fireReminder(r) {
   const name = state.data.profile && state.data.profile.firstName;
-  showToast('⏰ ' + r.label, 'success');
+  showToast('' + r.label, 'success');
   // If the device is subscribed to server push, the cron already delivers this
   // reminder — don't also raise a local system notification (would double-notify).
   if (!isPushSubscribed() && 'Notification' in window && Notification.permission === 'granted') {
-    try { new Notification('⏰ ' + (name ? name + ', ' : '') + r.label, { body: 'Escalate', tag: r.id }); } catch {}
+    try { new Notification('' + (name ? name + ', ' : '') + r.label, { body: 'Escalate', tag: r.id }); } catch {}
   }
 }
 function checkReminders() {
@@ -5045,7 +5045,7 @@ function renderChecklistCard() {
     '<span class="chk-text">' + escapeHtml(i.text) + '</span></div>').join('');
   return '<div class="card">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-    '<h3 class="card-title" style="margin-bottom:0">✅ Today\'s Checklist</h3>' +
+    '<h3 class="card-title" style="margin-bottom:0">Today\'s Checklist</h3>' +
     '<span style="font-size:13px;color:var(--text-muted)">' + prog.done + '/' + prog.total + '</span></div>' +
     '<div class="chk-progress"><div style="width:' + pct + '%"></div></div>' +
     '<div class="chk-list">' + rows + '</div></div>';
@@ -5061,15 +5061,15 @@ function renderNudgeCard() {
   const opts = Array.from({ length: 24 }, (_, h) => '<option value="' + h + '"' + (h === hour ? ' selected' : '') + '>' + fmt(h) + '</option>').join('');
   return '<div class="card">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-    '<h3 class="card-title" style="margin-bottom:0">🔥 Daily streak nudge</h3>' +
+    '<h3 class="card-title" style="margin-bottom:0">Daily streak nudge</h3>' +
     '<label class="pc-toggle"><input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="toggleDailyNudge()"><span class="pc-slider"></span></label></div>' +
     '<p class="card-sub">If you haven\'t logged by this time, we\'ll send one friendly push to your phone — so you never break your streak.</p>' +
     '<div class="rem-add"><label style="align-self:center;color:var(--text-muted);font-size:14px;white-space:nowrap">Remind me at</label>' +
     '<select id="nudge-hour" onchange="setNudgeHour(this.value)"' + (on ? '' : ' disabled') + '>' + opts + '</select></div>' +
-    '<div class="rem-note">📱 Needs notifications enabled (above). Sent at most once a day, only if you haven\'t logged yet.</div>' +
+    '<div class="rem-note">Needs notifications enabled (above). Sent at most once a day, only if you haven\'t logged yet.</div>' +
     '<div style="height:1px;background:var(--border);margin:16px 0"></div>' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
-    '<h3 class="card-title" style="margin-bottom:0">🥩 Protein reminder</h3>' +
+    '<h3 class="card-title" style="margin-bottom:0">Protein reminder</h3>' +
     '<label class="pc-toggle"><input type="checkbox" ' + (proteinOn ? 'checked' : '') + ' onchange="toggleProteinNudge()"><span class="pc-slider"></span></label></div>' +
     '<p class="card-sub" style="margin-bottom:0">Logged food but came up short on protein? Around your reminder time we\'ll let you know there\'s still time for a shake — so you hit your target. (Needs nutrition set up.)</p>' +
     '</div>';
@@ -5105,7 +5105,7 @@ function renderChecklistPage() {
     ? items.map(i => '<div class="chk-row' + (isChecked(i.id) ? ' chk-done' : '') + '">' +
         '<button type="button" class="chk-box" onclick="toggleCheck(\'' + i.id + '\')">' + (isChecked(i.id) ? '✓' : '') + '</button>' +
         '<span class="chk-text">' + escapeHtml(i.text) + '</span>' +
-        '<button type="button" class="chk-del" onclick="deleteCheckItem(\'' + i.id + '\')" title="Remove">🗑️</button>' +
+        '<button type="button" class="chk-del" onclick="deleteCheckItem(\'' + i.id + '\')" title="Remove">✕</button>' +
         '</div>').join('')
     : '<div class="chk-empty">No checklist items yet — add your daily must-dos below.</div>';
 
@@ -5113,22 +5113,22 @@ function renderChecklistPage() {
   const remRows = reminders.length
     ? reminders.map(r => '<div class="rem-row' + (r.enabled ? '' : ' rem-off') + '">' +
         '<span class="rem-time">' + escapeHtml(r.time) + '</span>' +
-        '<span class="rem-label">' + escapeHtml(r.label) + (r.date ? ' <span class="rem-when">📅 ' + fmtDateShort(r.date) + '</span>' : '') + '</span>' +
+        '<span class="rem-label">' + escapeHtml(r.label) + (r.date ? ' <span class="rem-when">' + fmtDateShort(r.date) + '</span>' : '') + '</span>' +
         '<label class="pc-toggle"><input type="checkbox" ' + (r.enabled ? 'checked' : '') + ' onchange="toggleReminder(\'' + r.id + '\')"><span class="pc-slider"></span></label>' +
-        '<button type="button" class="chk-del" onclick="deleteReminder(\'' + r.id + '\')" title="Remove">🗑️</button>' +
+        '<button type="button" class="chk-del" onclick="deleteReminder(\'' + r.id + '\')" title="Remove">✕</button>' +
         '</div>').join('')
     : '<div class="chk-empty">No reminders yet — add one below.</div>';
 
   const notifBtn = ('Notification' in window && Notification.permission === 'granted')
-    ? '<span class="rem-notif-on">🔔 On</span> <button type="button" class="btn-link" onclick="sendTestPush()">Send test</button>'
-    : '<button type="button" class="btn btn-outline" onclick="enableNotifications()">🔔 Enable notifications</button>';
+    ? '<span class="rem-notif-on">On</span> <button type="button" class="btn-link" onclick="sendTestPush()">Send test</button>'
+    : '<button type="button" class="btn btn-outline" onclick="enableNotifications()">Enable notifications</button>';
 
   document.getElementById('main').innerHTML =
     '<div class="page-header"><h2 class="page-title">Checklist & Reminders</h2>' +
     '<p class="page-sub">Your daily must-dos and nudges to stay on track</p></div>' +
     '<div class="card">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-    '<h3 class="card-title" style="margin-bottom:0">✅ Today\'s Checklist</h3>' +
+    '<h3 class="card-title" style="margin-bottom:0">Today\'s Checklist</h3>' +
     '<span style="font-size:13px;color:var(--text-muted)">' + prog.done + '/' + prog.total + ' done</span></div>' +
     '<div class="chk-progress"><div style="width:' + pct + '%"></div></div>' +
     '<div class="chk-list">' + checklistRows + '</div>' +
@@ -5137,7 +5137,7 @@ function renderChecklistPage() {
     '</div>' +
     '<div class="card">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
-    '<h3 class="card-title" style="margin-bottom:0">⏰ Reminders</h3>' + notifBtn + '</div>' +
+    '<h3 class="card-title" style="margin-bottom:0">Reminders</h3>' + notifBtn + '</div>' +
     '<div class="rem-list">' + remRows + '</div>' +
     '<div class="rem-add">' +
     '<input type="text" id="rem-label" placeholder="Reminder (e.g. Call the dentist)">' +
@@ -5145,9 +5145,9 @@ function renderChecklistPage() {
     '<input type="date" id="rem-date" value="' + todayStr() + '" min="' + todayStr() + '" title="The day for this reminder — tap to pick another day (defaults to today)">' +
     '<button type="button" class="btn btn-primary" onclick="addReminder()">+ Add</button>' +
     '</div>' +
-    '<label class="rem-repeat-row"><input type="checkbox" id="rem-repeat" onchange="document.getElementById(\'rem-date\').disabled=this.checked"> 🔁 Repeat every day</label>' +
-    '<div class="rem-note">📅 Defaults to <strong>today</strong> — tap the date to pick any day ahead. Or check <strong>Repeat every day</strong> for a daily reminder.</div>' +
-    '<div class="rem-note">💡 Reminders nudge you while the app is open. On a phone, add it to your home screen and allow notifications for the best results.</div>' +
+    '<label class="rem-repeat-row"><input type="checkbox" id="rem-repeat" onchange="document.getElementById(\'rem-date\').disabled=this.checked"> Repeat every day</label>' +
+    '<div class="rem-note">Defaults to <strong>today</strong> — tap the date to pick any day ahead. Or check <strong>Repeat every day</strong> for a daily reminder.</div>' +
+    '<div class="rem-note">Reminders nudge you while the app is open. On a phone, add it to your home screen and allow notifications for the best results.</div>' +
     '</div>' +
     renderNudgeCard();
 }
@@ -5174,7 +5174,7 @@ function renderSettingsPage() {
 
     // Goals — labels follow your pillar names; only enabled pillars shown
     '<div class="card">' +
-    '<h3 class="card-title">🎯 Weekly Goals</h3>' +
+    '<h3 class="card-title">Weekly Goals</h3>' +
     '<form id="goals-form" onsubmit="saveGoals(event)">' +
     '<div class="form-row">' +
     (isPillarOn('gym') ? '<div class="form-group"><label>' + gymP.icon + ' ' + escapeHtml(gymP.label) + ' days per week</label>' +
@@ -5182,11 +5182,11 @@ function renderSettingsPage() {
     (isPillarOn('money') ? '<div class="form-group"><label>' + moneyP.icon + ' Weekly ' + escapeHtml(moneyP.label) + ' goal ($)</label>' +
       '<input type="number" id="g-income" min="0" step="50" placeholder="e.g. 1200" value="' + (p.weeklyIncomeGoal||'') + '"></div>' : '<input type="hidden" id="g-income" value="' + (p.weeklyIncomeGoal||0) + '">') +
     '</div>' +
-    (isPillarOn('money') ? '<div class="form-row"><div class="form-group"><label>💰 How often do you get paid?</label>' +
+    (isPillarOn('money') ? '<div class="form-row"><div class="form-group"><label>How often do you get paid?</label>' +
       '<select id="g-cadence"><option value="monthly"' + (moneyCadence()==='monthly'?' selected':'') + '>Monthly — set income once a month</option>' +
       '<option value="weekly"' + (moneyCadence()==='weekly'?' selected':'') + '>Weekly — set income once a week</option>' +
       '<option value="daily"' + (moneyCadence()==='daily'?' selected':'') + '>Daily — set income each day</option></select></div>' +
-      '<div class="form-group"><label>🎯 Savings goal per ' + moneyPeriodLabel() + ' ($)</label>' +
+      '<div class="form-group"><label>Savings goal per ' + moneyPeriodLabel() + ' ($)</label>' +
       '<input type="number" id="g-savings" min="0" step="50" placeholder="e.g. 500" value="' + (p.savingsGoal || '') + '"></div></div>' : '') +
     '<div class="form-row">' +
     (isPillarOn('networking') ? '<div class="form-group"><label>' + netP.icon + ' ' + escapeHtml(netP.label) + ' per week</label>' +
@@ -5206,7 +5206,7 @@ function renderSettingsPage() {
     '<div class="form-group"><label>Phone</label>' +
     '<input type="tel" id="g-phone" placeholder="+1 555 123 4567" value="' + escapeHtml(p.phone||'') + '"></div>' +
     '</div>' +
-    '<button type="submit" class="btn btn-primary">💾 Save Goals</button>' +
+    '<button type="submit" class="btn btn-primary">Save Goals</button>' +
     '</form></div>' +
 
     // Nutrition & calorie targets
@@ -5214,7 +5214,7 @@ function renderSettingsPage() {
 
     // Profile
     '<div class="card">' +
-    '<h3 class="card-title">💼 Work Profile</h3>' +
+    '<h3 class="card-title">Work Profile</h3>' +
     '<p class="card-sub">This is what the AI coach uses to give you personalized advice.</p>' +
     '<form id="profile-form" onsubmit="saveProfileSettings(event)">' +
     '<div class="form-group"><label>What is your job / role?</label>' +
@@ -5223,15 +5223,15 @@ function renderSettingsPage() {
     '<textarea id="s-desc" rows="3" placeholder="Describe what you sell, your commission rate, how deals work…">' + (p.jobDescription||'') + '</textarea></div>' +
     '<div class="form-group"><label>Commission rate (%)</label>' +
     '<input type="number" id="s-rate" min="0" max="100" step="0.1" placeholder="e.g. 3" value="' + (p.commissionRate||'') + '"></div>' +
-    '<button type="submit" class="btn btn-primary">💾 Save Profile</button>' +
+    '<button type="submit" class="btn btn-primary">Save Profile</button>' +
     '</form></div>' +
 
     // AI Key
     '<div class="card">' +
-    '<h3 class="card-title">🔑 AI Coach — Claude API Key</h3>' +
+    '<h3 class="card-title">AI Coach — Claude API Key</h3>' +
     (hasKey
       ? '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--success-bg);border:1px solid rgba(16,185,129,0.3);border-radius:var(--radius-sm);margin-bottom:12px">' +
-        '<span style="color:var(--success);font-weight:600">✅ API key connected — AI Coach is active</span>' +
+        '<span style="color:var(--success);font-weight:600">API key connected — AI Coach is active</span>' +
         '<button class="btn-link" onclick="clearApiKey()">Remove key</button></div>'
       : '<p class="card-sub">Get your free key at <strong>console.anthropic.com</strong> → API Keys</p>' +
         '<div style="display:flex;gap:10px">' +
@@ -5247,11 +5247,11 @@ function renderSettingsPage() {
 
     // Notifications info
     '<div class="card">' +
-    '<h3 class="card-title">🔔 Notifications & Reminders</h3>' +
+    '<h3 class="card-title">Notifications & Reminders</h3>' +
     '<div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);padding:14px 16px;font-size:14px;color:var(--text-muted);line-height:1.7;margin-bottom:12px">' +
     'Get your reminders and a daily <strong style="color:var(--text)">streak nudge</strong> on your phone — <strong style="color:var(--text)">even when the app is closed</strong>. ' +
     'Turn them on in <strong style="color:var(--text)">Checklist → Reminders → Enable notifications</strong>, then add your own reminder times and set the nudge.' +
-    '<br><br>📱 <strong style="color:var(--text)">On iPhone:</strong> add the app to your Home Screen first (Share → Add to Home Screen), then allow notifications.' +
+    '<br><br><strong style="color:var(--text)">On iPhone:</strong> add the app to your Home Screen first (Share → Add to Home Screen), then allow notifications.' +
     '</div>' +
     '<button class="btn btn-outline" onclick="navigate(\'checklist\')">Open Checklist & Reminders →</button>' +
     '</div>';
@@ -5263,15 +5263,15 @@ function renderSettingsPage() {
 function renderOwnerCard() {
   if (!state.isOwner) return '';
   return '<div class="card" style="border:1px solid rgba(124,92,255,0.4)">' +
-    '<h3 class="card-title">📣 Send a notification to everyone</h3>' +
+    '<h3 class="card-title">Send a notification to everyone</h3>' +
     '<p class="card-sub">Owner tool — pushes a notification to every person who turned on notifications, right on their phone. <span id="bc-reach"></span></p>' +
     '<div class="form-group"><label>Title</label>' +
-    '<input type="text" id="bc-title" maxlength="80" placeholder="e.g. New feature added 🎉"></div>' +
+    '<input type="text" id="bc-title" maxlength="80" placeholder="e.g. New feature added "></div>' +
     '<div class="form-group"><label>Message</label>' +
     '<textarea id="bc-body" rows="2" maxlength="300" placeholder="e.g. Don\'t forget to log your day — keep the streak alive!"></textarea></div>' +
-    '<button type="button" class="btn btn-primary" onclick="sendBroadcast()">📣 Send to everyone</button>' +
+    '<button type="button" class="btn btn-primary" onclick="sendBroadcast()">Send to everyone</button>' +
     '<hr style="border:none;border-top:1px solid var(--border);margin:18px 0">' +
-    '<h3 class="card-title" style="margin-bottom:6px">⭐ Activate a subscriber</h3>' +
+    '<h3 class="card-title" style="margin-bottom:6px">Activate a subscriber</h3>' +
     '<p class="card-sub">After someone pays, enter their username here to unlock Pro for their account.</p>' +
     '<div class="rem-add"><input type="text" id="pro-user" placeholder="their username">' +
     '<button type="button" class="btn btn-primary" onclick="grantPro()">Grant Pro</button></div>' +
@@ -5283,7 +5283,7 @@ async function grantPro() {
   try {
     const r = await fetch('/api/admin/grant-pro', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ username, pro: true }) });
     const j = await r.json();
-    if (r.ok) { showToast('✅ ' + j.username + ' is now Pro.', 'success'); document.getElementById('pro-user').value = ''; }
+    if (r.ok) { showToast('' + j.username + ' is now Pro.', 'success'); document.getElementById('pro-user').value = ''; }
     else showToast(j.error || 'Could not update.', 'error');
   } catch { showToast('Could not update.', 'error'); }
 }
@@ -5293,7 +5293,7 @@ function renderAdminStatsCard() {
   if (!state.isOwner) return '';
   return '<div class="card" style="border:1px solid rgba(45,212,191,0.3)">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
-    '<h3 class="card-title" style="margin-bottom:0">📊 Your app — live numbers</h3>' +
+    '<h3 class="card-title" style="margin-bottom:0">Your app — live numbers</h3>' +
     '<button class="btn btn-outline btn-sm" onclick="loadAdminStats()">↻ Refresh</button></div>' +
     '<p class="card-sub">Owner only. How many people use Escalate and how active they are.</p>' +
     '<div id="admin-stats" class="admin-grid"><div class="di-loading"><div class="spinner"></div><span>Loading…</span></div></div>' +
@@ -5344,7 +5344,7 @@ async function sendBroadcast() {
     const r = await fetch('/api/admin/broadcast', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ title, body }) });
     const j = await r.json();
     if (r.ok) {
-      showToast('Sent to ' + (j.sent || 0) + ' device' + (j.sent === 1 ? '' : 's') + ' 📣', 'success');
+      showToast('Sent to ' + (j.sent || 0) + ' device' + (j.sent === 1 ? '' : 's') + ' ', 'success');
       document.getElementById('bc-title').value = '';
       document.getElementById('bc-body').value = '';
     } else showToast(j.error || 'Could not send.', 'error');
@@ -5357,7 +5357,7 @@ async function saveProfileSettings(e) {
   state.data.profile.jobDescription = document.getElementById('s-desc').value.trim();
   state.data.profile.commissionRate = parseFloat(document.getElementById('s-rate').value) || 0;
   await saveData();
-  showToast('Profile saved! ✅', 'success');
+  showToast('Profile saved! ', 'success');
 }
 
 // ─────────────────────────────────────────────────────────────

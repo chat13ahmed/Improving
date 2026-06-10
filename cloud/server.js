@@ -64,11 +64,11 @@ function verifyJwt(token, secret) {
 function buildSystemPrompt(p) {
   const order = ['gym', 'food', 'networking', 'money', 'reading'];
   const meta = {
-    gym:        { icon: '💪', def: 'Gym',        line: (l) => `${l.toUpperCase()}: a daily "did I do it?" habit — goal is ${p.gymDaysPerWeek || 5} days/week (builds a streak)` },
-    food:       { icon: '🥗', def: 'Food',       line: (l) => `${l.toUpperCase()}: rated daily from 1 to 5 (quality)` },
-    networking: { icon: '🤝', def: 'Networking', line: (l) => `${l.toUpperCase()}: a daily count — goal is ${p.weeklyNetworkGoal || 3} per week` },
-    money:      { icon: '💰', def: 'Income',     line: (l) => `${l.toUpperCase()}: spending is logged DAILY; income is set per ${p.incomeCadence === 'weekly' ? 'week' : 'month'}. Net (income − spending) and savings rate matter — connect spending to other pillars (e.g. stress, gym, mood) when you can.` },
-    reading:    { icon: '📚', def: 'Reading',    line: (l) => `${l.toUpperCase()}: pages read each day + written summaries${p.weeklyReadGoal ? ` — goal is ${p.weeklyReadGoal} pages/week` : ''}` }
+    gym:        { icon: '', def: 'Gym',        line: (l) => `${l.toUpperCase()}: a daily "did I do it?" habit — goal is ${p.gymDaysPerWeek || 5} days/week (builds a streak)` },
+    food:       { icon: '', def: 'Food',       line: (l) => `${l.toUpperCase()}: rated daily from 1 to 5 (quality)` },
+    networking: { icon: '', def: 'Networking', line: (l) => `${l.toUpperCase()}: a daily count — goal is ${p.weeklyNetworkGoal || 3} per week` },
+    money:      { icon: '', def: 'Income',     line: (l) => `${l.toUpperCase()}: spending is logged DAILY; income is set per ${p.incomeCadence === 'weekly' ? 'week' : 'month'}. Net (income − spending) and savings rate matter — connect spending to other pillars (e.g. stress, gym, mood) when you can.` },
+    reading:    { icon: '', def: 'Reading',    line: (l) => `${l.toUpperCase()}: pages read each day + written summaries${p.weeklyReadGoal ? ` — goal is ${p.weeklyReadGoal} pages/week` : ''}` }
   };
   const pillars = p.pillars || null;
   const active = order.filter(id => !pillars || pillars[id] == null || pillars[id].enabled !== false);
@@ -79,8 +79,8 @@ function buildSystemPrompt(p) {
 
 The user is tracking daily:
 ${lines}
-- 💧 WATER: daily hydration, tracked in gallons
-- 📔 DAILY NOTES: a short written reflection each day about how the day went
+- WATER: daily hydration, tracked in gallons
+- DAILY NOTES: a short written reflection each day about how the day went
 ${(p.nutrition && p.nutrition.age && p.nutrition.heightCm && p.nutrition.weightKg) ? `\nThey also have calculated daily nutrition targets — calories, protein/carbs/fat, and a split across ${p.nutrition.mealsPerDay || 3} meals/day (see "nutritionTargets"). They log the actual foods they eat with counted macros (see "foodsEatenToday", "caloriesEatenToday", "proteinEatenToday", and per-day "foodLog"/"eaten"). Compare what they actually ate to their targets and give specific, food-level advice.` : ''}
 ${p.jobTitle ? `\nRole: ${p.jobTitle}` : ''}${p.jobDescription ? `\nWork/life context: ${p.jobDescription}` : ''}${p.commissionRate ? `\nCommission rate: ${p.commissionRate}%` : ''}
 
@@ -397,9 +397,9 @@ app.post('/api/review', async (req, res) => {
     const client = new Anthropic({ apiKey: getApiKey() });
     const system = `You are this person's personal chief-of-staff and coach. Write their WEEKLY LIFE REVIEW from their tracking data across every area of life. Make it feel personal and earned — reference their real numbers.
 Use EXACTLY these three short markdown sections and nothing else:
-**🏆 Wins this week** — 2–3 bullets of what genuinely went well.
-**🔗 The pattern I noticed** — ONE cross-domain connection between two different areas (e.g. training↔income, reading↔focus, protein↔weight). This is the most important part.
-**🎯 Focus for next week** — ONE concrete priority phrased as a single action.
+**Wins this week** — 2–3 bullets of what genuinely went well.
+**The pattern I noticed** — ONE cross-domain connection between two different areas (e.g. training↔income, reading↔focus, protein↔weight). This is the most important part.
+**Focus for next week** — ONE concrete priority phrased as a single action.
 Rules: warm, direct, no fluff or generic filler; use their actual data. If the week is thin on data, keep it short and honest. ~120 words total. Output only the three sections.`;
     const msg = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 450, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'My tracking data:\n\n```json\n' + JSON.stringify(req.body.data, null, 2) + '\n```\n\nWrite my weekly review' + (req.body.weekLabel ? ' for the week of ' + req.body.weekLabel : '') + '.' }] });
     const review = ((msg.content && msg.content[0] && msg.content[0].text) || '').trim();
@@ -425,7 +425,7 @@ app.post('/api/push/test', requireAuth, async (req, res) => {
   try {
     const subs = (await DB.allPushSubs()).filter(s => String(s.user_id) === String(req.userId));
     let sent = 0;
-    for (const s of subs) { try { await push.sendPush(s.sub, { title: '🔔 Test notification', body: 'Push is working — see you every day!', url: './' }); sent++; } catch (e) {} }
+    for (const s of subs) { try { await push.sendPush(s.sub, { title: 'Test notification', body: 'Push is working — see you every day!', url: './' }); sent++; } catch (e) {} }
     res.json({ sent });
   } catch (e) { res.status(500).json({ error: 'Send failed' }); }
 });
@@ -592,7 +592,7 @@ app.post('/api/cron/tick', async (req, res) => {
       for (const r of (data.reminders || [])) {
         if (!push.isReminderDue(r, local.hhmm, local.date)) continue;
         for (const sub of byUser[uid]) {
-          try { await push.sendPush(sub, { title: '⏰ ' + r.label, body: 'Escalate', url: './', tag: r.id }); sent++; }
+          try { await push.sendPush(sub, { title: '' + r.label, body: 'Escalate', url: './', tag: r.id }); sent++; }
           catch (e) { if (e && (e.statusCode === 404 || e.statusCode === 410)) { try { await DB.deletePushSub(sub.endpoint); } catch {} } }
         }
         r._lastFired = local.date; if (r.date) r.enabled = false; changed = true; // one-time dated reminder is done
@@ -603,7 +603,7 @@ app.post('/api/cron/tick', async (req, res) => {
       if (push.isNudgeDue({ hhmm: local.hhmm, date: local.date, nudgeHour: profile.nudgeHour, loggedToday, lastNudge: data._lastNudge, enabled: profile.dailyNudge })) {
         const name = profile.firstName || profile.name || '';
         for (const sub of byUser[uid]) {
-          try { await push.sendPush(sub, { title: '🔥 Keep your streak alive', body: (name ? name + ', ' : '') + "you haven't logged today — it takes 30 seconds.", url: './', tag: 'daily-nudge' }); sent++; }
+          try { await push.sendPush(sub, { title: 'Keep your streak alive', body: (name ? name + ', ' : '') + "you haven't logged today — it takes 30 seconds.", url: './', tag: 'daily-nudge' }); sent++; }
           catch (e) { if (e && (e.statusCode === 404 || e.statusCode === 410)) { try { await DB.deletePushSub(sub.endpoint); } catch {} } }
         }
         data._lastNudge = local.date; changed = true;
@@ -618,7 +618,7 @@ app.post('/api/cron/tick', async (req, res) => {
       })) {
         const gap = Math.round((tn.targetP || 0) - (tn.eatenP || 0));
         for (const sub of byUser[uid]) {
-          try { await push.sendPush(sub, { title: '🥩 Protein check', body: "You're " + gap + "g short on protein today — still time for a shake or some chicken.", url: './', tag: 'protein-nudge' }); sent++; }
+          try { await push.sendPush(sub, { title: 'Protein check', body: "You're " + gap + "g short on protein today — still time for a shake or some chicken.", url: './', tag: 'protein-nudge' }); sent++; }
           catch (e) { if (e && (e.statusCode === 404 || e.statusCode === 410)) { try { await DB.deletePushSub(sub.endpoint); } catch {} } }
         }
         data._lastProteinNudge = local.date; changed = true;

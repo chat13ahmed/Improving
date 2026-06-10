@@ -101,6 +101,10 @@ body {
   background: linear-gradient(135deg, rgba(59,130,246,0.06), transparent);
 }
 .brand-icon { font-size: 28px; line-height: 1; }
+/* Emoji icons were removed — collapse any now-empty icon holders so they leave no gap */
+.brand-icon:empty, .nav-icon:empty, .pillar-icon:empty, .di-icon:empty, .ach-icon:empty,
+.empty-icon:empty, .insight-icon:empty, .api-key-icon:empty, .rbc-icon:empty, .rsc-icon:empty,
+.fb-icon:empty, .dd-icon:empty, .hyd-icon:empty, .ob-area-icon:empty, .auth-brand .brand-icon:empty { display: none; }
 .brand-title { font-size: 15px; font-weight: 800; color: var(--text); line-height: 1.2; letter-spacing: -0.3px; }
 .brand-sub { font-size: 10px; color: var(--text-muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 1.5px; }
 
@@ -1550,6 +1554,7 @@ body {
 .comm-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .comm-x { background: none; border: none; cursor: pointer; font-size: 15px; opacity: 0.6; padding: 4px 6px; border-radius: 6px; }
 .comm-x:hover { opacity: 1; background: var(--tint-3); }
+.comm-report { font-size: 12px; font-weight: 600; width: auto; }
 
 /* Meal builder (ingredient rows) */
 .ing-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; }
