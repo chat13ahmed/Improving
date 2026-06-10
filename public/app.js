@@ -1359,21 +1359,41 @@ function mealLabels(count) {
   return map[count] || Array.from({ length: count }, (_, i) => 'Meal ' + (i + 1));
 }
 
-// Healthiest split: bigger main meals, lighter snacks, with protein kept up at
-// every meal (an even-ish protein spread supports muscle synthesis). Returns a
-// per-meal plan { label, calories, protein, carbs, fat }.
-function mealCalWeight(label) { return /snack/i.test(label) ? 0.6 : 1; }
-function mealProteinWeight(label) { return /snack/i.test(label) ? 0.85 : 1; }
+// Healthiest split by meal: Breakfast ~25–30% (morning energy), Lunch ~35–40%
+// (the day's main fuel), Dinner ~30–35% (recovery, not too heavy at night),
+// snacks light. Calories + every macro follow the same share, so each meal's
+// targets are consistent and add up to the day. Returns a per-meal plan.
+function mealCalWeight(label) {
+  const l = (label || '').toLowerCase();
+  if (/breakfast/.test(l)) return 0.28;
+  if (/lunch/.test(l)) return 0.38;
+  if (/dinner/.test(l)) return 0.34;
+  if (/snack/.test(l)) return 0.12;
+  return 1; // generic "Meal N" → even share
+}
 function distributeMeals(totalCal, totalP, totalC, totalF, labels) {
   const ls = (labels && labels.length) ? labels : ['Meal 1'];
-  const cw = ls.map(mealCalWeight), pw = ls.map(mealProteinWeight);
-  const cwS = cw.reduce((a, b) => a + b, 0) || 1, pwS = pw.reduce((a, b) => a + b, 0) || 1;
+  const w = ls.map(mealCalWeight);
+  const sum = w.reduce((a, b) => a + b, 0) || 1;
   return ls.map((label, i) => {
-    const protein = Math.round(totalP * pw[i] / pwS);
-    const carbs = Math.round(totalC * cw[i] / cwS);
-    const fat = Math.round(totalF * cw[i] / cwS);
-    return { label, protein, carbs, fat, calories: Math.round(protein * 4 + carbs * 4 + fat * 9) };
+    const frac = w[i] / sum;
+    return {
+      label,
+      calories: Math.round(totalCal * frac),
+      protein: Math.round(totalP * frac),
+      carbs: Math.round(totalC * frac),
+      fat: Math.round(totalF * frac)
+    };
   });
+}
+// What to actually put on the plate at each meal (the plate method)
+function mealPlateHint(label) {
+  const l = (label || '').toLowerCase();
+  if (/breakfast/.test(l)) return '25–30g protein + fruit + whole-grain carb';
+  if (/lunch/.test(l)) return '½ plate veggies · ¼ protein · ¼ carbs';
+  if (/dinner/.test(l)) return 'Like lunch, a little lighter';
+  if (/snack/.test(l)) return 'Protein + fruit or nuts';
+  return 'Protein + veg/fruit + healthy carb + healthy fat';
 }
 
 // Compute calories (Mifflin-St Jeor BMR → TDEE → goal) and a macro split.
@@ -1465,16 +1485,19 @@ function renderMealPlan(nut) {
   if (!nut || !nut.meals || !nut.meals.plan) return '';
   const m = nut.meals;
   return '<div class="meal-plan">' +
-    '<div class="meal-plan-head">Your ' + m.count + '-meal plan — bigger mains, lighter snacks, protein kept up</div>' +
+    '<div class="meal-plan-head">Your ' + m.count + '-meal plan — lunch is the biggest (main fuel), breakfast lighter, dinner moderate</div>' +
     '<div class="meal-plan-grid">' +
     m.plan.map(function (mm) {
       return '<div class="meal-plan-card">' +
         '<div class="mpc-name">' + escapeHtml(mm.label) + '</div>' +
         '<div class="mpc-cal">' + mm.calories.toLocaleString() + ' <span>cal</span></div>' +
         '<div class="mpc-macros"><b class="mp">' + mm.protein + 'g</b> P · <b class="mc">' + mm.carbs + 'g</b> C · <b class="mf">' + mm.fat + 'g</b> F</div>' +
+        '<div class="mpc-plate">' + mealPlateHint(mm.label) + '</div>' +
         '</div>';
     }).join('') +
-    '</div></div>';
+    '</div>' +
+    '<div class="meal-plan-note">At <b>every</b> meal: a palm of <b>protein</b>, ½ plate <b>veg or fruit</b>, a fist of <b>healthy carbs</b> (rice, oats, potatoes, whole grains), a thumb of <b>healthy fats</b> (nuts, olive oil, avocado).</div>' +
+    '</div>';
 }
 function renderLogNutritionSection(eatenVal) {
   const nut = getNutrition();

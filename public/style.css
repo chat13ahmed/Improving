@@ -1567,6 +1567,9 @@ body {
 .mpc-macros { font-size: 11px; color: var(--text-muted); }
 .mpc-macros b { font-weight: 800; }
 .mpc-macros b.mp { color: var(--success); } .mpc-macros b.mc { color: var(--accent); } .mpc-macros b.mf { color: #A78BFA; }
+.mpc-plate { font-size: 11px; color: var(--text-muted); margin-top: 6px; padding-top: 5px; border-top: 1px dashed var(--border); line-height: 1.4; }
+.meal-plan-note { margin-top: 10px; font-size: 12.5px; color: var(--text-muted); line-height: 1.55; }
+.meal-plan-note b { color: var(--text); font-weight: 700; }
 
 /* Autosave indicator (Log page) */
 .autosave-status { font-size: 12.5px; font-weight: 600; color: var(--text-muted); margin-right: auto; align-self: center; opacity: 0; transition: opacity 0.2s; }

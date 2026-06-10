@@ -88,16 +88,18 @@ const bal = A.computeNutrition({ age: 30, sex: 'female', heightCm: 165, weightKg
 ok('balanced split 30/40/30', bal.protein.pct === 30 && bal.carbs.pct === 40 && bal.fat.pct === 30);
 eq('incomplete nutrition → null', A.computeNutrition({ age: 0 }), null);
 eq('mealLabels fallback length', A.mealLabels(2).length, 2);
-// Healthiest meal split (bigger mains, lighter snacks, protein kept up)
+// Healthiest meal split — Breakfast ~28%, Lunch ~38% (main fuel), Dinner ~34%, snacks light
 const _plan5 = A.distributeMeals(2100, 168, 210, 70, A.mealLabels(5)); // Breakfast, Snack, Lunch, Snack, Dinner
-ok('distribute: one entry per meal', _plan5.length === 5);
-ok('distribute: snack lighter than a main', _plan5[1].calories < _plan5[0].calories);
-ok('distribute: protein kept up in snacks', _plan5[1].protein >= _plan5[0].protein * 0.7);
-approx('distribute: protein sums ~ total', _plan5.reduce((s, m) => s + m.protein, 0), 168, 6);
-approx('distribute: calories sum ~ total', _plan5.reduce((s, m) => s + m.calories, 0), 2100, 120);
-const _plan3 = A.distributeMeals(1800, 150, 180, 60, A.mealLabels(3));
-ok('distribute: 3 mains are even', _plan3[0].calories === _plan3[1].calories && _plan3[1].calories === _plan3[2].calories);
-ok('distribute: any number of meals (8) works', A.distributeMeals(2400, 180, 240, 80, A.mealLabels(8)).length === 8);
+ok('split: one entry per meal', _plan5.length === 5);
+ok('split: snack much lighter than a main', _plan5[1].calories < _plan5[0].calories * 0.6);
+approx('split: calories sum to the day', _plan5.reduce((s, m) => s + m.calories, 0), 2100, 5);
+approx('split: protein sums to the day', _plan5.reduce((s, m) => s + m.protein, 0), 168, 5);
+const _plan3 = A.distributeMeals(2000, 150, 200, 67, ['Breakfast', 'Lunch', 'Dinner']);
+ok('split: lunch is the biggest meal', _plan3[1].calories > _plan3[0].calories && _plan3[1].calories > _plan3[2].calories);
+ok('split: breakfast is the lightest', _plan3[0].calories < _plan3[2].calories && _plan3[0].calories < _plan3[1].calories);
+ok('split: breakfast ~28% (≈560 of 2000)', Math.abs(_plan3[0].calories - 560) <= 25);
+ok('split: lunch ~38% (≈760 of 2000)', Math.abs(_plan3[1].calories - 760) <= 25);
+ok('split: any number of meals (8) works', A.distributeMeals(2400, 180, 240, 80, A.mealLabels(8)).length === 8);
 ok('computeNutrition exposes a meal plan', Array.isArray(nut.meals.plan) && nut.meals.plan.length === 5 && nut.meals.plan[0].calories > 0);
 // Saved day → per-meal grouping (history view)
 const _grp = A.groupFoodsByMeal([
