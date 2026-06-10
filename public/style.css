@@ -1556,6 +1556,23 @@ body {
 .comm-x:hover { opacity: 1; background: var(--tint-3); }
 .comm-report { font-size: 12px; font-weight: 600; width: auto; }
 
+/* Per-meal target breakdown */
+.meal-plan { margin: 2px 0 14px; }
+.meal-plan-head { font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; }
+.meal-plan-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+.meal-plan-card { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); padding: 10px 12px; }
+.mpc-name { font-size: 11px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 0.4px; }
+.mpc-cal { font-size: 18px; font-weight: 800; color: var(--text); margin: 2px 0; }
+.mpc-cal span { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.mpc-macros { font-size: 11px; color: var(--text-muted); }
+.mpc-macros b { font-weight: 800; }
+.mpc-macros b.mp { color: var(--success); } .mpc-macros b.mc { color: var(--accent); } .mpc-macros b.mf { color: #A78BFA; }
+
+/* Autosave indicator (Log page) */
+.autosave-status { font-size: 12.5px; font-weight: 600; color: var(--text-muted); margin-right: auto; align-self: center; opacity: 0; transition: opacity 0.2s; }
+.autosave-status.is-saving, .autosave-status.is-saved { opacity: 1; }
+.autosave-status.is-saved { color: var(--success); }
+
 /* Meal builder (ingredient rows) */
 .ing-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; align-items: center; }
 .ing-row input { padding: 8px; font-size: 13px; }

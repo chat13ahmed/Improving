@@ -1441,6 +1441,22 @@ function updateCaloriesRemaining() {
 }
 
 // Log-page nutrition block: targets + food logger + calories eaten + remaining
+// The daily calorie + macro target, split across the number of meals they chose
+function renderMealPlan(nut) {
+  if (!nut || !nut.meals || !nut.meals.count) return '';
+  const m = nut.meals;
+  return '<div class="meal-plan">' +
+    '<div class="meal-plan-head">Your ' + m.count + '-meal split — aim for about this each meal</div>' +
+    '<div class="meal-plan-grid">' +
+    m.labels.map(function (lbl) {
+      return '<div class="meal-plan-card">' +
+        '<div class="mpc-name">' + escapeHtml(lbl) + '</div>' +
+        '<div class="mpc-cal">' + m.calories.toLocaleString() + ' <span>cal</span></div>' +
+        '<div class="mpc-macros"><b class="mp">' + m.protein + 'g</b> P · <b class="mc">' + m.carbs + 'g</b> C · <b class="mf">' + m.fat + 'g</b> F</div>' +
+        '</div>';
+    }).join('') +
+    '</div></div>';
+}
 function renderLogNutritionSection(eatenVal) {
   const nut = getNutrition();
   if (!nut) {
@@ -1468,6 +1484,7 @@ function renderLogNutritionSection(eatenVal) {
     nut.meals.count + ' meals (~' + nut.meals.calories.toLocaleString() + ' cal each)</span>' +
     '<button type="button" class="btn-link" onclick="navigate(\'settings\')">Edit</button>' +
     '</div>' +
+    renderMealPlan(nut) +
 
     // Food logger
     '<div class="food-logger">' +
@@ -1643,7 +1660,10 @@ function persistFoodNudgeState() {
     targetP: nut ? nut.protein.g : 0,
     loggedFood: (state._foodLog || []).length > 0
   };
-  saveData();
+  // On the Log page, autosave persists the food log into today's entry too;
+  // otherwise just save the snapshot.
+  if (state.page === 'log' && document.getElementById('day-form')) scheduleAutosave();
+  else saveData();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2787,7 +2807,10 @@ function renderPrevNoteBanner() {
 // ─────────────────────────────────────────────────────────────
 function renderLogToday(editDay) {
   const isEditing = !!editDay;
-  const d = editDay || {};
+  // When not editing a past day, resume today's entry so the form shows what's
+  // already logged (and autosave updates it instead of wiping it).
+  const existingTodayEntry = !isEditing ? state.data.days.find(x => x.date === todayStr()) : null;
+  const d = editDay || existingTodayEntry || {};
   const dateVal = d.date || todayStr();
   const gymDone = d.gym?.done ?? null;  // null = not set, true/false = set
   const gymGroup = d.gym?.muscleGroup || '';
@@ -2801,9 +2824,8 @@ function renderLogToday(editDay) {
   const daySpent = (d.spent !== undefined && d.spent !== null && d.spent !== 0) ? d.spent : '';
   const waterVal = (d.water !== undefined && d.water !== null && d.water !== 0) ? d.water : '';
   const caloriesEaten = (d.calories !== undefined && d.calories !== null && d.calories !== 0) ? d.calories : '';
-  // Seed the in-progress food log from the day being edited (or today's entry)
-  const existingTodayEntry = !isEditing ? state.data.days.find(x => x.date === todayStr()) : null;
-  state._foodLog = ((d.foodLog) || (existingTodayEntry && existingTodayEntry.foodLog) || []).map(x => ({ ...x }));
+  // Seed the in-progress food log from the day being edited / today's entry
+  state._foodLog = ((d.foodLog) || []).map(x => ({ ...x }));
   const globalNotes = d.notes || '';
   // Weigh-in prefill: existing weight entry for this date (shown in the user's unit)
   const existingWeight = (state.data.weights || []).find(w => w.date === dateVal);
@@ -2862,7 +2884,7 @@ function renderLogToday(editDay) {
     '</div>' +
     editBanner + prevNoteBanner +
     '<div class="card">' +
-    '<form id="day-form" onsubmit="submitDay(event)">' +
+    '<form id="day-form" onsubmit="submitDay(event)" oninput="scheduleAutosave()" onchange="scheduleAutosave()">' +
     '<div class="form-group" style="max-width:220px">' +
     '<label>Date</label>' +
     '<input type="date" id="day-date" value="' + dateVal + '" required>' +
@@ -2976,8 +2998,9 @@ function renderLogToday(editDay) {
     '<textarea id="day-notes" rows="3" placeholder="Share everything about your day — wins, struggles, ideas, how you felt…">' + escapeHtml(globalNotes) + '</textarea></div>' +
 
     '<div class="form-actions">' +
+    '<span id="autosave-status" class="autosave-status"></span>' +
     (isEditing ? '<button type="button" class="btn btn-outline" onclick="navigate(\'history\')" style="margin-right:12px">Cancel</button>' : '') +
-    '<button type="submit" class="btn btn-primary btn-lg">' + (isEditing ? 'Update Day' : 'Save Today') + '</button>' +
+    '<button type="submit" class="btn btn-primary btn-lg">' + (isEditing ? 'Update Day' : 'Done for today') + '</button>' +
     '</div>' +
     '</form></div>';
   updateNetHint(); // show the period income − spending net summary right away
@@ -3016,6 +3039,7 @@ function setGymDone(val) {
   if (btn) { btn.classList.add('active'); btn.classList.add(val ? 'gym-yes' : 'gym-no'); }
   document.getElementById('gym-details').style.display = val ? '' : 'none';
   state._gymDone = val;
+  scheduleAutosave();
 }
 
 function setFoodRating(n) {
@@ -3023,6 +3047,7 @@ function setFoodRating(n) {
   document.querySelector('.rating-btn.r' + n)?.classList.add('sel');
   const inp = document.getElementById('food-rating');
   if (inp) inp.value = n;
+  scheduleAutosave();
 }
 
 // Water quick-fill: add the chip amount to the current gallons value
@@ -3031,19 +3056,15 @@ function setWater(gal) {
   if (!inp) return;
   const cur = parseFloat(inp.value) || 0;
   inp.value = Math.round((cur + gal) * 100) / 100;
+  if (inp.oninput) inp.oninput();
+  scheduleAutosave();
 }
 
-async function submitDay(e) {
-  e.preventDefault();
-  const date = document.getElementById('day-date').value;
-
-  // Prior entry for this date (or the one being edited). Used to PRESERVE
-  // data for pillars that are currently disabled — their fields aren't on
-  // screen, so we carry the old values over instead of zeroing them out.
-  const prior = (state._editDayId
-    ? state.data.days.find(d => d.id === state._editDayId)
-    : state.data.days.find(d => d.date === date)) || {};
-
+// Build a day entry from the current Log form. Shared by the explicit Save and
+// the silent autosave. Pillars whose sections aren't on screen keep their prior
+// values (so a disabled pillar isn't zeroed out).
+function readDayForm(date, prior) {
+  prior = prior || {};
   const gymDoneBtn = document.querySelector('.gym-btn.active');
   const gymDone = gymDoneBtn ? gymDoneBtn.classList.contains('gym-yes') : null;
   const foodEl = document.getElementById('food-rating');
@@ -3072,7 +3093,6 @@ async function submitDay(e) {
     water: document.getElementById('water-gallons') ? (parseFloat(document.getElementById('water-gallons').value) || 0) : (prior.water || 0),
     notes: document.getElementById('day-notes')?.value?.trim() || ''
   };
-
   // Food log + calories eaten (food total wins; else the manual field)
   const fLog = (state._foodLog || []);
   const fTot = foodLogTotals(fLog);
@@ -3081,66 +3101,82 @@ async function submitDay(e) {
     entry.calories = fLog.length ? Math.round(fTot.kcal) : (parseFloat(document.getElementById('calories-eaten')?.value) || 0);
     entry.eaten = fLog.length ? { protein: Math.round(fTot.p), carbs: Math.round(fTot.c), fat: Math.round(fTot.f) } : null;
   } else {
-    // nutrition not set up → preserve whatever was there
     entry.foodLog = prior.foodLog || [];
     entry.calories = prior.calories || 0;
     entry.eaten = prior.eaten || null;
   }
-
   // Reading — section is present whenever the reading pillar is on
   if (document.querySelector('.read-section')) {
     const ab = (state.data.books || []).find(b => b.status === 'reading');
-    const readPages = parseInt(document.getElementById('read-pages')?.value) || 0;
-    const readSummary = document.getElementById('read-summary')?.value?.trim() || '';
-    entry.reading = { pages: readPages, bookId: ab?.id || '', bookTitle: ab?.title || '', summary: readSummary };
+    entry.reading = { pages: parseInt(document.getElementById('read-pages')?.value) || 0, bookId: ab?.id || '', bookTitle: ab?.title || '', summary: document.getElementById('read-summary')?.value?.trim() || '' };
   } else {
     entry.reading = prior.reading || { pages: 0, bookId: '', bookTitle: '', summary: '' };
   }
+  return entry;
+}
 
-  if (state._editDayId) {
-    const idx = state.data.days.findIndex(d => d.id === state._editDayId);
-    if (idx !== -1) state.data.days[idx] = entry; else state.data.days.push(entry);
-    state._editDayId = null;
-  } else {
-    const existing = state.data.days.findIndex(d => d.date === date);
-    if (existing !== -1) {
-      if (!confirm('You already have an entry for ' + fmtDate(date) + '. Replace it?')) return;
-      state.data.days[existing] = entry;
-    } else {
-      state.data.days.push(entry);
-    }
-  }
-
-  // Save income for the period (weekly or monthly, per the user's chosen cadence)
+// Persist the current Log form (day entry + period income + weigh-in + nutrition
+// snapshot). Used by both the explicit Save and the silent autosave.
+async function commitDayFromForm() {
+  const dateEl = document.getElementById('day-date');
+  if (!dateEl) return null;
+  const date = dateEl.value;
+  const prior = (state._editDayId
+    ? state.data.days.find(d => d.id === state._editDayId)
+    : state.data.days.find(d => d.date === date)) || {};
+  const entry = readDayForm(date, prior);
+  const idx = state._editDayId
+    ? state.data.days.findIndex(d => d.id === state._editDayId)
+    : state.data.days.findIndex(d => d.date === date);
+  if (idx !== -1) state.data.days[idx] = entry; else state.data.days.push(entry);
+  // Period income (weekly/monthly, per the chosen cadence)
   const periodIncomeEl = document.getElementById('period-income');
-  if (periodIncomeEl) {
-    const cad = moneyCadence();
-    setPeriodIncome(cad, periodKeyFor(date, cad), parseFloat(periodIncomeEl.value) || 0);
-  }
-
-  // Save weigh-in (stored in kg) + keep nutrition weight current
+  if (periodIncomeEl) { const cad = moneyCadence(); setPeriodIncome(cad, periodKeyFor(date, cad), parseFloat(periodIncomeEl.value) || 0); }
+  // Weigh-in (stored in kg) + keep nutrition weight current
   const weighEl = document.getElementById('weigh-in');
   if (weighEl) {
     const wv = parseFloat(weighEl.value) || 0;
-    if (wv > 0) {
-      const kg = Math.round(displayToKg(wv) * 10) / 10;
-      upsertWeight(date, kg);
-      if (state.data.profile.nutrition && state.data.profile.nutrition.heightCm) state.data.profile.nutrition.weightKg = kg;
-    }
+    if (wv > 0) { const kg = Math.round(displayToKg(wv) * 10) / 10; upsertWeight(date, kg); if (state.data.profile.nutrition && state.data.profile.nutrition.heightCm) state.data.profile.nutrition.weightKg = kg; }
   }
-
+  // Keep the protein-nudge snapshot fresh
+  const nut = getNutrition(); const t = foodLogTotals(state._foodLog);
+  state.data._todayNutrition = { date: todayStr(), eatenP: Math.round(t.p), targetP: nut ? nut.protein.g : 0, loggedFood: (state._foodLog || []).length > 0 };
   await saveData();
+  return entry;
+}
 
-  // Check for streak milestone
-  if (entry.gym.done) {
+async function submitDay(e) {
+  e.preventDefault();
+  const wasEditing = !!state._editDayId;
+  const entry = await commitDayFromForm();
+  if (!entry) return;
+  state._editDayId = null;
+  if (entry.gym && entry.gym.done) {
     const newStreak = getGymStreak();
-    if ([3, 7, 14, 21, 30].includes(newStreak)) {
-      setTimeout(() => showStreakCelebration(newStreak), 600);
-    }
+    if ([3, 7, 14, 21, 30].includes(newStreak)) setTimeout(() => showStreakCelebration(newStreak), 600);
   }
-
-  showToast(state._editDayId ? 'Day updated! ' : 'Today logged! ', 'success');
+  showToast(wasEditing ? 'Day updated!' : 'Saved — see you tomorrow!', 'success');
   navigate('dashboard');
+}
+
+// Silent autosave while filling in the Log, so nothing is ever lost
+let _autosaveTimer = null;
+function scheduleAutosave() {
+  if (state.page !== 'log' || !document.getElementById('day-form')) return;
+  setAutosaveStatus('saving');
+  clearTimeout(_autosaveTimer);
+  _autosaveTimer = setTimeout(autosaveDay, 700);
+}
+async function autosaveDay() {
+  if (state.page !== 'log' || !document.getElementById('day-form')) return;
+  try { await commitDayFromForm(); setAutosaveStatus('saved'); }
+  catch { setAutosaveStatus(''); }
+}
+function setAutosaveStatus(s) {
+  const el = document.getElementById('autosave-status');
+  if (!el) return;
+  el.textContent = s === 'saving' ? 'Saving…' : (s === 'saved' ? '✓ Saved' : '');
+  el.className = 'autosave-status' + (s === 'saving' ? ' is-saving' : (s === 'saved' ? ' is-saved' : ''));
 }
 
 function editDay(id) {
