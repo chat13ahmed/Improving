@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -99,6 +99,14 @@ const _plan3 = A.distributeMeals(1800, 150, 180, 60, A.mealLabels(3));
 ok('distribute: 3 mains are even', _plan3[0].calories === _plan3[1].calories && _plan3[1].calories === _plan3[2].calories);
 ok('distribute: any number of meals (8) works', A.distributeMeals(2400, 180, 240, 80, A.mealLabels(8)).length === 8);
 ok('computeNutrition exposes a meal plan', Array.isArray(nut.meals.plan) && nut.meals.plan.length === 5 && nut.meals.plan[0].calories > 0);
+// Saved day → per-meal grouping (history view)
+const _grp = A.groupFoodsByMeal([
+  { name: 'Eggs', kcal: 140, p: 12, meal: 0 }, { name: 'Chicken', kcal: 330, p: 62, meal: 2 },
+  { name: 'Rice', kcal: 200, p: 4, meal: 2 }, { name: 'Toast', kcal: 90, p: 4, meal: 0 }
+]);
+ok('groupFoodsByMeal: groups only used meals', _grp.length === 2 && _grp[0].index === 0 && _grp[1].index === 2);
+ok('groupFoodsByMeal: per-meal calories sum', _grp[0].kcal === 230 && _grp[1].kcal === 530);
+ok('groupFoodsByMeal: empty → []', A.groupFoodsByMeal([]).length === 0);
 
 // Goal status (pure)
 const _wg = { kind: 'weight', start: 180, target: 170, deadline: '2026-07-10', createdAt: '2026-06-10' };

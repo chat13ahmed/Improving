@@ -4633,6 +4633,28 @@ async function finishBook(id) {
 // ─────────────────────────────────────────────────────────────
 // DAY DETAIL POPUP  (from calendar)
 // ─────────────────────────────────────────────────────────────
+// Group a saved day's food log into its meals, each with its own calories (testable)
+function groupFoodsByMeal(foodLog) {
+  const log = (foodLog || []).filter(x => x && (x.kcal || x.name));
+  if (!log.length) return [];
+  const count = log.reduce((m, x) => Math.max(m, (x.meal || 0)), 0) + 1;
+  const labels = mealLabels(Math.max(3, count));
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const foods = log.filter(x => (x.meal || 0) === i);
+    if (!foods.length) continue;
+    const t = foodLogTotals(foods);
+    out.push({ index: i, label: labels[i] || ('Meal ' + (i + 1)), kcal: Math.round(t.kcal), p: Math.round(t.p), foods });
+  }
+  return out;
+}
+function foodLogMealSummary(foodLog) {
+  return groupFoodsByMeal(foodLog).map(g =>
+    '<div class="dd-meal"><div class="dd-meal-top"><span class="dd-meal-name">' + escapeHtml(g.label) + '</span>' +
+    '<span class="dd-meal-cal">' + g.kcal.toLocaleString() + ' cal · ' + g.p + 'g P</span></div>' +
+    '<div class="dd-meal-foods">' + g.foods.map(x => escapeHtml(x.name) + ' <span>' + x.kcal + '</span>').join(' · ') + '</div></div>'
+  ).join('');
+}
 function showDayDetail(dateStr) {
   const day = state.data.days.find(d => d.date === dateStr);
   if (!day) { navigate('log'); return; }
@@ -4687,7 +4709,7 @@ function showDayDetail(dateStr) {
     '<span class="dd-icon"></span><div>' +
     '<div class="dd-label" style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px">Calories eaten</div>' +
     '<div class="dd-label">' + calLabel + '</div>' +
-    (foodsNote ? '<div class="dd-notes">' + escapeHtml(foodsNote) + '</div>' : '') +
+    ((day.foodLog && day.foodLog.length) ? '<div class="dd-meals">' + foodLogMealSummary(day.foodLog) + '</div>' : '') +
     '</div></div>' +
     '</div>' +
     (day.notes ? '<div class="dd-global-notes">' + escapeHtml(day.notes) + '</div>' : '') +
