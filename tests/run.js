@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -88,6 +88,20 @@ const bal = A.computeNutrition({ age: 30, sex: 'female', heightCm: 165, weightKg
 ok('balanced split 30/40/30', bal.protein.pct === 30 && bal.carbs.pct === 40 && bal.fat.pct === 30);
 eq('incomplete nutrition → null', A.computeNutrition({ age: 0 }), null);
 eq('mealLabels fallback length', A.mealLabels(2).length, 2);
+
+// Goal status (pure)
+const _wg = { kind: 'weight', start: 180, target: 170, deadline: '2026-07-10', createdAt: '2026-06-10' };
+const _gs = A.goalStatus(_wg, 175, Date.parse('2026-06-25T12:00:00'));
+ok('goalStatus weight halfway + on track', _gs.pct === 50 && _gs.reached === false && _gs.onTrack === true);
+ok('goalStatus reached', A.goalStatus({ kind: 'savings', start: 0, target: 1000 }, 1000, Date.now()).reached === true);
+ok('goalStatus behind pace', A.goalStatus(_wg, 178, Date.parse('2026-06-25T12:00:00')).onTrack === false);
+ok('goalStatus no goal → null', A.goalStatus(null, 0, Date.now()) === null);
+// Next step (pure)
+ok('nextStep: log when not logged', A.pickNextStep({ loggedToday: false }).title === 'Log today');
+ok('nextStep: protein gap', /short on protein/.test(A.pickNextStep({ loggedToday: true, nutOn: true, anyFood: true, proteinLeft: 42 }).title));
+ok('nextStep: gym when untrained', /trained/.test(A.pickNextStep({ loggedToday: true, nutOn: true, anyFood: true, proteinLeft: 5, gymOn: true, gymDone: false }).title));
+ok('nextStep: goal reached wins', /reached your goal/.test(A.pickNextStep({ goalReached: true, loggedToday: false }).title));
+ok('nextStep: on-track fallback', /on track/.test(A.pickNextStep({ loggedToday: true, nutOn: true, anyFood: true, proteinLeft: 5, gymOn: true, gymDone: true }).title));
 
 // Food DB + macros (the banana + 80g rice + 120g chicken example)
 const banana = A.findFood('banana'), rice = A.findFood('rice, white'), chicken = A.findFood('chicken breast');

@@ -2593,6 +2593,203 @@ function pillarCardHtml(id, ctx) {
   return '';
 }
 
+// ─────────────────────────────────────────────────────────────
+// GOAL — one thing to work toward; the app shows progress + pace
+// ─────────────────────────────────────────────────────────────
+function currentGoalValue(goal) {
+  if (!goal) return 0;
+  if (goal.kind === 'weight') {
+    const ws = (state.data.weights || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+    return ws.length ? Math.round(kgToDisplay(ws[0].kg) * 10) / 10 : (+goal.start || 0);
+  }
+  if (goal.kind === 'savings') return getMoneyCircle().savedTotal;
+  if (goal.kind === 'streak') return loggingStreak();
+  return +goal.current || 0; // custom
+}
+// Pure: progress + pace for a goal (testable). current is supplied by the caller.
+function goalStatus(goal, current, todayMs) {
+  if (!goal || goal.target == null) return null;
+  const start = +goal.start || 0, target = +goal.target, total = target - start, done = current - start;
+  const pct = total === 0 ? (current >= target ? 100 : 0) : Math.max(0, Math.min(100, Math.round(done / total * 100)));
+  const reached = total >= 0 ? current >= target : current <= target;
+  const remaining = target - current;
+  let daysLeft = null, onTrack = true, expectedPct = null;
+  if (goal.deadline) {
+    const dMs = Date.parse(goal.deadline + 'T23:59:59');
+    daysLeft = Math.max(0, Math.ceil((dMs - todayMs) / 86400000));
+    const createdMs = Date.parse((goal.createdAt || goal.deadline) + 'T00:00:00');
+    const totalDays = Math.max(1, Math.round((dMs - createdMs) / 86400000));
+    const elapsed = Math.max(0, Math.min(totalDays, Math.round((todayMs - createdMs) / 86400000)));
+    expectedPct = Math.round(elapsed / totalDays * 100);
+    onTrack = reached || pct >= expectedPct - 5;
+  }
+  return { pct, reached, remaining, daysLeft, onTrack, expectedPct };
+}
+function goalPaceLine(goal, s) {
+  if (!s) return '';
+  if (s.reached) return 'You hit it — set a new goal to keep the momentum.';
+  const rem = Math.abs(s.remaining);
+  const wk = (s.daysLeft && s.daysLeft > 0) ? rem / s.daysLeft * 7 : null;
+  if (goal.kind === 'weight') {
+    const dir = (goal.target < goal.start) ? 'to lose' : 'to gain';
+    return (Math.round(rem * 10) / 10) + ' ' + (goal.unit || 'lb') + ' ' + dir + (wk ? ' · about ' + (Math.round(wk * 10) / 10) + ' ' + (goal.unit || 'lb') + '/week to hit your date' : '');
+  }
+  if (goal.kind === 'savings') return formatCurrency(rem) + ' to go' + (wk ? ' · save ~' + formatCurrency(Math.round(wk)) + '/week to stay on pace' : '');
+  if (goal.kind === 'streak') return rem + ' more day' + (rem === 1 ? '' : 's') + ' in a row — log today to keep it going';
+  return (Math.round(rem * 10) / 10) + (goal.unit ? ' ' + goal.unit : '') + ' to go';
+}
+function renderGoalCard() {
+  const goal = state.data.profile && state.data.profile.goal;
+  if (!goal || goal.target == null) {
+    return '<div class="card goal-card goal-empty">' +
+      '<div><div class="goal-empty-title">Set your goal</div>' +
+      '<div class="goal-empty-sub">Pick one thing to work toward — Escalate guides you there and shows your pace.</div></div>' +
+      '<button type="button" class="btn btn-primary btn-sm" onclick="openGoalForm()">Set a goal</button></div>';
+  }
+  const cur = currentGoalValue(goal);
+  const s = goalStatus(goal, cur, Date.now());
+  const unit = goal.unit || '';
+  const fmt = v => unit === '$' ? formatCurrency(v) : (Math.round(v * 10) / 10) + (unit && unit !== '$' ? ' ' + unit : '');
+  const chip = s.reached ? '<span class="goal-chip done">Goal reached</span>'
+    : (s.daysLeft != null ? (s.onTrack ? '<span class="goal-chip ok">On track</span>' : '<span class="goal-chip behind">Behind pace</span>') : '');
+  const barColor = s.reached ? 'var(--success)' : (s.onTrack ? 'var(--primary)' : 'var(--warning)');
+  return '<div class="card goal-card">' +
+    '<div class="goal-head"><div class="goal-title">' + escapeHtml(goal.title) + '</div>' + chip + '</div>' +
+    '<div class="goal-bar-lg"><div class="goal-bar-lg-fill" style="width:' + s.pct + '%;background:' + barColor + '"></div></div>' +
+    '<div class="goal-meta"><span><b>' + fmt(cur) + '</b> of ' + fmt(goal.target) + '</span>' +
+    (s.daysLeft != null ? '<span>' + (s.daysLeft === 0 ? 'due today' : s.daysLeft + ' days left') + '</span>' : '') + '</div>' +
+    '<div class="goal-pace">' + goalPaceLine(goal, s) + '</div>' +
+    '<div class="goal-actions">' +
+    (goal.kind === 'custom' ? '<button type="button" class="btn-link" onclick="updateGoalProgress()">Update progress</button>' : '') +
+    '<button type="button" class="btn-link" onclick="openGoalForm()">Edit goal</button>' +
+    '<button type="button" class="btn-link" onclick="clearGoal()">Remove</button>' +
+    '</div></div>';
+}
+function goalKindChanged() {
+  const k = document.getElementById('goal-kind').value;
+  const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
+  show('goal-start-wrap', k === 'weight' || k === 'custom');
+  show('goal-unit-wrap', k === 'custom');
+  const tl = document.getElementById('goal-target-label');
+  if (tl) tl.textContent = k === 'savings' ? 'Target amount ($)' : k === 'streak' ? 'Target streak (days)' : k === 'weight' ? 'Target weight (' + (weightUnitPref() === 'lbs' ? 'lb' : 'kg') + ')' : 'Target number';
+  const sl = document.getElementById('goal-start-label');
+  if (sl) sl.textContent = k === 'weight' ? 'Current weight' : 'Starting value';
+}
+function openGoalForm() {
+  document.getElementById('goal-modal')?.remove();
+  const g = (state.data.profile && state.data.profile.goal) || {};
+  const latestW = (state.data.weights || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+  const curW = latestW ? Math.round(kgToDisplay(latestW.kg) * 10) / 10 : '';
+  const opt = (v, lbl) => '<option value="' + v + '"' + (g.kind === v ? ' selected' : '') + '>' + lbl + '</option>';
+  const modal = document.createElement('div');
+  modal.id = 'goal-modal'; modal.className = 'modal-overlay';
+  modal.innerHTML =
+    '<div class="modal-box" style="max-width:440px;text-align:left">' +
+    '<div class="modal-badge">Your goal</div>' +
+    '<p style="font-size:14px;color:var(--text-muted);margin-bottom:16px">One thing to work toward — we track your pace and tell you what to do each day.</p>' +
+    '<div class="form-group"><label>Goal type</label><select id="goal-kind" onchange="goalKindChanged()">' +
+    opt('weight', 'Reach a weight') + opt('savings', 'Save money') + opt('streak', 'Build a logging streak') + opt('custom', 'Custom goal') + '</select></div>' +
+    '<div class="form-group"><label>Name <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label><input type="text" id="goal-title" maxlength="60" placeholder="e.g. Summer cut" value="' + escapeAttr(g.title || '') + '"></div>' +
+    '<div class="form-group" id="goal-start-wrap"><label id="goal-start-label">Current weight</label><input type="number" id="goal-current-start" step="0.1" value="' + (g.start != null ? g.start : curW) + '"></div>' +
+    '<div class="form-group" id="goal-unit-wrap" style="display:none"><label>Unit</label><input type="text" id="goal-unit" maxlength="12" placeholder="e.g. books, miles" value="' + escapeAttr(g.unit || '') + '"></div>' +
+    '<div class="form-group"><label id="goal-target-label">Target</label><input type="number" id="goal-target" step="0.1" placeholder="e.g. 165" value="' + (g.target != null ? g.target : '') + '"></div>' +
+    '<div class="form-group"><label>By when <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label><input type="date" id="goal-deadline" value="' + (g.deadline || '') + '"></div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">' +
+    '<button class="btn btn-outline" onclick="document.getElementById(\'goal-modal\').remove()">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="saveGoal()">Save goal</button></div>' +
+    '</div>';
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  goalKindChanged();
+}
+async function saveGoal() {
+  const num = id => parseFloat(document.getElementById(id)?.value);
+  const kind = document.getElementById('goal-kind').value;
+  const target = num('goal-target');
+  if (isNaN(target)) { showToast('Enter a target number.', 'error'); return; }
+  let title = (document.getElementById('goal-title').value || '').trim();
+  const deadline = document.getElementById('goal-deadline').value || '';
+  const goal = { id: uid(), kind, target, deadline, createdAt: todayStr() };
+  if (kind === 'weight') { goal.unit = weightUnitPref() === 'lbs' ? 'lb' : 'kg'; goal.start = num('goal-current-start') || target; if (!title) title = 'Reach ' + target + ' ' + goal.unit; }
+  else if (kind === 'savings') { goal.unit = '$'; goal.start = getMoneyCircle().savedTotal; if (!title) title = 'Save ' + formatCurrency(target); }
+  else if (kind === 'streak') { goal.unit = 'days'; goal.start = 0; if (!title) title = target + '-day streak'; }
+  else { goal.unit = (document.getElementById('goal-unit').value || '').trim(); goal.start = num('goal-current-start') || 0; goal.current = goal.start; if (!title) title = 'My goal'; }
+  goal.title = title.slice(0, 60);
+  state.data.profile = state.data.profile || {};
+  state.data.profile.goal = goal;
+  await saveData();
+  document.getElementById('goal-modal')?.remove();
+  showToast('Goal set — let\'s get after it.', 'success');
+  if (state.page === 'dashboard') renderDashboard();
+}
+async function clearGoal() {
+  if (!confirm('Remove your goal?')) return;
+  if (state.data.profile) delete state.data.profile.goal;
+  await saveData();
+  showToast('Goal removed.', 'success');
+  if (state.page === 'dashboard') renderDashboard();
+}
+async function updateGoalProgress() {
+  const g = state.data.profile && state.data.profile.goal; if (!g) return;
+  const v = prompt('Update your progress (' + (g.unit || '') + '):', g.current != null ? g.current : g.start);
+  if (v == null) return;
+  g.current = parseFloat(v) || 0;
+  await saveData();
+  showToast('Progress updated.', 'success');
+  if (state.page === 'dashboard') renderDashboard();
+}
+
+// ─────────────────────────────────────────────────────────────
+// NEXT STEP — the single most important thing to do right now
+// ─────────────────────────────────────────────────────────────
+// Pure: pick the one next action from a snapshot of signals (testable)
+function pickNextStep(s) {
+  if (s.goalReached) return { tone: 'good', title: 'You reached your goal!', sub: 'Huge. Set your next one to keep climbing.', ctaLabel: 'Set a new goal', ctaAction: 'openGoalForm()' };
+  if (!s.loggedToday) return { title: 'Log today', sub: 'Takes 30 seconds — keep your streak alive and your data honest.', ctaLabel: 'Log today', ctaAction: "navigate('log')" };
+  if (s.nutOn && s.anyFood && s.proteinLeft != null && s.proteinLeft >= 30) return { title: "You're " + s.proteinLeft + 'g short on protein', sub: (s.emptyMeal ? 'Make ' + s.emptyMeal.toLowerCase() + ' protein-heavy' : 'Add a protein-heavy bite') + ' — chicken, eggs, Greek yogurt, or a shake.', ctaLabel: 'Log food', ctaAction: "navigate('log')" };
+  if (s.gymOn && !s.gymDone) return { title: "Haven't trained yet today", sub: 'Even 20 minutes counts — log it when you do.', ctaLabel: 'Open log', ctaAction: "navigate('log')" };
+  if (s.nutOn && s.emptyMeal) return { title: 'Log your ' + s.emptyMeal.toLowerCase(), sub: 'Keep your meals on track for the day.', ctaLabel: 'Log food', ctaAction: "navigate('log')" };
+  if (s.moneyOn && s.moneyOver) return { tone: 'warn', title: "You're over budget this period", sub: 'Spending has passed your income — ease off where you can.', ctaLabel: 'See money', ctaAction: "navigate('log')" };
+  if (s.goalBehind) return { tone: 'warn', title: 'Behind on "' + (s.goalTitle || 'your goal') + '"', sub: 'Pick one action today that moves it forward.', ctaLabel: 'View goal', ctaAction: 'openGoalForm()' };
+  return { tone: 'good', title: "You're on track today", sub: 'Logged and on pace — keep the chain going.', ctaLabel: '', ctaAction: '' };
+}
+function renderNextStep() {
+  if (!state.data || !state.data.days) return '';
+  const today = state.data.days.find(d => d.date === todayStr());
+  const nut = getNutrition();
+  const fLog = (today && today.foodLog) || [];
+  const eaten = foodLogTotals(fLog);
+  const goal = state.data.profile && state.data.profile.goal;
+  const gStat = goal ? goalStatus(goal, currentGoalValue(goal), Date.now()) : null;
+  let emptyMeal = null;
+  if (nut && nut.meals && fLog.length) {
+    const count = nut.meals.count;
+    for (let i = 0; i < count; i++) { if (!fLog.some(x => Math.min(Math.max(0, x.meal || 0), count - 1) === i)) { emptyMeal = nut.meals.labels[i]; break; } }
+  }
+  const mc = getMoneyCircle();
+  const step = pickNextStep({
+    loggedToday: !!today,
+    goalReached: !!(gStat && gStat.reached),
+    goalBehind: !!(gStat && gStat.daysLeft != null && !gStat.onTrack),
+    goalTitle: goal && goal.title,
+    nutOn: !!nut,
+    proteinLeft: nut ? Math.round(nut.protein.g - eaten.p) : null,
+    anyFood: fLog.length > 0,
+    emptyMeal,
+    gymOn: isPillarOn('gym'),
+    gymDone: !!(today && today.gym && today.gym.done),
+    moneyOn: isPillarOn('money'),
+    moneyOver: mc.available > 0 && mc.spent > mc.available
+  });
+  if (!step) return '';
+  return '<div class="card nextstep ' + (step.tone || '') + '">' +
+    '<div class="ns-label">Your next step</div>' +
+    '<div class="ns-title">' + escapeHtml(step.title) + '</div>' +
+    (step.sub ? '<div class="ns-sub">' + escapeHtml(step.sub) + '</div>' : '') +
+    (step.ctaLabel ? '<button type="button" class="btn btn-primary btn-sm ns-cta" onclick="' + step.ctaAction + '">' + escapeHtml(step.ctaLabel) + '</button>' : '') +
+    '</div>';
+}
+
 function renderDashboard() {
   const { days, weeks, profile } = state.data;
   const stats = getWeekStats();
@@ -2725,6 +2922,7 @@ function renderDashboard() {
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p></div>' +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">Share my week</button>' : '') +
     '</div>' +
+    renderNextStep() + renderGoalCard() +
     renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard() + renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderMoneyCircleCard() + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
 
   setTimeout(animateCounters, 120);
