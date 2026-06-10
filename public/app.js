@@ -3906,13 +3906,51 @@ function renderCoachPage() {
     '<p class="page-sub">Powered by Claude — your personal life & income coach</p></div>' +
     keyBanner +
     '<div class="insights-grid">' + cards + '</div>' +
-    '<div class="card custom-question-card">' +
-    '<h3 class="card-title">Ask Anything</h3>' +
-    '<p class="card-sub">Ask your coach anything — "How do I stay consistent at the gym?", "What side business fits my skills?", "Why is my income inconsistent?", "How do I meet more people?"</p>' +
-    '<div class="form-group"><textarea id="custom-question" rows="3" placeholder="Type your question here…"></textarea></div>' +
-    '<button class="btn btn-primary" onclick="runCustomAnalysis()"' + (!state.hasApiKey ? ' disabled' : '') + '>Ask Coach</button>' +
-    '<div class="insight-result hidden" id="result-custom"></div>' +
-    '</div>';
+    '<div class="card coach-chat-card">' +
+    '<h3 class="card-title">Chat with your coach</h3>' +
+    '<p class="card-sub">It knows all your data and your goal. Ask anything — "what should I eat tonight to hit my macros?", "am I on track for my goal?", "why is my income inconsistent?"</p>' +
+    '<div id="coach-thread" class="coach-thread">' + renderChatThread() + '</div>' +
+    '<div class="coach-input-row">' +
+    '<textarea id="chat-input" rows="1" placeholder="Message your coach…"' + (!state.hasApiKey ? ' disabled' : '') + ' onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>' +
+    '<button class="btn btn-primary" onclick="sendChat()"' + (!state.hasApiKey ? ' disabled' : '') + '>Send</button>' +
+    '</div></div>';
+}
+
+// ── Conversational coach (chat thread, in-memory) ──
+function renderChatThread() {
+  const chat = state._chat || [];
+  if (!chat.length && !state._chatBusy) {
+    return '<div class="coach-empty">Your coach has all your numbers and your goal. Ask it anything to get started.</div>';
+  }
+  return chat.map(m => '<div class="chat-msg ' + (m.role === 'user' ? 'chat-user' : 'chat-bot') + '">' +
+    (m.role === 'user' ? escapeHtml(m.content) : renderMarkdown(m.content)) + '</div>').join('') +
+    (state._chatBusy ? '<div class="chat-msg chat-bot chat-typing"><span></span><span></span><span></span></div>' : '');
+}
+function refreshChatThread() {
+  const el = document.getElementById('coach-thread');
+  if (el) { el.innerHTML = renderChatThread(); el.scrollTop = el.scrollHeight; }
+}
+async function sendChat() {
+  const inp = document.getElementById('chat-input');
+  const text = (inp && inp.value || '').trim();
+  if (!text || state._chatBusy) return;
+  if (!state.hasApiKey) { showToast('Add your Claude API key in Settings to chat.', 'error'); return; }
+  state._chat = state._chat || [];
+  state._chat.push({ role: 'user', content: text });
+  if (inp) inp.value = '';
+  state._chatBusy = true;
+  refreshChatThread();
+  try {
+    const res = await fetch('/api/chat', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ messages: state._chat, data: enrichedData() }) });
+    const j = await res.json().catch(() => ({}));
+    state._chatBusy = false;
+    if (!res.ok) state._chat.push({ role: 'assistant', content: j.error === 'NO_KEY' ? 'Add your Claude API key in Settings to chat with your coach.' : (j.error || 'Something went wrong — try again.') });
+    else state._chat.push({ role: 'assistant', content: j.reply || 'Hmm — try rephrasing that.' });
+  } catch {
+    state._chatBusy = false;
+    state._chat.push({ role: 'assistant', content: 'Could not reach your coach — check your connection.' });
+  }
+  refreshChatThread();
 }
 
 // ─────────────────────────────────────────────────────────────

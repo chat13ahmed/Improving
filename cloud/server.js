@@ -325,6 +325,32 @@ app.post('/api/analyze-stream', async (req, res) => {
   } catch (e) { if (!aborted) { res.write(`data: ${JSON.stringify({ error: e.message || 'Analysis failed' })}\n\n`); res.end(); } }
 });
 
+// ── Conversational coach: multi-turn chat with their data as cached context ──
+app.post('/api/chat', async (req, res) => {
+  if (!aiGuard(req, res)) return;
+  try {
+    const data = req.body.data || {};
+    const msgs = (Array.isArray(req.body.messages) ? req.body.messages : [])
+      .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+      .slice(-12)
+      .map(m => ({ role: m.role, content: m.content.slice(0, 4000) }));
+    if (!msgs.length || msgs[msgs.length - 1].role !== 'user') return res.status(400).json({ error: 'Ask a question first.' });
+    const client = new Anthropic({ apiKey: getApiKey() });
+    const sys = buildSystemPrompt(data.profile || {}) +
+      '\n\nYou are now in a back-and-forth CHAT with this person. Keep replies short and conversational (2–5 sentences, or a tight list) unless they ask for depth. Be specific to their real numbers and goal. Do NOT add a "Your Next 3 Actions" footer here — just answer naturally.';
+    const msg = await client.messages.create({
+      model: 'claude-sonnet-4-6', max_tokens: 1024,
+      system: [
+        { type: 'text', text: sys },
+        { type: 'text', text: 'The person\'s current tracking data (for context):\n\n```json\n' + JSON.stringify(data, null, 2) + '\n```', cache_control: { type: 'ephemeral' } }
+      ],
+      messages: msgs
+    });
+    const reply = (msg.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    res.json({ reply: reply || 'Sorry — try rephrasing that.' });
+  } catch (e) { res.status(500).json({ error: e.message || 'Coach is unavailable right now.' }); }
+});
+
 app.post('/api/estimate-food', async (req, res) => {
   if (!aiGuard(req, res)) return;
   const description = String(req.body.description || '').trim();
