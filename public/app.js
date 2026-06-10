@@ -4090,7 +4090,14 @@ function enrichedData() {
   const eatenDays = days.filter(d => d.calories > 0);
   return {
     profile, ideas,
-    nutritionTargets: nut ? { calories: nut.calories, proteinG: nut.protein.g, carbsG: nut.carbs.g, fatG: nut.fat.g, goal: nut.goal, strategy: nut.strategy, mealsPerDay: nut.meals.count, perMealCalories: nut.meals.calories } : null,
+    nutritionTargets: nut ? {
+      calories: nut.calories, proteinG: nut.protein.g, carbsG: nut.carbs.g, fatG: nut.fat.g,
+      goal: nut.goal, strategy: nut.strategy, mealsPerDay: nut.meals.count,
+      // per-meal targets (breakfast ~28%, lunch ~38%, dinner ~34%) + what to put on the plate
+      mealPlan: (nut.meals.plan || []).map(m => ({ meal: m.label, calories: m.calories, proteinG: m.protein, carbsG: m.carbs, fatG: m.fat, plate: mealPlateHint(m.label) }))
+    } : null,
+    mealsEatenToday: groupFoodsByMeal(state.data.days.find(d => d.date === todayStr())?.foodLog || [])
+      .map(g => ({ meal: g.label, calories: g.kcal, proteinG: g.p, foods: g.foods.map(f => f.name) })),
     caloriesEatenToday: state.data.days.find(d => d.date === todayStr())?.calories || 0,
     proteinEatenToday: state.data.days.find(d => d.date === todayStr())?.eaten?.protein || 0,
     foodsEatenToday: (state.data.days.find(d => d.date === todayStr())?.foodLog || []).map(x => x.name + ' (' + x.grams + 'g)'),
