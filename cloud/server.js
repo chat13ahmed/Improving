@@ -433,6 +433,15 @@ app.post('/api/push/test', requireAuth, async (req, res) => {
 // ── Community Meals (user-shared, copyable; deliberately NOT merged into the
 // verified food database — they're a browsable library you copy into your own
 // meals, so a bad entry can never silently poison anyone's macro math) ──
+// Accept only a small, compressed image data URL (the client downscales before
+// upload). Anything else — wrong format, or too big for the DB — is dropped, so
+// the share still succeeds without a photo. ~160 KB ceiling keeps the feed light.
+function cleanPhoto(p) {
+  const s = String(p || '');
+  if (!/^data:image\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(s)) return '';
+  if (s.length > 160000) return '';
+  return s;
+}
 function cleanMeal(b) {
   const num = (x, max) => Math.max(0, Math.min(max, Math.round(Number(x) || 0)));
   // Ingredients (a recipe breakdown). When present, the meal's totals are the
@@ -457,7 +466,7 @@ function cleanMeal(b) {
   return {
     name: String(b.name || '').trim().slice(0, 80), kcal, p, c, f,
     servings: Math.max(1, Math.min(50, Math.round(Number(b.servings) || 1))),
-    notes: String(b.notes || '').trim().slice(0, 500), ingredients
+    notes: String(b.notes || '').trim().slice(0, 500), ingredients, photo: cleanPhoto(b.photo)
   };
 }
 app.get('/api/community/meals', requireAuth, async (req, res) => {
@@ -466,7 +475,7 @@ app.get('/api/community/meals', requireAuth, async (req, res) => {
     res.json({ meals: rows.map(m => ({
       id: m.id, name: m.name, kcal: m.kcal, p: m.p, c: m.c, f: m.f, servings: m.servings,
       notes: m.notes || '', ingredients: Array.isArray(m.ingredients) ? m.ingredients : [],
-      uses: m.uses || 0, author: m.author_name || 'Someone',
+      photo: m.photo || '', uses: m.uses || 0, author: m.author_name || 'Someone',
       mine: String(m.user_id) === String(req.userId)
     })) });
   } catch (e) { res.status(500).json({ error: 'Could not load community meals' }); }

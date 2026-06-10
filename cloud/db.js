@@ -57,11 +57,12 @@ function sqliteImpl() {
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
         author_name TEXT, name TEXT NOT NULL,
         kcal REAL DEFAULT 0, p REAL DEFAULT 0, c REAL DEFAULT 0, f REAL DEFAULT 0,
-        servings INTEGER DEFAULT 1, notes TEXT, ingredients TEXT,
+        servings INTEGER DEFAULT 1, notes TEXT, ingredients TEXT, photo TEXT,
         uses INTEGER DEFAULT 0, flags INTEGER DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now'))
       )`);
       try { db.exec('ALTER TABLE shared_meals ADD COLUMN ingredients TEXT'); } catch {} // migrate older DBs
+      try { db.exec('ALTER TABLE shared_meals ADD COLUMN photo TEXT'); } catch {}
     },
     async createUser(u) {
       const r = db.prepare('INSERT INTO users(username,email,phone,pw_salt,pw_hash,sec_question,sec_salt,sec_hash) VALUES(?,?,?,?,?,?,?,?)')
@@ -99,13 +100,13 @@ function sqliteImpl() {
     async allUserData() { return db.prepare('SELECT user_id, data FROM user_data').all().map(r => ({ user_id: r.user_id, data: JSON.parse(r.data) })); },
     // ── Community meals ──
     async createSharedMeal(m) {
-      const r = db.prepare('INSERT INTO shared_meals(user_id,author_name,name,kcal,p,c,f,servings,notes,ingredients) VALUES(?,?,?,?,?,?,?,?,?,?)')
-        .run(m.user_id, m.author_name || null, m.name, m.kcal || 0, m.p || 0, m.c || 0, m.f || 0, m.servings || 1, m.notes || null, JSON.stringify(m.ingredients || []));
+      const r = db.prepare('INSERT INTO shared_meals(user_id,author_name,name,kcal,p,c,f,servings,notes,ingredients,photo) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+        .run(m.user_id, m.author_name || null, m.name, m.kcal || 0, m.p || 0, m.c || 0, m.f || 0, m.servings || 1, m.notes || null, JSON.stringify(m.ingredients || []), m.photo || null);
       return Number(r.lastInsertRowid);
     },
     async listSharedMeals(qstr) {
       const ql = (qstr || '').toLowerCase();
-      return db.prepare(`SELECT id,user_id,author_name,name,kcal,p,c,f,servings,notes,ingredients,uses,flags,created_at
+      return db.prepare(`SELECT id,user_id,author_name,name,kcal,p,c,f,servings,notes,ingredients,photo,uses,flags,created_at
         FROM shared_meals WHERE flags < 5 AND (? = '' OR lower(name) LIKE ?)
         ORDER BY uses DESC, id DESC LIMIT 120`).all(ql, '%' + ql + '%')
         .map(r => ({ ...r, ingredients: safeJsonArray(r.ingredients) }));
@@ -137,8 +138,9 @@ function pgImpl() {
                endpoint TEXT UNIQUE NOT NULL, sub JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT now())`);
       await q(`CREATE TABLE IF NOT EXISTS shared_meals (id BIGSERIAL PRIMARY KEY, user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
                author_name TEXT, name TEXT NOT NULL, kcal REAL DEFAULT 0, p REAL DEFAULT 0, c REAL DEFAULT 0, f REAL DEFAULT 0,
-               servings INTEGER DEFAULT 1, notes TEXT, ingredients TEXT, uses INTEGER DEFAULT 0, flags INTEGER DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now())`);
+               servings INTEGER DEFAULT 1, notes TEXT, ingredients TEXT, photo TEXT, uses INTEGER DEFAULT 0, flags INTEGER DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now())`);
       await q('ALTER TABLE shared_meals ADD COLUMN IF NOT EXISTS ingredients TEXT'); // migrate older DBs
+      await q('ALTER TABLE shared_meals ADD COLUMN IF NOT EXISTS photo TEXT');
     },
     async createUser(u) {
       const r = await q('INSERT INTO users(username,email,phone,pw_salt,pw_hash,sec_question,sec_salt,sec_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
@@ -170,13 +172,13 @@ function pgImpl() {
     async allUserData() { const r = await q('SELECT user_id, data FROM user_data', []); return r.rows.map(x => ({ user_id: x.user_id, data: x.data })); },
     // ── Community meals ──
     async createSharedMeal(m) {
-      const r = await q('INSERT INTO shared_meals(user_id,author_name,name,kcal,p,c,f,servings,notes,ingredients) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id',
-        [m.user_id, m.author_name || null, m.name, m.kcal || 0, m.p || 0, m.c || 0, m.f || 0, m.servings || 1, m.notes || null, JSON.stringify(m.ingredients || [])]);
+      const r = await q('INSERT INTO shared_meals(user_id,author_name,name,kcal,p,c,f,servings,notes,ingredients,photo) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id',
+        [m.user_id, m.author_name || null, m.name, m.kcal || 0, m.p || 0, m.c || 0, m.f || 0, m.servings || 1, m.notes || null, JSON.stringify(m.ingredients || []), m.photo || null]);
       return r.rows[0].id;
     },
     async listSharedMeals(qstr) {
       const ql = (qstr || '').toLowerCase();
-      const r = await q(`SELECT id,user_id,author_name,name,kcal,p,c,f,servings,notes,ingredients,uses,flags,created_at
+      const r = await q(`SELECT id,user_id,author_name,name,kcal,p,c,f,servings,notes,ingredients,photo,uses,flags,created_at
         FROM shared_meals WHERE flags < 5 AND ($1 = '' OR lower(name) LIKE $2)
         ORDER BY uses DESC, id DESC LIMIT 120`, [ql, '%' + ql + '%']);
       return r.rows.map(x => ({ ...x, ingredients: safeJsonArray(x.ingredients) }));

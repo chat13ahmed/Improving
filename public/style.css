@@ -1562,6 +1562,15 @@ body {
 .comm-recipe li { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
 .comm-recipe li b { color: var(--text); }
 .ing-amt-tag { font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 6px; }
+/* Meal photos */
+.mm-photo { margin-top: 12px; }
+.mm-photo-btn { display: inline-flex; align-items: center; cursor: pointer; }
+.mm-photo-preview { display: flex; align-items: center; gap: 12px; }
+.mm-photo-preview img { width: 72px; height: 72px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+.comm-photo { width: 56px; height: 56px; object-fit: cover; border-radius: var(--radius-sm); flex-shrink: 0; align-self: flex-start; }
+.meal-chip-text { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.meal-chip.has-photo { flex-direction: row; align-items: center; gap: 8px; padding: 6px 13px 6px 6px; }
+.meal-chip-img { width: 34px; height: 34px; object-fit: cover; border-radius: 9px; flex-shrink: 0; }
 
 @media (max-width: 640px) {
   .food-item { grid-template-columns: 1fr auto; row-gap: 4px; }

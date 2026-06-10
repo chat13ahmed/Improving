@@ -1657,9 +1657,10 @@ function macroLine(m) {
 function renderMyMealsRow() {
   const meals = state.data.meals || [];
   const chips = meals.slice(0, 12).map(m =>
-    '<button type="button" class="meal-chip" onclick="logMyMeal(\'' + m.id + '\')" title="Tap to log this meal">' +
-    '<span class="meal-chip-name">' + escapeHtml(m.name) + '</span>' +
-    '<span class="meal-chip-macros">' + Math.round(m.kcal || 0) + ' cal · ' + Math.round(m.p || 0) + 'p</span>' +
+    '<button type="button" class="meal-chip' + (m.photo ? ' has-photo' : '') + '" onclick="logMyMeal(\'' + m.id + '\')" title="Tap to log this meal">' +
+    (m.photo ? '<img class="meal-chip-img" src="' + m.photo + '" alt="">' : '') +
+    '<span class="meal-chip-text"><span class="meal-chip-name">' + escapeHtml(m.name) + '</span>' +
+    '<span class="meal-chip-macros">' + Math.round(m.kcal || 0) + ' cal · ' + Math.round(m.p || 0) + 'p</span></span>' +
     '</button>').join('');
   return '<div class="my-meals" id="my-meals-row">' +
     '<div class="my-meals-head"><span class="recent-foods-label">🍱 My meals</span>' +
@@ -1728,10 +1729,55 @@ function removeIng(id) {
   const el = document.getElementById('ing-rows'); if (el) el.innerHTML = renderIngredientRows();
   updateMealTotalLine();
 }
+// Read an image File and downscale it to a small JPEG data URL, so meal photos
+// stay tiny (~15–30 KB) — no file server needed, light to store and sync.
+function fileToThumb(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\//.test(file.type)) { reject(new Error('not an image')); return; }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('read failed'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('decode failed'));
+      img.onload = () => {
+        const md = maxDim || 320;
+        let w = img.width, h = img.height;
+        if (w > h && w > md) { h = Math.round(h * md / w); w = md; }
+        else if (h > md) { w = Math.round(w * md / h); h = md; }
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        try { resolve(cv.toDataURL('image/jpeg', quality || 0.6)); } catch (e) { reject(e); }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function renderMealPhotoControl() {
+  if (state._mealPhoto) {
+    return '<div class="mm-photo-preview"><img src="' + state._mealPhoto + '" alt="meal photo">' +
+      '<button type="button" class="btn btn-outline btn-sm" onclick="clearMealPhoto()">✕ Remove photo</button></div>';
+  }
+  return '<label class="btn btn-outline btn-sm mm-photo-btn">📷 Add a photo' +
+    '<input type="file" accept="image/*" style="display:none" onchange="onMealPhotoPick(this)"></label>';
+}
+async function onMealPhotoPick(input) {
+  const file = input.files && input.files[0]; if (!file) return;
+  try {
+    showToast('Processing photo…', 'success');
+    state._mealPhoto = await fileToThumb(file, 320, 0.6);
+    const el = document.getElementById('mm-photo'); if (el) el.innerHTML = renderMealPhotoControl();
+  } catch { showToast('Could not read that image — try another.', 'error'); }
+}
+function clearMealPhoto() {
+  state._mealPhoto = null;
+  const el = document.getElementById('mm-photo'); if (el) el.innerHTML = renderMealPhotoControl();
+}
 // Create-a-meal form (ingredient-by-ingredient; macros auto-sum)
 function openMyMealForm() {
   document.getElementById('my-meal-modal')?.remove();
   state._mealDraft = [blankIng(), blankIng()];
+  state._mealPhoto = null;
   const modal = document.createElement('div');
   modal.id = 'my-meal-modal';
   modal.className = 'modal-overlay';
@@ -1744,6 +1790,7 @@ function openMyMealForm() {
     '<div id="ing-rows">' + renderIngredientRows() + '</div>' +
     '<button type="button" class="btn btn-outline btn-sm" style="margin-top:8px" onclick="addIng()">＋ Add ingredient</button>' +
     '<div id="mm-total" class="mm-total"></div>' +
+    '<div id="mm-photo" class="mm-photo">' + renderMealPhotoControl() + '</div>' +
     '<label class="mm-share"><input type="checkbox" id="mm-share"> Also share to 🌍 Community so other members can use it</label>' +
     '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">' +
     '<button class="btn btn-outline" onclick="document.getElementById(\'my-meal-modal\').remove()">Cancel</button>' +
@@ -1764,7 +1811,7 @@ async function saveMyMeal() {
   })).filter(x => x.name || x.kcal || x.p || x.c || x.f);
   if (!ings.length) { showToast('Add at least one ingredient.', 'error'); return; }
   const t = ings.reduce((a, x) => ({ kcal: a.kcal + x.kcal, p: a.p + x.p, c: a.c + x.c, f: a.f + x.f }), { kcal: 0, p: 0, c: 0, f: 0 });
-  const meal = { id: uid(), name: name.slice(0, 80), ingredients: ings, kcal: t.kcal, p: t.p, c: t.c, f: t.f };
+  const meal = { id: uid(), name: name.slice(0, 80), ingredients: ings, kcal: t.kcal, p: t.p, c: t.c, f: t.f, photo: state._mealPhoto || '' };
   const share = document.getElementById('mm-share')?.checked;
   if (!state.data.meals) state.data.meals = [];
   state.data.meals.unshift(meal);
@@ -1792,7 +1839,8 @@ function openManageMeals() {
     '<div class="modal-box" style="max-width:500px;text-align:left">' +
     '<div class="modal-badge">🍱 My meals</div>' +
     (meals.length ? '<div class="manage-list">' + meals.map(m =>
-      '<div class="comm-item"><div class="comm-main"><div class="comm-name">' + escapeHtml(m.name) + '</div>' +
+      '<div class="comm-item">' + (m.photo ? '<img class="comm-photo" src="' + m.photo + '" alt="">' : '') +
+      '<div class="comm-main"><div class="comm-name">' + escapeHtml(m.name) + '</div>' +
       '<div class="comm-macros">' + macroLine(m) + '</div>' + ingredientLines(m) + '</div>' +
       '<div class="comm-actions">' +
       '<button type="button" class="btn btn-outline btn-sm" onclick="shareMyMeal(\'' + m.id + '\')">🌍 Share</button>' +
@@ -1813,7 +1861,7 @@ async function shareMyMeal(id) {
   try {
     const author = (state.data.profile && (state.data.profile.firstName || state.data.profile.name)) || state.user || '';
     const res = await fetch('/api/community/meals', { method: 'POST', headers: authHeaders(),
-      body: JSON.stringify({ name: m.name, kcal: m.kcal, p: m.p, c: m.c, f: m.f, ingredients: m.ingredients || [], author }) });
+      body: JSON.stringify({ name: m.name, kcal: m.kcal, p: m.p, c: m.c, f: m.f, ingredients: m.ingredients || [], photo: m.photo || '', author }) });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) { showToast(j.error || 'Could not share — are you signed in and online?', 'error'); return; }
     showToast('Shared "' + m.name + '" to Community 🌍', 'success');
@@ -1876,6 +1924,7 @@ function renderCommunityList(meals) {
   if (!meals.length) return '<div class="my-meals-empty">No shared meals yet. Be the first — save a meal and tick "share".</div>';
   return meals.map(m =>
     '<div class="comm-item">' +
+    (m.photo ? '<img class="comm-photo" src="' + m.photo + '" alt="">' : '') +
     '<div class="comm-main"><div class="comm-name">' + escapeHtml(m.name) + '</div>' +
     '<div class="comm-macros">' + macroLine(m) + '</div>' +
     '<div class="comm-meta">by ' + escapeHtml(m.author || 'Someone') + (m.uses ? ' · used by ' + m.uses : '') + '</div>' +
@@ -1893,7 +1942,7 @@ async function addCommunityMeal(id) {
   if (!m) return;
   if (!state.data.meals) state.data.meals = [];
   if (state.data.meals.some(x => (x.name || '').toLowerCase() === (m.name || '').toLowerCase())) { showToast('Already in your meals.', 'success'); return; }
-  state.data.meals.unshift({ id: uid(), name: m.name, kcal: m.kcal, p: m.p, c: m.c, f: m.f, ingredients: m.ingredients || [], fromCommunity: true });
+  state.data.meals.unshift({ id: uid(), name: m.name, kcal: m.kcal, p: m.p, c: m.c, f: m.f, ingredients: m.ingredients || [], photo: m.photo || '', fromCommunity: true });
   await saveData();
   fetch('/api/community/meals/' + id + '/use', { method: 'POST', headers: authHeaders() }).catch(() => {});
   showToast('Added "' + m.name + '" to My Meals', 'success');
