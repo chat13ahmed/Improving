@@ -1493,13 +1493,14 @@ function renderLogNutritionSection(eatenVal) {
     '<input type="text" list="food-datalist" id="food-pick" placeholder="Search a food (e.g. chicken breast)…" autocomplete="off" onkeydown="if(event.key===\'Enter\'){event.preventDefault();document.getElementById(\'food-qty\').focus();}">' +
     '<input type="number" id="food-qty" min="0" step="1" placeholder="amount" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addFoodToLog();}">' +
     '<select id="food-unit"><option value="g">grams</option><option value="ml">mL</option><option value="l">litres</option><option value="oz">oz</option><option value="serving">serving(s)</option></select>' +
+    '<select id="food-meal" title="Add to which meal">' + nut.meals.labels.map(function (lbl, i) { return '<option value="' + i + '">' + escapeHtml(lbl) + '</option>'; }).join('') + '</select>' +
     '<button type="button" class="btn btn-outline food-add-btn" onclick="addFoodToLog()">+ Add</button>' +
     '<button type="button" class="btn btn-outline food-ai-btn" id="food-ai-btn" onclick="estimateFoodWithAI()" title="Estimate macros with AI for any food">AI</button>' +
     '</div>' + datalist +
     '<div class="food-ai-hint">Not in the list? Type any food (e.g. "homemade chicken burrito") and hit AI to estimate it.</div>' +
     recentRow +
     renderMyMealsRow() +
-    '<div id="food-log-list">' + renderFoodLogList() + '</div>' +
+    '<div id="food-log-list">' + renderFoodLogByMeal() + '</div>' +
     '<div id="food-log-totals">' + renderFoodLogTotals() + '</div>' +
     '</div>' +
 
@@ -1509,18 +1510,45 @@ function renderLogNutritionSection(eatenVal) {
     '</div>';
 }
 
-// Render the list of foods added today (from state._foodLog)
-function renderFoodLogList() {
-  const log = state._foodLog || [];
-  if (!log.length) return '<div class="food-log-empty">No foods added yet — search above to add what you ate.</div>';
-  return '<div class="food-log-items">' + log.map(x =>
-    '<div class="food-item">' +
-    '<div class="fi-name">' + escapeHtml(x.name) + (x.ai ? ' <span class="fi-ai" title="Estimated with AI"></span>' : '') + '</div>' +
+// Which meal the add-row is currently targeting
+function currentMeal() { const el = document.getElementById('food-meal'); return el ? (parseInt(el.value, 10) || 0) : 0; }
+// One food row
+function foodItemRow(x) {
+  return '<div class="food-item">' +
+    '<div class="fi-name">' + escapeHtml(x.name) + '</div>' +
     '<div class="fi-amt">' + foodAmountLabel(x) + '</div>' +
     '<div class="fi-macros"><b>' + x.kcal + '</b> cal · <b class="mp">' + x.p + 'g</b> · <b class="mc">' + x.c + 'g</b> · <b class="mf">' + x.f + 'g</b></div>' +
     '<button type="button" class="fi-remove" onclick="removeFoodFromLog(\'' + x.id + '\')" title="Remove">✕</button>' +
-    '</div>'
-  ).join('') + '</div>';
+    '</div>';
+}
+// Render the food log grouped into the meals the user chose (Breakfast, Lunch…),
+// each meal showing its own foods + running total vs that meal's target.
+function renderFoodLogByMeal() {
+  const log = state._foodLog || [];
+  const nut = getNutrition();
+  const count = (nut && nut.meals && nut.meals.count) ? nut.meals.count : 1;
+  const labels = (nut && nut.meals) ? nut.meals.labels : ['Meals'];
+  const per = (nut && nut.meals) ? nut.meals : null;
+  const slotOf = x => Math.min(Math.max(0, x.meal || 0), count - 1);
+  let html = '';
+  for (let i = 0; i < count; i++) {
+    const foods = log.filter(x => slotOf(x) === i);
+    const t = foodLogTotals(foods);
+    const calStr = Math.round(t.kcal) + (per ? ' / ' + per.calories : '') + ' cal';
+    const pStr = Math.round(t.p) + (per ? ' / ' + per.protein : '') + 'g P';
+    const over = per && t.kcal > per.calories * 1.05;
+    const name = labels[i] || ('Meal ' + (i + 1));
+    html += '<div class="meal-slot">' +
+      '<div class="meal-slot-head">' +
+      '<span class="ms-name">' + escapeHtml(name) + '</span>' +
+      '<span class="ms-total' + (over ? ' is-over' : '') + '">' + calStr + ' · <b class="mp">' + pStr + '</b></span>' +
+      '</div>' +
+      (foods.length
+        ? '<div class="meal-slot-foods">' + foods.map(foodItemRow).join('') + '</div>'
+        : '<div class="meal-slot-empty">Nothing here yet — choose "' + escapeHtml(name) + '" above and add a food.</div>') +
+      '</div>';
+  }
+  return html;
 }
 
 // Instant, rule-based nutrition coaching based on what they've eaten vs. their targets
@@ -1565,7 +1593,7 @@ function addFoodToLog() {
   const grams = unitToGrams(qty, unit, food);
   const m = foodMacros(food, grams);
   if (!state._foodLog) state._foodLog = [];
-  state._foodLog.push({ id: uid(), name: food.n, grams: Math.round(grams), unit, qty, kcal: m.kcal, p: m.p, c: m.c, f: m.f });
+  state._foodLog.push({ id: uid(), name: food.n, grams: Math.round(grams), unit, qty, kcal: m.kcal, p: m.p, c: m.c, f: m.f, meal: currentMeal() });
   if (pick) pick.value = '';
   const q = document.getElementById('food-qty'); if (q) q.value = '';
   refreshFoodLog();
@@ -1592,7 +1620,7 @@ async function estimateFoodWithAI() {
       return;
     }
     if (!state._foodLog) state._foodLog = [];
-    state._foodLog.push({ id: uid(), name: j.name, grams: j.grams || 0, unit: 'g', qty: j.grams || 0, kcal: j.kcal, p: j.p, c: j.c, f: j.f, ai: true });
+    state._foodLog.push({ id: uid(), name: j.name, grams: j.grams || 0, unit: 'g', qty: j.grams || 0, kcal: j.kcal, p: j.p, c: j.c, f: j.f, ai: true, meal: currentMeal() });
     if (pick) pick.value = '';
     const q = document.getElementById('food-qty'); if (q) q.value = '';
     refreshFoodLog();
@@ -1630,7 +1658,7 @@ function quickAddRecent(i) {
   const f = (state._recentFoods || [])[i];
   if (!f) return;
   if (!state._foodLog) state._foodLog = [];
-  state._foodLog.push({ id: uid(), name: f.name, grams: f.grams, unit: f.unit, qty: f.qty, kcal: f.kcal, p: f.p, c: f.c, f: f.f, ai: f.ai });
+  state._foodLog.push({ id: uid(), name: f.name, grams: f.grams, unit: f.unit, qty: f.qty, kcal: f.kcal, p: f.p, c: f.c, f: f.f, ai: f.ai, meal: currentMeal() });
   refreshFoodLog();
   persistFoodNudgeState();
   showToast('Added ' + f.name, 'success');
@@ -1639,7 +1667,7 @@ function quickAddRecent(i) {
 function refreshFoodLog() {
   const listEl = document.getElementById('food-log-list');
   const totEl = document.getElementById('food-log-totals');
-  if (listEl) listEl.innerHTML = renderFoodLogList();
+  if (listEl) listEl.innerHTML = renderFoodLogByMeal();
   if (totEl) totEl.innerHTML = renderFoodLogTotals();
   const t = foodLogTotals(state._foodLog);
   const calEl = document.getElementById('calories-eaten');
@@ -1701,7 +1729,7 @@ function logMyMeal(id) {
   const m = (state.data.meals || []).find(x => x.id === id);
   if (!m) return;
   if (!state._foodLog) state._foodLog = [];
-  state._foodLog.push({ id: uid(), name: m.name, grams: 0, unit: 'meal', qty: 1, kcal: m.kcal, p: m.p, c: m.c, f: m.f });
+  state._foodLog.push({ id: uid(), name: m.name, grams: 0, unit: 'meal', qty: 1, kcal: m.kcal, p: m.p, c: m.c, f: m.f, meal: currentMeal() });
   refreshFoodLog();
   persistFoodNudgeState();
   showToast('Logged ' + m.name, 'success');
