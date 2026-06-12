@@ -89,6 +89,7 @@ Rules for every response:
 - Refer to each area by the user's own name for it (exactly as listed above)
 - Connect the dots between the areas
 - Use markdown: ## headers, **bold**, bullet points, tables
+- If a training plan is provided (see "trainingPlan" — tailored to their goal + weight), use it when they ask what workout to do (frequency, split, strength reps, cardio)
 - End EVERY response with "## Your Next 3 Actions This Week" — three concrete steps to take right now
 - Be direct, honest, and motivating`;
 }

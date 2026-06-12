@@ -1591,6 +1591,8 @@ body {
 .gp-k { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; color: var(--gym-color, var(--success)); }
 .gp-v { color: var(--text); line-height: 1.45; }
 .gp-tip { font-size: 13px; color: var(--text-muted); line-height: 1.5; padding-top: 10px; border-top: 1px solid var(--border); }
+.gym-plan-hint { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--gym-bg, var(--surface)); border: 1px solid var(--gym-border, var(--border)); }
+.gym-plan-hint b { color: var(--text); }
 
 /* Autosave indicator (Log page) */
 .autosave-status { font-size: 12.5px; font-weight: 600; color: var(--text-muted); margin-right: auto; align-self: center; opacity: 0; transition: opacity 0.2s; }

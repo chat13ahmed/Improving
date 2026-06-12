@@ -2961,6 +2961,15 @@ function renderGymPlanCard() {
     '<div class="gp-tip">' + escapeHtml(p.tip) + '</div>' +
     '</div>';
 }
+// Compact training hint shown right in the gym log section
+function renderGymPlanHint() {
+  if (!isPillarOn('gym')) return '';
+  const n = state.data.profile && state.data.profile.nutrition;
+  if (!n || !n.weightKg || !n.goal) return '';
+  const p = gymPlan(n.goal, n.weightKg);
+  return '<div class="gym-plan-hint"><b>For ' + p.goal + ':</b> ' + escapeHtml(p.split) + ' · ' + escapeHtml(p.strength) +
+    (p.cardioBurn30 ? ' · ~' + p.cardioBurn30 + ' kcal/30 min cardio' : '') + '</div>';
+}
 
 function renderDashboard() {
   const { days, weeks, profile } = state.data;
@@ -3294,6 +3303,7 @@ function renderLogToday(editDay) {
     (isPillarOn('gym') ?
       '<div class="today-section gym-section">' +
       '<div class="today-section-header gym-header">' + gymP.icon + ' ' + escapeHtml(gymP.label) + '</div>' +
+      renderGymPlanHint() +
       gymToggle + gymDetails +
       '</div>' : '') +
 
@@ -4227,6 +4237,8 @@ function enrichedData() {
     } : null,
     mealsEatenToday: groupFoodsByMeal(state.data.days.find(d => d.date === todayStr())?.foodLog || [])
       .map(g => ({ meal: g.label, calories: g.kcal, proteinG: g.p, foods: g.foods.map(f => f.name) })),
+    // gym training plan recommended for their goal + weight
+    trainingPlan: (isPillarOn('gym') && nut && nut.goal) ? (() => { const gp = gymPlan(nut.goal, state.data.profile?.nutrition?.weightKg); return { goal: gp.goal, frequency: gp.days, split: gp.split, strength: gp.strength, cardio: gp.cardio, cardioBurnPer30min: gp.cardioBurn30 }; })() : null,
     caloriesEatenToday: state.data.days.find(d => d.date === todayStr())?.calories || 0,
     proteinEatenToday: state.data.days.find(d => d.date === todayStr())?.eaten?.protein || 0,
     foodsEatenToday: (state.data.days.find(d => d.date === todayStr())?.foodLog || []).map(x => x.name + ' (' + x.grams + 'g)'),
