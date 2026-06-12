@@ -2874,6 +2874,42 @@ function renderNextStep() {
     '</div>';
 }
 
+// ─────────────────────────────────────────────────────────────
+// THIS WEEK IN NUTRITION — zoom-out adherence over the last 7 days
+// ─────────────────────────────────────────────────────────────
+function nutritionWeekStats(days, targetCal, targetProtein, today) {
+  const start = new Date(today + 'T00:00:00'); start.setDate(start.getDate() - 6);
+  const startStr = start.toISOString().split('T')[0];
+  const win = (days || []).filter(d => d.date >= startStr && d.date <= today && ((d.calories || 0) > 0 || (d.eaten && d.eaten.protein > 0)));
+  const logged = win.length;
+  if (!logged) return { logged: 0 };
+  const sumCal = win.reduce((s, d) => s + (d.calories || 0), 0);
+  const sumP = win.reduce((s, d) => s + ((d.eaten && d.eaten.protein) || 0), 0);
+  const proteinHit = win.filter(d => targetProtein && ((d.eaten && d.eaten.protein) || 0) >= targetProtein * 0.9).length;
+  const calOnTarget = win.filter(d => targetCal && Math.abs((d.calories || 0) - targetCal) <= targetCal * 0.12).length;
+  return { logged, avgCal: Math.round(sumCal / logged), avgProtein: Math.round(sumP / logged), proteinHit, calOnTarget };
+}
+function renderNutritionWeekCard() {
+  const nut = getNutrition();
+  if (!nut) return '';
+  const s = nutritionWeekStats(state.data.days, nut.calories, nut.protein.g, todayStr());
+  if (!s.logged) return '';
+  const verdict = s.proteinHit >= Math.ceil(s.logged * 0.7)
+    ? 'Protein on point — strong week. Keep it rolling.'
+    : (s.proteinHit >= Math.ceil(s.logged * 0.4)
+      ? 'Decent week — nudge protein up to hit it more days.'
+      : 'Protein slipped this week — make it the priority at every meal.');
+  return '<div class="card nutweek-card">' +
+    '<div class="card-title">This week in nutrition</div>' +
+    '<div class="nutweek-stats">' +
+    '<div class="nw-stat"><div class="nw-num">' + s.avgCal.toLocaleString() + '</div><div class="nw-lbl">avg cal/day <span>target ' + nut.calories.toLocaleString() + '</span></div></div>' +
+    '<div class="nw-stat"><div class="nw-num mp">' + s.avgProtein + 'g</div><div class="nw-lbl">avg protein <span>target ' + nut.protein.g + 'g</span></div></div>' +
+    '<div class="nw-stat"><div class="nw-num">' + s.proteinHit + '<span class="nw-of">/' + s.logged + '</span></div><div class="nw-lbl">days protein hit</div></div>' +
+    '</div>' +
+    '<div class="nutweek-verdict">' + verdict + '</div>' +
+    '</div>';
+}
+
 function renderDashboard() {
   const { days, weeks, profile } = state.data;
   const stats = getWeekStats();
@@ -3007,7 +3043,7 @@ function renderDashboard() {
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">Share my week</button>' : '') +
     '</div>' +
     renderNextStep() + renderGoalCard() +
-    renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard() + renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderMoneyCircleCard() + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
+    renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard() + renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderMoneyCircleCard() + renderNutritionWeekCard() + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
 
   setTimeout(animateCounters, 120);
   if (showIncomeChart) initIncomeChart(sortedWeeks);

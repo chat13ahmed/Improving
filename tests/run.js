@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -116,6 +116,18 @@ ok('currentMealIndex: dinner in the evening', A.currentMealIndex(3, 19) === 2);
 ok('currentMealIndex: before waking → first meal', A.currentMealIndex(3, 5) === 0);
 ok('currentMealIndex: late night → last meal', A.currentMealIndex(3, 23) === 2);
 ok('currentMealIndex: 5 meals midday → lunch slot', A.currentMealIndex(5, 13) === 2);
+// This week in nutrition
+const _nwDays = [
+  { date: '2026-06-09', calories: 2000, eaten: { protein: 160 } },
+  { date: '2026-06-10', calories: 1800, eaten: { protein: 140 } },
+  { date: '2026-06-11', calories: 2100, eaten: { protein: 120 } }
+];
+const _nw = A.nutritionWeekStats(_nwDays, 2000, 150, '2026-06-11');
+ok('nutritionWeek: counts logged days in window', _nw.logged === 3);
+ok('nutritionWeek: avg calories', _nw.avgCal === Math.round((2000 + 1800 + 2100) / 3));
+ok('nutritionWeek: protein-hit days (≥90% of 150)', _nw.proteinHit === 2);
+ok('nutritionWeek: empty → logged 0', A.nutritionWeekStats([], 2000, 150, '2026-06-11').logged === 0);
+ok('nutritionWeek: excludes days older than 7', A.nutritionWeekStats([{ date: '2026-05-01', calories: 2000, eaten: { protein: 160 } }], 2000, 150, '2026-06-11').logged === 0);
 
 // Goal status (pure)
 const _wg = { kind: 'weight', start: 180, target: 170, deadline: '2026-07-10', createdAt: '2026-06-10' };

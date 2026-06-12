@@ -1576,6 +1576,15 @@ body {
 .mf-line { font-size: 14px; color: var(--text); line-height: 1.5; }
 .mf-line b { font-weight: 800; }
 .mf-btn { margin-top: 10px; }
+/* This week in nutrition */
+.nutweek-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 10px; }
+.nw-stat { text-align: center; padding: 12px 6px; border-radius: var(--radius-sm); background: var(--surface); }
+.nw-num { font-size: 24px; font-weight: 900; color: var(--text); line-height: 1.1; }
+.nw-num.mp { color: var(--success); }
+.nw-of { font-size: 15px; font-weight: 700; color: var(--text-muted); }
+.nw-lbl { font-size: 11px; color: var(--text-muted); margin-top: 5px; line-height: 1.4; }
+.nw-lbl span { display: block; opacity: 0.85; }
+.nutweek-verdict { font-size: 13px; color: var(--text); font-weight: 600; }
 
 /* Autosave indicator (Log page) */
 .autosave-status { font-size: 12.5px; font-weight: 600; color: var(--text-muted); margin-right: auto; align-self: center; opacity: 0; transition: opacity 0.2s; }
