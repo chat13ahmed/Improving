@@ -2910,6 +2910,58 @@ function renderNutritionWeekCard() {
     '</div>';
 }
 
+// ─────────────────────────────────────────────────────────────
+// GYM PLAN — training recommendation by goal (lose / gain / maintain) + weight
+// ─────────────────────────────────────────────────────────────
+function gymPlan(goal, weightKg) {
+  const g = (goal === 'lose' || goal === 'gain') ? goal : 'maintain';
+  // ~30 min of moderate cardio (~7 METs) — kcal scales with bodyweight
+  const cardioBurn30 = weightKg ? Math.round((7 * 3.5 * weightKg / 200) * 30) : 0;
+  const plans = {
+    lose: {
+      headline: 'Train for fat loss', days: '4–5 days/week',
+      split: 'Full-body strength 3× + 2 cardio / conditioning days',
+      strength: 'Compound lifts — 3–4 sets of 8–12 reps',
+      cardio: '20–40 min moderate cardio or intervals, 2–3×/week',
+      tip: 'Lift to keep your muscle while the deficit burns fat — protein high, steps up.'
+    },
+    gain: {
+      headline: 'Train for muscle gain', days: '4–5 days/week',
+      split: 'Push / Pull / Legs or Upper / Lower',
+      strength: 'Progressive overload — 3–5 sets of 6–12 reps, add weight weekly',
+      cardio: 'Light cardio 1–2×/week for health — don\'t burn the surplus',
+      tip: 'Hit each muscle ~2×/week and push the big lifts. Eat in a surplus.'
+    },
+    maintain: {
+      headline: 'Train to stay strong', days: '3–4 days/week',
+      split: 'Balanced full-body or Upper / Lower',
+      strength: '3–4 sets of 8–12 reps',
+      cardio: '2–3 cardio sessions for heart health',
+      tip: 'Mix strength and cardio, keep protein steady, stay consistent.'
+    }
+  };
+  return Object.assign({ goal: g, cardioBurn30 }, plans[g]);
+}
+function renderGymPlanCard() {
+  if (!isPillarOn('gym')) return '';
+  const n = state.data.profile && state.data.profile.nutrition;
+  if (!n || !n.weightKg || !n.goal) return ''; // needs weight + goal (from nutrition setup)
+  const p = gymPlan(n.goal, n.weightKg);
+  const wDisp = Math.round(kgToDisplay(n.weightKg)) + ' ' + (weightUnitPref() === 'lbs' ? 'lb' : 'kg');
+  const row = (k, v) => '<div class="gp-row"><span class="gp-k">' + k + '</span><span class="gp-v">' + v + '</span></div>';
+  return '<div class="card gymplan-card">' +
+    '<div class="card-title">' + escapeHtml(p.headline) + '</div>' +
+    '<div class="card-sub">Tailored to your goal (' + p.goal + ') and weight (' + wDisp + ')</div>' +
+    '<div class="gp-grid">' +
+    row('Frequency', escapeHtml(p.days)) +
+    row('Split', escapeHtml(p.split)) +
+    row('Strength', escapeHtml(p.strength)) +
+    row('Cardio', escapeHtml(p.cardio) + (p.cardioBurn30 ? ' · ~' + p.cardioBurn30 + ' kcal / 30 min at your weight' : '')) +
+    '</div>' +
+    '<div class="gp-tip">' + escapeHtml(p.tip) + '</div>' +
+    '</div>';
+}
+
 function renderDashboard() {
   const { days, weeks, profile } = state.data;
   const stats = getWeekStats();
@@ -3043,7 +3095,7 @@ function renderDashboard() {
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">Share my week</button>' : '') +
     '</div>' +
     renderNextStep() + renderGoalCard() +
-    renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard() + renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderMoneyCircleCard() + renderNutritionWeekCard() + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
+    renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard() + renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderMoneyCircleCard() + renderNutritionWeekCard() + renderGymPlanCard() + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
 
   setTimeout(animateCounters, 120);
   if (showIncomeChart) initIncomeChart(sortedWeeks);
