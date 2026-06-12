@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -128,6 +128,12 @@ ok('nutritionWeek: avg calories', _nw.avgCal === Math.round((2000 + 1800 + 2100)
 ok('nutritionWeek: protein-hit days (≥90% of 150)', _nw.proteinHit === 2);
 ok('nutritionWeek: empty → logged 0', A.nutritionWeekStats([], 2000, 150, '2026-06-11').logged === 0);
 ok('nutritionWeek: excludes days older than 7', A.nutritionWeekStats([{ date: '2026-05-01', calories: 2000, eaten: { protein: 160 } }], 2000, 150, '2026-06-11').logged === 0);
+// Book picker
+ok('BOOK_DB is a sizable curated list', Array.isArray(A.BOOK_DB) && A.BOOK_DB.length >= 40);
+ok('BOOK_DB entries have title/author/pages', A.BOOK_DB.every(b => b.t && b.a && b.p > 0));
+ok('findBook exact match fills pages + author', A.findBook('Atomic Habits').p === 320 && A.findBook('Atomic Habits').a === 'James Clear');
+ok('findBook fuzzy match', A.findBook('psychology of money').t === 'The Psychology of Money');
+ok('findBook miss → null', A.findBook('zzz not a real book') === null);
 
 // Goal status (pure)
 const _wg = { kind: 'weight', start: 180, target: 170, deadline: '2026-07-10', createdAt: '2026-06-10' };

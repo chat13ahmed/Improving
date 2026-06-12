@@ -4686,6 +4686,82 @@ function renderReadingPage() {
     statsBar + bookCard + historyCard + finishedCard;
 }
 
+// Curated list of popular growth/business/self-development books with page counts,
+// so people pick instead of typing title + author + pages. Custom entries still work.
+const BOOK_DB = [
+  { t: 'Atomic Habits', a: 'James Clear', p: 320 },
+  { t: 'The 7 Habits of Highly Effective People', a: 'Stephen R. Covey', p: 432 },
+  { t: 'Rich Dad Poor Dad', a: 'Robert Kiyosaki', p: 336 },
+  { t: 'Think and Grow Rich', a: 'Napoleon Hill', p: 238 },
+  { t: 'The Psychology of Money', a: 'Morgan Housel', p: 256 },
+  { t: 'How to Win Friends and Influence People', a: 'Dale Carnegie', p: 288 },
+  { t: 'Deep Work', a: 'Cal Newport', p: 296 },
+  { t: 'The Lean Startup', a: 'Eric Ries', p: 336 },
+  { t: 'Zero to One', a: 'Peter Thiel', p: 224 },
+  { t: 'The 4-Hour Workweek', a: 'Tim Ferriss', p: 308 },
+  { t: 'Start with Why', a: 'Simon Sinek', p: 256 },
+  { t: "Can't Hurt Me", a: 'David Goggins', p: 364 },
+  { t: 'The Subtle Art of Not Giving a F*ck', a: 'Mark Manson', p: 224 },
+  { t: 'Mindset', a: 'Carol S. Dweck', p: 320 },
+  { t: 'Grit', a: 'Angela Duckworth', p: 352 },
+  { t: 'Outliers', a: 'Malcolm Gladwell', p: 336 },
+  { t: 'The Power of Habit', a: 'Charles Duhigg', p: 416 },
+  { t: "Man's Search for Meaning", a: 'Viktor E. Frankl', p: 184 },
+  { t: 'The Alchemist', a: 'Paulo Coelho', p: 208 },
+  { t: 'Sapiens', a: 'Yuval Noah Harari', p: 464 },
+  { t: 'The Millionaire Next Door', a: 'Thomas J. Stanley', p: 272 },
+  { t: 'The Intelligent Investor', a: 'Benjamin Graham', p: 640 },
+  { t: 'The 10X Rule', a: 'Grant Cardone', p: 256 },
+  { t: 'Never Split the Difference', a: 'Chris Voss', p: 288 },
+  { t: 'Influence', a: 'Robert B. Cialdini', p: 336 },
+  { t: 'Good to Great', a: 'Jim Collins', p: 320 },
+  { t: 'The E-Myth Revisited', a: 'Michael E. Gerber', p: 288 },
+  { t: 'Eat That Frog!', a: 'Brian Tracy', p: 144 },
+  { t: 'The Compound Effect', a: 'Darren Hardy', p: 176 },
+  { t: 'The Magic of Thinking Big', a: 'David J. Schwartz', p: 320 },
+  { t: 'Awaken the Giant Within', a: 'Tony Robbins', p: 544 },
+  { t: 'The 5 AM Club', a: 'Robin Sharma', p: 336 },
+  { t: 'Daring Greatly', a: 'Brené Brown', p: 320 },
+  { t: 'Ego Is the Enemy', a: 'Ryan Holiday', p: 256 },
+  { t: 'The Obstacle Is the Way', a: 'Ryan Holiday', p: 224 },
+  { t: 'Meditations', a: 'Marcus Aurelius', p: 256 },
+  { t: 'Extreme Ownership', a: 'Jocko Willink', p: 320 },
+  { t: 'The 48 Laws of Power', a: 'Robert Greene', p: 480 },
+  { t: 'Mastery', a: 'Robert Greene', p: 352 },
+  { t: 'The 12 Week Year', a: 'Brian P. Moran', p: 208 },
+  { t: 'Essentialism', a: 'Greg McKeown', p: 272 },
+  { t: 'The One Thing', a: 'Gary Keller', p: 240 },
+  { t: 'Getting Things Done', a: 'David Allen', p: 352 },
+  { t: 'The Almanack of Naval Ravikant', a: 'Eric Jorgenson', p: 244 },
+  { t: 'Shoe Dog', a: 'Phil Knight', p: 400 },
+  { t: 'Principles', a: 'Ray Dalio', p: 592 },
+  { t: 'The Hard Thing About Hard Things', a: 'Ben Horowitz', p: 304 },
+  { t: '$100M Offers', a: 'Alex Hormozi', p: 174 },
+  { t: 'The Mom Test', a: 'Rob Fitzpatrick', p: 136 },
+  { t: 'Building a StoryBrand', a: 'Donald Miller', p: 240 },
+  { t: 'The 80/20 Principle', a: 'Richard Koch', p: 288 },
+  { t: "So Good They Can't Ignore You", a: 'Cal Newport', p: 304 },
+  { t: 'Drive', a: 'Daniel H. Pink', p: 272 },
+  { t: 'The Richest Man in Babylon', a: 'George S. Clason', p: 144 },
+  { t: 'Rework', a: 'Jason Fried', p: 288 }
+];
+function findBook(title) {
+  if (!title) return null;
+  const q = title.trim().toLowerCase();
+  return BOOK_DB.find(b => b.t.toLowerCase() === q) ||
+    BOOK_DB.find(b => b.t.toLowerCase().startsWith(q)) ||
+    BOOK_DB.find(b => b.t.toLowerCase().includes(q)) || null;
+}
+// When the title exactly matches a known book (i.e. picked from the list), fill author + pages
+function onBookPick() {
+  const title = (document.getElementById('book-title-input')?.value || '').trim().toLowerCase();
+  const b = BOOK_DB.find(x => x.t.toLowerCase() === title);
+  if (!b) return;
+  const a = document.getElementById('book-author-input');
+  const p = document.getElementById('book-pages-total-input');
+  if (a) a.value = b.a;
+  if (p) p.value = b.p;
+}
 function showAddBookModal(isChanging) {
   document.getElementById('add-book-modal')?.remove();
   const modal = document.createElement('div');
@@ -4695,8 +4771,9 @@ function showAddBookModal(isChanging) {
     '<div class="modal-box" style="max-width:400px;text-align:left">' +
     '<div class="modal-badge">' + (isChanging ? 'Change Book' : 'Start Reading') + '</div>' +
     '<p style="font-size:14px;color:var(--text-muted);margin-bottom:20px">' + (isChanging ? 'What are you reading now?' : 'What book are you starting?') + '</p>' +
-    '<div class="form-group"><label>Book Title <span style="color:var(--danger)">*</span></label>' +
-    '<input type="text" id="book-title-input" placeholder="e.g. Rich Dad Poor Dad" autocomplete="off"></div>' +
+    '<div class="form-group"><label>Book Title <span style="color:var(--danger)">*</span> <span style="font-weight:400;color:var(--text-muted)">— pick from the list or type your own</span></label>' +
+    '<input type="text" id="book-title-input" list="book-datalist" placeholder="Search a book…" autocomplete="off" oninput="onBookPick()"></div>' +
+    '<datalist id="book-datalist">' + BOOK_DB.map(b => '<option value="' + escapeAttr(b.t) + '">' + escapeAttr(b.a) + '</option>').join('') + '</datalist>' +
     '<div class="form-group"><label>Author <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>' +
     '<input type="text" id="book-author-input" placeholder="e.g. Robert Kiyosaki"></div>' +
     '<div class="form-group"><label>Total Pages <span style="font-weight:400;color:var(--text-muted)">(optional — tracks your % progress)</span></label>' +
