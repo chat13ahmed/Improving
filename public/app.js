@@ -2953,6 +2953,73 @@ function renderNutritionWeekCard() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// YOUR CLIMB — a signature SVG ascent: momentum → how far up the mountain
+// ─────────────────────────────────────────────────────────────
+// Momentum 0-100 from streak + this week's consistency + goal progress (testable)
+function momentumScore(streak, weeklyScore, goalPct) {
+  const s = Math.min(100, (streak || 0) * 6);        // ~17-day streak = full
+  const w = Math.max(0, Math.min(100, weeklyScore || 0));
+  if (goalPct == null) return Math.round(s * 0.5 + w * 0.5);
+  const g = Math.max(0, Math.min(100, goalPct));
+  return Math.round(s * 0.4 + w * 0.35 + g * 0.25);
+}
+// The mountain trail — switchback waypoints from base (bottom-left) to summit
+function climbTrail() { return [[26, 176], [98, 150], [60, 122], [150, 104], [108, 74], [212, 60], [176, 38], [292, 26]]; }
+function trailTotal(pts) { let t = 0; for (let i = 1; i < pts.length; i++) t += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return t; }
+// The point a fraction t (0..1) of the way along the trail (testable)
+function pointAlong(pts, t) {
+  const total = trailTotal(pts);
+  let target = Math.max(0, Math.min(1, t)) * total;
+  for (let i = 1; i < pts.length; i++) {
+    const len = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    if (target <= len || i === pts.length - 1) { const f = len ? target / len : 0; return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f]; }
+    target -= len;
+  }
+  return pts[pts.length - 1];
+}
+function renderClimbCard() {
+  const streak = loggingStreak();
+  const weekly = getWeeklyScore();
+  const goal = state.data.profile && state.data.profile.goal;
+  const gp = goal ? goalStatus(goal, currentGoalValue(goal), Date.now()) : null;
+  const m = momentumScore(streak, weekly, gp ? gp.pct : null);
+  const pts = climbTrail();
+  const d = 'M' + pts.map(p => p[0] + ' ' + p[1]).join(' L ');
+  const total = Math.round(trailTotal(pts));
+  const climbed = Math.round(total * m / 100);
+  const c = pointAlong(pts, m / 100);
+  const s = pts[pts.length - 1]; // summit
+  const caption = m >= 80 ? 'Near the summit — incredible momentum.'
+    : m >= 50 ? 'Strong climb. Keep stacking days.'
+      : m >= 20 ? "You're moving up — one log at a time."
+        : 'Every climb starts with one step. Log today.';
+  const svg =
+    '<svg viewBox="0 0 320 190" class="climb-svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Your climb, ' + m + ' percent">' +
+    '<defs>' +
+    '<linearGradient id="climbSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8f0ff"/><stop offset="1" stop-color="#ffe9d8"/></linearGradient>' +
+    '<linearGradient id="climbDone" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#fb923c"/><stop offset="0.5" stop-color="#ef4444"/><stop offset="1" stop-color="#a855f7"/></linearGradient>' +
+    '</defs>' +
+    '<rect x="0" y="0" width="320" height="190" rx="12" fill="url(#climbSky)"/>' +
+    '<circle cx="264" cy="36" r="15" fill="#fff" opacity="0.75"/>' +
+    '<polygon points="0,190 64,116 112,150 178,90 224,128 282,78 320,108 320,190" fill="#c4d0e6" opacity="0.55"/>' +
+    '<polygon points="0,190 92,148 152,168 214,118 274,150 320,132 320,190" fill="#a9b8d4" opacity="0.5"/>' +
+    '<path d="' + d + '" fill="none" stroke="#94a3b8" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 7" opacity="0.65"/>' +
+    '<path d="' + d + '" class="climb-trail-done" fill="none" stroke="url(#climbDone)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="' + climbed + ' 9999" style="--len:' + climbed + '"/>' +
+    '<line x1="' + s[0] + '" y1="' + s[1] + '" x2="' + s[0] + '" y2="' + (s[1] - 15) + '" stroke="#475569" stroke-width="2"/>' +
+    '<polygon points="' + s[0] + ',' + (s[1] - 15) + ' ' + (s[0] + 13) + ',' + (s[1] - 11) + ' ' + s[0] + ',' + (s[1] - 7) + '" fill="#ef4444"/>' +
+    '<circle class="climber-ring" cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="8" fill="#fff"/>' +
+    '<circle class="climber" cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="5.5" fill="url(#climbDone)"/>' +
+    '</svg>';
+  return '<div class="card climb-card">' +
+    '<div class="climb-head"><div><div class="climb-title">Your climb</div>' +
+    '<div class="climb-sub">' + streak + '-day streak · toward ' + escapeHtml(goal ? goal.title : 'your peak') + '</div></div>' +
+    '<div class="climb-pct">' + m + '%</div></div>' +
+    svg +
+    '<div class="climb-caption">' + escapeHtml(caption) + '</div>' +
+    '</div>';
+}
+
+// ─────────────────────────────────────────────────────────────
 // GYM PLAN — training recommendation by goal (lose / gain / maintain) + weight
 // ─────────────────────────────────────────────────────────────
 function gymPlan(goal, weightKg) {
@@ -3141,7 +3208,7 @@ function renderDashboard() {
 
   // Group the cards into scannable sections — a label only shows if its group has content
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
-  const gGuidance = renderNextStep() + renderGoalCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
+  const gGuidance = renderNextStep() + renderGoalCard() + renderClimbCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
   const gCoach    = renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard();
   const gToday    = pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderChecklistCard() + focusHtml;
   const gHealth   = renderNutritionWeekCard() + renderGymPlanCard() + renderWeightTrend();

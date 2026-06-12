@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, gymPlan,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, gymPlan, momentumScore, pointAlong,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -139,6 +139,14 @@ ok('gymPlan lose → fat loss + cardio', /fat loss/i.test(A.gymPlan('lose', 80).
 ok('gymPlan gain → progressive overload', /overload/i.test(A.gymPlan('gain', 80).strength));
 ok('gymPlan unknown goal → maintain', A.gymPlan('whatever', 80).goal === 'maintain');
 ok('gymPlan cardio burn scales with weight', A.gymPlan('lose', 100).cardioBurn30 > A.gymPlan('lose', 60).cardioBurn30);
+// Your Climb — momentum + trail geometry
+ok('momentum: zero inputs → 0', A.momentumScore(0, 0, null) === 0);
+ok('momentum: more streak climbs higher', A.momentumScore(15, 50, null) > A.momentumScore(2, 50, null));
+ok('momentum: caps near 100', A.momentumScore(100, 100, 100) >= 95 && A.momentumScore(100, 100, 100) <= 100);
+ok('momentum: goal progress factors in', A.momentumScore(5, 50, 90) > A.momentumScore(5, 50, 10));
+ok('pointAlong: t=0 → first point', A.pointAlong([[0, 0], [10, 0]], 0)[0] === 0);
+ok('pointAlong: t=1 → last point', A.pointAlong([[0, 0], [10, 0]], 1)[0] === 10);
+ok('pointAlong: t=0.5 → midpoint', A.pointAlong([[0, 0], [10, 0]], 0.5)[0] === 5);
 
 // Goal status (pure)
 const _wg = { kind: 'weight', start: 180, target: 170, deadline: '2026-07-10', createdAt: '2026-06-10' };
