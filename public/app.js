@@ -625,9 +625,7 @@ async function startApp() {
   Chart.defaults.plugins.tooltip.borderWidth = 1;
   }
 
-  document.querySelectorAll('.nav-item').forEach(el =>
-    el.addEventListener('click', e => { e.preventDefault(); navigate(el.dataset.page); })
-  );
+  wireNav();
   renderUserChip();
   applyNavVisibility();
   renderXPBar();
@@ -940,9 +938,53 @@ function navigate(page) {
   Object.values(charts).forEach(c => c.destroy());
   charts = {};
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
+  // Sync the mobile bottom bar — highlight the matching tab, else "More"
+  document.querySelectorAll('.bnav-item[data-page]').forEach(el => el.classList.toggle('active', el.dataset.page === page));
+  const moreBtn = document.getElementById('bnav-more');
+  if (moreBtn) moreBtn.classList.toggle('active', !['dashboard', 'log', 'coach'].includes(page));
+  document.getElementById('more-sheet')?.remove();
   const pages = { dashboard: renderDashboard, log: renderLogToday, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
   injectFAB();
   (pages[page] || renderDashboard)();
+}
+
+// Bind nav clicks once (sidebar + mobile bottom bar + the More button). Called
+// from both the normal app start and the demo, so navigation works in both.
+function wireNav() {
+  if (state._navWired) return;
+  state._navWired = true;
+  document.querySelectorAll('.nav-item').forEach(el =>
+    el.addEventListener('click', e => { e.preventDefault(); navigate(el.dataset.page); }));
+  document.querySelectorAll('.bnav-item[data-page]').forEach(el =>
+    el.addEventListener('click', e => { e.preventDefault(); navigate(el.dataset.page); }));
+  document.getElementById('bnav-more')?.addEventListener('click', e => { e.preventDefault(); openMoreSheet(); });
+}
+
+// Mobile "More" sheet — the rest of the destinations (built from the live nav,
+// so it respects which pillars are enabled), plus log out.
+function openMoreSheet() {
+  document.getElementById('more-sheet')?.remove();
+  const items = [...document.querySelectorAll('.sidebar-nav .nav-item')]
+    .filter(el => el.style.display !== 'none')
+    .map(el => { const l = el.querySelector('span:not(.nav-icon):not(.nav-badge)'); return { page: el.dataset.page, label: (l || el).textContent.trim() }; });
+  const sheet = document.createElement('div');
+  sheet.id = 'more-sheet';
+  sheet.className = 'more-sheet-overlay';
+  sheet.innerHTML = '<div class="more-sheet">' +
+    '<div class="more-sheet-grip"></div>' +
+    '<div class="more-sheet-title">Go to</div>' +
+    '<div class="more-grid">' +
+    items.map(i => '<button type="button" class="more-item' + (i.page === state.page ? ' active' : '') + '" data-page="' + i.page + '">' + escapeHtml(i.label) + '</button>').join('') +
+    '</div>' +
+    (state.user ? '<button type="button" class="more-logout" onclick="logout()">Log out</button>' : '') +
+    '</div>';
+  document.body.appendChild(sheet);
+  requestAnimationFrame(() => sheet.classList.add('open'));
+  sheet.addEventListener('click', e => {
+    if (e.target === sheet) { sheet.remove(); return; }
+    const btn = e.target.closest('.more-item');
+    if (btn) navigate(btn.dataset.page); // navigate() removes the sheet
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2179,7 +2221,7 @@ function updateNavBadges() {
 
 function getFollowUpCount() {
   const today = todayStr();
-  return state.data.contacts.filter(c => c.followUpDate && c.followUpDate <= today && c.status !== 'closed' && c.status !== 'dropped').length;
+  return (state.data.contacts || []).filter(c => c.followUpDate && c.followUpDate <= today && c.status !== 'closed' && c.status !== 'dropped').length;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -4383,6 +4425,7 @@ async function startDemo() {
   try { const ks = await fetch('/api/settings').then(r => r.json()); state.hasApiKey = !!ks.hasKey; } catch { state.hasApiKey = false; }
   document.getElementById('auth-screen')?.remove();
   document.body.classList.remove('auth-active');
+  wireNav();
   applyNavVisibility();
   injectFAB();
   navigate('dashboard');
