@@ -1612,6 +1612,9 @@ body.auth-active .bottom-nav { display: none !important; }
 .gp-tip { font-size: 13px; color: var(--text-muted); line-height: 1.5; padding-top: 10px; border-top: 1px solid var(--border); }
 .gym-plan-hint { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--gym-bg, var(--surface)); border: 1px solid var(--gym-border, var(--border)); }
 .gym-plan-hint b { color: var(--text); }
+/* Dashboard section labels (scannable grouping) */
+.dash-section { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin: 26px 4px 12px; display: flex; align-items: center; gap: 10px; }
+.dash-section::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 /* Autosave indicator (Log page) */
 .autosave-status { font-size: 12.5px; font-weight: 600; color: var(--text-muted); margin-right: auto; align-self: center; opacity: 0; transition: opacity 0.2s; }

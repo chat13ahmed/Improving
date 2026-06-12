@@ -3139,14 +3139,26 @@ function renderDashboard() {
 
   const focusHtml = renderFocusCard(stats, lastStats);
 
+  // Group the cards into scannable sections — a label only shows if its group has content
+  const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
+  const gGuidance = renderNextStep() + renderGoalCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
+  const gCoach    = renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard();
+  const gToday    = pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderChecklistCard() + focusHtml;
+  const gHealth   = renderNutritionWeekCard() + renderGymPlanCard() + renderWeightTrend();
+  const gMoney    = renderMoneyCircleCard();
+  const gBack     = renderRecentNotesCard() + renderReviewCard() + chartsHtml + achievementsHtml;
   document.getElementById('main').innerHTML =
     '<div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
     '<div><h2 class="page-title">Dashboard</h2>' +
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p></div>' +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">Share my week</button>' : '') +
     '</div>' +
-    renderNextStep() + renderGoalCard() +
-    renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard() + renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard() + pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderMoneyCircleCard() + renderNutritionWeekCard() + renderGymPlanCard() + renderChecklistCard() + focusHtml + renderRecentNotesCard() + renderReviewCard() + chartsHtml + renderWeightTrend() + achievementsHtml;
+    gGuidance +
+    sec('Your coach', gCoach) +
+    sec('Today', gToday) +
+    sec('Health', gHealth) +
+    sec('Money', gMoney) +
+    sec('Looking back', gBack);
 
   setTimeout(animateCounters, 120);
   if (showIncomeChart) initIncomeChart(sortedWeeks);
