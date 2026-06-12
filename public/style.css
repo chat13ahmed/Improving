@@ -1629,9 +1629,16 @@ body.auth-active .bottom-nav { display: none !important; }
 @keyframes climbDraw { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
 .climber, .climber-ring { transform-box: fill-box; transform-origin: center; opacity: 0; animation: climberPop .5s cubic-bezier(.34,1.56,.64,1) 1.25s forwards; }
 @keyframes climberPop { from { opacity: 0; transform: scale(.2); } to { opacity: 1; transform: scale(1); } }
+.climb-ms.pending { opacity: 0.5; }
+.climb-ms.reached { transform-box: fill-box; transform-origin: bottom center; opacity: 0; animation: msPlant .5s cubic-bezier(.34,1.56,.64,1) 1.5s forwards; }
+@keyframes msPlant { from { opacity: 0; transform: translateY(3px) scale(.5); } to { opacity: 1; transform: none; } }
+.climb-peak-back { transform-box: fill-box; animation: peakDrift 22s ease-in-out infinite alternate; }
+@keyframes peakDrift { from { transform: translateX(0); } to { transform: translateX(-5px); } }
+.climb-share-btn { display: block; margin: 12px auto 0; }
 @media (prefers-reduced-motion: reduce) {
   .climb-trail-done { animation: none; stroke-dashoffset: 0; }
-  .climber, .climber-ring { animation: none; opacity: 1; transform: none; }
+  .climber, .climber-ring, .climb-ms.reached { animation: none; opacity: 1; transform: none; }
+  .climb-peak-back { animation: none; }
 }
 /* Dashboard section labels (scannable grouping) */
 .dash-section { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin: 26px 4px 12px; display: flex; align-items: center; gap: 10px; }

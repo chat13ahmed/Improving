@@ -2977,22 +2977,50 @@ function pointAlong(pts, t) {
   }
   return pts[pts.length - 1];
 }
-function renderClimbCard() {
-  const streak = loggingStreak();
-  const weekly = getWeeklyScore();
-  const goal = state.data.profile && state.data.profile.goal;
-  const gp = goal ? goalStatus(goal, currentGoalValue(goal), Date.now()) : null;
-  const m = momentumScore(streak, weekly, gp ? gp.pct : null);
-  const pts = climbTrail();
+// The inner mountain scene (peaks, trail, milestone flags, summit, climber).
+// Reused by the live card AND the shareable image, so they always match.
+function climbScene(pts, m, streak) {
   const d = 'M' + pts.map(p => p[0] + ' ' + p[1]).join(' L ');
   const total = Math.round(trailTotal(pts));
   const climbed = Math.round(total * m / 100);
   const c = pointAlong(pts, m / 100);
-  const s = pts[pts.length - 1]; // summit
-  const caption = m >= 80 ? 'Near the summit — incredible momentum.'
+  const s = pts[pts.length - 1];
+  const milestones = [{ t: 0.34, days: 7 }, { t: 0.7, days: 30 }];
+  const ms = milestones.map(k => {
+    const p = pointAlong(pts, k.t);
+    const reached = (streak || 0) >= k.days;
+    return '<g class="climb-ms' + (reached ? ' reached' : ' pending') + '">' +
+      '<line x1="' + p[0].toFixed(1) + '" y1="' + p[1].toFixed(1) + '" x2="' + p[0].toFixed(1) + '" y2="' + (p[1] - 11).toFixed(1) + '" stroke="#94a3b8" stroke-width="1.4"/>' +
+      '<polygon points="' + p[0].toFixed(1) + ',' + (p[1] - 11).toFixed(1) + ' ' + (p[0] + 8).toFixed(1) + ',' + (p[1] - 8.5).toFixed(1) + ' ' + p[0].toFixed(1) + ',' + (p[1] - 6).toFixed(1) + '" fill="' + (reached ? '#ef4444' : '#cbd5e1') + '"/>' +
+      '<text x="' + p[0].toFixed(1) + '" y="' + (p[1] + 10).toFixed(1) + '" text-anchor="middle" font-size="7" font-weight="800" fill="#64748b">' + k.days + 'd</text>' +
+      '</g>';
+  }).join('');
+  return '<circle cx="264" cy="36" r="15" fill="#fff" opacity="0.7"/>' +
+    '<polygon class="climb-peak-back" points="0,190 64,116 112,150 178,90 224,128 282,78 320,108 320,190" fill="#c4d0e6" opacity="0.55"/>' +
+    '<polygon points="0,190 92,148 152,168 214,118 274,150 320,132 320,190" fill="#a9b8d4" opacity="0.5"/>' +
+    '<path d="' + d + '" fill="none" stroke="#94a3b8" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 7" opacity="0.6"/>' +
+    '<path d="' + d + '" class="climb-trail-done" fill="none" stroke="url(#climbDone)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="' + climbed + ' 9999" style="--len:' + climbed + '"/>' +
+    ms +
+    '<line x1="' + s[0] + '" y1="' + s[1] + '" x2="' + s[0] + '" y2="' + (s[1] - 15) + '" stroke="#475569" stroke-width="2"/>' +
+    '<polygon points="' + s[0] + ',' + (s[1] - 15) + ' ' + (s[0] + 13) + ',' + (s[1] - 11) + ' ' + s[0] + ',' + (s[1] - 7) + '" fill="#ef4444"/>' +
+    '<circle class="climber-ring" cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="8" fill="#fff"/>' +
+    '<circle class="climber" cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="5.5" fill="url(#climbDone)"/>';
+}
+function climbCaption(m) {
+  return m >= 80 ? 'Near the summit — incredible momentum.'
     : m >= 50 ? 'Strong climb. Keep stacking days.'
       : m >= 20 ? "You're moving up — one log at a time."
         : 'Every climb starts with one step. Log today.';
+}
+function climbMomentum() {
+  const goal = state.data.profile && state.data.profile.goal;
+  const gp = goal ? goalStatus(goal, currentGoalValue(goal), Date.now()) : null;
+  return momentumScore(loggingStreak(), getWeeklyScore(), gp ? gp.pct : null);
+}
+function renderClimbCard() {
+  const streak = loggingStreak();
+  const m = climbMomentum();
+  const goal = state.data.profile && state.data.profile.goal;
   const svg =
     '<svg viewBox="0 0 320 190" class="climb-svg" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Your climb, ' + m + ' percent">' +
     '<defs>' +
@@ -3000,23 +3028,61 @@ function renderClimbCard() {
     '<linearGradient id="climbDone" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#fb923c"/><stop offset="0.5" stop-color="#ef4444"/><stop offset="1" stop-color="#a855f7"/></linearGradient>' +
     '</defs>' +
     '<rect x="0" y="0" width="320" height="190" rx="12" fill="url(#climbSky)"/>' +
-    '<circle cx="264" cy="36" r="15" fill="#fff" opacity="0.75"/>' +
-    '<polygon points="0,190 64,116 112,150 178,90 224,128 282,78 320,108 320,190" fill="#c4d0e6" opacity="0.55"/>' +
-    '<polygon points="0,190 92,148 152,168 214,118 274,150 320,132 320,190" fill="#a9b8d4" opacity="0.5"/>' +
-    '<path d="' + d + '" fill="none" stroke="#94a3b8" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 7" opacity="0.65"/>' +
-    '<path d="' + d + '" class="climb-trail-done" fill="none" stroke="url(#climbDone)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="' + climbed + ' 9999" style="--len:' + climbed + '"/>' +
-    '<line x1="' + s[0] + '" y1="' + s[1] + '" x2="' + s[0] + '" y2="' + (s[1] - 15) + '" stroke="#475569" stroke-width="2"/>' +
-    '<polygon points="' + s[0] + ',' + (s[1] - 15) + ' ' + (s[0] + 13) + ',' + (s[1] - 11) + ' ' + s[0] + ',' + (s[1] - 7) + '" fill="#ef4444"/>' +
-    '<circle class="climber-ring" cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="8" fill="#fff"/>' +
-    '<circle class="climber" cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="5.5" fill="url(#climbDone)"/>' +
+    climbScene(climbTrail(), m, streak) +
     '</svg>';
   return '<div class="card climb-card">' +
     '<div class="climb-head"><div><div class="climb-title">Your climb</div>' +
     '<div class="climb-sub">' + streak + '-day streak · toward ' + escapeHtml(goal ? goal.title : 'your peak') + '</div></div>' +
     '<div class="climb-pct">' + m + '%</div></div>' +
     svg +
-    '<div class="climb-caption">' + escapeHtml(caption) + '</div>' +
+    '<div class="climb-caption">' + escapeHtml(climbCaption(m)) + '</div>' +
+    '<button type="button" class="btn btn-outline btn-sm climb-share-btn" onclick="shareMyClimb()">Share my climb</button>' +
     '</div>';
+}
+// Build a square shareable PNG of the climb (SVG → image → canvas)
+function climbShareSvg(size) {
+  const pts = climbTrail();
+  const streak = loggingStreak();
+  const m = climbMomentum();
+  const goal = state.data.profile && state.data.profile.goal;
+  const goalLabel = escapeHtml(goal ? goal.title : 'my peak');
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + size + '" viewBox="0 0 1080 1080">' +
+    '<defs>' +
+    '<linearGradient id="climbDone" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#fb923c"/><stop offset="0.5" stop-color="#ef4444"/><stop offset="1" stop-color="#a855f7"/></linearGradient>' +
+    '<linearGradient id="shareBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b1020"/><stop offset="1" stop-color="#1c1233"/></linearGradient>' +
+    '<linearGradient id="climbSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#243049"/><stop offset="1" stop-color="#3a2a40"/></linearGradient>' +
+    '</defs>' +
+    '<rect width="1080" height="1080" fill="url(#shareBg)"/>' +
+    '<text x="540" y="148" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="38" font-weight="800" letter-spacing="4" fill="#94a3b8">YOUR CLIMB</text>' +
+    '<text x="540" y="320" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="200" font-weight="900" fill="url(#climbDone)">' + m + '%</text>' +
+    '<text x="540" y="392" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="40" font-weight="600" fill="#cbd5e1">' + streak + '-day streak · toward ' + goalLabel + '</text>' +
+    '<svg x="110" y="450" width="860" height="510" viewBox="0 0 320 190"><rect width="320" height="190" rx="14" fill="url(#climbSky)"/>' + climbScene(pts, m, streak) + '</svg>' +
+    '<text x="540" y="1008" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="38" font-weight="700" fill="#e2e8f0">' + escapeHtml(climbCaption(m)) + '  ·  Escalate</text>' +
+    '</svg>';
+}
+function buildClimbShareBlob(size) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => { const cv = document.createElement('canvas'); cv.width = cv.height = size; cv.getContext('2d').drawImage(img, 0, 0, size, size); cv.toBlob(b => resolve(b), 'image/png'); };
+    img.onerror = () => resolve(null);
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(climbShareSvg(size));
+  });
+}
+async function shareMyClimb() {
+  try {
+    showToast('Building your climb…', 'success');
+    const blob = await buildClimbShareBlob(1080);
+    if (!blob) { showToast('Could not create the image.', 'error'); return; }
+    const file = new File([blob], 'my-climb.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'My climb on Escalate', text: 'Escalating across my whole life.' });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'my-climb.png'; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      showToast('Saved — post your climb!', 'success');
+    }
+  } catch { showToast('Could not share.', 'error'); }
 }
 
 // ─────────────────────────────────────────────────────────────
