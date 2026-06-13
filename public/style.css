@@ -1293,11 +1293,20 @@ body {
      wrap vertically. Drop to a 2x2 grid (matches the Contacts/History stat bars).
      Uses .main to outrank the base .reading-stats rule defined later in this file. */
   .main .reading-stats { grid-template-columns: repeat(2, 1fr); }
+  /* Book card: keep the action buttons on their own row so the title/label always
+     get the full width beside the cover and can never be squeezed to vertical text. */
+  .rbc-actions { flex-basis: 100%; }
+  .rbc-info { min-width: 0; }
+  .rbc-title, .rbc-label, .rbc-author { overflow-wrap: break-word; word-break: normal; }
   /* Owner analytics table can scroll sideways; the main data tables restyle into cards below */
   .main .admin-table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .chart-wrap { max-width: 100%; }
   img, canvas, pre, textarea { max-width: 100%; }
-  .di-text, .review-text, .card { overflow-wrap: anywhere; word-break: break-word; }
+  /* Use overflow-wrap:break-word (NOT anywhere) + leave word-break normal: long words
+     still wrap to avoid overflow, but a cell/flex item's min-content stays at the
+     longest word — so squeezed flex children (e.g. the book title) never collapse to
+     one-character-per-line vertical text. */
+  .di-text, .review-text, .card { overflow-wrap: break-word; word-break: normal; }
 
   /* Data tables (History, Reading Log) collapse from columns into readable stacked rows
      so text is never crushed into vertical single letters on a narrow phone. */
