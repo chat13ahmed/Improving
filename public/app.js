@@ -4870,6 +4870,29 @@ function shiftCal(dir) {
 // ─────────────────────────────────────────────────────────────
 // READING PAGE
 // ─────────────────────────────────────────────────────────────
+// A book cover: the resolved image if we have one, else a lettered placeholder.
+function bookCoverHtml(b, cls) {
+  const letter = escapeHtml(((b.title || '?').trim().charAt(0) || '?').toUpperCase());
+  const img = b.cover ? '<img src="' + escapeAttr(b.cover) + '" alt="' + escapeAttr(b.title) + ' cover" loading="lazy" onerror="this.remove()">' : '';
+  return '<div class="book-cover ' + (cls || '') + '" data-letter="' + letter + '">' + img + '</div>';
+}
+// Resolve missing covers from the free Open Library API (cached per book).
+async function ensureBookCovers() {
+  const pending = (state.data.books || []).filter(b => b.cover === undefined && b.title);
+  if (!pending.length) return;
+  let changed = false;
+  for (const b of pending) {
+    try {
+      const q = 'title=' + encodeURIComponent(b.title) + (b.author ? '&author=' + encodeURIComponent(b.author) : '');
+      const res = await fetch('https://openlibrary.org/search.json?' + q + '&limit=1&fields=cover_i');
+      const j = await res.json();
+      const id = j && j.docs && j.docs[0] && j.docs[0].cover_i;
+      b.cover = id ? 'https://covers.openlibrary.org/b/id/' + id + '-M.jpg' : '';
+    } catch { b.cover = ''; }
+    changed = true;
+  }
+  if (changed) { saveData(); if (state.page === 'reading') renderReadingPage(); }
+}
 function renderReadingPage() {
   const books      = state.data.books || [];
   const activeBook = books.find(b => b.status === 'reading');
@@ -4904,7 +4927,7 @@ function renderReadingPage() {
   const bookCard = activeBook
     ? '<div class="card reading-book-card">' +
       '<div class="rbc-header">' +
-      '<div class="rbc-icon"></div>' +
+      bookCoverHtml(activeBook, 'bc-lg') +
       '<div class="rbc-info">' +
       '<div class="rbc-label">Currently Reading</div>' +
       '<div class="rbc-title">' + escapeHtml(activeBook.title) + '</div>' +
@@ -4950,7 +4973,7 @@ function renderReadingPage() {
       '<div class="finished-books-grid">' +
       finished.map(b =>
         '<div class="finished-book">' +
-        '<span class="fb-icon"></span>' +
+        bookCoverHtml(b, 'bc-sm') +
         '<div><div class="fb-title">' + escapeHtml(b.title) + '</div>' +
         (b.author ? '<div class="fb-date" style="color:var(--text-muted);font-size:12px">' + escapeHtml(b.author) + '</div>' : '') +
         (b.finishedDate ? '<div class="fb-date">' + fmtDate(b.finishedDate) + '</div>' : '') +
@@ -4965,6 +4988,7 @@ function renderReadingPage() {
     '<p class="page-sub">Track your books, build a daily reading habit, and retain what you learn</p>' +
     '</div>' +
     statsBar + bookCard + historyCard + finishedCard;
+  ensureBookCovers(); // resolve any missing covers, then re-render
 }
 
 // Curated list of popular growth/business/self-development books with page counts,
