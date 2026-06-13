@@ -3353,11 +3353,11 @@ function renderRecentDaysTable(days) {
       ? '<span style="font-size:12px;color:var(--text-muted)">' + d.money.activities.slice(0, 40) + (d.money.activities.length > 40 ? '…' : '') + '</span>'
       : '—';
     return '<tr>' +
-      '<td><strong>' + fmtDate(d.date) + '</strong></td>' +
-      '<td>' + gymCell + '</td>' +
-      '<td>' + foodCell + '</td>' +
-      '<td>' + netCell + '</td>' +
-      '<td>' + moneyCell + '</td>' +
+      '<td data-label="Date"><strong>' + fmtDate(d.date) + '</strong></td>' +
+      '<td data-label="' + escapeHtml(pillar('gym').label) + '">' + gymCell + '</td>' +
+      '<td data-label="' + escapeHtml(pillar('food').label) + '">' + foodCell + '</td>' +
+      '<td data-label="' + escapeHtml(pillar('networking').label) + '">' + netCell + '</td>' +
+      '<td data-label="' + escapeHtml(pillar('money').label) + '">' + moneyCell + '</td>' +
       '<td class="action-cell">' +
       '<button class="btn-sm" onclick="editDay(\'' + d.id + '\')"></button>' +
       '<button class="btn-sm btn-sm-danger" onclick="deleteDay(\'' + d.id + '\')"></button>' +
@@ -4245,11 +4245,11 @@ function renderHistoryRows(days) {
       : '—';
     const noteCell = d.notes ? '<div style="font-size:11px;color:var(--text-muted);margin-top:3px">' + d.notes.slice(0, 60) + '</div>' : '';
     return '<tr>' +
-      '<td><strong>' + fmtDate(d.date) + '</strong>' + noteCell + '</td>' +
-      '<td>' + gymCell + '</td>' +
-      '<td>' + foodCell + '</td>' +
-      '<td>' + netCell + '</td>' +
-      '<td>' + moneyCell + '</td>' +
+      '<td data-label="Date"><strong>' + fmtDate(d.date) + '</strong>' + noteCell + '</td>' +
+      '<td data-label="' + escapeHtml(pillar('gym').label) + '">' + gymCell + '</td>' +
+      '<td data-label="' + escapeHtml(pillar('food').label) + '">' + foodCell + '</td>' +
+      '<td data-label="' + escapeHtml(pillar('networking').label) + '">' + netCell + '</td>' +
+      '<td data-label="' + escapeHtml(pillar('money').label) + '">' + moneyCell + '</td>' +
       '<td class="action-cell">' +
       '<button class="btn-sm" onclick="editDay(\'' + d.id + '\')">Edit</button>' +
       '<button class="btn-sm btn-sm-danger" onclick="deleteDay(\'' + d.id + '\')"></button>' +
@@ -4958,10 +4958,10 @@ function renderReadingPage() {
       '<thead><tr><th>Date</th><th>Book</th><th>Pages</th><th>Summary</th></tr></thead><tbody>' +
       recentLogs.map(d =>
         '<tr>' +
-        '<td><strong>' + fmtDate(d.date) + '</strong></td>' +
-        '<td style="font-size:12px;color:var(--text-muted);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escapeHtml(d.reading.bookTitle || '') + '</td>' +
-        '<td><span class="pill pill-read">+' + d.reading.pages + ' pg</span></td>' +
-        '<td style="font-size:13px;color:var(--text-muted);max-width:320px">' + escapeHtml((d.reading.summary || '').slice(0, 90)) + (d.reading.summary?.length > 90 ? '…' : '') + '</td>' +
+        '<td data-label="Date"><strong>' + fmtDate(d.date) + '</strong></td>' +
+        '<td data-label="Book" style="font-size:12px;color:var(--text-muted);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escapeHtml(d.reading.bookTitle || '') + '</td>' +
+        '<td data-label="Pages"><span class="pill pill-read">+' + d.reading.pages + ' pg</span></td>' +
+        '<td data-label="Summary" style="font-size:13px;color:var(--text-muted);max-width:320px">' + escapeHtml((d.reading.summary || '').slice(0, 90)) + (d.reading.summary?.length > 90 ? '…' : '') + '</td>' +
         '</tr>'
       ).join('') +
       '</tbody></table></div>'

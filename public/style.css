@@ -1289,10 +1289,54 @@ body {
   .page-title { font-size: 22px; }
   /* Anything that could be wider than the phone scrolls inside its own card */
   .card { max-width: 100%; }
-  .main table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Owner analytics table can scroll sideways; the main data tables restyle into cards below */
+  .main .admin-table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .chart-wrap { max-width: 100%; }
   img, canvas, pre, textarea { max-width: 100%; }
   .di-text, .review-text, .card { overflow-wrap: anywhere; word-break: break-word; }
+
+  /* Data tables (History, Reading Log) collapse from columns into readable stacked rows
+     so text is never crushed into vertical single letters on a narrow phone. */
+  .table, .table tbody { display: block; width: 100%; }
+  .table thead { display: none; }
+  .table tr {
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 6px 14px;
+    margin-bottom: 10px;
+  }
+  .table tr:hover td { background: transparent; }
+  .table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--tint-2);
+    max-width: none !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: normal;
+    overflow-wrap: anywhere;
+    text-align: right;
+  }
+  .table td:last-child { border-bottom: none; }
+  .table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-muted);
+  }
+  .table td.action-cell { justify-content: flex-end; gap: 8px; }
+  .table td.action-cell::before { content: none; }
 }
 
 /* ─── Mobile bottom tab bar ──────────────────────── */
