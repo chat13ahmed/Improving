@@ -1289,6 +1289,10 @@ body {
   .page-title { font-size: 22px; }
   /* Anything that could be wider than the phone scrolls inside its own card */
   .card { max-width: 100%; }
+  /* Reading stat cards: 4-across is too tight on a phone, so values like "22 pages"
+     wrap vertically. Drop to a 2x2 grid (matches the Contacts/History stat bars).
+     Uses .main to outrank the base .reading-stats rule defined later in this file. */
+  .main .reading-stats { grid-template-columns: repeat(2, 1fr); }
   /* Owner analytics table can scroll sideways; the main data tables restyle into cards below */
   .main .admin-table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .chart-wrap { max-width: 100%; }
