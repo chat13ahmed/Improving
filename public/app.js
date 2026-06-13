@@ -566,6 +566,28 @@ function showStreakCelebration(streak) {
   setTimeout(() => { if (el.parentNode) el.remove(); }, 5000);
 }
 
+// Celebrate hitting 100% momentum — you reached the summit of "Your Climb"
+function showSummitCelebration() {
+  const cols = ['#fb923c', '#ef4444', '#a855f7', '#fbbf24', '#3b82f6'];
+  let conf = '';
+  for (let i = 0; i < 34; i++) {
+    const left = Math.random() * 100, delay = Math.random() * 1.8, dur = 2.2 + Math.random() * 2.2, w = 7 + Math.random() * 8;
+    conf += '<div class="conf-p" style="left:' + left + '%;width:' + w + 'px;height:' + (w * 1.5) + 'px;background:' + cols[i % cols.length] + ';border-radius:2px;animation-delay:' + delay + 's;animation-duration:' + dur + 's"></div>';
+  }
+  const el = document.createElement('div');
+  el.className = 'celebration-overlay';
+  el.onclick = () => el.remove();
+  el.innerHTML = conf +
+    '<div class="celeb-box">' +
+    '<svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 10px;display:block"><path d="M5 21V4l11 3.5L5 11"/></svg>' +
+    '<div class="celeb-title">Summit reached</div>' +
+    '<div class="celeb-sub">100% momentum — every pillar firing at once. This is the top of your game.</div>' +
+    '<div class="celeb-tap">tap anywhere to continue</div>' +
+    '</div>';
+  document.body.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.remove(); }, 6000);
+}
+
 // ─────────────────────────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────────────────────────
@@ -2979,10 +3001,11 @@ function pointAlong(pts, t) {
 }
 // The inner mountain scene (peaks, trail, milestone flags, summit, climber).
 // Reused by the live card AND the shareable image, so they always match.
-function climbScene(pts, m, streak) {
+function climbScene(pts, m, streak, animated) {
   const d = 'M' + pts.map(p => p[0] + ' ' + p[1]).join(' L ');
   const total = Math.round(trailTotal(pts));
   const climbed = Math.round(total * m / 100);
+  const frac = Math.max(0, Math.min(1, m / 100)).toFixed(3);
   const c = pointAlong(pts, m / 100);
   const s = pts[pts.length - 1];
   const milestones = [{ t: 0.34, days: 7 }, { t: 0.7, days: 30 }];
@@ -3003,8 +3026,11 @@ function climbScene(pts, m, streak) {
     ms +
     '<line x1="' + s[0] + '" y1="' + s[1] + '" x2="' + s[0] + '" y2="' + (s[1] - 15) + '" stroke="#475569" stroke-width="2"/>' +
     '<polygon points="' + s[0] + ',' + (s[1] - 15) + ' ' + (s[0] + 13) + ',' + (s[1] - 11) + ' ' + s[0] + ',' + (s[1] - 7) + '" fill="#ef4444"/>' +
-    '<circle class="climber-ring" cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="8" fill="#fff"/>' +
-    '<circle class="climber" cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="5.5" fill="url(#climbDone)"/>';
+    (animated
+      ? '<g class="climber-walk"><circle r="8" fill="#fff"/><circle r="5.5" fill="url(#climbDone)"/>' +
+        '<animateMotion dur="1.7s" begin="0s" fill="freeze" calcMode="spline" keyTimes="0;1" keyPoints="0;' + frac + '" keySplines="0.42 0 0.2 1" path="' + d + '"/></g>'
+      : '<circle class="climber-ring" cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="8" fill="#fff"/>' +
+        '<circle class="climber" cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="5.5" fill="url(#climbDone)"/>');
 }
 function climbCaption(m) {
   return m >= 80 ? 'Near the summit — incredible momentum.'
@@ -3028,7 +3054,7 @@ function renderClimbCard() {
     '<linearGradient id="climbDone" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#fb923c"/><stop offset="0.5" stop-color="#ef4444"/><stop offset="1" stop-color="#a855f7"/></linearGradient>' +
     '</defs>' +
     '<rect x="0" y="0" width="320" height="190" rx="12" fill="url(#climbSky)"/>' +
-    climbScene(climbTrail(), m, streak) +
+    climbScene(climbTrail(), m, streak, !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) +
     '</svg>';
   return '<div class="card climb-card">' +
     '<div class="climb-head"><div><div class="climb-title">Your climb</div>' +
@@ -3056,7 +3082,7 @@ function climbShareSvg(size) {
     '<text x="540" y="148" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="38" font-weight="800" letter-spacing="4" fill="#94a3b8">YOUR CLIMB</text>' +
     '<text x="540" y="320" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="200" font-weight="900" fill="url(#climbDone)">' + m + '%</text>' +
     '<text x="540" y="392" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="40" font-weight="600" fill="#cbd5e1">' + streak + '-day streak · toward ' + goalLabel + '</text>' +
-    '<svg x="110" y="450" width="860" height="510" viewBox="0 0 320 190"><rect width="320" height="190" rx="14" fill="url(#climbSky)"/>' + climbScene(pts, m, streak) + '</svg>' +
+    '<svg x="110" y="450" width="860" height="510" viewBox="0 0 320 190"><rect width="320" height="190" rx="14" fill="url(#climbSky)"/>' + climbScene(pts, m, streak, false) + '</svg>' +
     '<text x="540" y="1008" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="38" font-weight="700" fill="#e2e8f0">' + escapeHtml(climbCaption(m)) + '  ·  Escalate</text>' +
     '</svg>';
 }
@@ -3294,6 +3320,9 @@ function renderDashboard() {
     sec('Looking back', gBack);
 
   setTimeout(animateCounters, 120);
+  // Summit celebration once when momentum hits 100% (resets if it drops)
+  const _mom = climbMomentum();
+  if (_mom >= 100) { if (!state._summitShown) { state._summitShown = true; setTimeout(showSummitCelebration, 700); } } else { state._summitShown = false; }
   if (showIncomeChart) initIncomeChart(sortedWeeks);
   if (showGymChart)    initGymChart(days);
   if ((state.data.weights || []).length >= 2) initWeightChart();
