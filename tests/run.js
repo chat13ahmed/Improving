@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, gymPlan, momentumScore, pointAlong,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, gymPlan, momentumScore, pointAlong,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -143,6 +143,19 @@ ok('booksByAuthor accounts for every book', _byAuthor.reduce((n, g) => n + g.boo
 ok('booksByAuthor is sorted alphabetically', _byAuthor.map(g => g.author).join('|') === _byAuthor.map(g => g.author).slice().sort((x, y) => x.localeCompare(y)).join('|'));
 ok('booksByAuthor surfaces multi-book authors', _byAuthor.filter(g => g.books.length >= 3).length >= 3);
 ok('booksByAuthor groups Robert Greene together', (_byAuthor.find(g => g.author === 'Robert Greene') || { books: [] }).books.length >= 3);
+// Reading notes grouped by book
+const _rg = A.groupReadingByBook([
+  { date: '2026-06-10', reading: { bookTitle: 'Deep Work', pages: 20, summary: 'focus' } },
+  { date: '2026-06-12', reading: { bookTitle: 'Deep Work', pages: 15, summary: '' } },
+  { date: '2026-06-11', reading: { bookTitle: 'Grit', pages: 30, summary: 'effort' } },
+  { date: '2026-06-09', reading: { pages: 0 } }
+]);
+ok('groupReadingByBook groups by title', _rg.length === 2);
+ok('groupReadingByBook orders most-recent book first', _rg[0].title === 'Deep Work');
+ok('groupReadingByBook sums pages per book', _rg[0].pages === 35);
+ok('groupReadingByBook counts only non-empty notes', _rg[0].notes === 1);
+ok('groupReadingByBook entries newest-first', _rg[0].entries[0].date === '2026-06-12');
+ok('groupReadingByBook ignores zero-page days', _rg.reduce((n, g) => n + g.entries.length, 0) === 3);
 // Gym training plan by goal + weight
 ok('gymPlan lose → fat loss + cardio', /fat loss/i.test(A.gymPlan('lose', 80).headline) && /cardio/i.test(A.gymPlan('lose', 80).cardio));
 ok('gymPlan gain → progressive overload', /overload/i.test(A.gymPlan('gain', 80).strength));

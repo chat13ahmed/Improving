@@ -4910,10 +4910,9 @@ function renderReadingPage() {
     ? Math.min(100, Math.round((bookPagesRead / activeBook.totalPages) * 100))
     : null;
 
-  const recentLogs = [...state.data.days]
-    .filter(d => d.reading?.pages > 0)
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 15);
+  const booksByTitle = {};
+  (state.data.books || []).forEach(b => { booksByTitle[b.title] = b; });
+  const noteGroups = groupReadingByBook(state.data.days);
 
   const statsBar = readingDays.length > 0
     ? '<div class="reading-stats">' +
@@ -4951,20 +4950,32 @@ function renderReadingPage() {
       '<button class="btn btn-primary" onclick="showAddBookModal(false)">Set My Current Book</button>' +
       '</div>';
 
-  const historyCard = recentLogs.length > 0
+  const historyCard = noteGroups.length > 0
     ? '<div class="card">' +
-      '<h3 class="card-title">Reading Log</h3>' +
-      '<table class="table">' +
-      '<thead><tr><th>Date</th><th>Book</th><th>Pages</th><th>Summary</th></tr></thead><tbody>' +
-      recentLogs.map(d =>
-        '<tr>' +
-        '<td data-label="Date"><strong>' + fmtDate(d.date) + '</strong></td>' +
-        '<td data-label="Book" style="font-size:12px;color:var(--text-muted);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escapeHtml(d.reading.bookTitle || '') + '</td>' +
-        '<td data-label="Pages"><span class="pill pill-read">+' + d.reading.pages + ' pg</span></td>' +
-        '<td data-label="Summary" style="font-size:13px;color:var(--text-muted);max-width:320px">' + escapeHtml((d.reading.summary || '').slice(0, 90)) + (d.reading.summary?.length > 90 ? '…' : '') + '</td>' +
-        '</tr>'
-      ).join('') +
-      '</tbody></table></div>'
+      '<h3 class="card-title">Reading Notes</h3>' +
+      '<p class="muted" style="font-size:13px;margin:-4px 0 14px">Grouped by book — tap a title to show or hide its notes.</p>' +
+      noteGroups.map(g => {
+        const collapsed = _collapsedBookNotes.has(g.title);
+        return '<div class="rlog-group' + (collapsed ? ' collapsed' : '') + '" data-key="' + escapeAttr(g.title) + '">' +
+          '<button type="button" class="rlog-book-head" onclick="toggleBookNotes(this)">' +
+          bookCoverHtml(booksByTitle[g.title] || { title: g.title }, 'bc-sm') +
+          '<span class="rlog-book-meta">' +
+          '<span class="rlog-book-name">' + escapeHtml(g.title) + '</span>' +
+          '<span class="rlog-book-sub">' + g.entries.length + ' session' + (g.entries.length > 1 ? 's' : '') + ' · ' + g.pages.toLocaleString() + ' pages' + (g.notes ? ' · ' + g.notes + ' note' + (g.notes > 1 ? 's' : '') : '') + '</span>' +
+          '</span>' +
+          '<span class="rlog-chev">›</span>' +
+          '</button>' +
+          '<div class="rlog-book-body">' +
+          g.entries.map(d =>
+            '<div class="rlog-entry">' +
+            '<div class="rlog-entry-top"><span class="rlog-date">' + fmtDate(d.date) + '</span><span class="pill pill-read">+' + d.reading.pages + ' pg</span></div>' +
+            ((d.reading.summary || '').trim() ? '<div class="rlog-note">' + escapeHtml(d.reading.summary.trim()) + '</div>' : '') +
+            '</div>'
+          ).join('') +
+          '</div>' +
+          '</div>';
+      }).join('') +
+      '</div>'
     : '';
 
   const finishedCard = finished.length > 0
@@ -5127,6 +5138,33 @@ function booksByAuthor() {
     .map(a => ({ author: a, books: map[a].slice().sort((m, n) => m.t.localeCompare(n.t)) }));
 }
 let _authorGroups = null;
+// Group reading sessions by book (most-recently-active book first) for the notes log.
+function groupReadingByBook(days) {
+  const order = [], map = {};
+  [...(days || [])]
+    .filter(d => d.reading && d.reading.pages > 0)
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .forEach(d => {
+      const t = (d.reading.bookTitle || 'Untitled').trim() || 'Untitled';
+      if (!map[t]) { map[t] = []; order.push(t); }
+      map[t].push(d);
+    });
+  return order.map(title => ({
+    title,
+    entries: map[title],
+    pages: map[title].reduce((s, d) => s + (d.reading.pages || 0), 0),
+    notes: map[title].filter(d => (d.reading.summary || '').trim()).length
+  }));
+}
+// Remembers which book note-groups are collapsed, across re-renders.
+const _collapsedBookNotes = new Set();
+function toggleBookNotes(btn) {
+  const grp = btn && btn.closest('.rlog-group');
+  if (!grp) return;
+  const key = grp.getAttribute('data-key');
+  const isCollapsed = grp.classList.toggle('collapsed');
+  if (isCollapsed) _collapsedBookNotes.add(key); else _collapsedBookNotes.delete(key);
+}
 function findBook(title) {
   if (!title) return null;
   const q = title.trim().toLowerCase();
