@@ -1643,6 +1643,8 @@ body.auth-active .bottom-nav { display: none !important; }
 .book-cover.bc-lg { width: 62px; height: 90px; }
 .book-cover.bc-sm { width: 42px; height: 60px; }
 .book-cover.bc-sm::after { font-size: 16px; }
+.book-pick-cover { display: none; }
+.book-pick-cover.book-cover { display: flex; margin: 0 auto 16px; }
 @media (prefers-reduced-motion: reduce) {
   .climb-trail-done { animation: none; stroke-dashoffset: 0; }
   .climber, .climber-ring, .climb-ms.reached { animation: none; opacity: 1; transform: none; }

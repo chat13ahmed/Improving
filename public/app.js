@@ -5059,13 +5059,38 @@ function findBook(title) {
 }
 // When the title exactly matches a known book (i.e. picked from the list), fill author + pages
 function onBookPick() {
-  const title = (document.getElementById('book-title-input')?.value || '').trim().toLowerCase();
-  const b = BOOK_DB.find(x => x.t.toLowerCase() === title);
-  if (!b) return;
-  const a = document.getElementById('book-author-input');
-  const p = document.getElementById('book-pages-total-input');
-  if (a) a.value = b.a;
-  if (p) p.value = b.p;
+  const raw = (document.getElementById('book-title-input')?.value || '').trim();
+  const b = BOOK_DB.find(x => x.t.toLowerCase() === raw.toLowerCase());
+  if (b) {
+    const a = document.getElementById('book-author-input');
+    const p = document.getElementById('book-pages-total-input');
+    if (a) a.value = b.a;
+    if (p) p.value = b.p;
+  }
+  updateBookPreview();
+}
+// Live cover preview in the picker as you type/select (Open Library, debounced)
+let _coverPreviewTimer = null;
+function updateBookPreview() {
+  const wrap = document.getElementById('book-cover-preview');
+  if (!wrap) return;
+  const title = (document.getElementById('book-title-input')?.value || '').trim();
+  if (!title) { wrap.className = 'book-pick-cover'; wrap.innerHTML = ''; wrap.removeAttribute('data-letter'); return; }
+  wrap.className = 'book-pick-cover book-cover bc-lg';
+  wrap.setAttribute('data-letter', title.charAt(0).toUpperCase());
+  wrap.innerHTML = ''; // lettered placeholder while we resolve
+  clearTimeout(_coverPreviewTimer);
+  _coverPreviewTimer = setTimeout(async () => {
+    const author = (document.getElementById('book-author-input')?.value || '').trim();
+    try {
+      const res = await fetch('https://openlibrary.org/search.json?title=' + encodeURIComponent(title) + (author ? '&author=' + encodeURIComponent(author) : '') + '&limit=1&fields=cover_i');
+      const j = await res.json();
+      const id = j && j.docs && j.docs[0] && j.docs[0].cover_i;
+      const w = document.getElementById('book-cover-preview');
+      if (!w || (document.getElementById('book-title-input')?.value || '').trim() !== title) return; // changed since
+      if (id) w.innerHTML = '<img src="https://covers.openlibrary.org/b/id/' + id + '-M.jpg" alt="cover" onerror="this.remove()">';
+    } catch {}
+  }, 450);
 }
 function showAddBookModal(isChanging) {
   document.getElementById('add-book-modal')?.remove();
@@ -5076,6 +5101,7 @@ function showAddBookModal(isChanging) {
     '<div class="modal-box" style="max-width:400px;text-align:left">' +
     '<div class="modal-badge">' + (isChanging ? 'Change Book' : 'Start Reading') + '</div>' +
     '<p style="font-size:14px;color:var(--text-muted);margin-bottom:20px">' + (isChanging ? 'What are you reading now?' : 'What book are you starting?') + '</p>' +
+    '<div id="book-cover-preview" class="book-pick-cover"></div>' +
     '<div class="form-group"><label>Book Title <span style="color:var(--danger)">*</span> <span style="font-weight:400;color:var(--text-muted)">— pick from the list or type your own</span></label>' +
     '<input type="text" id="book-title-input" list="book-datalist" placeholder="Search a book…" autocomplete="off" oninput="onBookPick()"></div>' +
     '<datalist id="book-datalist">' + BOOK_DB.map(b => '<option value="' + escapeAttr(b.t) + '">' + escapeAttr(b.a) + '</option>').join('') + '</datalist>' +
