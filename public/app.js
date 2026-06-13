@@ -5048,8 +5048,85 @@ const BOOK_DB = [
   { t: "So Good They Can't Ignore You", a: 'Cal Newport', p: 304 },
   { t: 'Drive', a: 'Daniel H. Pink', p: 272 },
   { t: 'The Richest Man in Babylon', a: 'George S. Clason', p: 144 },
-  { t: 'Rework', a: 'Jason Fried', p: 288 }
+  { t: 'Rework', a: 'Jason Fried', p: 288 },
+  { t: 'The Laws of Human Nature', a: 'Robert Greene', p: 608 },
+  { t: 'The 33 Strategies of War', a: 'Robert Greene', p: 496 },
+  { t: 'The Art of Seduction', a: 'Robert Greene', p: 480 },
+  { t: 'The Daily Laws', a: 'Robert Greene', p: 416 },
+  { t: 'Blink', a: 'Malcolm Gladwell', p: 320 },
+  { t: 'The Tipping Point', a: 'Malcolm Gladwell', p: 304 },
+  { t: 'Talking to Strangers', a: 'Malcolm Gladwell', p: 400 },
+  { t: 'David and Goliath', a: 'Malcolm Gladwell', p: 352 },
+  { t: 'The Daily Stoic', a: 'Ryan Holiday', p: 416 },
+  { t: 'Stillness Is the Key', a: 'Ryan Holiday', p: 288 },
+  { t: 'Courage Is Calling', a: 'Ryan Holiday', p: 304 },
+  { t: 'Discipline Is Destiny', a: 'Ryan Holiday', p: 336 },
+  { t: "Trust Me, I'm Lying", a: 'Ryan Holiday', p: 288 },
+  { t: 'Digital Minimalism', a: 'Cal Newport', p: 304 },
+  { t: 'A World Without Email', a: 'Cal Newport', p: 320 },
+  { t: 'Slow Productivity', a: 'Cal Newport', p: 256 },
+  { t: 'Tools of Titans', a: 'Tim Ferriss', p: 736 },
+  { t: 'Tribe of Mentors', a: 'Tim Ferriss', p: 624 },
+  { t: 'The 4-Hour Body', a: 'Tim Ferriss', p: 592 },
+  { t: 'Homo Deus', a: 'Yuval Noah Harari', p: 464 },
+  { t: '21 Lessons for the 21st Century', a: 'Yuval Noah Harari', p: 400 },
+  { t: 'Leaders Eat Last', a: 'Simon Sinek', p: 368 },
+  { t: 'The Infinite Game', a: 'Simon Sinek', p: 272 },
+  { t: 'Dare to Lead', a: 'Brené Brown', p: 320 },
+  { t: 'Atlas of the Heart', a: 'Brené Brown', p: 336 },
+  { t: 'The Gifts of Imperfection', a: 'Brené Brown', p: 160 },
+  { t: 'Money: Master the Game', a: 'Tony Robbins', p: 688 },
+  { t: 'Unshakeable', a: 'Tony Robbins', p: 256 },
+  { t: 'Cashflow Quadrant', a: 'Robert Kiyosaki', p: 376 },
+  { t: 'Everything Is F*cked', a: 'Mark Manson', p: 288 },
+  { t: 'To Sell Is Human', a: 'Daniel H. Pink', p: 272 },
+  { t: 'A Whole New Mind', a: 'Daniel H. Pink', p: 304 },
+  { t: 'When', a: 'Daniel H. Pink', p: 272 },
+  { t: 'Built to Last', a: 'Jim Collins', p: 368 },
+  { t: 'Great by Choice', a: 'Jim Collins', p: 320 },
+  { t: 'This Is Marketing', a: 'Seth Godin', p: 288 },
+  { t: 'Purple Cow', a: 'Seth Godin', p: 160 },
+  { t: 'Linchpin', a: 'Seth Godin', p: 256 },
+  { t: 'The Dip', a: 'Seth Godin', p: 96 },
+  { t: 'Give and Take', a: 'Adam Grant', p: 320 },
+  { t: 'Originals', a: 'Adam Grant', p: 336 },
+  { t: 'Think Again', a: 'Adam Grant', p: 320 },
+  { t: 'Hooked', a: 'Nir Eyal', p: 256 },
+  { t: 'Indistractable', a: 'Nir Eyal', p: 288 },
+  { t: 'Steve Jobs', a: 'Walter Isaacson', p: 656 },
+  { t: 'Elon Musk', a: 'Walter Isaacson', p: 688 },
+  { t: 'Einstein: His Life and Universe', a: 'Walter Isaacson', p: 704 },
+  { t: 'Leonardo da Vinci', a: 'Walter Isaacson', p: 624 },
+  { t: '$100M Leads', a: 'Alex Hormozi', p: 320 },
+  { t: 'Same as Ever', a: 'Morgan Housel', p: 272 },
+  { t: 'Thinking, Fast and Slow', a: 'Daniel Kahneman', p: 499 },
+  { t: 'The Power of Now', a: 'Eckhart Tolle', p: 236 },
+  { t: 'A New Earth', a: 'Eckhart Tolle', p: 336 },
+  { t: 'The Four Agreements', a: 'Don Miguel Ruiz', p: 160 },
+  { t: 'As a Man Thinketh', a: 'James Allen', p: 64 },
+  { t: 'The Art of War', a: 'Sun Tzu', p: 273 },
+  { t: 'Smarter Faster Better', a: 'Charles Duhigg', p: 400 },
+  { t: 'First Things First', a: 'Stephen R. Covey', p: 384 },
+  { t: 'Hyperfocus', a: 'Chris Bailey', p: 272 },
+  { t: 'The Productivity Project', a: 'Chris Bailey', p: 304 },
+  { t: 'Effortless', a: 'Greg McKeown', p: 272 },
+  { t: 'Never Finished', a: 'David Goggins', p: 336 },
+  { t: 'Discipline Equals Freedom', a: 'Jocko Willink', p: 208 },
+  { t: 'Leadership Strategy and Tactics', a: 'Jocko Willink', p: 304 },
+  { t: 'Be Obsessed or Be Average', a: 'Grant Cardone', p: 256 },
+  { t: 'Pre-Suasion', a: 'Robert B. Cialdini', p: 432 },
+  { t: "Poor Charlie's Almanack", a: 'Charlie Munger', p: 560 },
+  { t: 'What You Do Is Who You Are', a: 'Ben Horowitz', p: 276 }
 ];
+// Group the library by author (sorted) for the "browse by author" picker.
+function booksByAuthor() {
+  const map = {};
+  for (const b of BOOK_DB) { (map[b.a] = map[b.a] || []).push(b); }
+  return Object.keys(map)
+    .sort((x, y) => x.localeCompare(y))
+    .map(a => ({ author: a, books: map[a].slice().sort((m, n) => m.t.localeCompare(n.t)) }));
+}
+let _authorGroups = null;
 function findBook(title) {
   if (!title) return null;
   const q = title.trim().toLowerCase();
@@ -5092,15 +5169,72 @@ function updateBookPreview() {
     } catch {}
   }, 450);
 }
+// ── "Browse by author" picker ──────────────────────────────
+function switchBookTab(which) {
+  const search = document.getElementById('book-search');
+  const browse = document.getElementById('book-browse');
+  if (!search || !browse) return;
+  const isAuthor = which === 'author';
+  search.style.display = isAuthor ? 'none' : 'block';
+  browse.style.display = isAuthor ? 'block' : 'none';
+  document.getElementById('tab-search')?.classList.toggle('active', !isAuthor);
+  document.getElementById('tab-author')?.classList.toggle('active', isAuthor);
+  if (isAuthor) renderAuthorList();
+}
+function renderAuthorList() {
+  const wrap = document.getElementById('book-author-list');
+  if (!wrap) return;
+  _authorGroups = booksByAuthor();
+  wrap.innerHTML = _authorGroups.map((g, i) =>
+    '<button type="button" class="author-row" onclick="showAuthorBooks(' + i + ')">' +
+    '<span class="author-name">' + escapeHtml(g.author) + '</span>' +
+    '<span class="author-count">' + g.books.length + ' book' + (g.books.length > 1 ? 's' : '') + ' ›</span>' +
+    '</button>'
+  ).join('');
+}
+function showAuthorBooks(i) {
+  const wrap = document.getElementById('book-author-list');
+  const g = _authorGroups && _authorGroups[i];
+  if (!wrap || !g) return;
+  wrap.innerHTML =
+    '<button type="button" class="author-back" onclick="renderAuthorList()">‹ All authors</button>' +
+    '<div class="author-head">' + escapeHtml(g.author) + '</div>' +
+    g.books.map((b, j) =>
+      '<button type="button" class="abook-row" onclick="pickBrowsedBook(' + i + ',' + j + ')">' +
+      bookCoverHtml({ title: b.t }, 'bc-sm') +
+      '<span class="abook-info"><span class="abook-title">' + escapeHtml(b.t) + '</span>' +
+      '<span class="abook-pages">' + b.p + ' pages</span></span>' +
+      '<span class="abook-go">›</span>' +
+      '</button>'
+    ).join('');
+}
+function pickBrowsedBook(i, j) {
+  const g = _authorGroups && _authorGroups[i];
+  const b = g && g.books[j];
+  if (!b) return;
+  const t = document.getElementById('book-title-input');
+  const a = document.getElementById('book-author-input');
+  const p = document.getElementById('book-pages-total-input');
+  if (t) t.value = b.t;
+  if (a) a.value = b.a;
+  if (p) p.value = b.p;
+  switchBookTab('search');
+  updateBookPreview();
+}
 function showAddBookModal(isChanging) {
   document.getElementById('add-book-modal')?.remove();
   const modal = document.createElement('div');
   modal.id = 'add-book-modal';
   modal.className = 'modal-overlay';
   modal.innerHTML =
-    '<div class="modal-box" style="max-width:400px;text-align:left">' +
+    '<div class="modal-box" style="text-align:left">' +
     '<div class="modal-badge">' + (isChanging ? 'Change Book' : 'Start Reading') + '</div>' +
-    '<p style="font-size:14px;color:var(--text-muted);margin-bottom:20px">' + (isChanging ? 'What are you reading now?' : 'What book are you starting?') + '</p>' +
+    '<p style="font-size:14px;color:var(--text-muted);margin-bottom:16px">' + (isChanging ? 'What are you reading now?' : 'Pick from the library, browse by author, or type your own.') + '</p>' +
+    '<div class="book-tabs">' +
+    '<button type="button" id="tab-search" class="book-tab active" onclick="switchBookTab(\'search\')">Search a book</button>' +
+    '<button type="button" id="tab-author" class="book-tab" onclick="switchBookTab(\'author\')">Browse by author</button>' +
+    '</div>' +
+    '<div id="book-search">' +
     '<div id="book-cover-preview" class="book-pick-cover"></div>' +
     '<div class="form-group"><label>Book Title <span style="color:var(--danger)">*</span> <span style="font-weight:400;color:var(--text-muted)">— pick from the list or type your own</span></label>' +
     '<input type="text" id="book-title-input" list="book-datalist" placeholder="Search a book…" autocomplete="off" oninput="onBookPick()"></div>' +
@@ -5109,6 +5243,8 @@ function showAddBookModal(isChanging) {
     '<input type="text" id="book-author-input" placeholder="e.g. Robert Kiyosaki"></div>' +
     '<div class="form-group"><label>Total Pages <span style="font-weight:400;color:var(--text-muted)">(optional — tracks your % progress)</span></label>' +
     '<input type="number" id="book-pages-total-input" min="1" placeholder="e.g. 336"></div>' +
+    '</div>' + // end #book-search
+    '<div id="book-browse" style="display:none"><div id="book-author-list" class="author-list"></div></div>' +
     '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">' +
     '<button class="btn btn-outline" onclick="document.getElementById(\'add-book-modal\').remove()">Cancel</button>' +
     '<button class="btn btn-primary" onclick="saveBook()">Start Reading</button>' +

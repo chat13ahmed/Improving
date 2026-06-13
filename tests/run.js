@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, gymPlan, momentumScore, pointAlong,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, gymPlan, momentumScore, pointAlong,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -134,6 +134,15 @@ ok('BOOK_DB entries have title/author/pages', A.BOOK_DB.every(b => b.t && b.a &&
 ok('findBook exact match fills pages + author', A.findBook('Atomic Habits').p === 320 && A.findBook('Atomic Habits').a === 'James Clear');
 ok('findBook fuzzy match', A.findBook('psychology of money').t === 'The Psychology of Money');
 ok('findBook miss → null', A.findBook('zzz not a real book') === null);
+// Book library + browse-by-author
+ok('BOOK_DB is a substantial library (80+ books)', A.BOOK_DB.length >= 80);
+ok('BOOK_DB entries are well-formed (title, author, pages>0)', A.BOOK_DB.every(b => b.t && b.a && b.p > 0));
+ok('BOOK_DB has no duplicate titles', new Set(A.BOOK_DB.map(b => b.t.toLowerCase())).size === A.BOOK_DB.length);
+const _byAuthor = A.booksByAuthor();
+ok('booksByAuthor accounts for every book', _byAuthor.reduce((n, g) => n + g.books.length, 0) === A.BOOK_DB.length);
+ok('booksByAuthor is sorted alphabetically', _byAuthor.map(g => g.author).join('|') === _byAuthor.map(g => g.author).slice().sort((x, y) => x.localeCompare(y)).join('|'));
+ok('booksByAuthor surfaces multi-book authors', _byAuthor.filter(g => g.books.length >= 3).length >= 3);
+ok('booksByAuthor groups Robert Greene together', (_byAuthor.find(g => g.author === 'Robert Greene') || { books: [] }).books.length >= 3);
 // Gym training plan by goal + weight
 ok('gymPlan lose → fat loss + cardio', /fat loss/i.test(A.gymPlan('lose', 80).headline) && /cardio/i.test(A.gymPlan('lose', 80).cardio));
 ok('gymPlan gain → progressive overload', /overload/i.test(A.gymPlan('gain', 80).strength));
