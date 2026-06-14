@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, gymPlan, momentumScore, pointAlong,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, weekConnection, gymPlan, momentumScore, pointAlong,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -156,6 +156,15 @@ ok('groupReadingByBook sums pages per book', _rg[0].pages === 35);
 ok('groupReadingByBook counts only non-empty notes', _rg[0].notes === 1);
 ok('groupReadingByBook entries newest-first', _rg[0].entries[0].date === '2026-06-12');
 ok('groupReadingByBook ignores zero-page days', _rg.reduce((n, g) => n + g.entries.length, 0) === 3);
+// Connection of the Week — cross-pillar correlation (no AI)
+const _cdays = [];
+for (let i = 0; i < 4; i++) _cdays.push({ date: '2026-06-0' + (i + 1), gym: { done: true }, reading: { pages: 38 } });
+for (let i = 0; i < 4; i++) _cdays.push({ date: '2026-06-1' + i, gym: { done: false }, reading: { pages: 9 } });
+const _conn = A.weekConnection(_cdays);
+ok('weekConnection finds the gym↔reading link', _conn && _conn.kind === 'read' && _conn.pct > 40);
+ok('weekConnection phrases it as a sentence', _conn && /On days you train/.test(_conn.headline));
+ok('weekConnection needs enough days (null on 3)', A.weekConnection(_cdays.slice(0, 3)) === null);
+ok('weekConnection needs gym variation (null if every day is gym)', A.weekConnection(_cdays.map(d => ({ ...d, gym: { done: true } }))) === null);
 // Gym training plan by goal + weight
 ok('gymPlan lose → fat loss + cardio', /fat loss/i.test(A.gymPlan('lose', 80).headline) && /cardio/i.test(A.gymPlan('lose', 80).cardio));
 ok('gymPlan gain → progressive overload', /overload/i.test(A.gymPlan('gain', 80).strength));

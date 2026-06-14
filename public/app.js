@@ -3321,6 +3321,69 @@ function renderGymPlanHint() {
     (p.cardioBurn30 ? ' · ~' + p.cardioBurn30 + ' kcal/30 min cardio' : '') + '</div>';
 }
 
+// ── Connection of the Week — the cross-pillar "wow" (rule-based, no AI needed) ──
+// Compares a numeric metric on days you trained vs days you didn't and surfaces the
+// biggest honest gap. This is the one insight no single-purpose app can give you.
+function weekConnection(days) {
+  const logged = (days || []).filter(Boolean);
+  if (logged.length < 6) return null;
+  const gymDays = logged.filter(d => d.gym && d.gym.done);
+  const restDays = logged.filter(d => !(d.gym && d.gym.done));
+  if (gymDays.length < 2 || restDays.length < 2) return null;
+  const avg = (arr, fn) => { const v = arr.map(fn); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; };
+  const metrics = [
+    { key: 'read', get: d => (d.reading && d.reading.pages) || 0, phrase: (m, up) => 'read ' + m + '% ' + (up ? 'more' : 'fewer') + ' pages' },
+    { key: 'food', get: d => (d.food && d.food.rating) || 0, phrase: (m, up) => 'rate your nutrition ' + m + '% ' + (up ? 'higher' : 'lower') },
+    { key: 'net', get: d => (d.networking && d.networking.count) || 0, phrase: (m, up) => 'reach out to ' + m + '% ' + (up ? 'more' : 'fewer') + ' people' }
+  ];
+  // Prefer a positive synergy (training lifts something) — that's the motivating
+  // hook. Only fall back to the strongest negative link if no positive one exists.
+  let best = null, bestUp = null;
+  for (const mt of metrics) {
+    const on = avg(gymDays, mt.get), off = avg(restDays, mt.get);
+    const base = (on + off) / 2;
+    if (base <= 0) continue;
+    const pct = Math.round((on - off) / base * 100);
+    if (Math.abs(pct) < 18) continue; // not a meaningful gap
+    if (!best || Math.abs(pct) > Math.abs(best.pct)) best = { mt, pct };
+    if (pct > 0 && (!bestUp || pct > bestUp.pct)) bestUp = { mt, pct };
+  }
+  best = bestUp || best;
+  if (!best) return null;
+  const up = best.pct > 0;
+  const mag = Math.min(200, Math.abs(best.pct));
+  return {
+    kind: best.mt.key,
+    pct: best.pct,
+    headline: 'On days you train, you ' + best.mt.phrase(mag, up) + '.',
+    sub: up ? 'Your training lifts the rest of your life with it.' : 'They pull on each other — worth noticing.'
+  };
+}
+function renderConnectionCard() {
+  const c = weekConnection(state.data.days || []);
+  if (!c) {
+    if ((state.data.days || []).length < 3) return '';
+    return '<div class="card conn-card conn-building">' +
+      '<div class="conn-tag">Connection of the week</div>' +
+      '<div class="conn-headline">Your first life connection is forming.</div>' +
+      '<div class="conn-sub">Keep logging — in a week or two, Escalate shows how your pillars pull on each other. No single-purpose app can do that.</div>' +
+      '</div>';
+  }
+  const hl = escapeHtml(c.headline).replace(/(\d+%)/, '<span class="conn-pct">$1</span>');
+  return '<div class="card conn-card">' +
+    '<div class="conn-tag">Connection of the week</div>' +
+    '<div class="conn-headline">' + hl + '</div>' +
+    '<div class="conn-sub">' + escapeHtml(c.sub) + '</div>' +
+    '<button class="btn-link conn-share" onclick="shareConnection()">Share this</button>' +
+    '</div>';
+}
+async function shareConnection() {
+  const c = weekConnection(state.data.days || []);
+  if (!c) return;
+  const text = 'Escalate spotted this in my life — ' + c.headline + ' One app that connects your whole life.';
+  try { if (navigator.share) { await navigator.share({ title: 'Escalate', text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(text); showToast('Copied — paste it anywhere.', 'success'); } catch { showToast('Share not available here.', 'error'); }
+}
 function renderDashboard() {
   const { days, weeks, profile } = state.data;
   const stats = getWeekStats();
@@ -3449,7 +3512,7 @@ function renderDashboard() {
 
   // Group the cards into scannable sections — a label only shows if its group has content
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
-  const gGuidance = renderNextStep() + renderGoalCard() + renderClimbCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
+  const gGuidance = renderNextStep() + renderClimbCard() + renderConnectionCard() + renderGoalCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
   const gCoach    = renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard();
   const gToday    = pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderChecklistCard() + focusHtml;
   const gHealth   = renderNutritionWeekCard() + renderGymPlanCard() + renderWeightTrend();
