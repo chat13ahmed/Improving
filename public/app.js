@@ -1400,6 +1400,52 @@ function foodAmountLabel(x) {
     ? (qty + ' ' + foodUnitLabel(u))
     : (qty + ' ' + foodUnitLabel(u) + ' · ' + x.grams + 'g');
 }
+// Mobile-friendly food search — custom suggestion dropdown (native <datalist>
+// barely works on phones). Filters by name, shows macros, taps to fill.
+function searchFoods(query, limit) {
+  const q = (query || '').trim().toLowerCase();
+  if (!q) return [];
+  const starts = [], incl = [];
+  for (const f of FOOD_DB) {
+    const n = f.n.toLowerCase();
+    if (n.startsWith(q)) starts.push(f);
+    else if (n.includes(q)) incl.push(f);
+  }
+  return starts.concat(incl).slice(0, limit || 8);
+}
+let _foodSuggestMatches = [];
+function renderFoodSuggest() {
+  const wrap = document.getElementById('food-suggest');
+  if (!wrap) return;
+  const q = (document.getElementById('food-pick')?.value || '').trim();
+  const matches = q ? searchFoods(q, 8) : [];
+  _foodSuggestMatches = matches;
+  if (!matches.length) { wrap.innerHTML = ''; wrap.style.display = 'none'; return; }
+  wrap.innerHTML = matches.map((f, i) =>
+    '<button type="button" class="bs-row" onclick="pickFoodSuggestion(' + i + ')">' +
+    '<span class="bs-info"><span class="bs-title">' + escapeHtml(f.n) + '</span>' +
+    '<span class="bs-author">' + f.k + ' cal · ' + f.p + 'g P · ' + f.c + 'g C · ' + f.f + 'g F <span style="opacity:.65">per 100g</span></span></span>' +
+    '</button>'
+  ).join('');
+  wrap.style.display = 'block';
+}
+function pickFoodSuggestion(i) {
+  const f = _foodSuggestMatches && _foodSuggestMatches[i];
+  if (!f) return;
+  const pick = document.getElementById('food-pick');
+  const qty = document.getElementById('food-qty');
+  const unit = document.getElementById('food-unit');
+  if (pick) pick.value = f.n;
+  if (unit) unit.value = 'g';
+  if (qty && !qty.value) qty.value = f.sg || 100; // sensible default = one serving
+  hideFoodSuggest();
+  if (qty) { qty.focus(); try { qty.select(); } catch (e) {} }
+}
+function hideFoodSuggest() {
+  const wrap = document.getElementById('food-suggest');
+  if (wrap) { wrap.innerHTML = ''; wrap.style.display = 'none'; }
+}
+function onFoodSearch() { renderFoodSuggest(); }
 function findFood(name) {
   if (!name) return null;
   const q = name.trim().toLowerCase();
@@ -1614,7 +1660,7 @@ function renderLogNutritionSection(eatenVal) {
   }
   const totals = foodLogTotals(state._foodLog);
   const initEaten = totals.kcal > 0 ? Math.round(totals.kcal) : (parseFloat(eatenVal) || 0);
-  const datalist = '<datalist id="food-datalist">' + FOOD_DB.map(f => '<option value="' + escapeHtml(f.n) + '">').join('') + '</datalist>';
+  // Food search uses a custom suggestion dropdown (renderFoodSuggest), not a native datalist
   // Quick-add chips from foods you've logged before
   state._recentFoods = getRecentFoods(8);
   const recentRow = state._recentFoods.length
@@ -1638,13 +1684,14 @@ function renderLogNutritionSection(eatenVal) {
     '<div class="food-logger">' +
     '<label class="food-logger-label">What did you eat? <span style="font-weight:400;color:var(--text-muted)">Add foods and we\'ll count the macros</span></label>' +
     '<div class="food-add-row">' +
-    '<input type="text" list="food-datalist" id="food-pick" placeholder="Search a food (e.g. chicken breast)…" autocomplete="off" onkeydown="if(event.key===\'Enter\'){event.preventDefault();document.getElementById(\'food-qty\').focus();}">' +
+    '<input type="text" id="food-pick" placeholder="Search a food (e.g. chicken breast)…" autocomplete="off" oninput="onFoodSearch()" onfocus="onFoodSearch()" onblur="setTimeout(hideFoodSuggest, 200)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();document.getElementById(\'food-qty\').focus();}">' +
     '<input type="number" id="food-qty" min="0" step="1" placeholder="amount" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addFoodToLog();}">' +
     '<select id="food-unit"><option value="g">grams</option><option value="ml">mL</option><option value="l">litres</option><option value="oz">oz</option><option value="serving">serving(s)</option></select>' +
     '<select id="food-meal" title="Add to which meal">' + nut.meals.labels.map(function (lbl, i) { return '<option value="' + i + '"' + (i === currentMealIndex(nut.meals.count, new Date().getHours()) ? ' selected' : '') + '>' + escapeHtml(lbl) + '</option>'; }).join('') + '</select>' +
     '<button type="button" class="btn btn-outline food-add-btn" onclick="addFoodToLog()">+ Add</button>' +
     '<button type="button" class="btn btn-outline food-ai-btn" id="food-ai-btn" onclick="estimateFoodWithAI()" title="Estimate macros with AI for any food">AI</button>' +
-    '</div>' + datalist +
+    '</div>' +
+    '<div id="food-suggest" class="book-suggest"></div>' +
     '<div class="food-ai-hint">Not in the list? Type any food (e.g. "homemade chicken burrito") and hit AI to estimate it.</div>' +
     recentRow +
     renderMyMealsRow() +
