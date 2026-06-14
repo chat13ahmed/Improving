@@ -230,6 +230,7 @@ eq('enabledPillars count', A.enabledPillars().length, 3);
 A.state.data = { profile: { pillars: dp }, days: [{ gym: { done: true }, food: { rating: 4 }, networking: { count: 2 } }], weeks: [{ income: 100 }], weights: [] };
 ok('computeXP positive', A.computeXP() > 0);
 ok('getLevel returns label', typeof A.getLevel(A.computeXP()).label === 'string');
+ok('levels are mountain stations (Base Camp → Summit)', A.getLevel(0).label === 'Base Camp' && A.getLevel(5000).label === 'Summit');
 
 // Weight conversions + upsert
 A.state.data = { profile: { nutrition: { weightUnit: 'lbs' } }, days: [], weeks: [], weights: [] };

@@ -284,13 +284,13 @@ function renderMarkdown(text) {
 // XP & LEVEL SYSTEM
 // ─────────────────────────────────────────────────────────────
 const LEVELS = [
-  { min: 0,    label: 'Rookie',   color: '#94A3B8' },
-  { min: 100,  label: 'Hustler',  color: '#3B82F6' },
-  { min: 300,  label: 'Grinder',  color: '#10B981' },
-  { min: 600,  label: 'Player',   color: '#F59E0B' },
-  { min: 1000, label: 'Closer',   color: '#A78BFA' },
-  { min: 1800, label: 'Wolf',     color: '#EF4444' },
-  { min: 3000, label: 'Legend',   color: '#F97316' }
+  { min: 0,    label: 'Base Camp',   color: '#94A3B8' },
+  { min: 100,  label: 'Foothills',   color: '#3B82F6' },
+  { min: 300,  label: 'Treeline',    color: '#10B981' },
+  { min: 600,  label: 'The Ridge',   color: '#F59E0B' },
+  { min: 1000, label: 'High Camp',   color: '#A78BFA' },
+  { min: 1800, label: 'Summit Push', color: '#EF4444' },
+  { min: 3000, label: 'Summit',      color: '#F97316' }
 ];
 
 function computeXP() {
@@ -3498,11 +3498,11 @@ function renderDashboard() {
       (chartCards ? '<div class="charts-row">' + chartCards + '</div>' : '') +
       '<div class="card"><h3 class="card-title">Recent Days</h3>' + renderRecentDaysTable(sortedDays.slice(0, 7)) + '</div>';
   } else {
-    chartsHtml = '<div class="empty-state"><div class="empty-icon"></div>' +
-      '<h3>Start tracking your life progress</h3>' +
-      '<p>Log your first day to start building data across your ' + enabledPillars().length + ' pillars.</p>' +
+    chartsHtml = '<div class="empty-state"><div class="empty-icon empty-mtn">' + obMountainSvg() + '</div>' +
+      '<h3>Your mountain is waiting</h3>' +
+      '<p>Log your first day to take the first step up — even 30 seconds counts. Every day you log moves your climber higher.</p>' +
       '<div class="empty-actions">' +
-      '<button class="btn btn-primary" onclick="navigate(\'log\')">Log Today</button>' +
+      '<button class="btn btn-primary" onclick="navigate(\'log\')">Log my first day</button>' +
       '</div></div>';
   }
 

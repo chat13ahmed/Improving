@@ -1797,6 +1797,15 @@ body.auth-active .bottom-nav { display: none !important; }
 .onboard-actions-center .btn { min-width: 220px; }
 .ob-skip-link { display: block; margin: 14px auto 0; background: none; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; font-family: inherit; }
 .ob-skip-link:hover { color: var(--text); text-decoration: underline; }
+
+/* Color pass — the mountain motif as the brand mark + loading/empty heroes */
+.sidebar-brand .brand-icon, .auth-brand .brand-icon {
+  display: inline-block !important; width: 30px; height: 30px; flex-shrink: 0; font-size: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='2,28 12,9 18,19 24,7 30,28' fill='%231D9E75'/%3E%3Cpolygon points='2,28 9,17 15,23 30,28' fill='%239FE1CB'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+.auth-brand .brand-icon { width: 36px; height: 36px; }
+.loading-mtn { line-height: 0; margin-bottom: 4px; }
+.empty-icon.empty-mtn { font-size: 0; max-width: 220px; width: 100%; margin: 0 auto 12px; line-height: 0; }
 @media (prefers-reduced-motion: reduce) {
   .climb-trail-done { animation: none; stroke-dashoffset: 0; }
   .climber, .climber-ring, .climb-ms.reached { animation: none; opacity: 1; transform: none; }
