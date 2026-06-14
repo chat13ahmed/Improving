@@ -3080,7 +3080,7 @@ function renderNextStep() {
   });
   if (!step) return '';
   return '<div class="card nextstep ' + (step.tone || '') + '">' +
-    '<div class="ns-label">Your next step</div>' +
+    '<div class="ns-label">Today\'s one move</div>' +
     '<div class="ns-title">' + escapeHtml(step.title) + '</div>' +
     (step.sub ? '<div class="ns-sub">' + escapeHtml(step.sub) + '</div>' : '') +
     (step.ctaLabel ? '<button type="button" class="btn btn-primary btn-sm ns-cta" onclick="' + step.ctaAction + '">' + escapeHtml(step.ctaLabel) + '</button>' : '') +
@@ -3384,6 +3384,34 @@ async function shareConnection() {
   try { if (navigator.share) { await navigator.share({ title: 'Escalate', text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
   try { await navigator.clipboard.writeText(text); showToast('Copied — paste it anywhere.', 'success'); } catch { showToast('Share not available here.', 'error'); }
 }
+// The picture's 7-day dots — this week at a glance (filled = logged, ring = today).
+function renderWeekStrip() {
+  if (!state.data || !state.data.days) return '';
+  const start = getWeekStart(todayStr());
+  const today = todayStr();
+  const logged = new Set((state.data.days || []).map(d => d.date));
+  const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const base = new Date(start + 'T00:00:00');
+  let dots = '', count = 0;
+  for (let i = 0; i < 7; i++) {
+    const dt = new Date(base); dt.setDate(base.getDate() + i);
+    const ds = dt.toISOString().split('T')[0];
+    const done = logged.has(ds);
+    if (done && ds <= today) count++;
+    const cls = 'wk-dot' + (done ? ' wk-done' : '') + (ds === today ? ' wk-today' : '') + (ds > today ? ' wk-future' : '');
+    dots += '<div class="wk-day"><span class="' + cls + '"></span><span class="wk-lbl">' + labels[i] + '</span></div>';
+  }
+  return '<div class="card wk-card">' +
+    '<div class="wk-head"><span class="wk-title">This week</span><span class="wk-count">' + count + ' / 7 logged</span></div>' +
+    '<div class="wk-strip">' + dots + '</div></div>';
+}
+// The picture's compact pillar row — your focus areas, one tap to log.
+function renderPillarNav() {
+  const ids = PILLAR_IDS.filter(id => isPillarOn(id));
+  if (!ids.length) return '';
+  const pills = ids.map(id => '<button type="button" class="pnav-pill" onclick="navigate(\'log\')">' + escapeHtml(pillar(id).label) + '</button>').join('');
+  return '<div class="pnav">' + pills + '<button type="button" class="pnav-pill pnav-more" onclick="openMoreSheet()">More</button></div>';
+}
 function renderDashboard() {
   const { days, weeks, profile } = state.data;
   const stats = getWeekStats();
@@ -3512,7 +3540,8 @@ function renderDashboard() {
 
   // Group the cards into scannable sections — a label only shows if its group has content
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
-  const gGuidance = renderNextStep() + renderClimbCard() + renderConnectionCard() + renderGoalCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
+  const gHero     = renderClimbCard() + renderNextStep() + renderConnectionCard() + renderWeekStrip() + renderPillarNav();
+  const gGuidance = renderGoalCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
   const gCoach    = renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard();
   const gToday    = pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderChecklistCard() + focusHtml;
   const gHealth   = renderNutritionWeekCard() + renderGymPlanCard() + renderWeightTrend();
@@ -3524,6 +3553,7 @@ function renderDashboard() {
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p></div>' +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">Share my week</button>' : '') +
     '</div>' +
+    gHero +
     gGuidance +
     sec('Your coach', gCoach) +
     sec('Today', gToday) +
