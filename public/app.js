@@ -5701,13 +5701,24 @@ const ONBOARD_AREAS = [
   { id: 'reading',    icon: '', label: 'Reading',          desc: 'Daily reading habit & learning' }
 ];
 
+// A small flat mountain used in the onboarding hero + the "your climb begins" moment.
+function obMountainSvg() {
+  return '<svg viewBox="0 0 320 140" width="100%" preserveAspectRatio="xMidYMid meet" aria-hidden="true">' +
+    '<polygon points="0,140 80,46 140,92 210,30 270,74 320,52 320,140" fill="#9FE1CB"></polygon>' +
+    '<polygon points="0,140 52,92 112,112 170,78 230,104 300,82 320,96 320,140" fill="#1D9E75"></polygon>' +
+    '<polyline points="36,128 92,100 70,82 150,76 132,60 210,34" fill="none" stroke="#712B13" stroke-width="2" stroke-dasharray="3 5" stroke-linecap="round"></polyline>' +
+    '<circle cx="132" cy="60" r="5" fill="#D85A30"></circle>' +
+    '<line x1="210" y1="34" x2="210" y2="12" stroke="#0F6E56" stroke-width="2"></line>' +
+    '<polygon points="210,13 228,18 210,23" fill="#D85A30"></polygon>' +
+    '</svg>';
+}
 function showOnboarding() {
   const p = state.data.profile || {};
   state._onboard = {
-    step: 1,
+    step: 0,
     firstName: p.firstName || '', lastName: p.lastName || '', age: p.age || '', sex: p.sex || 'male',
     email: p.email || '', phone: p.phone || '',
-    areas: { gym: true, food: true, networking: true, money: true, reading: true },
+    areas: { gym: true, food: false, networking: false, money: true, reading: true },
     goals: { gymDaysPerWeek: p.gymDaysPerWeek || 5, weeklyNetworkGoal: p.weeklyNetworkGoal || 3, weeklyIncomeGoal: p.weeklyIncomeGoal || '', weeklyReadGoal: p.weeklyReadGoal || '' },
     jobTitle: p.jobTitle || '',
     cadence: p.incomeCadence || 'monthly',
@@ -5719,11 +5730,30 @@ function showOnboarding() {
 function renderOnboardStep() {
   const f = state._onboard;
   document.getElementById('onboarding-modal')?.remove();
+
+  if (f.step === 0) {
+    const m0 = document.createElement('div');
+    m0.id = 'onboarding-modal';
+    m0.className = 'modal-overlay';
+    m0.innerHTML =
+      '<div class="modal-box onboard-wizard onboard-hero">' +
+      '<div class="ob-hero-art">' + obMountainSvg() + '</div>' +
+      '<h2 class="onboard-title">One life. One climb.</h2>' +
+      '<p class="onboard-sub">Escalate is the only app that shows how your whole life moves together — your body, your money, your mind, all pulling on each other. Let\'s find your summit.</p>' +
+      '<div class="onboard-actions onboard-actions-center">' +
+      '<button type="button" class="btn btn-primary" onclick="onboardNext()">Begin your climb →</button>' +
+      '</div>' +
+      '<button type="button" class="ob-skip-link" onclick="skipOnboarding()">Skip for now</button>' +
+      '</div>';
+    document.body.appendChild(m0);
+    return;
+  }
+
   let title = '', sub = '', body = '';
 
   if (f.step === 1) {
-    title = 'Welcome! Let\'s set you up';
-    sub = 'A few quick details so we can tailor everything to you.';
+    title = 'First, the basics';
+    sub = 'A couple of details so your plan fits you — about 20 seconds.';
     body =
       '<div class="form-row">' +
       '<div class="form-group"><label>First name</label><input type="text" id="ob-first" value="' + escapeHtml(f.firstName) + '" placeholder="Alex"></div>' +
@@ -5735,8 +5765,8 @@ function renderOnboardStep() {
       '<select id="ob-sex"><option value="male"' + (f.sex === 'male' ? ' selected' : '') + '>Male</option><option value="female"' + (f.sex === 'female' ? ' selected' : '') + '>Female</option></select></div>' +
       '</div>';
   } else if (f.step === 2) {
-    title = 'What do you want to develop?';
-    sub = 'Pick the areas you want to work on — you can change these anytime in Settings.';
+    title = 'What are you climbing toward?';
+    sub = 'Pick your focus — start with a few, add more anytime. A focused climb beats a scattered one.';
     body = '<div class="ob-area-grid">' + ONBOARD_AREAS.map(a => {
       const on = f.areas[a.id];
       return '<button type="button" class="ob-area' + (on ? ' ob-area-on' : '') + '" onclick="onboardToggleArea(\'' + a.id + '\')">' +
@@ -5747,8 +5777,8 @@ function renderOnboardStep() {
         '</button>';
     }).join('') + '</div>';
   } else {
-    title = 'Set your goals';
-    sub = 'Targets for what you chose — leave any blank if you\'re not sure yet.';
+    title = 'Plant your first flags';
+    sub = 'Targets to climb toward — leave any blank if you\'re not sure yet.';
     const parts = [];
     if (f.areas.gym) parts.push('<div class="form-group"><label>Fitness — gym days per week</label><input type="number" id="ob-gym" min="1" max="7" value="' + (f.goals.gymDaysPerWeek || 5) + '"></div>');
     if (f.areas.networking) parts.push('<div class="form-group"><label>Networking — new connections per week</label><input type="number" id="ob-net" min="0" value="' + (f.goals.weeklyNetworkGoal || 3) + '"></div>');
@@ -5856,6 +5886,7 @@ function captureOnboard() {
 function onboardNext() {
   captureOnboard();
   const f = state._onboard;
+  if (f.step === 0) { f.step = 1; renderOnboardStep(); return; }
   if (f.step === 1) {
     if (!f.firstName) { showToast('Please enter your first name.', 'error'); return; }
     if (f.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)) { showToast('Enter a valid email (or leave it blank).', 'error'); return; }
@@ -5907,9 +5938,29 @@ async function onboardFinish() {
   document.getElementById('onboarding-modal')?.remove();
   applyNavVisibility();
   renderXPBar();
-  showToast('You\'re all set' + (p.firstName ? ', ' + p.firstName : '') + '! Let\'s get to work. ', 'success');
   navigate('dashboard');
+  showClimbStart(p.firstName);
 }
+
+function showClimbStart(name) {
+  document.getElementById('climb-start-modal')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'climb-start-modal';
+  modal.className = 'modal-overlay';
+  modal.innerHTML =
+    '<div class="modal-box onboard-wizard onboard-hero">' +
+    '<div class="ob-hero-art">' + obMountainSvg() + '</div>' +
+    '<h2 class="onboard-title">Your summit is set' + (name ? ', ' + escapeHtml(name) : '') + '.</h2>' +
+    '<p class="onboard-sub">Every day you log, your climber takes a step up the mountain. Let\'s take the first one — it takes about 30 seconds.</p>' +
+    '<div class="onboard-actions onboard-actions-center">' +
+    '<button type="button" class="btn btn-primary" onclick="startClimbLog()">Log my first day →</button>' +
+    '</div>' +
+    '<button type="button" class="ob-skip-link" onclick="startClimbExplore()">I\'ll explore first</button>' +
+    '</div>';
+  document.body.appendChild(modal);
+}
+function startClimbLog() { document.getElementById('climb-start-modal')?.remove(); navigate('log'); }
+function startClimbExplore() { document.getElementById('climb-start-modal')?.remove(); navigate('dashboard'); }
 
 async function skipOnboarding() {
   state.data.profile.onboarded = true;

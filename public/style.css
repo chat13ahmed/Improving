@@ -1787,6 +1787,16 @@ body.auth-active .bottom-nav { display: none !important; }
 .conn-share { margin-top: 12px; }
 .conn-building { border-color: var(--border); background: var(--surface); }
 .conn-building .conn-tag { color: var(--text-muted); }
+
+/* Onboarding — emotional hero moments (welcome + "your climb begins") */
+.onboard-hero { text-align: center; }
+.ob-hero-art { max-width: 280px; margin: 4px auto 18px; }
+.onboard-hero .onboard-title { font-size: 24px; }
+.onboard-hero .onboard-sub { max-width: 380px; margin-left: auto; margin-right: auto; }
+.onboard-actions-center { justify-content: center !important; }
+.onboard-actions-center .btn { min-width: 220px; }
+.ob-skip-link { display: block; margin: 14px auto 0; background: none; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; font-family: inherit; }
+.ob-skip-link:hover { color: var(--text); text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) {
   .climb-trail-done { animation: none; stroke-dashoffset: 0; }
   .climber, .climber-ring, .climb-ms.reached { animation: none; opacity: 1; transform: none; }
