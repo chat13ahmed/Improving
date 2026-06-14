@@ -13,6 +13,11 @@ function safeJsonArray(s) {
   if (Array.isArray(s)) return s;
   try { const v = JSON.parse(s); return Array.isArray(v) ? v : []; } catch { return []; }
 }
+// Parse a JSON object column safely (post `data`); always returns an object.
+function safeJsonObject(s) {
+  if (s && typeof s === 'object' && !Array.isArray(s)) return s;
+  try { const v = JSON.parse(s); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; }
+}
 
 async function init() {
   if (impl) return impl;
@@ -63,6 +68,13 @@ function sqliteImpl() {
       )`);
       try { db.exec('ALTER TABLE shared_meals ADD COLUMN ingredients TEXT'); } catch {} // migrate older DBs
       try { db.exec('ALTER TABLE shared_meals ADD COLUMN photo TEXT'); } catch {}
+      db.exec(`CREATE TABLE IF NOT EXISTS community_posts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        author_name TEXT, type TEXT NOT NULL, title TEXT, body TEXT,
+        data TEXT DEFAULT '{}', likes TEXT DEFAULT '[]', flags INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now'))
+      )`);
     },
     async createUser(u) {
       const r = db.prepare('INSERT INTO users(username,email,phone,pw_salt,pw_hash,sec_question,sec_salt,sec_hash) VALUES(?,?,?,?,?,?,?,?)')
@@ -117,6 +129,35 @@ function sqliteImpl() {
       const r = force ? db.prepare('DELETE FROM shared_meals WHERE id=?').run(id)
                       : db.prepare('DELETE FROM shared_meals WHERE id=? AND user_id=?').run(id, userId);
       return r.changes > 0;
+    },
+    // ── Community posts (thoughts / training programs / meals) ──
+    async createPost(p) {
+      const r = db.prepare('INSERT INTO community_posts(user_id,author_name,type,title,body,data,likes) VALUES(?,?,?,?,?,?,?)')
+        .run(p.user_id, p.author_name || null, p.type, p.title || null, p.body || null, JSON.stringify(p.data || {}), '[]');
+      return Number(r.lastInsertRowid);
+    },
+    async listPosts(type) {
+      const t = (type || '').toLowerCase();
+      return db.prepare(`SELECT id,user_id,author_name,type,title,body,data,likes,flags,created_at
+        FROM community_posts WHERE flags < 5 AND (? = '' OR type = ?)
+        ORDER BY id DESC LIMIT 100`).all(t, t)
+        .map(r => ({ ...r, data: safeJsonObject(r.data), likes: safeJsonArray(r.likes) }));
+    },
+    async togglePostLike(id, userId) {
+      const row = db.prepare('SELECT likes FROM community_posts WHERE id=?').get(id);
+      if (!row) return null;
+      const uid = String(userId);
+      const likes = safeJsonArray(row.likes).map(String);
+      const i = likes.indexOf(uid);
+      if (i >= 0) likes.splice(i, 1); else likes.push(uid);
+      db.prepare('UPDATE community_posts SET likes=? WHERE id=?').run(JSON.stringify(likes), id);
+      return { liked: i < 0, count: likes.length };
+    },
+    async flagPost(id) { db.prepare('UPDATE community_posts SET flags = flags + 1 WHERE id=?').run(id); },
+    async deletePost(id, userId, force) {
+      const r = force ? db.prepare('DELETE FROM community_posts WHERE id=?').run(id)
+                      : db.prepare('DELETE FROM community_posts WHERE id=? AND user_id=?').run(id, userId);
+      return r.changes > 0;
     }
   };
 }
@@ -141,6 +182,8 @@ function pgImpl() {
                servings INTEGER DEFAULT 1, notes TEXT, ingredients TEXT, photo TEXT, uses INTEGER DEFAULT 0, flags INTEGER DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now())`);
       await q('ALTER TABLE shared_meals ADD COLUMN IF NOT EXISTS ingredients TEXT'); // migrate older DBs
       await q('ALTER TABLE shared_meals ADD COLUMN IF NOT EXISTS photo TEXT');
+      await q(`CREATE TABLE IF NOT EXISTS community_posts (id BIGSERIAL PRIMARY KEY, user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+               author_name TEXT, type TEXT NOT NULL, title TEXT, body TEXT, data TEXT DEFAULT '{}', likes TEXT DEFAULT '[]', flags INTEGER DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now())`);
     },
     async createUser(u) {
       const r = await q('INSERT INTO users(username,email,phone,pw_salt,pw_hash,sec_question,sec_salt,sec_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
@@ -189,6 +232,35 @@ function pgImpl() {
       const r = force ? await q('DELETE FROM shared_meals WHERE id=$1', [id])
                       : await q('DELETE FROM shared_meals WHERE id=$1 AND user_id=$2', [id, userId]);
       return r.rowCount > 0;
+    },
+    // ── Community posts (thoughts / training programs / meals) ──
+    async createPost(p) {
+      const r = await q('INSERT INTO community_posts(user_id,author_name,type,title,body,data,likes) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+        [p.user_id, p.author_name || null, p.type, p.title || null, p.body || null, JSON.stringify(p.data || {}), '[]']);
+      return r.rows[0].id;
+    },
+    async listPosts(type) {
+      const t = (type || '').toLowerCase();
+      const r = await q(`SELECT id,user_id,author_name,type,title,body,data,likes,flags,created_at
+        FROM community_posts WHERE flags < 5 AND ($1 = '' OR type = $1)
+        ORDER BY id DESC LIMIT 100`, [t]);
+      return r.rows.map(x => ({ ...x, data: safeJsonObject(x.data), likes: safeJsonArray(x.likes) }));
+    },
+    async togglePostLike(id, userId) {
+      const r0 = await q('SELECT likes FROM community_posts WHERE id=$1', [id]);
+      if (!r0.rowCount) return null;
+      const uid = String(userId);
+      const likes = safeJsonArray(r0.rows[0].likes).map(String);
+      const i = likes.indexOf(uid);
+      if (i >= 0) likes.splice(i, 1); else likes.push(uid);
+      await q('UPDATE community_posts SET likes=$1 WHERE id=$2', [JSON.stringify(likes), id]);
+      return { liked: i < 0, count: likes.length };
+    },
+    async flagPost(id) { await q('UPDATE community_posts SET flags = flags + 1 WHERE id=$1', [id]); },
+    async deletePost(id, userId, force) {
+      const r = force ? await q('DELETE FROM community_posts WHERE id=$1', [id])
+                      : await q('DELETE FROM community_posts WHERE id=$1 AND user_id=$2', [id, userId]);
+      return r.rowCount > 0;
     }
   };
 }
@@ -215,5 +287,10 @@ module.exports = {
   listSharedMeals: (q) => impl.listSharedMeals(q),
   incSharedMealUse: (i) => impl.incSharedMealUse(i),
   flagSharedMeal: (i) => impl.flagSharedMeal(i),
-  deleteSharedMeal: (i, u, f) => impl.deleteSharedMeal(i, u, f)
+  deleteSharedMeal: (i, u, f) => impl.deleteSharedMeal(i, u, f),
+  createPost: (p) => impl.createPost(p),
+  listPosts: (t) => impl.listPosts(t),
+  togglePostLike: (i, u) => impl.togglePostLike(i, u),
+  flagPost: (i) => impl.flagPost(i),
+  deletePost: (i, u, f) => impl.deletePost(i, u, f)
 };

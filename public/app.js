@@ -965,7 +965,7 @@ function navigate(page) {
   const moreBtn = document.getElementById('bnav-more');
   if (moreBtn) moreBtn.classList.toggle('active', !['dashboard', 'log', 'coach'].includes(page));
   document.getElementById('more-sheet')?.remove();
-  const pages = { dashboard: renderDashboard, log: renderLogToday, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
+  const pages = { dashboard: renderDashboard, log: renderLogToday, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
   injectFAB();
   (pages[page] || renderDashboard)();
 }
@@ -2156,6 +2156,155 @@ async function removeCommunityMeal(id) {
     if (res.ok) { showToast('Removed.', 'success'); loadCommunityMeals(); }
     else showToast('Could not remove.', 'error');
   } catch { showToast('Could not reach the server.', 'error'); }
+}
+
+// ─────────────────────────────────────────────────────────────
+// COMMUNITY FEED — thoughts / training programs / meals
+// ─────────────────────────────────────────────────────────────
+const POST_TYPE_LABELS = { thought: 'Thought', program: 'Training program', meal: 'Meal' };
+function composerFields(type) {
+  if (type === 'program') {
+    return '<input type="text" id="cf-title" class="cf-input" placeholder="Program name — e.g. Push / Pull / Legs" maxlength="120">' +
+      '<div class="cf-row">' +
+      '<input type="text" id="cf-goal" class="cf-input" placeholder="Goal — gain, lose, strength…" maxlength="40">' +
+      '<input type="number" id="cf-days" class="cf-input" placeholder="Days/week" min="1" max="7">' +
+      '</div>' +
+      '<textarea id="cf-body" class="cf-input cf-area" placeholder="The program — days, exercises, sets × reps, notes…"></textarea>';
+  }
+  if (type === 'meal') {
+    return '<input type="text" id="cf-title" class="cf-input" placeholder="Meal name — e.g. High-protein oats" maxlength="120">' +
+      '<div class="cf-row cf-macros">' +
+      '<input type="number" id="cf-kcal" class="cf-input" placeholder="Cal" min="0">' +
+      '<input type="number" id="cf-p" class="cf-input" placeholder="Protein" min="0">' +
+      '<input type="number" id="cf-c" class="cf-input" placeholder="Carbs" min="0">' +
+      '<input type="number" id="cf-f" class="cf-input" placeholder="Fat" min="0">' +
+      '</div>' +
+      '<textarea id="cf-body" class="cf-input cf-area" placeholder="How to make it, why you like it, when you eat it…"></textarea>';
+  }
+  return '<textarea id="cf-body" class="cf-input cf-area" placeholder="Share a thought, a win, a question for the community…"></textarea>';
+}
+function setComposerType(type) {
+  state._composerType = type;
+  document.querySelectorAll('.cf-type').forEach(el => el.classList.toggle('active', el.dataset.t === type));
+  const f = document.getElementById('cf-fields');
+  if (f) f.innerHTML = composerFields(type);
+}
+async function submitCommunityPost() {
+  const type = state._composerType || 'thought';
+  const body = { type, author: state.user || '' };
+  body.body = (document.getElementById('cf-body')?.value || '').trim();
+  if (type !== 'thought') body.title = (document.getElementById('cf-title')?.value || '').trim();
+  if (type === 'program') { body.goal = document.getElementById('cf-goal')?.value || ''; body.daysPerWeek = document.getElementById('cf-days')?.value || ''; }
+  if (type === 'meal') { body.kcal = document.getElementById('cf-kcal')?.value || 0; body.p = document.getElementById('cf-p')?.value || 0; body.c = document.getElementById('cf-c')?.value || 0; body.f = document.getElementById('cf-f')?.value || 0; }
+  if (!body.body && !body.title) { showToast('Write something first.', 'error'); return; }
+  try {
+    const res = await fetch('/api/community/posts', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+    if (!res.ok) { const j = await res.json().catch(() => ({})); showToast(j.error || 'Could not post.', 'error'); return; }
+    showToast('Posted to the community', 'success');
+    const b = document.getElementById('cf-body'); if (b) b.value = '';
+    ['cf-title', 'cf-goal', 'cf-days', 'cf-kcal', 'cf-p', 'cf-c', 'cf-f'].forEach(idv => { const e = document.getElementById(idv); if (e) e.value = ''; });
+    loadCommunityFeed();
+  } catch { showToast('You appear to be offline.', 'error'); }
+}
+async function loadCommunityFeed() {
+  const listEl = document.getElementById('feed-list');
+  if (!listEl) return;
+  const type = state._feedFilter || '';
+  listEl.innerHTML = '<div class="my-meals-empty">Loading…</div>';
+  try {
+    const res = await fetch('/api/community/posts' + (type ? '?type=' + type : ''), { headers: authHeaders() });
+    if (!res.ok) { listEl.innerHTML = '<div class="my-meals-empty">' + (res.status === 401 ? 'Please sign in to see the community.' : 'Could not load — try again.') + '</div>'; return; }
+    const j = await res.json();
+    state._feed = j.posts || [];
+    listEl.innerHTML = renderFeedList(state._feed);
+  } catch { listEl.innerHTML = '<div class="my-meals-empty">You appear to be offline.</div>'; }
+}
+function setCommunityFilter(type) {
+  state._feedFilter = type;
+  document.querySelectorAll('.cf-filter').forEach(el => el.classList.toggle('active', el.dataset.f === type));
+  loadCommunityFeed();
+}
+function feedMetaLine(p) {
+  const d = p.data || {};
+  if (p.type === 'program') {
+    const bits = [];
+    if (d.goal) bits.push(escapeHtml(d.goal));
+    if (d.daysPerWeek) bits.push(d.daysPerWeek + ' days/week');
+    return bits.length ? '<div class="fp-meta">' + bits.join(' · ') + '</div>' : '';
+  }
+  if (p.type === 'meal') {
+    const bits = [];
+    if (d.kcal) bits.push(d.kcal + ' cal');
+    if (d.p) bits.push(d.p + 'g P');
+    if (d.c) bits.push(d.c + 'g C');
+    if (d.f) bits.push(d.f + 'g F');
+    return bits.length ? '<div class="fp-meta fp-macros">' + bits.join(' · ') + '</div>' : '';
+  }
+  return '';
+}
+function renderFeedList(posts) {
+  if (!posts.length) return '<div class="my-meals-empty">Nothing here yet — be the first to post.</div>';
+  return posts.map(p =>
+    '<div class="feed-post">' +
+    '<div class="fp-head"><span class="fp-badge fp-' + p.type + '">' + (POST_TYPE_LABELS[p.type] || 'Post') + '</span>' +
+    '<span class="fp-author">' + escapeHtml(p.author || 'Someone') + '</span></div>' +
+    (p.title ? '<div class="fp-title">' + escapeHtml(p.title) + '</div>' : '') +
+    feedMetaLine(p) +
+    (p.body ? '<div class="fp-body">' + escapeHtml(p.body) + '</div>' : '') +
+    '<div class="fp-actions">' +
+    '<button type="button" class="fp-like' + (p.likedByMe ? ' liked' : '') + '" onclick="likeCommunityPost(' + p.id + ')">' + (p.likedByMe ? '♥' : '♡') + ' <span>' + (p.likeCount || 0) + '</span></button>' +
+    (p.mine
+      ? '<button type="button" class="fp-x" onclick="deleteCommunityPost(' + p.id + ')">Delete</button>'
+      : '<button type="button" class="fp-x" onclick="reportCommunityPost(' + p.id + ')">Report</button>') +
+    '</div></div>'
+  ).join('');
+}
+async function likeCommunityPost(id) {
+  try {
+    const res = await fetch('/api/community/posts/' + id + '/like', { method: 'POST', headers: authHeaders() });
+    if (!res.ok) return;
+    const j = await res.json();
+    const post = (state._feed || []).find(p => p.id === id);
+    if (post) { post.likedByMe = j.liked; post.likeCount = j.count; }
+    const listEl = document.getElementById('feed-list');
+    if (listEl) listEl.innerHTML = renderFeedList(state._feed);
+  } catch {}
+}
+async function reportCommunityPost(id) {
+  if (!confirm('Report this post as inappropriate? It gets hidden automatically once enough members report it.')) return;
+  fetch('/api/community/posts/' + id + '/report', { method: 'POST', headers: authHeaders() }).catch(() => {});
+  showToast('Reported — thanks for keeping it clean.', 'success');
+}
+async function deleteCommunityPost(id) {
+  if (!confirm('Delete your post?')) return;
+  try {
+    const res = await fetch('/api/community/posts/' + id, { method: 'DELETE', headers: authHeaders() });
+    if (res.ok) { showToast('Deleted.', 'success'); loadCommunityFeed(); }
+    else showToast('Could not delete.', 'error');
+  } catch { showToast('Could not reach the server.', 'error'); }
+}
+function renderCommunityPage() {
+  if (!state._composerType) state._composerType = 'thought';
+  if (state._feedFilter == null) state._feedFilter = '';
+  const filters = [['', 'All'], ['thought', 'Thoughts'], ['program', 'Programs'], ['meal', 'Meals']];
+  document.getElementById('main').innerHTML =
+    '<div class="page-header">' +
+    '<h2 class="page-title">Community</h2>' +
+    '<p class="page-sub">Share thoughts, training programs, and meals — and see what others post</p>' +
+    '</div>' +
+    '<div class="card">' +
+    '<h3 class="card-title">Share something</h3>' +
+    '<div class="cf-typetabs">' +
+    ['thought', 'program', 'meal'].map(t => '<button type="button" class="cf-type' + (t === state._composerType ? ' active' : '') + '" data-t="' + t + '" onclick="setComposerType(\'' + t + '\')">' + POST_TYPE_LABELS[t] + '</button>').join('') +
+    '</div>' +
+    '<div id="cf-fields">' + composerFields(state._composerType) + '</div>' +
+    '<button class="btn btn-primary" style="margin-top:12px" onclick="submitCommunityPost()">Post</button>' +
+    '</div>' +
+    '<div class="cf-filters">' +
+    filters.map(([v, l]) => '<button type="button" class="cf-filter' + (v === state._feedFilter ? ' active' : '') + '" data-f="' + v + '" onclick="setCommunityFilter(\'' + v + '\')">' + l + '</button>').join('') +
+    '</div>' +
+    '<div id="feed-list"><div class="my-meals-empty">Loading…</div></div>';
+  loadCommunityFeed();
 }
 
 // ─────────────────────────────────────────────────────────────

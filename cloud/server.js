@@ -539,6 +539,69 @@ app.delete('/api/community/meals/:id', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'failed' }); }
 });
 
+// ── Community feed: thoughts / training programs / meals ──────────────
+// Sanitize a post: type is whitelisted; title/body length-capped; structured
+// `data` kept small + numeric. The server never trusts the client beyond this.
+const POST_TYPES = ['thought', 'program', 'meal'];
+function cleanPost(b) {
+  const num = (x, max) => Math.max(0, Math.min(max, Math.round(Number(x) || 0)));
+  const type = POST_TYPES.includes(String(b.type)) ? String(b.type) : 'thought';
+  const title = String(b.title || '').trim().slice(0, 120);
+  const body = String(b.body || '').trim().slice(0, 4000);
+  const data = {};
+  if (type === 'program') {
+    if (b.goal) data.goal = String(b.goal).trim().slice(0, 40);
+    const d = Math.round(Number(b.daysPerWeek) || 0);
+    if (d) data.daysPerWeek = Math.max(1, Math.min(7, d));
+  } else if (type === 'meal') {
+    data.kcal = num(b.kcal, 20000); data.p = num(b.p, 2000); data.c = num(b.c, 2000); data.f = num(b.f, 2000);
+  }
+  return { type, title, body, data };
+}
+app.get('/api/community/posts', requireAuth, async (req, res) => {
+  try {
+    const type = String(req.query.type || '').toLowerCase();
+    const rows = await DB.listPosts(POST_TYPES.includes(type) ? type : '');
+    const me = String(req.userId);
+    res.json({ posts: rows.map(p => ({
+      id: p.id, type: p.type, title: p.title || '', body: p.body || '', data: p.data || {},
+      author: p.author_name || 'Someone', created_at: p.created_at,
+      likeCount: (p.likes || []).length, likedByMe: (p.likes || []).map(String).includes(me),
+      mine: String(p.user_id) === me
+    })) });
+  } catch (e) { res.status(500).json({ error: 'Could not load the community feed' }); }
+});
+app.post('/api/community/posts', requireAuth, async (req, res) => {
+  try {
+    const p = cleanPost(req.body || {});
+    if (!p.body && !p.title) return res.status(400).json({ error: 'Write something first.' });
+    const author = String(req.body.author || req.username || '').trim().slice(0, 40);
+    const id = await DB.createPost({ user_id: req.userId, author_name: author, ...p });
+    res.json({ success: true, id });
+  } catch (e) { res.status(500).json({ error: 'Could not post' }); }
+});
+app.post('/api/community/posts/:id/like', requireAuth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'bad id' });
+  try { const r = await DB.togglePostLike(id, req.userId); if (!r) return res.status(404).json({ error: 'not found' }); res.json({ success: true, ...r }); }
+  catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+app.post('/api/community/posts/:id/report', requireAuth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'bad id' });
+  try { await DB.flagPost(id); res.json({ success: true }); }
+  catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+app.delete('/api/community/posts/:id', requireAuth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'bad id' });
+  try {
+    const ok = await DB.deletePost(id, req.userId, isOwner(req.username));
+    if (!ok) return res.status(403).json({ error: 'Not allowed.' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+
 // Owner-only: how many devices a broadcast would reach.
 app.get('/api/admin/reach', requireAuth, async (req, res) => {
   if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });
@@ -668,4 +731,4 @@ if (require.main === module) {
     .catch(err => { console.error('Startup failed:', err.message); process.exit(1); });
 }
 
-module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner, cleanMeal };
+module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner, cleanMeal, cleanPost };

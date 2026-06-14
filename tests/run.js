@@ -545,6 +545,28 @@ if (P) {
     ok('DB deleteSharedMeal blocks non-author', delMine === false);
     const delForce = await DBm.deleteSharedMeal(mid, id, false); // author → deletes
     ok('DB deleteSharedMeal author removes own', delForce === true && (await DBm.listSharedMeals('')).length === 1);
+    // ── community posts (thoughts / training programs / meals) ──
+    const pid = await DBm.createPost({ user_id: id, author_name: 'Ahmed', type: 'program', title: 'PPL 6-day', body: 'Push pull legs', data: { goal: 'gain', daysPerWeek: 6 } });
+    ok('DB createPost returns id', !!pid);
+    await DBm.createPost({ user_id: id, author_name: 'Ahmed', type: 'thought', body: 'Consistency beats intensity' });
+    await DBm.createPost({ user_id: id, author_name: 'Sam', type: 'meal', title: 'Protein oats', data: { kcal: 450, p: 35 } });
+    const allPosts = await DBm.listPosts('');
+    ok('DB listPosts returns all, newest first', allPosts.length === 3 && allPosts[0].type === 'meal');
+    ok('DB listPosts filters by type', (await DBm.listPosts('program')).length === 1);
+    ok('DB listPosts parses the data object', (await DBm.listPosts('program'))[0].data.daysPerWeek === 6);
+    const lk1 = await DBm.togglePostLike(pid, id);
+    ok('DB togglePostLike adds a like', lk1.liked === true && lk1.count === 1);
+    const lk2 = await DBm.togglePostLike(pid, id);
+    ok('DB togglePostLike removes it again', lk2.liked === false && lk2.count === 0);
+    for (let i = 0; i < 5; i++) await DBm.flagPost(pid);
+    ok('DB flagged post (≥5) hidden from feed', !(await DBm.listPosts('')).some(p => p.id === pid));
+    ok('DB deletePost blocks non-author', (await DBm.deletePost(pid, 99999, false)) === false);
+    ok('DB deletePost author removes own', (await DBm.deletePost(pid, id, false)) === true);
+    // server-side post sanitizer
+    ok('cleanPost defaults unknown type to thought', C.cleanPost({ type: 'spam', body: 'hi' }).type === 'thought');
+    ok('cleanPost keeps program goal + days/week', (() => { const p = C.cleanPost({ type: 'program', title: 'X', daysPerWeek: '6', goal: 'gain' }); return p.data.daysPerWeek === 6 && p.data.goal === 'gain'; })());
+    ok('cleanPost coerces meal macros to numbers', (() => { const p = C.cleanPost({ type: 'meal', title: 'Oats', kcal: '450', p: 'x' }); return p.data.kcal === 450 && p.data.p === 0; })());
+    ok('cleanPost caps very long bodies', C.cleanPost({ type: 'thought', body: 'a'.repeat(5000) }).body.length === 4000);
   } catch (e) { failures.push('cloud DB (sqlite) — ' + e.message); }
 
   // ── report ──
