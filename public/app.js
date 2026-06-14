@@ -5430,6 +5430,59 @@ function findBook(title) {
     BOOK_DB.find(b => b.t.toLowerCase().startsWith(q)) ||
     BOOK_DB.find(b => b.t.toLowerCase().includes(q)) || null;
 }
+// Mobile-friendly book search — a custom suggestion dropdown, because the native
+// <datalist> barely works on phones. Shows popular picks on focus, then filters
+// by title and author as you type.
+function searchBooks(query, limit) {
+  const q = (query || '').trim().toLowerCase();
+  if (!q) return [];
+  const starts = [], incl = [], byAuthor = [];
+  for (const b of BOOK_DB) {
+    const t = b.t.toLowerCase(), a = b.a.toLowerCase();
+    if (t.startsWith(q)) starts.push(b);
+    else if (t.includes(q)) incl.push(b);
+    else if (a.includes(q)) byAuthor.push(b);
+  }
+  return starts.concat(incl, byAuthor).slice(0, limit || 8);
+}
+let _bookSuggestMatches = [];
+function renderBookSuggest() {
+  const wrap = document.getElementById('book-suggest');
+  if (!wrap) return;
+  const q = (document.getElementById('book-title-input')?.value || '').trim();
+  const matches = q ? searchBooks(q, 8) : BOOK_DB.slice(0, 6);
+  _bookSuggestMatches = matches;
+  if (!matches.length) { wrap.innerHTML = ''; wrap.style.display = 'none'; return; }
+  const head = q ? '' : '<div class="bs-head">Popular picks</div>';
+  wrap.innerHTML = head + matches.map((b, i) =>
+    '<button type="button" class="bs-row" onclick="pickSuggestion(' + i + ')">' +
+    bookCoverHtml({ title: b.t }, 'bc-sm') +
+    '<span class="bs-info"><span class="bs-title">' + escapeHtml(b.t) + '</span>' +
+    '<span class="bs-author">' + escapeHtml(b.a) + ' · ' + b.p + ' pages</span></span>' +
+    '</button>'
+  ).join('');
+  wrap.style.display = 'block';
+}
+function pickSuggestion(i) {
+  const b = _bookSuggestMatches && _bookSuggestMatches[i];
+  if (!b) return;
+  const t = document.getElementById('book-title-input');
+  const a = document.getElementById('book-author-input');
+  const p = document.getElementById('book-pages-total-input');
+  if (t) t.value = b.t;
+  if (a) a.value = b.a;
+  if (p) p.value = b.p;
+  hideBookSuggest();
+  updateBookPreview();
+}
+function hideBookSuggest() {
+  const wrap = document.getElementById('book-suggest');
+  if (wrap) { wrap.innerHTML = ''; wrap.style.display = 'none'; }
+}
+function onBookSearch() {
+  renderBookSuggest();
+  onBookPick();
+}
 // When the title exactly matches a known book (i.e. picked from the list), fill author + pages
 function onBookPick() {
   const raw = (document.getElementById('book-title-input')?.value || '').trim();
@@ -5533,8 +5586,8 @@ function showAddBookModal(isChanging) {
     '<div id="book-search">' +
     '<div id="book-cover-preview" class="book-pick-cover"></div>' +
     '<div class="form-group"><label>Book Title <span style="color:var(--danger)">*</span> <span style="font-weight:400;color:var(--text-muted)">— pick from the list or type your own</span></label>' +
-    '<input type="text" id="book-title-input" list="book-datalist" placeholder="Search a book…" autocomplete="off" oninput="onBookPick()"></div>' +
-    '<datalist id="book-datalist">' + BOOK_DB.map(b => '<option value="' + escapeAttr(b.t) + '">' + escapeAttr(b.a) + '</option>').join('') + '</datalist>' +
+    '<input type="text" id="book-title-input" placeholder="Search by title or author…" autocomplete="off" oninput="onBookSearch()" onfocus="renderBookSuggest()" onblur="setTimeout(hideBookSuggest, 200)"></div>' +
+    '<div id="book-suggest" class="book-suggest"></div>' +
     '<div class="form-group"><label>Author <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>' +
     '<input type="text" id="book-author-input" placeholder="e.g. Robert Kiyosaki"></div>' +
     '<div class="form-group"><label>Total Pages <span style="font-weight:400;color:var(--text-muted)">(optional — tracks your % progress)</span></label>' +

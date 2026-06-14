@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, weekConnection, gymPlan, momentumScore, pointAlong,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, weekConnection, gymPlan, momentumScore, pointAlong,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -150,6 +150,11 @@ const _bf = A.backfillBookData();
 ok('backfillBookData fills author + pages from the library', _bf === true && A.state.data.books[0].author === 'James Clear' && A.state.data.books[0].totalPages === 320);
 ok('backfillBookData leaves books not in the library untouched', A.state.data.books[1].author === '' && A.state.data.books[1].totalPages === 0);
 A.state.data = _sdBooks;
+// searchBooks — mobile picker suggestions (by title + author)
+ok('searchBooks matches by title prefix', A.searchBooks('atomic', 8)[0].t === 'Atomic Habits');
+ok('searchBooks matches by author name', A.searchBooks('greene', 8).length >= 3 && A.searchBooks('greene', 8).every(b => /Greene/.test(b.a)));
+ok('searchBooks returns nothing for an empty query', A.searchBooks('', 8).length === 0);
+ok('searchBooks respects the result limit', A.searchBooks('the', 5).length <= 5);
 // Reading notes grouped by book
 const _rg = A.groupReadingByBook([
   { date: '2026-06-10', reading: { bookTitle: 'Deep Work', pages: 20, summary: 'focus' } },

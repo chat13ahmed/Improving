@@ -1823,6 +1823,16 @@ body.auth-active .bottom-nav { display: none !important; }
 .pnav-pill { flex: 1; min-width: 70px; text-align: center; padding: 10px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer; transition: border-color 0.15s; }
 .pnav-pill:hover { border-color: var(--accent); }
 .pnav-more { flex: 0 0 auto; min-width: 54px; color: var(--text-muted); }
+
+/* Book search suggestions (mobile-friendly autocomplete) */
+.book-suggest { display: none; border: 1px solid var(--border); border-radius: 10px; overflow-x: hidden; overflow-y: auto; margin: -4px 0 14px; max-height: 300px; background: var(--surface); }
+.bs-head { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); padding: 9px 12px 5px; }
+.bs-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 9px 11px; background: none; border: none; border-top: 1px solid var(--tint-2); cursor: pointer; font-family: inherit; color: var(--text); }
+.bs-row:first-child { border-top: none; }
+.bs-row:hover, .bs-row:active { background: var(--tint-1); }
+.bs-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.bs-title { font-weight: 700; font-size: 13.5px; line-height: 1.25; }
+.bs-author { font-size: 12px; color: var(--text-muted); }
 @media (prefers-reduced-motion: reduce) {
   .climb-trail-done { animation: none; stroke-dashoffset: 0; }
   .climber, .climber-ring, .climb-ms.reached { animation: none; opacity: 1; transform: none; }
