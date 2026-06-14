@@ -635,6 +635,7 @@ async function startApp() {
   if (!state.data.weights)  state.data.weights  = [];
   ensureChecklistData();
   if (!state.data.profile.pillars) state.data.profile.pillars = defaultPillars();
+  if (backfillBookData()) saveData(); // fill missing author/pages on saved books
 
   // Dark mode chart defaults (guarded — app still works if Chart didn't load)
   if (typeof Chart !== 'undefined') {
@@ -5229,6 +5230,7 @@ function renderReadingPage() {
         bookCoverHtml(b, 'bc-sm') +
         '<div><div class="fb-title">' + escapeHtml(b.title) + '</div>' +
         (b.author ? '<div class="fb-date" style="color:var(--text-muted);font-size:12px">' + escapeHtml(b.author) + '</div>' : '') +
+        (b.totalPages ? '<div class="fb-date">' + b.totalPages + ' pages</div>' : '') +
         (b.finishedDate ? '<div class="fb-date">' + fmtDate(b.finishedDate) + '</div>' : '') +
         '</div></div>'
       ).join('') +
@@ -5407,6 +5409,20 @@ function toggleBookNotes(btn) {
   const isCollapsed = grp.classList.toggle('collapsed');
   if (isCollapsed) _collapsedBookNotes.add(key); else _collapsedBookNotes.delete(key);
 }
+// Fill in any missing author / total pages on the user's saved books from the
+// curated library — older entries were saved before we captured that data.
+function backfillBookData() {
+  if (!state.data || !Array.isArray(state.data.books)) return false;
+  let changed = false;
+  state.data.books.forEach(b => {
+    if (!b || !b.title || (b.author && b.totalPages)) return;
+    const m = BOOK_DB.find(x => x.t.toLowerCase() === b.title.trim().toLowerCase());
+    if (!m) return;
+    if (!b.author) { b.author = m.a; changed = true; }
+    if (!b.totalPages) { b.totalPages = m.p; changed = true; }
+  });
+  return changed;
+}
 function findBook(title) {
   if (!title) return null;
   const q = title.trim().toLowerCase();
@@ -5543,6 +5559,7 @@ async function saveBook() {
   // Pause any existing reading book
   state.data.books.forEach(b => { if (b.status === 'reading') b.status = 'paused'; });
   state.data.books.push({ id: uid(), title, author, totalPages, startDate: todayStr(), status: 'reading', finishedDate: null });
+  backfillBookData(); // if they typed a known title, fill author/pages from the library
   await saveData();
   document.getElementById('add-book-modal')?.remove();
   showToast('Now reading: ' + title, 'success');
