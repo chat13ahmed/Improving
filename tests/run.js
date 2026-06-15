@@ -186,6 +186,9 @@ ok('gymPlan lose → fat loss + cardio', /fat loss/i.test(A.gymPlan('lose', 80).
 ok('gymPlan gain → progressive overload', /overload/i.test(A.gymPlan('gain', 80).strength));
 ok('gymPlan unknown goal → maintain', A.gymPlan('whatever', 80).goal === 'maintain');
 ok('gymPlan cardio burn scales with weight', A.gymPlan('lose', 100).cardioBurn30 > A.gymPlan('lose', 60).cardioBurn30);
+ok('gymPlan includes diet guidance for the goal', A.gymPlan('lose', 80).diet && A.gymPlan('lose', 80).diet.rules.length >= 2 && /deficit/i.test(A.gymPlan('lose', 80).diet.cals));
+ok('gymPlan gain diet calls for a surplus', /surplus/i.test(A.gymPlan('gain', 80).diet.cals));
+ok('gymPlan maintain diet is maintenance', /maintenance/i.test(A.gymPlan('maintain', 80).diet.cals));
 // Your Climb — momentum + trail geometry
 ok('momentum: zero inputs → 0', A.momentumScore(0, 0, null) === 0);
 ok('momentum: more streak climbs higher', A.momentumScore(15, 50, null) > A.momentumScore(2, 50, null));

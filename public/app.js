@@ -3321,21 +3321,36 @@ function gymPlan(goal, weightKg) {
       split: 'Full-body strength 3× + 2 cardio / conditioning days',
       strength: 'Compound lifts — 3–4 sets of 8–12 reps',
       cardio: '20–40 min moderate cardio or intervals, 2–3×/week',
-      tip: 'Lift to keep your muscle while the deficit burns fat — protein high, steps up.'
+      tip: 'Lift to keep your muscle while the deficit burns fat — protein high, steps up.',
+      diet: {
+        cals: 'Eat in a ~20% calorie deficit',
+        protein: 'High protein — ~1.8–2.2 g per kg of bodyweight',
+        rules: ['Protein at every meal — chicken, fish, eggs, Greek yogurt', 'Fill half your plate with veg + fiber to stay full', 'Cut liquid calories and snacking first']
+      }
     },
     gain: {
       headline: 'Train for muscle gain', days: '4–5 days/week',
       split: 'Push / Pull / Legs or Upper / Lower',
       strength: 'Progressive overload — 3–5 sets of 6–12 reps, add weight weekly',
       cardio: 'Light cardio 1–2×/week for health — don\'t burn the surplus',
-      tip: 'Hit each muscle ~2×/week and push the big lifts. Eat in a surplus.'
+      tip: 'Hit each muscle ~2×/week and push the big lifts. Eat in a surplus.',
+      diet: {
+        cals: 'Eat in a ~10–15% calorie surplus',
+        protein: '~1.8–2.2 g of protein per kg to build',
+        rules: ['Eat enough — the surplus is what builds muscle', 'Put most of your carbs around training', 'Don\'t skip meals; add a shake if you fall short']
+      }
     },
     maintain: {
       headline: 'Train to stay strong', days: '3–4 days/week',
       split: 'Balanced full-body or Upper / Lower',
       strength: '3–4 sets of 8–12 reps',
       cardio: '2–3 cardio sessions for heart health',
-      tip: 'Mix strength and cardio, keep protein steady, stay consistent.'
+      tip: 'Mix strength and cardio, keep protein steady, stay consistent.',
+      diet: {
+        cals: 'Eat around your maintenance calories',
+        protein: 'Keep protein ~1.6–2 g per kg',
+        rules: ['Mostly whole foods, minimal processed', 'Protein with every meal', 'Stay consistent week to week']
+      }
     }
   };
   return Object.assign({ goal: g, cardioBurn30 }, plans[g]);
@@ -3345,6 +3360,7 @@ function renderGymPlanCard() {
   const n = state.data.profile && state.data.profile.nutrition;
   if (!n || !n.weightKg || !n.goal) return ''; // needs weight + goal (from nutrition setup)
   const p = gymPlan(n.goal, n.weightKg);
+  const nut = getNutrition();
   const wDisp = Math.round(kgToDisplay(n.weightKg)) + ' ' + (weightUnitPref() === 'lbs' ? 'lb' : 'kg');
   const row = (k, v) => '<div class="gp-row"><span class="gp-k">' + k + '</span><span class="gp-v">' + v + '</span></div>';
   return '<div class="card gymplan-card">' +
@@ -3356,6 +3372,16 @@ function renderGymPlanCard() {
     row('Strength', escapeHtml(p.strength)) +
     row('Cardio', escapeHtml(p.cardio) + (p.cardioBurn30 ? ' · ~' + p.cardioBurn30 + ' kcal / 30 min at your weight' : '')) +
     '</div>' +
+    '<div class="gp-diet">' +
+    '<div class="gp-diet-head">How to eat for this goal</div>' +
+    '<div class="gp-grid">' +
+    (nut
+      ? row('Calories', nut.calories.toLocaleString() + ' / day') + row('Protein', nut.protein.g + 'g / day')
+      : row('Calories', escapeHtml(p.diet.cals)) + row('Protein', escapeHtml(p.diet.protein))) +
+    '</div>' +
+    '<ul class="gp-diet-rules">' + p.diet.rules.map(r => '<li>' + escapeHtml(r) + '</li>').join('') + '</ul>' +
+    (nut ? '<button class="btn-link gp-diet-link" onclick="navigate(\'log\')">Log today\'s food →</button>' : '<button class="btn-link gp-diet-link" onclick="navigate(\'settings\')">Set up your nutrition →</button>') +
+    '</div>' +
     '<div class="gp-tip">' + escapeHtml(p.tip) + '</div>' +
     '</div>';
 }
@@ -3365,8 +3391,10 @@ function renderGymPlanHint() {
   const n = state.data.profile && state.data.profile.nutrition;
   if (!n || !n.weightKg || !n.goal) return '';
   const p = gymPlan(n.goal, n.weightKg);
+  const nut = getNutrition();
   return '<div class="gym-plan-hint"><b>For ' + p.goal + ':</b> ' + escapeHtml(p.split) + ' · ' + escapeHtml(p.strength) +
-    (p.cardioBurn30 ? ' · ~' + p.cardioBurn30 + ' kcal/30 min cardio' : '') + '</div>';
+    (p.cardioBurn30 ? ' · ~' + p.cardioBurn30 + ' kcal/30 min cardio' : '') +
+    (nut ? ' · eat ~' + nut.calories.toLocaleString() + ' cal / ' + nut.protein.g + 'g protein' : '') + '</div>';
 }
 
 // ── Connection of the Week — the cross-pillar "wow" (rule-based, no AI needed) ──
