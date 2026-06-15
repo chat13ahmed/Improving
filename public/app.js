@@ -632,6 +632,7 @@ async function startApp() {
   if (!state.data.ideas)    state.data.ideas    = [];
   if (!state.data.contacts) state.data.contacts = [];
   if (!state.data.books)    state.data.books    = [];
+  if (!state.data.vocab)    state.data.vocab    = [];
   if (!state.data.weights)  state.data.weights  = [];
   ensureChecklistData();
   if (!state.data.profile.pillars) state.data.profile.pillars = defaultPillars();
@@ -3745,35 +3746,39 @@ function yearRange(days, weeksBack, today) {
   trimmed.forEach(w => { if (w.value > best.value) best = w; });
   return { weeks: trimmed, max, activeWeeks: trimmed.filter(w => w.value > 0).length, best, totalWeeks: trimmed.length };
 }
-function renderYearRange() {
-  const data = yearRange(state.data.days, 52);
-  if (!data) return '';
-  const W = 400, H = 150, base = H - 4, top = 16, n = data.weeks.length;
+// Build the layered ridge paths for a given canvas size — shared by the live
+// card and the shareable image so they always match.
+function yearRangeRidge(weeks, max, W, H) {
+  const base = H - 4, top = 16, n = weeks.length;
   const xAt = i => n === 1 ? W / 2 : Math.round(6 + i * (W - 12) / (n - 1));
-  const yAt = v => Math.round(base - (v / data.max) * (base - top));
-  const half = n > 1 ? (xAt(1) - xAt(0)) / 2 : 120;
+  const yAt = v => Math.round(base - (v / max) * (base - top));
+  const half = n > 1 ? (xAt(1) - xAt(0)) / 2 : (W - 12) / 2;
   const cap = (x, y) => '<polygon points="' + x + ',' + y + ' ' + (x + 5) + ',' + (y + 9) + ' ' + (x - 5) + ',' + (y + 9) + '" fill="#ffffff" opacity="0.92"/>';
-  // Each week is its OWN peak, with a valley dipping between peaks — so it always
-  // reads as a mountain range, even when the weeks are evenly strong.
-  const peakY = data.weeks.map(w => yAt(w.value));
-  const backY = data.weeks.map(w => Math.round(base - 0.7 * (base - yAt(w.value))) - 6);
+  const peakY = weeks.map(w => yAt(w.value));
+  const backY = weeks.map(w => Math.round(base - 0.7 * (base - yAt(w.value))) - 6);
   let near = 'M ' + Math.max(0, Math.round(xAt(0) - half)) + ' ' + base + ' L ' + xAt(0) + ' ' + peakY[0];
   let back = 'M 0 ' + base + ' L ' + xAt(0) + ' ' + backY[0];
-  let caps = data.weeks[0].value >= data.max * 0.75 ? cap(xAt(0), peakY[0]) : '';
+  let caps = weeks[0].value >= max * 0.75 ? cap(xAt(0), peakY[0]) : '';
   for (let i = 1; i < n; i++) {
     const vx = Math.round((xAt(i - 1) + xAt(i)) / 2);
     const vyN = Math.round(base - 0.42 * (((base - peakY[i - 1]) + (base - peakY[i])) / 2));
     const vyB = Math.round(base - 0.5 * (((base - backY[i - 1]) + (base - backY[i])) / 2));
     near += ' L ' + vx + ' ' + vyN + ' L ' + xAt(i) + ' ' + peakY[i];
     back += ' L ' + vx + ' ' + vyB + ' L ' + xAt(i) + ' ' + backY[i];
-    if (data.weeks[i].value >= data.max * 0.75) caps += cap(xAt(i), peakY[i]);
+    if (weeks[i].value >= max * 0.75) caps += cap(xAt(i), peakY[i]);
   }
   near += ' L ' + Math.min(W, Math.round(xAt(n - 1) + half)) + ' ' + base + ' Z';
   back += ' L ' + W + ' ' + base + ' Z';
-  const svg = '<svg class="yr-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Your year as a mountain range">' +
+  return { near, back, caps };
+}
+function renderYearRange() {
+  const data = yearRange(state.data.days, 52);
+  if (!data) return '';
+  const r = yearRangeRidge(data.weeks, data.max, 400, 150);
+  const svg = '<svg class="yr-svg" viewBox="0 0 400 150" role="img" aria-label="Your year as a mountain range">' +
     '<defs><linearGradient id="yrFar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9FE1CB"/><stop offset="1" stop-color="#9FE1CB" stop-opacity="0.35"/></linearGradient>' +
     '<linearGradient id="yrNear" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1D9E75"/><stop offset="1" stop-color="#0F6E56"/></linearGradient></defs>' +
-    '<path d="' + back + '" fill="url(#yrFar)"/><path d="' + near + '" fill="url(#yrNear)"/>' + caps + '</svg>';
+    '<path d="' + r.back + '" fill="url(#yrFar)"/><path d="' + r.near + '" fill="url(#yrNear)"/>' + r.caps + '</svg>';
   return '<div class="card yr-card">' +
     '<div class="card-title">Your year as a range</div>' +
     '<div class="card-sub">Every week you log becomes a peak. This is the range you\'ve built so far.</div>' +
@@ -3782,10 +3787,44 @@ function renderYearRange() {
     '<button class="btn-link yr-share" onclick="shareYearRange()">Share my range</button>' +
     '</div>';
 }
+function yearRangeShareSvg(size, data) {
+  const r = yearRangeRidge(data.weeks, data.max, 400, 200);
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + size + '" viewBox="0 0 1080 1080">' +
+    '<defs>' +
+    '<linearGradient id="yShareBg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bfe6ff"/><stop offset="1" stop-color="#eef7ee"/></linearGradient>' +
+    '<linearGradient id="yShareNear" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1D9E75"/><stop offset="1" stop-color="#0F6E56"/></linearGradient>' +
+    '<linearGradient id="yShareFar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9FE1CB"/><stop offset="1" stop-color="#9FE1CB" stop-opacity="0.4"/></linearGradient>' +
+    '</defs>' +
+    '<rect width="1080" height="1080" fill="url(#yShareBg)"/>' +
+    '<text x="540" y="170" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="40" font-weight="800" letter-spacing="5" fill="#0F6E56">MY YEAR AS A RANGE</text>' +
+    '<text x="540" y="362" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="200" font-weight="900" fill="#1D9E75">' + data.activeWeeks + '</text>' +
+    '<text x="540" y="432" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="44" font-weight="600" fill="#334155">weeks climbed — every one a peak</text>' +
+    '<svg x="0" y="520" width="1080" height="540" viewBox="0 0 400 200" preserveAspectRatio="none">' +
+    '<path d="' + r.back + '" fill="url(#yShareFar)"/><path d="' + r.near + '" fill="url(#yShareNear)"/>' + r.caps + '</svg>' +
+    '<text x="540" y="1024" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="36" font-weight="700" fill="#ffffff">Tallest peak: week of ' + escapeHtml(fmtDateShort(data.best.weekStart)) + '  ·  Escalate</text>' +
+    '</svg>';
+}
+function buildYearShareBlob(size, data) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => { const cv = document.createElement('canvas'); cv.width = cv.height = size; cv.getContext('2d').drawImage(img, 0, 0, size, size); cv.toBlob(b => resolve(b), 'image/png'); };
+    img.onerror = () => resolve(null);
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(yearRangeShareSvg(size, data));
+  });
+}
 async function shareYearRange() {
   const data = yearRange(state.data.days, 52);
   if (!data) return;
-  const text = 'My year on Escalate — ' + data.activeWeeks + ' weeks logged, each one a peak in my range. Building the climb of my life. ↗';
+  try {
+    showToast('Building your range…', 'success');
+    const blob = await buildYearShareBlob(1080, data);
+    if (blob) {
+      const file = new File([blob], 'my-year.png', { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'My year on Escalate', text: 'Every week a peak.' }); return; }
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'my-year.png'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000); showToast('Saved — post your range!', 'success'); return;
+    }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const text = 'My year on Escalate — ' + data.activeWeeks + ' weeks logged, each one a peak in my range. ↗';
   try { if (navigator.share) { await navigator.share({ title: 'Escalate', text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
   try { await navigator.clipboard.writeText(text); showToast('Copied — paste it anywhere.', 'success'); } catch { showToast('Share not available here.', 'error'); }
 }
@@ -5550,6 +5589,74 @@ async function ensureBookCovers() {
   }
   if (changed) { saveData(); if (state.page === 'reading') renderReadingPage(); }
 }
+// ── Vocabulary — capture words from books, their meaning, then use each in a
+// sentence. Active recall beats passive highlighting. ──
+function vocabStats(vocab) {
+  const list = Array.isArray(vocab) ? vocab : [];
+  const practiced = list.filter(w => w.sentence && w.sentence.trim()).length;
+  return { total: list.length, practiced, needSentence: list.length - practiced };
+}
+function renderVocabCard() {
+  const vocab = state.data.vocab || [];
+  const s = vocabStats(vocab);
+  const form =
+    '<div class="vocab-form">' +
+    '<input type="text" id="vocab-word" class="vocab-input" placeholder="New word" maxlength="60" autocomplete="off">' +
+    '<input type="text" id="vocab-meaning" class="vocab-input" placeholder="What it means" maxlength="240" autocomplete="off">' +
+    '<input type="text" id="vocab-book" class="vocab-input" placeholder="From which book? (optional)" maxlength="80" autocomplete="off">' +
+    '<button class="btn btn-primary" onclick="addVocabWord()">Add word</button>' +
+    '</div>';
+  const list = vocab.length
+    ? '<div class="vocab-list">' + [...vocab].reverse().map(w => {
+      const hasS = w.sentence && w.sentence.trim();
+      return '<div class="vocab-item">' +
+        '<div class="vocab-top"><span class="vocab-word">' + escapeHtml(w.word) + '</span>' +
+        (w.book ? '<span class="vocab-bk">' + escapeHtml(w.book) + '</span>' : '') +
+        '<button class="vocab-x" title="Remove" onclick="deleteVocabWord(\'' + w.id + '\')">✕</button></div>' +
+        (w.meaning ? '<div class="vocab-mean">' + escapeHtml(w.meaning) + '</div>' : '') +
+        (hasS
+          ? '<div class="vocab-sentence">“' + escapeHtml(w.sentence) + '” <span class="vocab-done">✓ used it</span></div>'
+          : '<div class="vocab-ask"><div class="vocab-ask-q">Can you use <b>' + escapeHtml(w.word) + '</b> in a sentence?</div>' +
+            '<div class="vocab-ask-row"><input type="text" id="vs-' + w.id + '" class="vocab-input" placeholder="Write your sentence…" maxlength="240" onkeydown="if(event.key===\'Enter\'){saveVocabSentence(\'' + w.id + '\')}">' +
+            '<button class="btn-sm" onclick="saveVocabSentence(\'' + w.id + '\')">Save</button></div></div>') +
+        '</div>';
+    }).join('') + '</div>'
+    : '<div class="my-meals-empty">No words yet — add one you picked up from a book.</div>';
+  return '<div class="card vocab-card">' +
+    '<h3 class="card-title">Words I\'m learning</h3>' +
+    '<p class="card-sub">Capture new words from your books and their meaning — then put each to work in a sentence.' +
+    (s.total ? ' · <b>' + s.total + '</b> word' + (s.total === 1 ? '' : 's') + ' · <b>' + s.practiced + '</b> used in a sentence' : '') + '</p>' +
+    form + list +
+    '</div>';
+}
+async function addVocabWord() {
+  const word = (document.getElementById('vocab-word')?.value || '').trim();
+  const meaning = (document.getElementById('vocab-meaning')?.value || '').trim();
+  const book = (document.getElementById('vocab-book')?.value || '').trim();
+  if (!word) { showToast('Type the word first.', 'error'); return; }
+  if (!state.data.vocab) state.data.vocab = [];
+  state.data.vocab.push({ id: uid(), word, meaning, book, sentence: '', createdAt: todayStr() });
+  await saveData();
+  showToast('Added “' + word + '” — now use it in a sentence!', 'success');
+  renderReadingPage();
+}
+async function saveVocabSentence(id) {
+  const el = document.getElementById('vs-' + id);
+  const sentence = ((el && el.value) || '').trim();
+  if (!sentence) { showToast('Write a sentence using the word.', 'error'); return; }
+  const w = (state.data.vocab || []).find(x => x.id === id);
+  if (!w) return;
+  w.sentence = sentence;
+  await saveData();
+  showToast('Nice — you used “' + w.word + '”.', 'success');
+  renderReadingPage();
+}
+async function deleteVocabWord(id) {
+  if (!confirm('Remove this word?')) return;
+  state.data.vocab = (state.data.vocab || []).filter(x => x.id !== id);
+  await saveData();
+  renderReadingPage();
+}
 function renderReadingPage() {
   const books      = state.data.books || [];
   const activeBook = books.find(b => b.status === 'reading');
@@ -5656,7 +5763,7 @@ function renderReadingPage() {
     '<h2 class="page-title">Reading</h2>' +
     '<p class="page-sub">Track your books, build a daily reading habit, and retain what you learn</p>' +
     '</div>' +
-    statsBar + bookCard + historyCard + finishedCard;
+    statsBar + bookCard + renderVocabCard() + historyCard + finishedCard;
   ensureBookCovers(); // resolve any missing covers, then re-render
 }
 

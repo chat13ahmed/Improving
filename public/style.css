@@ -1799,6 +1799,7 @@ body.auth-active .bottom-nav { display: none !important; }
 .fut-card { border: 1px solid var(--read-color, var(--accent)); background: var(--tint-1); }
 .fut-tag { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: var(--read-color, var(--accent)); margin-bottom: 8px; }
 .fut-headline { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.4; }
+.fut-snapshot { margin-top: 8px; padding: 12px 13px; border-radius: var(--radius-sm); background: rgba(6,182,212,0.08); border: 1px solid rgba(6,182,212,0.18); font-size: 14px; line-height: 1.55; color: var(--text); font-weight: 650; }
 .fut-list { margin: 10px 0 0; padding-left: 20px; }
 .fut-list li { font-size: 14px; color: var(--text); line-height: 1.7; }
 .fut-level { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 14px; color: var(--text); }
@@ -1829,6 +1830,24 @@ body.auth-active .bottom-nav { display: none !important; }
 .yr-svg { display: block; width: 100%; height: auto; aspect-ratio: 400 / 150; margin: 10px 0 8px; border-radius: var(--radius-sm); overflow: hidden; }
 .yr-stats { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; font-size: 12.5px; color: var(--text-muted); padding-top: 8px; border-top: 1px solid var(--border); }
 .yr-share { margin-top: 10px; display: inline-block; }
+
+/* Vocabulary — words from books + use-it-in-a-sentence */
+.vocab-form { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 14px; }
+.vocab-input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--field-bg); color: var(--text); font-family: inherit; font-size: 14px; box-sizing: border-box; }
+.vocab-list { display: flex; flex-direction: column; gap: 10px; }
+.vocab-item { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
+.vocab-top { display: flex; align-items: center; gap: 8px; }
+.vocab-word { font-weight: 800; font-size: 16px; color: var(--text); }
+.vocab-bk { font-size: 11px; color: var(--read-color, var(--text-muted)); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; }
+.vocab-x { margin-left: auto; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; }
+.vocab-x:hover { color: var(--danger); }
+.vocab-mean { font-size: 13.5px; color: var(--text-muted); margin-top: 3px; line-height: 1.5; }
+.vocab-sentence { margin-top: 8px; font-size: 13.5px; color: var(--text); font-style: italic; line-height: 1.5; }
+.vocab-done { font-style: normal; font-size: 12px; color: var(--success); font-weight: 700; margin-left: 4px; }
+.vocab-ask { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+.vocab-ask-q { font-size: 13px; color: var(--text); margin-bottom: 7px; }
+.vocab-ask-row { display: flex; gap: 8px; }
+.vocab-ask-row .vocab-input { flex: 1; }
 
 /* Onboarding — emotional hero moments (welcome + "your climb begins") */
 .onboard-hero { text-align: center; }
@@ -1934,6 +1953,36 @@ body.auth-active .bottom-nav { display: none !important; }
 .ns-title { font-size: 18px; font-weight: 800; color: var(--text); letter-spacing: -0.2px; }
 .ns-sub { font-size: 13.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
 .ns-cta { margin-top: 12px; }
+
+/* Quest Mode - a compact daily mission board */
+.quest-card {
+  background: linear-gradient(135deg, rgba(15,23,42,0.03), rgba(59,130,246,0.06));
+  border: 1px solid rgba(59,130,246,0.22);
+}
+.quest-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.quest-label { font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.7px; color: var(--primary); margin-bottom: 3px; }
+.quest-title { font-size: 18px; font-weight: 850; color: var(--text); letter-spacing: -0.2px; }
+.quest-score {
+  min-width: 48px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+  background: var(--field-bg); border: 1px solid var(--border); font-size: 15px; font-weight: 900; color: var(--text);
+}
+.quest-list { display: flex; flex-direction: column; gap: 8px; }
+.quest-row {
+  width: 100%; display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px;
+  border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 10px;
+  padding: 10px 11px; font-family: inherit; text-align: left; cursor: pointer; transition: transform 0.15s, border-color 0.15s, background 0.15s;
+}
+.quest-row:hover { transform: translateY(-1px); border-color: var(--primary); background: var(--tint-1); }
+.quest-row.done { background: rgba(16,185,129,0.07); border-color: rgba(16,185,129,0.24); }
+.quest-check {
+  width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--border-bright); color: var(--success); font-size: 9px; font-weight: 900;
+}
+.quest-row.done .quest-check { background: var(--success); border-color: var(--success); color: #fff; }
+.quest-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.quest-copy b { font-size: 14px; line-height: 1.25; }
+.quest-copy small { font-size: 12.5px; color: var(--text-muted); line-height: 1.35; }
+.quest-cta { font-size: 12px; font-weight: 800; color: var(--primary); white-space: nowrap; }
 
 /* Coach chat */
 .coach-thread { display: flex; flex-direction: column; gap: 10px; max-height: 440px; overflow-y: auto; padding: 4px 2px 8px; margin-bottom: 12px; }

@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, yearRange, gymPlan, momentumScore, pointAlong,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, yearRange, vocabStats, gymPlan, momentumScore, pointAlong,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -210,6 +210,10 @@ ok('yearRange builds weekly peaks', _yr && _yr.weeks.length >= 3);
 ok('yearRange counts active weeks', _yr && _yr.activeWeeks >= 3);
 ok('yearRange finds the tallest peak', _yr && _yr.best && _yr.best.value === _yr.max);
 ok('yearRange needs a few weeks (null on tiny history)', A.yearRange(_yd.slice(0, 2), 52, '2026-06-14') === null);
+// Vocabulary — words from books
+const _vs = A.vocabStats([{ word: 'a', sentence: 'I used a.' }, { word: 'b', sentence: '' }, { word: 'c' }]);
+ok('vocabStats counts total + practiced + needSentence', _vs.total === 3 && _vs.practiced === 1 && _vs.needSentence === 2);
+ok('vocabStats handles empty/null safely', A.vocabStats(null).total === 0 && A.vocabStats([]).practiced === 0);
 // Gym training plan by goal + weight
 ok('gymPlan lose → fat loss + cardio', /fat loss/i.test(A.gymPlan('lose', 80).headline) && /cardio/i.test(A.gymPlan('lose', 80).cardio));
 ok('gymPlan gain → progressive overload', /overload/i.test(A.gymPlan('gain', 80).strength));
