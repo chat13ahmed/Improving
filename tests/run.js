@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, gymPlan, momentumScore, pointAlong,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, gymPlan, momentumScore, pointAlong,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -191,6 +191,17 @@ ok('projectFuture estimates books from pages', _proj && _proj.books > 0);
 ok('projectFuture projects workouts forward', _proj && _proj.workouts > 0);
 ok('projectFuture gives an XP/week rate', _proj && _proj.xpPerWeek > 0);
 ok('projectFuture needs enough data (null on too few days)', A.projectFuture(_fdays.slice(0, 3), 90, _ft) === null);
+// The Life Web — pairwise correlation constellation
+ok('pearson perfect positive = 1', Math.round(A.pearson([1, 2, 3, 4], [2, 4, 6, 8])) === 1);
+ok('pearson perfect negative = -1', Math.round(A.pearson([1, 2, 3, 4], [8, 6, 4, 2])) === -1);
+ok('pearson no variance = 0', A.pearson([5, 5, 5], [1, 2, 3]) === 0);
+const _wdays = [];
+for (let i = 0; i < 12; i++) { const on = i % 2 === 0; _wdays.push({ date: '2026-06-' + String(i + 1).padStart(2, '0'), gym: { done: on }, reading: { pages: on ? 30 : 5 }, networking: { count: on ? 3 : 2 } }); }
+const _web = A.lifeWeb(_wdays, ['gym', 'reading', 'networking']);
+ok('lifeWeb returns connected nodes', _web && _web.nodes.length >= 2);
+ok('lifeWeb links gym & reading (they move together)', _web && _web.edges.some(e => ((e.a === 'gym' && e.b === 'reading') || (e.a === 'reading' && e.b === 'gym')) && e.r > 0.5));
+ok('lifeWeb surfaces a strongest link', _web && _web.strongest && _web.strongest.strength >= 0.5);
+ok('lifeWeb needs enough days (null on too few)', A.lifeWeb(_wdays.slice(0, 3), ['gym', 'reading']) === null);
 // Gym training plan by goal + weight
 ok('gymPlan lose → fat loss + cardio', /fat loss/i.test(A.gymPlan('lose', 80).headline) && /cardio/i.test(A.gymPlan('lose', 80).cardio));
 ok('gymPlan gain → progressive overload', /overload/i.test(A.gymPlan('gain', 80).strength));

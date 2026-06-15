@@ -3516,6 +3516,70 @@ function renderFutureCard() {
     '<div class="fut-foot">Consistency compounds — this is where today\'s pace is taking you.</div>' +
     '</div>';
 }
+// ── The Life Web — the brand promise made visual: how every pillar pulls on
+// every other. Pairwise Pearson correlation across your days → a constellation. ──
+function pearson(xs, ys) {
+  const n = Math.min(xs.length, ys.length);
+  if (n < 2) return 0;
+  let sx = 0, sy = 0;
+  for (let i = 0; i < n; i++) { sx += xs[i]; sy += ys[i]; }
+  const mx = sx / n, my = sy / n;
+  let num = 0, dx = 0, dy = 0;
+  for (let i = 0; i < n; i++) { const a = xs[i] - mx, b = ys[i] - my; num += a * b; dx += a * a; dy += b * b; }
+  if (dx <= 0 || dy <= 0) return 0;
+  return num / Math.sqrt(dx * dy);
+}
+function lifeWeb(days, pillarIds) {
+  const list = (days || []).filter(d => d && d.date);
+  if (list.length < 6) return null;
+  const metricFns = {
+    gym: d => (d.gym && d.gym.done) ? 1 : 0,
+    food: d => (d.food && d.food.rating) || 0,
+    reading: d => (d.reading && d.reading.pages) || 0,
+    networking: d => (d.networking && d.networking.count) || 0
+  };
+  const ids = (pillarIds && pillarIds.length ? pillarIds : Object.keys(metricFns)).filter(id => metricFns[id]);
+  const series = {};
+  ids.forEach(id => { const arr = list.map(metricFns[id]); if (Math.max.apply(null, arr) > Math.min.apply(null, arr)) series[id] = arr; });
+  const nodes = Object.keys(series);
+  if (nodes.length < 2) return null;
+  const edges = [];
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+    const r = pearson(series[nodes[i]], series[nodes[j]]);
+    if (Math.abs(r) >= 0.15) edges.push({ a: nodes[i], b: nodes[j], r: Math.round(r * 100) / 100, strength: Math.abs(r) });
+  }
+  edges.sort((x, y) => y.strength - x.strength);
+  return { nodes, edges, strongest: edges[0] || null };
+}
+function renderLifeWeb() {
+  const ids = PILLAR_IDS.filter(id => isPillarOn(id) && ['gym', 'food', 'reading', 'networking'].includes(id));
+  const web = lifeWeb(state.data.days, ids);
+  if (!web || !web.edges.length) return '';
+  const colorVar = { gym: 'var(--gym-color)', food: 'var(--food-color)', reading: 'var(--read-color)', networking: 'var(--network-color)' };
+  const N = web.nodes.length, cx = 160, cy = 140, R = 95;
+  const pos = {};
+  web.nodes.forEach((id, i) => { const ang = (-90 + i * 360 / N) * Math.PI / 180; pos[id] = { x: Math.round(cx + R * Math.cos(ang)), y: Math.round(cy + R * Math.sin(ang)) }; });
+  const edgesSvg = web.edges.map(e => {
+    const A = pos[e.a], B = pos[e.b];
+    const w = (1.2 + e.strength * 6).toFixed(1), op = (0.18 + e.strength * 0.6).toFixed(2);
+    return '<line x1="' + A.x + '" y1="' + A.y + '" x2="' + B.x + '" y2="' + B.y + '" stroke="' + (e.r >= 0 ? '#16a34a' : '#ef4444') + '" stroke-width="' + w + '" opacity="' + op + '" stroke-linecap="round"/>';
+  }).join('');
+  const nodesSvg = web.nodes.map(id => {
+    const p = pos[id], lbl = escapeHtml(pillar(id).label);
+    const ly = p.y < cy ? p.y - 17 : p.y + 28;
+    return '<circle cx="' + p.x + '" cy="' + p.y + '" r="10" style="fill:' + (colorVar[id] || 'var(--accent)') + '"/>' +
+      '<text x="' + p.x + '" y="' + ly + '" text-anchor="middle" font-size="12.5" font-weight="700" style="fill:var(--text)">' + lbl + '</text>';
+  }).join('');
+  const s = web.strongest;
+  const strongLine = s ? '<div class="lw-strong"><b>Strongest link:</b> ' + escapeHtml(pillar(s.a).label) + ' ↔ ' + escapeHtml(pillar(s.b).label) + ' — ' + (s.r >= 0 ? 'they rise together' : 'one trades off the other') + '</div>' : '';
+  return '<div class="card lw-card">' +
+    '<div class="card-title">Your life web</div>' +
+    '<div class="card-sub">How your pillars pull on each other — thicker lines mean a stronger link.</div>' +
+    '<svg class="lw-svg" viewBox="0 0 320 280" width="100%" role="img" aria-label="A web showing how your tracked areas connect">' + edgesSvg + nodesSvg + '</svg>' +
+    strongLine +
+    '<div class="lw-legend"><span class="lw-key"><span class="lw-dot lw-pos"></span>rise together</span><span class="lw-key"><span class="lw-dot lw-neg"></span>trade off</span></div>' +
+    '</div>';
+}
 // The picture's 7-day dots — this week at a glance (filled = logged, ring = today).
 function renderWeekStrip() {
   if (!state.data || !state.data.days) return '';
@@ -3687,6 +3751,7 @@ function renderDashboard() {
     '</div>' +
     gHero +
     gGuidance +
+    sec('How it all connects', renderLifeWeb()) +
     sec('Your coach', gCoach) +
     sec('Today', gToday) +
     sec('Health', gHealth) +

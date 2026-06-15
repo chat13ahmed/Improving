@@ -1804,6 +1804,15 @@ body.auth-active .bottom-nav { display: none !important; }
 .fut-level { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 14px; color: var(--text); }
 .fut-foot { margin-top: 8px; font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
 
+/* The Life Web — pillar constellation */
+.lw-svg { display: block; margin: 10px auto 4px; max-width: 360px; }
+.lw-strong { font-size: 13.5px; color: var(--text); margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--border); line-height: 1.5; }
+.lw-legend { display: flex; gap: 18px; margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+.lw-key { display: inline-flex; align-items: center; gap: 6px; }
+.lw-dot { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
+.lw-dot.lw-pos { background: #16a34a; }
+.lw-dot.lw-neg { background: #ef4444; }
+
 /* Onboarding — emotional hero moments (welcome + "your climb begins") */
 .onboard-hero { text-align: center; }
 .ob-hero-art { max-width: 280px; margin: 4px auto 18px; }
