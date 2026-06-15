@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, gymPlan, momentumScore, pointAlong,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, gymPlan, momentumScore, pointAlong,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -181,6 +181,16 @@ ok('weekConnection finds the gym↔reading link', _conn && _conn.kind === 'read'
 ok('weekConnection phrases it as a sentence', _conn && /On days you train/.test(_conn.headline));
 ok('weekConnection needs enough days (null on 3)', A.weekConnection(_cdays.slice(0, 3)) === null);
 ok('weekConnection needs gym variation (null if every day is gym)', A.weekConnection(_cdays.map(d => ({ ...d, gym: { done: true } }))) === null);
+// The Climb Ahead — future-self forecast
+const _ft = '2026-06-14';
+const _fdays = [];
+for (let i = 0; i < 14; i++) { const dt = new Date('2026-06-14T00:00:00'); dt.setDate(dt.getDate() - i); _fdays.push({ date: dt.toISOString().split('T')[0], gym: { done: true }, reading: { pages: 20 } }); }
+const _proj = A.projectFuture(_fdays, 90, _ft);
+ok('projectFuture projects pages forward from recent pace', _proj && _proj.pages > 100);
+ok('projectFuture estimates books from pages', _proj && _proj.books > 0);
+ok('projectFuture projects workouts forward', _proj && _proj.workouts > 0);
+ok('projectFuture gives an XP/week rate', _proj && _proj.xpPerWeek > 0);
+ok('projectFuture needs enough data (null on too few days)', A.projectFuture(_fdays.slice(0, 3), 90, _ft) === null);
 // Gym training plan by goal + weight
 ok('gymPlan lose → fat loss + cardio', /fat loss/i.test(A.gymPlan('lose', 80).headline) && /cardio/i.test(A.gymPlan('lose', 80).cardio));
 ok('gymPlan gain → progressive overload', /overload/i.test(A.gymPlan('gain', 80).strength));

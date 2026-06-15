@@ -1795,6 +1795,15 @@ body.auth-active .bottom-nav { display: none !important; }
 .conn-building { border-color: var(--border); background: var(--surface); }
 .conn-building .conn-tag { color: var(--text-muted); }
 
+/* The Climb Ahead — future-self forecast */
+.fut-card { border: 1px solid var(--read-color, var(--accent)); background: var(--tint-1); }
+.fut-tag { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: var(--read-color, var(--accent)); margin-bottom: 8px; }
+.fut-headline { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.4; }
+.fut-list { margin: 10px 0 0; padding-left: 20px; }
+.fut-list li { font-size: 14px; color: var(--text); line-height: 1.7; }
+.fut-level { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 14px; color: var(--text); }
+.fut-foot { margin-top: 8px; font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
+
 /* Onboarding — emotional hero moments (welcome + "your climb begins") */
 .onboard-hero { text-align: center; }
 .ob-hero-art { max-width: 280px; margin: 4px auto 18px; }

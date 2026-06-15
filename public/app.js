@@ -3460,6 +3460,62 @@ async function shareConnection() {
   try { if (navigator.share) { await navigator.share({ title: 'Escalate', text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
   try { await navigator.clipboard.writeText(text); showToast('Copied — paste it anywhere.', 'success'); } catch { showToast('Share not available here.', 'error'); }
 }
+// ── The Climb Ahead — a momentum forecast of your future self (no AI needed) ──
+// Takes your recent pace and projects it forward, so the app points UP the
+// mountain, not just back down it. Pure + dated for testability.
+function projectFuture(days, horizonDays, today) {
+  horizonDays = horizonDays || 90;
+  const t = today || todayStr();
+  const list = (days || []).filter(d => d && d.date);
+  if (list.length < 5) return null;
+  const cutoffMs = Date.parse(t + 'T00:00:00') - 55 * 86400000;
+  const win = list.filter(d => Date.parse(d.date + 'T00:00:00') >= cutoffMs);
+  if (win.length < 5) return null;
+  const earliest = win.reduce((m, d) => d.date < m ? d.date : m, t);
+  const coverDays = Math.max(7, (Date.parse(t + 'T00:00:00') - Date.parse(earliest + 'T00:00:00')) / 86400000 + 1);
+  const weeks = coverDays / 7;
+  const scale = (horizonDays / 7) / weeks;
+  const sum = fn => win.reduce((s, d) => s + (fn(d) || 0), 0);
+  const pages = Math.round(sum(d => d.reading && d.reading.pages) * scale);
+  let winXp = 0;
+  win.forEach(d => {
+    if (d.gym && d.gym.done) winXp += 10;
+    if (d.food && d.food.rating > 0) winXp += 5;
+    winXp += ((d.networking && d.networking.count) || 0) * 3;
+    if (d.reading && d.reading.pages > 0) winXp += 8;
+  });
+  return {
+    days: horizonDays,
+    pages,
+    books: Math.round(pages / 300 * 10) / 10,
+    workouts: Math.round(win.filter(d => d.gym && d.gym.done).length * scale),
+    contacts: Math.round(sum(d => d.networking && d.networking.count) * scale),
+    xpPerWeek: Math.round(winXp / weeks)
+  };
+}
+function renderFutureCard() {
+  const proj = projectFuture(state.data.days, 90);
+  if (!proj) return '';
+  const lines = [];
+  if (isPillarOn('reading') && proj.pages > 0) lines.push('<li><b>' + proj.pages.toLocaleString() + '</b> more pages read — about <b>' + proj.books + '</b> book' + (proj.books === 1 ? '' : 's') + '</li>');
+  if (isPillarOn('gym') && proj.workouts > 0) lines.push('<li><b>' + proj.workouts + '</b> workouts in the bank</li>');
+  if (isPillarOn('networking') && proj.contacts > 0) lines.push('<li><b>' + proj.contacts + '</b> new people met</li>');
+  const curXp = computeXP();
+  const lvl = getLevel(curXp);
+  let levelLine = '';
+  if (lvl.nextMin && lvl.nextLabel && proj.xpPerWeek > 0) {
+    const weeksToNext = Math.max(1, Math.ceil((lvl.nextMin - curXp) / proj.xpPerWeek));
+    levelLine = '<div class="fut-level">You reach <b>' + escapeHtml(lvl.nextLabel) + '</b> in about <b>' + weeksToNext + ' week' + (weeksToNext === 1 ? '' : 's') + '</b> at this pace.</div>';
+  }
+  if (!lines.length && !levelLine) return '';
+  return '<div class="card fut-card">' +
+    '<div class="fut-tag">The climb ahead</div>' +
+    '<div class="fut-headline">Keep this pace, and 90 days from now you\'ll have:</div>' +
+    (lines.length ? '<ul class="fut-list">' + lines.join('') + '</ul>' : '') +
+    levelLine +
+    '<div class="fut-foot">Consistency compounds — this is where today\'s pace is taking you.</div>' +
+    '</div>';
+}
 // The picture's 7-day dots — this week at a glance (filled = logged, ring = today).
 function renderWeekStrip() {
   if (!state.data || !state.data.days) return '';
@@ -3617,7 +3673,7 @@ function renderDashboard() {
   // Group the cards into scannable sections — a label only shows if its group has content
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
   const gHero     = renderClimbCard() + renderNextStep() + renderConnectionCard() + renderWeekStrip() + renderPillarNav();
-  const gGuidance = renderGoalCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
+  const gGuidance = renderFutureCard() + renderGoalCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
   const gCoach    = renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard();
   const gToday    = pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderChecklistCard() + focusHtml;
   const gHealth   = renderNutritionWeekCard() + renderGymPlanCard() + renderWeightTrend();
