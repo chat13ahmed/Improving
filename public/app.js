@@ -2655,7 +2655,7 @@ function renderReviewCard() {
       '</p><button class="btn btn-primary" onclick="fetchReview(true)">Generate this week\'s review</button></div>';
   }
   return '<div class="card review-card' + (isSunday && !hasThisWeek ? ' review-due' : '') + '">' +
-    '<div class="di-head"><span class="di-icon"></span><span class="di-title">Weekly Life Review</span>' +
+    '<div class="di-head"><span class="di-icon"></span><span class="di-title">Weekly Story Recap</span>' +
     '<button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="shareMyWeek()">Share</button></div>' +
     '<div class="di-body" id="rev-body">' + body + '</div></div>';
 }
@@ -3135,6 +3135,110 @@ function renderNextStep() {
     '</div>';
 }
 
+// Quest Mode turns the tracker into a short mission board. It uses the same
+// data as Today's one move, but makes the day feel intentional and finishable.
+function dailyQuests() {
+  const today = state.data.days.find(d => d.date === todayStr());
+  const nut = getNutrition();
+  const fLog = (today && today.foodLog) || [];
+  const eaten = foodLogTotals(fLog);
+  const stats = getWeekStats();
+  const quests = [];
+
+  quests.push({
+    title: today ? 'Daily record secured' : 'Log the day',
+    sub: today ? 'Your chain has a mark for today.' : 'Capture the day before it disappears.',
+    done: !!today,
+    action: 'navigate(\'log\')',
+    cta: today ? 'Review' : 'Log now'
+  });
+
+  if (isPillarOn('gym')) {
+    const done = !!(today && today.gym && today.gym.done);
+    quests.push({
+      title: done ? pillar('gym').label + ' done' : 'Move the body',
+      sub: done ? 'Training is already feeding the rest of the system.' : 'One session, walk, or recovery block keeps momentum alive.',
+      done,
+      action: 'navigate(\'log\')',
+      cta: done ? 'View' : 'Train'
+    });
+  }
+
+  if (nut) {
+    const left = Math.round(nut.protein.g - eaten.p);
+    quests.push({
+      title: left <= 10 ? 'Protein target protected' : 'Protein rescue',
+      sub: left <= 10 ? 'You are close enough for today.' : 'Add about ' + left + 'g protein to support the climb.',
+      done: left <= 10,
+      action: 'navigate(\'log\')',
+      cta: 'Food'
+    });
+  } else if (isPillarOn('food')) {
+    const done = !!(today && today.food && today.food.rating);
+    quests.push({
+      title: done ? 'Nutrition rated' : 'Rate the fuel',
+      sub: done ? 'Food signal is logged.' : 'A simple 1-5 score gives the coach more pattern data.',
+      done,
+      action: 'navigate(\'log\')',
+      cta: 'Rate'
+    });
+  }
+
+  if (isPillarOn('networking')) {
+    const goal = state.data.profile.weeklyNetworkGoal || 3;
+    const done = stats.networkCount >= goal;
+    quests.push({
+      title: done ? 'Network goal hit' : 'Open one door',
+      sub: done ? stats.networkCount + ' connections this week.' : Math.max(0, goal - stats.networkCount) + ' left for the week. One message counts.',
+      done,
+      action: 'navigate(\'contacts\')',
+      cta: 'Contacts'
+    });
+  }
+
+  if (isPillarOn('reading')) {
+    const goal = state.data.profile.weeklyReadGoal || 0;
+    const done = goal > 0 ? stats.readPages >= goal : !!(today && today.reading && today.reading.pages > 0);
+    quests.push({
+      title: done ? 'Reading signal logged' : 'Bank ten pages',
+      sub: done ? stats.readPages + ' pages this week.' : (goal > 0 ? Math.max(0, goal - stats.readPages) + ' pages left for the weekly goal.' : 'Ten pages keeps the mind in the system.'),
+      done,
+      action: 'navigate(\'reading\')',
+      cta: 'Read'
+    });
+  }
+
+  if (isPillarOn('money')) {
+    const mc = getMoneyCircle();
+    const done = mc.available <= 0 || mc.spent <= mc.available;
+    quests.push({
+      title: done ? 'Money circle stable' : 'Close the spending leak',
+      sub: done ? 'Income and spending are inside the current circle.' : formatCurrency(mc.spent - mc.available) + ' over plan. Log the reason while it is fresh.',
+      done,
+      action: 'navigate(\'log\')',
+      cta: 'Money'
+    });
+  }
+
+  return quests.slice(0, 4);
+}
+
+function renderQuestCard() {
+  const quests = dailyQuests();
+  if (!quests.length) return '';
+  const complete = quests.filter(q => q.done).length;
+  const rows = quests.map(q => '<button type="button" class="quest-row' + (q.done ? ' done' : '') + '" onclick="' + q.action + '">' +
+    '<span class="quest-check">' + (q.done ? 'OK' : '') + '</span>' +
+    '<span class="quest-copy"><b>' + escapeHtml(q.title) + '</b><small>' + escapeHtml(q.sub) + '</small></span>' +
+    '<span class="quest-cta">' + escapeHtml(q.cta) + '</span>' +
+    '</button>').join('');
+  return '<div class="card quest-card">' +
+    '<div class="quest-top"><div><div class="quest-label">Quest mode</div><div class="quest-title">Today\'s mission board</div></div>' +
+    '<div class="quest-score">' + complete + '/' + quests.length + '</div></div>' +
+    '<div class="quest-list">' + rows + '</div>' +
+    '</div>';
+}
+
 // ─────────────────────────────────────────────────────────────
 // THIS WEEK IN NUTRITION — zoom-out adherence over the last 7 days
 // ─────────────────────────────────────────────────────────────
@@ -3440,14 +3544,14 @@ function renderConnectionCard() {
   if (!c) {
     if ((state.data.days || []).length < 3) return '';
     return '<div class="card conn-card conn-building">' +
-      '<div class="conn-tag">Connection of the week</div>' +
+      '<div class="conn-tag">Life Connection</div>' +
       '<div class="conn-headline">Your first life connection is forming.</div>' +
       '<div class="conn-sub">Keep logging — in a week or two, Escalate shows how your pillars pull on each other. No single-purpose app can do that.</div>' +
       '</div>';
   }
   const hl = escapeHtml(c.headline).replace(/(\d+%)/, '<span class="conn-pct">$1</span>');
   return '<div class="card conn-card">' +
-    '<div class="conn-tag">Connection of the week</div>' +
+    '<div class="conn-tag">Life Connection</div>' +
     '<div class="conn-headline">' + hl + '</div>' +
     '<div class="conn-sub">' + escapeHtml(c.sub) + '</div>' +
     '<button class="btn-link conn-share" onclick="shareConnection()">Share this</button>' +
@@ -3508,9 +3612,17 @@ function renderFutureCard() {
     levelLine = '<div class="fut-level">You reach <b>' + escapeHtml(lvl.nextLabel) + '</b> in about <b>' + weeksToNext + ' week' + (weeksToNext === 1 ? '' : 's') + '</b> at this pace.</div>';
   }
   if (!lines.length && !levelLine) return '';
+  const snapshotBits = [];
+  if (proj.workouts > 0) snapshotBits.push(proj.workouts + ' training sessions');
+  if (proj.pages > 0) snapshotBits.push(proj.pages.toLocaleString() + ' pages');
+  if (proj.contacts > 0) snapshotBits.push(proj.contacts + ' new conversations');
+  const snapshot = snapshotBits.length
+    ? 'Ninety days from now, future you is carrying ' + snapshotBits.slice(0, 3).join(', ') + ' from the choices you are repeating now.'
+    : 'Ninety days from now, future you is mostly shaped by what you repeat this week.';
   return '<div class="card fut-card">' +
-    '<div class="fut-tag">The climb ahead</div>' +
-    '<div class="fut-headline">Keep this pace, and 90 days from now you\'ll have:</div>' +
+    '<div class="fut-tag">Future Self Simulator</div>' +
+    '<div class="fut-headline">Keep this pace for ' + proj.days + ' days:</div>' +
+    '<div class="fut-snapshot">' + escapeHtml(snapshot) + '</div>' +
     (lines.length ? '<ul class="fut-list">' + lines.join('') + '</ul>' : '') +
     levelLine +
     '<div class="fut-foot">Consistency compounds — this is where today\'s pace is taking you.</div>' +
@@ -3639,14 +3751,25 @@ function renderYearRange() {
   const W = 400, H = 150, base = H - 4, top = 16, n = data.weeks.length;
   const xAt = i => n === 1 ? W / 2 : Math.round(6 + i * (W - 12) / (n - 1));
   const yAt = v => Math.round(base - (v / data.max) * (base - top));
-  let near = 'M ' + xAt(0) + ' ' + base, back = 'M ' + xAt(0) + ' ' + base, caps = '';
-  data.weeks.forEach((w, i) => {
-    near += ' L ' + xAt(i) + ' ' + yAt(w.value);
-    back += ' L ' + xAt(i) + ' ' + Math.round(base - (Math.min(data.max, w.value * 0.65 + data.max * 0.15) / data.max) * (base - top));
-    if (w.value >= data.max * 0.75) { const x = xAt(i), y = yAt(w.value); caps += '<polygon points="' + x + ',' + y + ' ' + (x + 5) + ',' + (y + 8) + ' ' + (x - 5) + ',' + (y + 8) + '" fill="#ffffff" opacity="0.9"/>'; }
-  });
-  near += ' L ' + xAt(n - 1) + ' ' + base + ' Z';
-  back += ' L ' + xAt(n - 1) + ' ' + base + ' Z';
+  const half = n > 1 ? (xAt(1) - xAt(0)) / 2 : 120;
+  const cap = (x, y) => '<polygon points="' + x + ',' + y + ' ' + (x + 5) + ',' + (y + 9) + ' ' + (x - 5) + ',' + (y + 9) + '" fill="#ffffff" opacity="0.92"/>';
+  // Each week is its OWN peak, with a valley dipping between peaks — so it always
+  // reads as a mountain range, even when the weeks are evenly strong.
+  const peakY = data.weeks.map(w => yAt(w.value));
+  const backY = data.weeks.map(w => Math.round(base - 0.7 * (base - yAt(w.value))) - 6);
+  let near = 'M ' + Math.max(0, Math.round(xAt(0) - half)) + ' ' + base + ' L ' + xAt(0) + ' ' + peakY[0];
+  let back = 'M 0 ' + base + ' L ' + xAt(0) + ' ' + backY[0];
+  let caps = data.weeks[0].value >= data.max * 0.75 ? cap(xAt(0), peakY[0]) : '';
+  for (let i = 1; i < n; i++) {
+    const vx = Math.round((xAt(i - 1) + xAt(i)) / 2);
+    const vyN = Math.round(base - 0.42 * (((base - peakY[i - 1]) + (base - peakY[i])) / 2));
+    const vyB = Math.round(base - 0.5 * (((base - backY[i - 1]) + (base - backY[i])) / 2));
+    near += ' L ' + vx + ' ' + vyN + ' L ' + xAt(i) + ' ' + peakY[i];
+    back += ' L ' + vx + ' ' + vyB + ' L ' + xAt(i) + ' ' + backY[i];
+    if (data.weeks[i].value >= data.max * 0.75) caps += cap(xAt(i), peakY[i]);
+  }
+  near += ' L ' + Math.min(W, Math.round(xAt(n - 1) + half)) + ' ' + base + ' Z';
+  back += ' L ' + W + ' ' + base + ' Z';
   const svg = '<svg class="yr-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Your year as a mountain range">' +
     '<defs><linearGradient id="yrFar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9FE1CB"/><stop offset="1" stop-color="#9FE1CB" stop-opacity="0.35"/></linearGradient>' +
     '<linearGradient id="yrNear" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1D9E75"/><stop offset="1" stop-color="#0F6E56"/></linearGradient></defs>' +
@@ -3829,7 +3952,7 @@ function renderDashboard() {
 
   // Group the cards into scannable sections — a label only shows if its group has content
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
-  const gHero     = renderClimbCard() + renderNextStep() + renderConnectionCard() + renderWeekStrip() + renderPillarNav();
+  const gHero     = renderClimbCard() + renderQuestCard() + renderNextStep() + renderConnectionCard() + renderWeekStrip() + renderPillarNav();
   const gGuidance = renderFutureCard() + renderGoalCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
   const gCoach    = renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard();
   const gToday    = pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderChecklistCard() + focusHtml;
