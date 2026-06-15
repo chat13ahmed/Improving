@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, gymPlan, momentumScore, pointAlong,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, yearRange, gymPlan, momentumScore, pointAlong,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -202,6 +202,14 @@ ok('lifeWeb returns connected nodes', _web && _web.nodes.length >= 2);
 ok('lifeWeb links gym & reading (they move together)', _web && _web.edges.some(e => ((e.a === 'gym' && e.b === 'reading') || (e.a === 'reading' && e.b === 'gym')) && e.r > 0.5));
 ok('lifeWeb surfaces a strongest link', _web && _web.strongest && _web.strongest.strength >= 0.5);
 ok('lifeWeb needs enough days (null on too few)', A.lifeWeb(_wdays.slice(0, 3), ['gym', 'reading']) === null);
+// Your Year as a Range — weekly peaks
+const _yd = [];
+for (let i = 0; i < 28; i++) { const dt = new Date('2026-06-14T00:00:00'); dt.setDate(dt.getDate() - i); _yd.push({ date: dt.toISOString().split('T')[0], gym: { done: i % 3 === 0 }, reading: { pages: i % 2 === 0 ? 10 : 0 } }); }
+const _yr = A.yearRange(_yd, 52, '2026-06-14');
+ok('yearRange builds weekly peaks', _yr && _yr.weeks.length >= 3);
+ok('yearRange counts active weeks', _yr && _yr.activeWeeks >= 3);
+ok('yearRange finds the tallest peak', _yr && _yr.best && _yr.best.value === _yr.max);
+ok('yearRange needs a few weeks (null on tiny history)', A.yearRange(_yd.slice(0, 2), 52, '2026-06-14') === null);
 // Gym training plan by goal + weight
 ok('gymPlan lose → fat loss + cardio', /fat loss/i.test(A.gymPlan('lose', 80).headline) && /cardio/i.test(A.gymPlan('lose', 80).cardio));
 ok('gymPlan gain → progressive overload', /overload/i.test(A.gymPlan('gain', 80).strength));

@@ -3608,6 +3608,64 @@ function renderPillarNav() {
   const pills = ids.map(id => '<button type="button" class="pnav-pill" onclick="navigate(\'log\')">' + escapeHtml(pillar(id).label) + '</button>').join('');
   return '<div class="pnav">' + pills + '<button type="button" class="pnav-pill pnav-more" onclick="openMoreSheet()">More</button></div>';
 }
+// ── Your Year as a Range — every week becomes a peak; your history as a
+// mountain range. Pure + dated for testability. ──
+function yearRange(days, weeksBack, today) {
+  weeksBack = weeksBack || 52;
+  const t = today || todayStr();
+  const list = (days || []).filter(d => d && d.date);
+  if (!list.length) return null;
+  const dayVal = d => (d.gym && d.gym.done ? 1 : 0) + (d.reading && d.reading.pages > 0 ? 1 : 0) + (d.food && d.food.rating > 0 ? 1 : 0) + ((d.networking && d.networking.count) ? 1 : 0);
+  const buckets = {};
+  list.forEach(d => { const ws = getWeekStart(d.date); buckets[ws] = (buckets[ws] || 0) + dayVal(d); });
+  const cursor = new Date(getWeekStart(t) + 'T00:00:00');
+  const weeks = [];
+  for (let i = 0; i < weeksBack; i++) {
+    const ws = cursor.toISOString().split('T')[0];
+    weeks.unshift({ weekStart: ws, value: buckets[ws] || 0 });
+    cursor.setDate(cursor.getDate() - 7);
+  }
+  const firstNonZero = weeks.findIndex(w => w.value > 0);
+  const trimmed = firstNonZero >= 0 ? weeks.slice(firstNonZero) : [];
+  if (trimmed.length < 3) return null;
+  const max = Math.max(1, ...trimmed.map(w => w.value));
+  let best = trimmed[0];
+  trimmed.forEach(w => { if (w.value > best.value) best = w; });
+  return { weeks: trimmed, max, activeWeeks: trimmed.filter(w => w.value > 0).length, best, totalWeeks: trimmed.length };
+}
+function renderYearRange() {
+  const data = yearRange(state.data.days, 52);
+  if (!data) return '';
+  const W = 400, H = 150, base = H - 4, top = 16, n = data.weeks.length;
+  const xAt = i => n === 1 ? W / 2 : Math.round(6 + i * (W - 12) / (n - 1));
+  const yAt = v => Math.round(base - (v / data.max) * (base - top));
+  let near = 'M ' + xAt(0) + ' ' + base, back = 'M ' + xAt(0) + ' ' + base, caps = '';
+  data.weeks.forEach((w, i) => {
+    near += ' L ' + xAt(i) + ' ' + yAt(w.value);
+    back += ' L ' + xAt(i) + ' ' + Math.round(base - (Math.min(data.max, w.value * 0.65 + data.max * 0.15) / data.max) * (base - top));
+    if (w.value >= data.max * 0.75) { const x = xAt(i), y = yAt(w.value); caps += '<polygon points="' + x + ',' + y + ' ' + (x + 5) + ',' + (y + 8) + ' ' + (x - 5) + ',' + (y + 8) + '" fill="#ffffff" opacity="0.9"/>'; }
+  });
+  near += ' L ' + xAt(n - 1) + ' ' + base + ' Z';
+  back += ' L ' + xAt(n - 1) + ' ' + base + ' Z';
+  const svg = '<svg class="yr-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Your year as a mountain range">' +
+    '<defs><linearGradient id="yrFar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9FE1CB"/><stop offset="1" stop-color="#9FE1CB" stop-opacity="0.35"/></linearGradient>' +
+    '<linearGradient id="yrNear" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1D9E75"/><stop offset="1" stop-color="#0F6E56"/></linearGradient></defs>' +
+    '<path d="' + back + '" fill="url(#yrFar)"/><path d="' + near + '" fill="url(#yrNear)"/>' + caps + '</svg>';
+  return '<div class="card yr-card">' +
+    '<div class="card-title">Your year as a range</div>' +
+    '<div class="card-sub">Every week you log becomes a peak. This is the range you\'ve built so far.</div>' +
+    svg +
+    '<div class="yr-stats"><span><b>' + data.activeWeeks + '</b> active week' + (data.activeWeeks === 1 ? '' : 's') + '</span><span>Tallest peak: <b>week of ' + escapeHtml(fmtDateShort(data.best.weekStart)) + '</b></span></div>' +
+    '<button class="btn-link yr-share" onclick="shareYearRange()">Share my range</button>' +
+    '</div>';
+}
+async function shareYearRange() {
+  const data = yearRange(state.data.days, 52);
+  if (!data) return;
+  const text = 'My year on Escalate — ' + data.activeWeeks + ' weeks logged, each one a peak in my range. Building the climb of my life. ↗';
+  try { if (navigator.share) { await navigator.share({ title: 'Escalate', text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(text); showToast('Copied — paste it anywhere.', 'success'); } catch { showToast('Share not available here.', 'error'); }
+}
 // A living mountain sky that greets you — time-of-day gradient, drifting clouds,
 // a glowing sun (or twinkling stars at night), parallax peaks. Pure atmosphere.
 function renderMountainHero() {
@@ -3792,6 +3850,7 @@ function renderDashboard() {
     sec('Today', gToday) +
     sec('Health', gHealth) +
     sec('Money', gMoney) +
+    sec('Your year', renderYearRange()) +
     sec('Looking back', gBack);
 
   setTimeout(animateCounters, 120);

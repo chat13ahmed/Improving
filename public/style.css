@@ -1825,6 +1825,11 @@ body.auth-active .bottom-nav { display: none !important; }
 @keyframes mtn-glow { 0%, 100% { opacity: 0.88; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .mtn-stars circle, .mtn-celestial { animation: none; } }
 
+/* Your Year as a Range — every week a peak */
+.yr-svg { display: block; width: 100%; height: auto; aspect-ratio: 400 / 150; margin: 10px 0 8px; border-radius: var(--radius-sm); overflow: hidden; }
+.yr-stats { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; font-size: 12.5px; color: var(--text-muted); padding-top: 8px; border-top: 1px solid var(--border); }
+.yr-share { margin-top: 10px; display: inline-block; }
+
 /* Onboarding — emotional hero moments (welcome + "your climb begins") */
 .onboard-hero { text-align: center; }
 .ob-hero-art { max-width: 280px; margin: 4px auto 18px; }
