@@ -3608,6 +3608,41 @@ function renderPillarNav() {
   const pills = ids.map(id => '<button type="button" class="pnav-pill" onclick="navigate(\'log\')">' + escapeHtml(pillar(id).label) + '</button>').join('');
   return '<div class="pnav">' + pills + '<button type="button" class="pnav-pill pnav-more" onclick="openMoreSheet()">More</button></div>';
 }
+// A living mountain sky that greets you — time-of-day gradient, drifting clouds,
+// a glowing sun (or twinkling stars at night), parallax peaks. Pure atmosphere.
+function renderMountainHero() {
+  const name = (state.data.profile && (state.data.profile.firstName || (state.data.profile.name || '').split(' ')[0])) || '';
+  const h = new Date().getHours();
+  let greet, sky1, sky2, night = false, dusk = false;
+  if (h >= 5 && h < 8)        { greet = 'Good morning';   sky1 = '#fbd9a5'; sky2 = '#acd0f0'; }
+  else if (h >= 8 && h < 12)  { greet = 'Good morning';   sky1 = '#bfe6ff'; sky2 = '#eaf6ff'; }
+  else if (h >= 12 && h < 17) { greet = 'Good afternoon'; sky1 = '#a9dbff'; sky2 = '#e3f2ff'; }
+  else if (h >= 17 && h < 20) { greet = 'Good evening';   sky1 = '#ff9e64'; sky2 = '#6f6aa6'; dusk = true; }
+  else                        { greet = 'Good evening';   sky1 = '#141d3f'; sky2 = '#33335f'; night = true; }
+  const sub = climbCaption(climbMomentum());
+  const cloudEll = (s) => '<ellipse cx="0" cy="0" rx="' + (24 * s) + '" ry="' + (12 * s) + '"/><ellipse cx="' + (20 * s) + '" cy="' + (-5 * s) + '" rx="' + (17 * s) + '" ry="' + (11 * s) + '"/><ellipse cx="' + (-18 * s) + '" cy="' + (2 * s) + '" rx="' + (15 * s) + '" ry="' + (9 * s) + '"/>';
+  const cloud = (y, s, dur, op) => '<g fill="#ffffff" opacity="' + op + '" transform="translate(0 ' + y + ')">' +
+    '<g>' + cloudEll(s) + '<animateTransform attributeName="transform" type="translate" from="-120 0" to="520 0" dur="' + dur + 's" repeatCount="indefinite"/></g></g>';
+  const celestial = night
+    ? '<circle class="mtn-celestial" cx="330" cy="40" r="15" fill="#eef2ff"/>'
+    : '<circle class="mtn-celestial" cx="' + (dusk ? 300 : 332) + '" cy="' + (dusk ? 62 : 42) + '" r="18" fill="' + (dusk ? '#ffcf7a' : '#ffd86b') + '"/>';
+  const stars = night
+    ? '<g class="mtn-stars" fill="#ffffff">' + [[40, 30], [85, 52], [135, 24], [185, 44], [235, 30], [270, 56], [300, 22], [365, 38]].map((p, i) => '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="1.6" style="animation-delay:' + (i * 0.37).toFixed(2) + 's"/>').join('') + '</g>'
+    : '';
+  const svg =
+    '<svg class="mtn-hero-svg" viewBox="0 0 400 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' +
+    '<defs><linearGradient id="mtnSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + sky1 + '"/><stop offset="1" stop-color="' + sky2 + '"/></linearGradient></defs>' +
+    '<rect width="400" height="150" fill="url(#mtnSky)"/>' + stars + celestial +
+    cloud(40, 1, 44, night ? 0.22 : 0.85) + cloud(70, 0.7, 64, night ? 0.15 : 0.6) +
+    '<polygon points="0,150 70,82 135,112 205,62 275,104 345,74 400,112 400,150" fill="#7fb8a3" opacity="0.55"/>' +
+    '<polygon points="0,150 60,106 130,130 195,96 265,122 335,94 400,122 400,150" fill="#1f7a5e"/>' +
+    '<polygon points="195,96 205,108 185,108" fill="#ffffff" opacity="0.85"/>' +
+    '<polygon points="335,94 343,104 327,104" fill="#ffffff" opacity="0.7"/>' +
+    '</svg>';
+  return '<div class="mtn-hero">' + svg +
+    '<div class="mtn-hero-text"><div class="mtn-greet">' + greet + (name ? ', ' + escapeHtml(name) : '') + '</div>' +
+    '<div class="mtn-sub">' + escapeHtml(sub) + '</div></div></div>';
+}
 function renderDashboard() {
   const { days, weeks, profile } = state.data;
   const stats = getWeekStats();
@@ -3744,6 +3779,7 @@ function renderDashboard() {
   const gMoney    = renderMoneyCircleCard();
   const gBack     = renderRecentNotesCard() + renderReviewCard() + chartsHtml + achievementsHtml;
   document.getElementById('main').innerHTML =
+    renderMountainHero() +
     '<div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
     '<div><h2 class="page-title">Dashboard</h2>' +
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p></div>' +
