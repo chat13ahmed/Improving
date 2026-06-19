@@ -1889,6 +1889,13 @@ body.auth-active .bottom-nav { display: none !important; }
 .gl-back, .gl-skip { background: none; border: none; color: var(--text-muted); font-family: inherit; font-size: 14px; cursor: pointer; padding: 8px; }
 .gl-next { min-width: 150px; padding: 13px 20px; font-size: 16px; }
 .gl-toguided { display: inline-block; margin-bottom: 8px; }
+.gl-hint { font-size: 12.5px; color: var(--text-muted); margin-top: 12px; }
+.gl-link-full { display: inline-block; margin-top: 14px; background: none; border: none; color: var(--accent); font-family: inherit; font-size: 13px; cursor: pointer; }
+.gl-stars + .gl-input { margin-top: 18px; }
+.gl-sub2 { font-size: 13px; color: var(--text-muted); margin: 4px 0 8px; }
+.gl-muscles { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 0 0 14px; }
+.gl-muscle { padding: 9px 15px; border-radius: 999px; border: 1px solid var(--border); background: var(--field-bg); color: var(--text); font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer; }
+.gl-muscle.gl-muscle-on { background: var(--gym-color, var(--accent)); color: #fff; border-color: var(--gym-color, var(--accent)); }
 
 /* Onboarding — emotional hero moments (welcome + "your climb begins") */
 .onboard-hero { text-align: center; }

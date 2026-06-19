@@ -4156,7 +4156,7 @@ function startGuidedLog() {
     draft: {
       _gymAnswered: !!prior.id, gymDone: !!(prior.gym && prior.gym.done),
       gymGroup: (prior.gym && prior.gym.muscleGroup) || '', gymDur: (prior.gym && prior.gym.duration) || '',
-      food: (prior.food && prior.food.rating) || 0,
+      food: (prior.food && prior.food.rating) || 0, cals: prior.calories || '',
       readPages: (prior.reading && prior.reading.pages) || '',
       net: (prior.networking && prior.networking.count) || '',
       spent: prior.spent || '', moneyActs: (prior.money && prior.money.activities) || '',
@@ -4177,11 +4177,16 @@ function renderGuidedLog() {
       '<button type="button" class="gl-big' + (d._gymAnswered && d.gymDone ? ' gl-on' : '') + '" onclick="glSetGym(true)">Yes, I trained</button>' +
       '<button type="button" class="gl-big' + (d._gymAnswered && !d.gymDone ? ' gl-on' : '') + '" onclick="glSetGym(false)">Rest day</button></div>' +
       '<div id="gl-gym-extra" class="gl-extra"' + (d.gymDone ? '' : ' style="display:none"') + '>' +
-      '<input id="gl-gym-group" class="gl-input" placeholder="What did you train? (optional)" value="' + escapeAttr(d.gymGroup || '') + '">' +
+      '<div class="gl-sub2">What did you train?</div>' +
+      '<div class="gl-muscles">' + ['Push', 'Pull', 'Legs', 'Chest', 'Back', 'Shoulders', 'Arms', 'Core', 'Full Body', 'Cardio'].map(grp => '<button type="button" class="gl-muscle' + (d.gymGroup === grp ? ' gl-muscle-on' : '') + '" onclick="glSetMuscle(\'' + grp + '\')">' + grp + '</button>').join('') + '</div>' +
       '<input id="gl-gym-dur" class="gl-input" type="number" inputmode="numeric" placeholder="Minutes (optional)" value="' + (d.gymDur || '') + '"></div>';
   } else if (key === 'food') {
-    q = 'How did you eat today?'; sub = 'Tap a rating'; optional = true;
-    body = '<div class="gl-stars">' + [1, 2, 3, 4, 5].map(n => '<button type="button" class="gl-star' + ((d.food || 0) >= n ? ' gl-star-on' : '') + '" onclick="glSetFood(' + n + ')">' + ((d.food || 0) >= n ? '★' : '☆') + '</button>').join('') + '</div>';
+    q = 'How did you eat today?'; sub = 'Rate it, then log your calories'; optional = true;
+    const nut = getNutrition();
+    body = '<div class="gl-stars">' + [1, 2, 3, 4, 5].map(n => '<button type="button" class="gl-star' + ((d.food || 0) >= n ? ' gl-star-on' : '') + '" onclick="glSetFood(' + n + ')">' + ((d.food || 0) >= n ? '★' : '☆') + '</button>').join('') + '</div>' +
+      '<input id="gl-cals" class="gl-input gl-num" type="number" inputmode="numeric" placeholder="Calories eaten" value="' + (d.cals || '') + '">' +
+      (nut ? '<div class="gl-hint">Target ' + nut.calories.toLocaleString() + ' cal · ' + nut.protein.g + 'g protein</div>' : '') +
+      '<button type="button" class="gl-link-full" onclick="showFullLog()">Log foods one by one →</button>';
   } else if (key === 'reading') {
     q = 'Pages read today?'; sub = ab ? 'in ' + escapeHtml(ab.title) : ''; optional = true;
     body = '<input id="gl-read" class="gl-input gl-num" type="number" inputmode="numeric" placeholder="0" value="' + (d.readPages || '') + '">';
@@ -4219,7 +4224,8 @@ function renderGuidedLog() {
 function glCapture() {
   const g = state._guided; if (!g) return;
   const key = g.keys[g.step], d = g.draft;
-  if (key === 'gym') { d.gymGroup = (document.getElementById('gl-gym-group')?.value || '').trim(); d.gymDur = parseInt(document.getElementById('gl-gym-dur')?.value) || ''; }
+  if (key === 'gym') { d.gymDur = parseInt(document.getElementById('gl-gym-dur')?.value) || ''; }
+  else if (key === 'food') d.cals = parseFloat(document.getElementById('gl-cals')?.value) || '';
   else if (key === 'reading') d.readPages = parseInt(document.getElementById('gl-read')?.value) || '';
   else if (key === 'networking') d.net = parseInt(document.getElementById('gl-net')?.value) || '';
   else if (key === 'money') { d.spent = parseFloat(document.getElementById('gl-spent')?.value) || ''; d.moneyActs = (document.getElementById('gl-money-acts')?.value || '').trim(); }
@@ -4228,7 +4234,8 @@ function glCapture() {
   else if (key === 'notes') d.notes = (document.getElementById('gl-notes')?.value || '').trim();
 }
 function glSetGym(v) { glCapture(); state._guided.draft.gymDone = v; state._guided.draft._gymAnswered = true; renderGuidedLog(); }
-function glSetFood(n) { state._guided.draft.food = n; renderGuidedLog(); }
+function glSetFood(n) { glCapture(); state._guided.draft.food = n; renderGuidedLog(); }
+function glSetMuscle(g) { glCapture(); const d = state._guided.draft; d.gymGroup = (d.gymGroup === g ? '' : g); renderGuidedLog(); }
 function glWater(inc) { const el = document.getElementById('gl-water'); if (el) el.value = Math.round(((parseFloat(el.value) || 0) + inc) * 100) / 100; }
 function glNext() { glCapture(); if (state._guided.step < state._guided.keys.length - 1) { state._guided.step++; renderGuidedLog(); } else finishGuidedLog(); }
 function glBack() { glCapture(); if (state._guided.step > 0) { state._guided.step--; renderGuidedLog(); } }
@@ -4240,7 +4247,7 @@ async function finishGuidedLog() {
   let day = days.find(x => x.date === date);
   if (!day) { day = { id: uid(), date }; days.push(day); }
   if (isPillarOn('gym')) day.gym = { done: !!d.gymDone, muscleGroup: d.gymGroup || '', duration: d.gymDur || 0, notes: (day.gym && day.gym.notes) || '' };
-  if (isPillarOn('food')) day.food = { rating: d.food || 0, notes: (day.food && day.food.notes) || '' };
+  if (isPillarOn('food')) { day.food = { rating: d.food || 0, notes: (day.food && day.food.notes) || '' }; if (d.cals) day.calories = d.cals; }
   if (isPillarOn('reading')) { const ab = (state.data.books || []).find(b => b.status === 'reading'); day.reading = { pages: d.readPages || 0, bookId: (ab && ab.id) || (day.reading && day.reading.bookId) || '', bookTitle: (ab && ab.title) || (day.reading && day.reading.bookTitle) || '', summary: (day.reading && day.reading.summary) || '' }; }
   if (isPillarOn('networking')) day.networking = { count: d.net || 0, notes: (day.networking && day.networking.notes) || '' };
   if (isPillarOn('money')) { day.spent = d.spent || 0; day.money = { activities: d.moneyActs || '', income: (day.money && day.money.income) || 0 }; }
