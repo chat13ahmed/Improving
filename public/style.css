@@ -1860,6 +1860,36 @@ body.auth-active .bottom-nav { display: none !important; }
 .vocab-remind { display: flex; align-items: flex-start; gap: 9px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-muted); line-height: 1.45; cursor: pointer; }
 .vocab-remind input { width: 17px; height: 17px; margin-top: 1px; flex-shrink: 0; }
 
+/* Guided log — one light question at a time */
+.gl-wrap { max-width: 480px; margin: 0 auto; padding: 8px 0 24px; }
+.gl-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.gl-step-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+.gl-full { background: none; border: none; color: var(--text-muted); font-family: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; }
+.gl-progress { display: flex; gap: 6px; margin-bottom: 28px; }
+.gl-dot { flex: 1; height: 4px; border-radius: 2px; background: var(--border); transition: background 0.2s; }
+.gl-dot.gl-dot-on { background: var(--accent); }
+.gl-step { min-height: 210px; text-align: center; padding: 10px 0 8px; }
+.gl-q { font-size: 24px; font-weight: 800; color: var(--text); line-height: 1.3; }
+.gl-sub { font-size: 14px; color: var(--text-muted); margin-top: 6px; }
+.gl-body { margin-top: 26px; }
+.gl-input { width: 100%; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--field-bg); color: var(--text); font-family: inherit; font-size: 16px; box-sizing: border-box; }
+.gl-num { text-align: center; font-size: 26px; font-weight: 800; }
+.gl-input + .gl-input { margin-top: 10px; }
+.gl-area { min-height: 120px; resize: vertical; font-size: 15px; line-height: 1.5; text-align: left; }
+.gl-yesno { display: flex; flex-direction: column; gap: 12px; }
+.gl-big { padding: 18px; border-radius: 14px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: 17px; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+.gl-big.gl-on { border-color: var(--accent); background: var(--tint-1); }
+.gl-extra { margin-top: 14px; }
+.gl-stars { display: flex; justify-content: center; gap: 8px; }
+.gl-star { background: none; border: none; font-size: 40px; line-height: 1; color: var(--accent); cursor: pointer; padding: 0; }
+.gl-chips { display: flex; gap: 8px; justify-content: center; margin-top: 12px; }
+.gl-chip { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--field-bg); color: var(--text); font-family: inherit; font-weight: 700; cursor: pointer; }
+.gl-actions { display: flex; align-items: center; gap: 10px; margin-top: 30px; }
+.gl-actions > :first-child { margin-right: auto; }
+.gl-back, .gl-skip { background: none; border: none; color: var(--text-muted); font-family: inherit; font-size: 14px; cursor: pointer; padding: 8px; }
+.gl-next { min-width: 150px; padding: 13px 20px; font-size: 16px; }
+.gl-toguided { display: inline-block; margin-bottom: 8px; }
+
 /* Onboarding — emotional hero moments (welcome + "your climb begins") */
 .onboard-hero { text-align: center; }
 .ob-hero-art { max-width: 280px; margin: 4px auto 18px; }

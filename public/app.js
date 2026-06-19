@@ -958,7 +958,7 @@ function applyNavVisibility() {
 // ─────────────────────────────────────────────────────────────
 function navigate(page) {
   state.page = page;
-  if (page !== 'log') { state._editDayId = null; }
+  if (page !== 'log') { state._editDayId = null; state._fullLog = false; state._guided = null; }
   Object.values(charts).forEach(c => c.destroy());
   charts = {};
   document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === page));
@@ -967,7 +967,7 @@ function navigate(page) {
   const moreBtn = document.getElementById('bnav-more');
   if (moreBtn) moreBtn.classList.toggle('active', !['dashboard', 'log', 'coach'].includes(page));
   document.getElementById('more-sheet')?.remove();
-  const pages = { dashboard: renderDashboard, log: renderLogToday, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
+  const pages = { dashboard: renderDashboard, log: renderLogEntry, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
   injectFAB();
   (pages[page] || renderDashboard)();
 }
@@ -4124,6 +4124,135 @@ function renderPrevNoteBanner() {
 // ─────────────────────────────────────────────────────────────
 // LOG TODAY
 // ─────────────────────────────────────────────────────────────
+// ── Guided log — one light question at a time (phone-first) ──────────────
+// The Log tab opens here by default; "Full form" drops to the detailed page.
+function renderLogEntry() {
+  if (state._editDayId || state._fullLog) {
+    renderLogToday(state._editDayId ? state.data.days.find(d => d.id === state._editDayId) : undefined);
+    if (!state._editDayId) {
+      const main = document.getElementById('main');
+      const ph = main.querySelector('.page-header') || main.firstElementChild;
+      if (ph) ph.insertAdjacentHTML('beforebegin', '<button type="button" class="btn-link gl-toguided" onclick="backToGuided()">← Quick log, one question at a time</button>');
+    }
+    return;
+  }
+  startGuidedLog();
+}
+function showFullLog() { state._fullLog = true; state._guided = null; renderLogEntry(); }
+function backToGuided() { state._fullLog = false; state._editDayId = null; startGuidedLog(); }
+function guidedStepKeys() {
+  const keys = [];
+  ['gym', 'food', 'reading', 'networking', 'money'].forEach(id => { if (isPillarOn(id)) keys.push(id); });
+  keys.push('water', 'weight', 'notes'); // light extras (all skippable)
+  return keys;
+}
+function startGuidedLog() {
+  state._fullLog = false; state._editDayId = null;
+  const date = todayStr();
+  const prior = (state.data.days || []).find(d => d.date === date) || {};
+  const w = (state.data.weights || []).find(x => x.date === date);
+  state._guided = {
+    step: 0, keys: guidedStepKeys(),
+    draft: {
+      _gymAnswered: !!prior.id, gymDone: !!(prior.gym && prior.gym.done),
+      gymGroup: (prior.gym && prior.gym.muscleGroup) || '', gymDur: (prior.gym && prior.gym.duration) || '',
+      food: (prior.food && prior.food.rating) || 0,
+      readPages: (prior.reading && prior.reading.pages) || '',
+      net: (prior.networking && prior.networking.count) || '',
+      spent: prior.spent || '', moneyActs: (prior.money && prior.money.activities) || '',
+      water: prior.water || '', weight: w ? (Math.round(kgToDisplay(w.kg) * 10) / 10 || '') : '',
+      notes: prior.notes || ''
+    }
+  };
+  renderGuidedLog();
+}
+function renderGuidedLog() {
+  const g = state._guided; if (!g) return;
+  const key = g.keys[g.step], total = g.keys.length, d = g.draft;
+  const ab = (state.data.books || []).find(b => b.status === 'reading');
+  let q = '', sub = '', body = '', optional = false;
+  if (key === 'gym') {
+    q = 'Did you train today?';
+    body = '<div class="gl-yesno">' +
+      '<button type="button" class="gl-big' + (d._gymAnswered && d.gymDone ? ' gl-on' : '') + '" onclick="glSetGym(true)">Yes, I trained</button>' +
+      '<button type="button" class="gl-big' + (d._gymAnswered && !d.gymDone ? ' gl-on' : '') + '" onclick="glSetGym(false)">Rest day</button></div>' +
+      '<div id="gl-gym-extra" class="gl-extra"' + (d.gymDone ? '' : ' style="display:none"') + '>' +
+      '<input id="gl-gym-group" class="gl-input" placeholder="What did you train? (optional)" value="' + escapeAttr(d.gymGroup || '') + '">' +
+      '<input id="gl-gym-dur" class="gl-input" type="number" inputmode="numeric" placeholder="Minutes (optional)" value="' + (d.gymDur || '') + '"></div>';
+  } else if (key === 'food') {
+    q = 'How did you eat today?'; sub = 'Tap a rating'; optional = true;
+    body = '<div class="gl-stars">' + [1, 2, 3, 4, 5].map(n => '<button type="button" class="gl-star' + ((d.food || 0) >= n ? ' gl-star-on' : '') + '" onclick="glSetFood(' + n + ')">' + ((d.food || 0) >= n ? '★' : '☆') + '</button>').join('') + '</div>';
+  } else if (key === 'reading') {
+    q = 'Pages read today?'; sub = ab ? 'in ' + escapeHtml(ab.title) : ''; optional = true;
+    body = '<input id="gl-read" class="gl-input gl-num" type="number" inputmode="numeric" placeholder="0" value="' + (d.readPages || '') + '">';
+  } else if (key === 'networking') {
+    q = 'New people you connected with?'; optional = true;
+    body = '<input id="gl-net" class="gl-input gl-num" type="number" inputmode="numeric" placeholder="0" value="' + (d.net || '') + '">';
+  } else if (key === 'money') {
+    q = 'Spent today?'; optional = true;
+    body = '<input id="gl-spent" class="gl-input gl-num" type="number" inputmode="decimal" placeholder="0" value="' + (d.spent || '') + '">' +
+      '<input id="gl-money-acts" class="gl-input" placeholder="On what? (optional)" value="' + escapeAttr(d.moneyActs || '') + '">';
+  } else if (key === 'water') {
+    q = 'Water today?'; optional = true;
+    body = '<input id="gl-water" class="gl-input gl-num" type="number" inputmode="decimal" placeholder="gallons" value="' + (d.water || '') + '">' +
+      '<div class="gl-chips">' + [0.25, 0.5, 1].map(x => '<button type="button" class="gl-chip" onclick="glWater(' + x + ')">+' + x + '</button>').join('') + '</div>';
+  } else if (key === 'weight') {
+    q = "Today's weight?"; sub = 'optional'; optional = true;
+    body = '<input id="gl-weight" class="gl-input gl-num" type="number" inputmode="decimal" placeholder="' + (weightUnitPref() === 'lbs' ? 'lbs' : 'kg') + '" value="' + (d.weight || '') + '">';
+  } else {
+    q = 'Anything about today?'; sub = 'optional'; optional = true;
+    body = '<textarea id="gl-notes" class="gl-input gl-area" placeholder="Wins, struggles, ideas — anything">' + escapeHtml(d.notes || '') + '</textarea>';
+  }
+  const isLast = g.step === total - 1;
+  document.getElementById('main').innerHTML =
+    '<div class="gl-wrap">' +
+    '<div class="gl-head"><span class="gl-step-label">Log today · ' + (g.step + 1) + ' of ' + total + '</span><button type="button" class="gl-full" onclick="showFullLog()">Full form</button></div>' +
+    '<div class="gl-progress">' + g.keys.map((k, i) => '<span class="gl-dot' + (i <= g.step ? ' gl-dot-on' : '') + '"></span>').join('') + '</div>' +
+    '<div class="gl-step"><div class="gl-q">' + q + '</div>' + (sub ? '<div class="gl-sub">' + sub + '</div>' : '') + '<div class="gl-body">' + body + '</div></div>' +
+    '<div class="gl-actions">' +
+    (g.step > 0 ? '<button type="button" class="gl-back" onclick="glBack()">← Back</button>' : '<span></span>') +
+    (optional ? '<button type="button" class="gl-skip" onclick="glSkip()">Skip</button>' : '<span></span>') +
+    '<button type="button" class="btn btn-primary gl-next" onclick="glNext()">' + (isLast ? 'Save my day' : 'Next →') + '</button>' +
+    '</div></div>';
+  setTimeout(() => { const inp = document.querySelector('.gl-body input:not([type=button]), .gl-body textarea'); if (inp) inp.focus(); }, 60);
+}
+function glCapture() {
+  const g = state._guided; if (!g) return;
+  const key = g.keys[g.step], d = g.draft;
+  if (key === 'gym') { d.gymGroup = (document.getElementById('gl-gym-group')?.value || '').trim(); d.gymDur = parseInt(document.getElementById('gl-gym-dur')?.value) || ''; }
+  else if (key === 'reading') d.readPages = parseInt(document.getElementById('gl-read')?.value) || '';
+  else if (key === 'networking') d.net = parseInt(document.getElementById('gl-net')?.value) || '';
+  else if (key === 'money') { d.spent = parseFloat(document.getElementById('gl-spent')?.value) || ''; d.moneyActs = (document.getElementById('gl-money-acts')?.value || '').trim(); }
+  else if (key === 'water') d.water = parseFloat(document.getElementById('gl-water')?.value) || '';
+  else if (key === 'weight') d.weight = parseFloat(document.getElementById('gl-weight')?.value) || '';
+  else if (key === 'notes') d.notes = (document.getElementById('gl-notes')?.value || '').trim();
+}
+function glSetGym(v) { glCapture(); state._guided.draft.gymDone = v; state._guided.draft._gymAnswered = true; renderGuidedLog(); }
+function glSetFood(n) { state._guided.draft.food = n; renderGuidedLog(); }
+function glWater(inc) { const el = document.getElementById('gl-water'); if (el) el.value = Math.round(((parseFloat(el.value) || 0) + inc) * 100) / 100; }
+function glNext() { glCapture(); if (state._guided.step < state._guided.keys.length - 1) { state._guided.step++; renderGuidedLog(); } else finishGuidedLog(); }
+function glBack() { glCapture(); if (state._guided.step > 0) { state._guided.step--; renderGuidedLog(); } }
+function glSkip() { glNext(); }
+async function finishGuidedLog() {
+  glCapture();
+  const d = state._guided.draft, date = todayStr();
+  const days = state.data.days = state.data.days || [];
+  let day = days.find(x => x.date === date);
+  if (!day) { day = { id: uid(), date }; days.push(day); }
+  if (isPillarOn('gym')) day.gym = { done: !!d.gymDone, muscleGroup: d.gymGroup || '', duration: d.gymDur || 0, notes: (day.gym && day.gym.notes) || '' };
+  if (isPillarOn('food')) day.food = { rating: d.food || 0, notes: (day.food && day.food.notes) || '' };
+  if (isPillarOn('reading')) { const ab = (state.data.books || []).find(b => b.status === 'reading'); day.reading = { pages: d.readPages || 0, bookId: (ab && ab.id) || (day.reading && day.reading.bookId) || '', bookTitle: (ab && ab.title) || (day.reading && day.reading.bookTitle) || '', summary: (day.reading && day.reading.summary) || '' }; }
+  if (isPillarOn('networking')) day.networking = { count: d.net || 0, notes: (day.networking && day.networking.notes) || '' };
+  if (isPillarOn('money')) { day.spent = d.spent || 0; day.money = { activities: d.moneyActs || '', income: (day.money && day.money.income) || 0 }; }
+  day.water = d.water || 0;
+  day.notes = d.notes || '';
+  if (d.weight) { const kg = Math.round(displayToKg(d.weight) * 10) / 10; upsertWeight(date, kg); if (state.data.profile.nutrition && state.data.profile.nutrition.heightCm) state.data.profile.nutrition.weightKg = kg; }
+  state._guided = null;
+  await saveData();
+  if (day.gym && day.gym.done) { const ns = getGymStreak(); if ([3, 7, 14, 21, 30].includes(ns)) setTimeout(() => showStreakCelebration(ns), 600); }
+  showToast('Logged — nice work!', 'success');
+  navigate('dashboard');
+}
 function renderLogToday(editDay) {
   const isEditing = !!editDay;
   // When not editing a past day, resume today's entry so the form shows what's
