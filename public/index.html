@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon.svg">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=84">
+  <link rel="stylesheet" href="style.css?v=85">
   <script src="vendor/chart.umd.min.js"></script>
   <script src="vendor/marked.min.js"></script>
 </head>
@@ -27,6 +27,9 @@
     <nav class="sidebar-nav">
       <a href="#" class="nav-item active" data-page="dashboard">
         <span class="nav-icon"></span><span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-page="stats">
+        <span class="nav-icon"></span><span>Statistics</span>
       </a>
       <a href="#" class="nav-item" data-page="log">
         <span class="nav-icon"></span><span>Log Today</span>
@@ -93,7 +96,7 @@
     </button>
   </nav>
 
-  <script src="app.js?v=92"></script>
+  <script src="app.js?v=93"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });

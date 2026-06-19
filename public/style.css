@@ -1896,6 +1896,7 @@ body.auth-active .bottom-nav { display: none !important; }
 .gl-muscles { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 0 0 14px; }
 .gl-muscle { padding: 9px 15px; border-radius: 999px; border: 1px solid var(--border); background: var(--field-bg); color: var(--text); font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer; }
 .gl-muscle.gl-muscle-on { background: var(--gym-color, var(--accent)); color: #fff; border-color: var(--gym-color, var(--accent)); }
+.dash-stats-cta { display: block; width: 100%; margin-top: 6px; }
 
 /* Onboarding — emotional hero moments (welcome + "your climb begins") */
 .onboard-hero { text-align: center; }

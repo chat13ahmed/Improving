@@ -967,7 +967,7 @@ function navigate(page) {
   const moreBtn = document.getElementById('bnav-more');
   if (moreBtn) moreBtn.classList.toggle('active', !['dashboard', 'log', 'coach'].includes(page));
   document.getElementById('more-sheet')?.remove();
-  const pages = { dashboard: renderDashboard, log: renderLogEntry, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
+  const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
   injectFAB();
   (pages[page] || renderDashboard)();
 }
@@ -3991,36 +3991,72 @@ function renderDashboard() {
 
   // Group the cards into scannable sections — a label only shows if its group has content
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
-  const gHero     = renderClimbCard() + renderQuestCard() + renderNextStep() + renderConnectionCard() + renderWeekStrip() + renderPillarNav();
-  const gGuidance = renderFutureCard() + renderGoalCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
-  const gCoach    = renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard();
-  const gToday    = pillarsHtml + renderHydrationStrip(stats) + scoreHtml + renderChecklistCard() + focusHtml;
-  const gHealth   = renderNutritionWeekCard() + renderGymPlanCard() + renderWeightTrend();
-  const gMoney    = renderMoneyCircleCard();
-  const gBack     = renderRecentNotesCard() + renderReviewCard() + chartsHtml + achievementsHtml;
+  // Light, goal-focused home — all the analytics live on the Statistics page.
+  const gHero  = renderNextStep() + renderClimbCard() + renderQuestCard() + renderWeekStrip() + renderPillarNav();
+  const gGoals = renderGoalCard() + scoreHtml;
+  const gLight = renderChecklistCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
   document.getElementById('main').innerHTML =
     renderMountainHero() +
     '<div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
     '<div><h2 class="page-title">Dashboard</h2>' +
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p></div>' +
-    (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">Share my week</button>' : '') +
-    '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+    (hasDays ? '<button class="btn btn-outline btn-sm" onclick="navigate(\'stats\')">All stats</button>' : '') +
+    (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">Share</button>' : '') +
+    '</div></div>' +
     gHero +
-    gGuidance +
-    sec('How it all connects', renderLifeWeb()) +
-    sec('Your coach', gCoach) +
-    sec('Today', gToday) +
-    sec('Health', gHealth) +
-    sec('Money', gMoney) +
-    sec('Your year', renderYearRange()) +
-    sec('Looking back', gBack);
+    sec('Your goals', gGoals) +
+    gLight +
+    (hasDays ? '<button class="btn btn-primary dash-stats-cta" onclick="navigate(\'stats\')">See all your stats →</button>' : chartsHtml);
 
   setTimeout(animateCounters, 120);
   // Summit celebration once when momentum hits 100% (resets if it drops)
   const _mom = climbMomentum();
   if (_mom >= 100) { if (!state._summitShown) { state._summitShown = true; setTimeout(showSummitCelebration, 700); } } else { state._summitShown = false; }
+}
+
+// ── Statistics — all the numbers, insights, charts and trends in one place,
+// so the dashboard can stay light and goal-focused. ──
+function renderStatsPage() {
+  const { days, weeks, profile } = state.data;
+  updateNavBadges();
+  const hasDays = days.length > 0, hasWeeks = weeks.length > 0;
+  const header = '<div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
+    '<div><h2 class="page-title">Statistics</h2><p class="page-sub">Your numbers, insights, and trends</p></div>' +
+    '<button class="btn btn-outline btn-sm" onclick="navigate(\'dashboard\')">← Dashboard</button></div>';
+  if (!hasDays) {
+    document.getElementById('main').innerHTML = header +
+      '<div class="empty-state"><div class="empty-icon empty-mtn">' + obMountainSvg() + '</div><h3>No stats yet</h3>' +
+      '<p>Log a few days and your charts, insights, and trends will appear here.</p>' +
+      '<div class="empty-actions"><button class="btn btn-primary" onclick="navigate(\'log\')">Log my first day</button></div></div>';
+    return;
+  }
+  const stats = getWeekStats(), lastStats = getLastWeekStats();
+  const sortedDays = [...days].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const sortedWeeks = [...weeks].sort((a, b) => new Date(b.weekStart) - new Date(a.weekStart));
+  const cardCtx = { stats, lastStats, profile, avgIncome: getWeeklyAvg(weeks, 4), gymStreak: getGymStreak(), readStreak: getReadingStreak() };
+  const pillarsHtml = '<div class="pillar-grid">' + PILLAR_IDS.map(id => pillarCardHtml(id, cardCtx)).join('') + '</div>';
+  const anySpend = days.some(d => (d.spent || 0) > 0);
+  const showIncomeChart = isPillarOn('money') && (hasWeeks || anySpend);
+  const showGymChart = isPillarOn('gym');
+  const chartCards =
+    (showIncomeChart ? '<div class="card"><h3 class="card-title">Money (last 12 weeks)</h3><div class="chart-wrap"><canvas id="incomeChart"></canvas></div></div>' : '') +
+    (showGymChart ? '<div class="card"><h3 class="card-title">' + escapeHtml(pillar('gym').label) + ' Days per Week</h3><div class="chart-wrap"><canvas id="gymChart"></canvas></div></div>' : '');
+  const chartsHtml = (chartCards ? '<div class="charts-row">' + chartCards + '</div>' : '') +
+    '<div class="card"><h3 class="card-title">Recent Days</h3>' + renderRecentDaysTable(sortedDays.slice(0, 7)) + '</div>';
+  const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
+  document.getElementById('main').innerHTML = header +
+    sec('How it all connects', renderConnectionCard() + renderLifeWeb()) +
+    sec("Where it's heading", renderFutureCard()) +
+    sec('Your year', renderYearRange()) +
+    sec('This week', pillarsHtml + renderHydrationStrip(stats) + renderFocusCard(stats, lastStats)) +
+    sec('Your coach', renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard()) +
+    sec('Health', renderNutritionWeekCard() + renderGymPlanCard() + renderWeightTrend()) +
+    sec('Money', renderMoneyCircleCard()) +
+    sec('Trends & history', chartsHtml + renderRecentNotesCard() + renderReviewCard() + renderAchievementsSection());
+  setTimeout(animateCounters, 120);
   if (showIncomeChart) initIncomeChart(sortedWeeks);
-  if (showGymChart)    initGymChart(days);
+  if (showGymChart) initGymChart(days);
   if ((state.data.weights || []).length >= 2) initWeightChart();
   maybeGeneratePlan();
   maybeGenerateInsight();
