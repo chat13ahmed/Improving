@@ -714,6 +714,20 @@ app.post('/api/cron/tick', async (req, res) => {
         data._lastProteinNudge = local.date; changed = true;
       }
 
+      // 4) Vocabulary practice nudge — a random saved word to use in a sentence.
+      const vocab = Array.isArray(data.vocab) ? data.vocab : [];
+      if (vocab.length && push.isVocabNudgeDue({ enabled: profile.vocabNudge, wordCount: vocab.length, hhmm: local.hhmm, date: local.date, hour: profile.vocabHour, lastNudge: data._lastVocabNudge, roll: Math.random() })) {
+        const pool = vocab.filter(w => !(w.sentence && String(w.sentence).trim()));
+        const arr = pool.length ? pool : vocab;
+        const word = arr[Math.floor(Math.random() * arr.length)] || {};
+        const body = (word.word || 'A word') + (word.meaning ? ' — ' + String(word.meaning).slice(0, 80) : '') + '. Can you use it in a sentence?';
+        for (const sub of byUser[uid]) {
+          try { await push.sendPush(sub, { title: 'Use it in a sentence', body, url: './', tag: 'vocab-nudge' }); sent++; }
+          catch (e) { if (e && (e.statusCode === 404 || e.statusCode === 410)) { try { await DB.deletePushSub(sub.endpoint); } catch {} } }
+        }
+        data._lastVocabNudge = local.date; changed = true;
+      }
+
       // Conditional metadata write: only if the client hasn't saved since we read.
       // Never bumps the version, so it can't clobber user data or force client conflicts.
       if (changed) await DB.saveDataMeta(uid, data, d.version);

@@ -526,6 +526,13 @@ if (P) {
   ok('protein nudge not due if already nudged today', P.isProteinNudgeDue({ hhmm: '20:00', date: D, loggedFood: true, eatenProtein: 90, targetProtein: 160, lastNudge: D }) === false);
   ok('protein nudge disabled when off', P.isProteinNudgeDue({ hhmm: '20:00', date: D, loggedFood: true, eatenProtein: 90, targetProtein: 160, lastNudge: '', enabled: false }) === false);
   ok('protein nudge respects custom hour', P.isProteinNudgeDue({ hhmm: '17:00', date: D, loggedFood: true, eatenProtein: 90, targetProtein: 160, lastNudge: '', hour: 17 }) === true);
+  // vocabulary practice nudge
+  ok('vocab nudge due (has words, past hour, roll passes)', P.isVocabNudgeDue({ hhmm: '13:30', date: D, wordCount: 5, lastNudge: '', roll: 0.1, chance: 0.5 }) === true);
+  ok('vocab nudge not due before the hour', P.isVocabNudgeDue({ hhmm: '09:00', date: D, wordCount: 5, lastNudge: '', roll: 0.1 }) === false);
+  ok('vocab nudge not due with no saved words', P.isVocabNudgeDue({ hhmm: '15:00', date: D, wordCount: 0, lastNudge: '', roll: 0.1 }) === false);
+  ok('vocab nudge not due if already nudged today', P.isVocabNudgeDue({ hhmm: '15:00', date: D, wordCount: 5, lastNudge: D, roll: 0.1 }) === false);
+  ok('vocab nudge respects the random roll', P.isVocabNudgeDue({ hhmm: '15:00', date: D, wordCount: 5, lastNudge: '', roll: 0.9, chance: 0.5 }) === false);
+  ok('vocab nudge disabled when off', P.isVocabNudgeDue({ hhmm: '15:00', date: D, wordCount: 5, lastNudge: '', roll: 0.1, enabled: false }) === false);
 }
 
 // ─────────────────────────────────────────────────────────────

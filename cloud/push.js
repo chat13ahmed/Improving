@@ -59,4 +59,18 @@ function isProteinNudgeDue(opts) {
   if ((o.hhmm || '00:00') < String(hour).padStart(2, '0') + ':00') return false;
   return (target - eaten) >= 25 && eaten < target * 0.8;
 }
-module.exports = { sendPush, configured, isReminderDue, userLocal, isNudgeDue, isProteinNudgeDue };
+// Pure: should a vocabulary practice nudge fire? Once/day, past the hour, only if
+// the user has saved words — with a random roll so it lands at a surprising
+// moment rather than the same minute every day. (testable)
+function isVocabNudgeDue(opts) {
+  const o = opts || {};
+  if (o.enabled === false) return false;          // user turned it off (default on)
+  if (!(+o.wordCount > 0)) return false;          // nothing to practice
+  if (o.lastNudge === o.date) return false;       // already nudged today
+  const hour = Number.isFinite(+o.hour) ? +o.hour : 13;
+  if ((o.hhmm || '00:00') < String(hour).padStart(2, '0') + ':00') return false;
+  const roll = Number.isFinite(+o.roll) ? +o.roll : 1;       // server passes Math.random()
+  const chance = Number.isFinite(+o.chance) ? +o.chance : 0.5;
+  return roll < chance;
+}
+module.exports = { sendPush, configured, isReminderDue, userLocal, isNudgeDue, isProteinNudgeDue, isVocabNudgeDue };

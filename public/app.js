@@ -5627,7 +5627,14 @@ function renderVocabCard() {
     '<p class="card-sub">Capture new words from your books and their meaning — then put each to work in a sentence.' +
     (s.total ? ' · <b>' + s.total + '</b> word' + (s.total === 1 ? '' : 's') + ' · <b>' + s.practiced + '</b> used in a sentence' : '') + '</p>' +
     form + list +
+    '<label class="vocab-remind"><input type="checkbox" onchange="toggleVocabNudge(this)"' + (state.data.profile && state.data.profile.vocabNudge !== false ? ' checked' : '') + '> Surprise me with a word to practice — send me a notification to use one in a sentence</label>' +
     '</div>';
+}
+async function toggleVocabNudge(el) {
+  if (!state.data.profile) state.data.profile = {};
+  state.data.profile.vocabNudge = !!el.checked;
+  await saveData();
+  showToast(el.checked ? 'On — we\'ll surprise you with a word to practice.' : 'Off — no practice reminders.', 'success');
 }
 async function addVocabWord() {
   const word = (document.getElementById('vocab-word')?.value || '').trim();

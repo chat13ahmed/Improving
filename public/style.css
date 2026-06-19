@@ -1302,6 +1302,15 @@ body {
   .main .admin-table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .chart-wrap { max-width: 100%; }
   img, canvas, pre, textarea { max-width: 100%; }
+  input, select, textarea, button { font-size: 16px; }
+  .page-header { margin-bottom: 16px; }
+  .card { padding: 18px; margin-bottom: 14px; border-radius: 12px; }
+  .mtn-hero { height: 118px; margin-bottom: 14px; }
+  .climb-head, .quest-top, .wk-head { gap: 10px; }
+  .community-box, .modal-box { max-height: calc(100dvh - 34px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .cf-row, .food-add-row, .rem-add, .chk-add, .backup-btns { flex-direction: column; }
+  .cf-row .cf-input, .food-add-row input, .food-add-row select, .food-add-row button, .rem-add input, .rem-add button, .chk-add input, .chk-add button { width: 100%; min-width: 0; }
+  .feed-post, .comm-item { overflow-wrap: break-word; }
   /* Use overflow-wrap:break-word (NOT anywhere) + leave word-break normal: long words
      still wrap to avoid overflow, but a cell/flex item's min-content stays at the
      longest word — so squeezed flex children (e.g. the book title) never collapse to
@@ -1848,6 +1857,8 @@ body.auth-active .bottom-nav { display: none !important; }
 .vocab-ask-q { font-size: 13px; color: var(--text); margin-bottom: 7px; }
 .vocab-ask-row { display: flex; gap: 8px; }
 .vocab-ask-row .vocab-input { flex: 1; }
+.vocab-remind { display: flex; align-items: flex-start; gap: 9px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-muted); line-height: 1.45; cursor: pointer; }
+.vocab-remind input { width: 17px; height: 17px; margin-top: 1px; flex-shrink: 0; }
 
 /* Onboarding — emotional hero moments (welcome + "your climb begins") */
 .onboard-hero { text-align: center; }
