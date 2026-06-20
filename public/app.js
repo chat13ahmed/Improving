@@ -7630,20 +7630,21 @@ function buildScene3d() {
   const mid  = mtn('s3-mid',  '0,400 0,300 180,215 360,285 540,195 720,275 900,185 1080,265 1200,215 1200,400');
   const near = mtn('s3-near', '0,400 0,340 220,265 430,335 620,255 820,325 1010,255 1200,305 1200,400');
 
-  // Floating particles — size + blur + opacity fake depth-of-field (bokeh)
+  // Floating particles — size + blur + opacity fake depth-of-field (bokeh).
+  // --o is the particle's base brightness; the float keyframe twinkles around it.
   let dots = '';
-  const N = reduce ? 0 : 24;
+  const N = reduce ? 0 : 32;
   for (let i = 0; i < N; i++) {
     const depth = Math.random();                       // 0 = far/small/blurred, 1 = near
-    const size = (3 + depth * 9).toFixed(1);
+    const size = (3.5 + depth * 11).toFixed(1);
     const left = (Math.random() * 100).toFixed(2);
     const top  = (Math.random() * 96).toFixed(2);
-    const dur  = (15 + Math.random() * 20).toFixed(1);
+    const dur  = (13 + Math.random() * 18).toFixed(1);
     const delay = (-Math.random() * 35).toFixed(1);
     const blur = ((1 - depth) * 2.6).toFixed(2);
-    const op   = (0.10 + depth * 0.30).toFixed(2);
+    const op   = (0.16 + depth * 0.40).toFixed(2);     // brighter, esp. the near bokeh
     dots += '<span class="p3" style="left:' + left + '%;top:' + top + '%;width:' + size + 'px;height:' + size +
-      'px;filter:blur(' + blur + 'px);opacity:' + op +
+      'px;filter:blur(' + blur + 'px);--o:' + op + ';opacity:' + op +
       ';animation-duration:' + dur + 's;animation-delay:' + delay + 's"></span>';
   }
 
