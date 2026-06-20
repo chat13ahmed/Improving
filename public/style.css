@@ -2277,3 +2277,60 @@ body.auth-active .fab-btn { display: none !important; }
 
 /* ─── Reading Log in History Table ───────────────── */
 .pill-read { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+
+/* ─── 3D parallax background ──────────────────────── */
+/* Let the fixed scene show through. html keeps the solid colour as a
+   fallback if the scene ever fails to build, so text is always readable. */
+html { background: var(--bg); }
+body { background: transparent; }
+.main { background: transparent; }
+
+#scene3d {
+  position: fixed; inset: 0; z-index: -1;
+  pointer-events: none; overflow: hidden;
+  perspective: 900px; perspective-origin: 50% 35%;
+  --mx: 0; --my: 0; --sc: 0;          /* set by JS: pointer/tilt (-1..1) + scroll (0..1) */
+}
+.s3-sky {
+  position: absolute; inset: 0;
+  background: radial-gradient(125% 85% at 50% 0%, #e9f3ff 0%, #eef4fb 45%, var(--bg) 100%);
+}
+.s3-stage {
+  position: absolute; inset: 0;
+  transform-style: preserve-3d; will-change: transform;
+  transform: rotateX(calc(var(--my) * -1.1deg)) rotateY(calc(var(--mx) * 1.5deg));
+  transition: transform .35s ease-out;
+}
+.s3-mtn {
+  position: absolute; left: -2%; width: 104%; bottom: 0; display: block;
+  transition: transform .35s ease-out; will-change: transform;
+}
+.s3-mtn polygon { fill: inherit; }
+.s3-far  { height: 46vh; fill: #dcecf6; opacity: .55;
+  transform: translate3d(calc(var(--mx) *  5px), calc(var(--my) *  4px - var(--sc) *  6px), 0); }
+.s3-mid  { height: 38vh; fill: #c6e4db; opacity: .6;
+  transform: translate3d(calc(var(--mx) *  9px), calc(var(--my) *  6px - var(--sc) * 12px), 0); }
+.s3-near { height: 30vh; fill: #abdac6; opacity: .7;
+  transform: translate3d(calc(var(--mx) * 15px), calc(var(--my) * 10px - var(--sc) * 20px), 0); }
+.s3-particles {
+  position: absolute; inset: 0; will-change: transform;
+  transform: translate3d(calc(var(--mx) * 12px), calc(var(--my) * 9px), 0);
+  transition: transform .35s ease-out;
+}
+.p3 {
+  position: absolute; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #88dcc1, #45b394);
+  animation-name: p3float; animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite; will-change: transform;
+}
+@keyframes p3float {
+  0%   { transform: translateY(6px); }
+  50%  { transform: translateY(-22px); }
+  100% { transform: translateY(6px); }
+}
+/* Reduced motion: keep the depth, drop all movement */
+.s3-still .s3-stage, .s3-still .s3-mtn, .s3-still .s3-particles { transform: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .p3 { animation: none !important; }
+  .s3-stage, .s3-mtn, .s3-particles { transition: none !important; }
+}

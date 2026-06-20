@@ -593,6 +593,7 @@ function showSummitCelebration() {
 // ─────────────────────────────────────────────────────────────
 // Entry point — gate the app behind a login session
 async function init() {
+  buildScene3d();   // animated 3D backdrop, behind every screen
   state.token = localStorage.getItem('be_token');
   let session = { authed: false };
   if (state.token) {
@@ -5473,6 +5474,7 @@ function buildDemoData() {
   };
 }
 async function startDemo() {
+  buildScene3d();
   state._previewMode = true;
   state.token = null;
   state.user = 'Demo';
@@ -7362,6 +7364,17 @@ function renderChecklistPage() {
     renderNudgeCard();
 }
 
+// Appearance — toggle the animated 3D parallax background (per device)
+function renderAppearanceCard() {
+  const on = bg3dEnabled();
+  return '<div class="card">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+    '<h3 class="card-title" style="margin-bottom:0">3D background</h3>' +
+    '<label class="pc-toggle"><input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="setBg3d(this.checked)"><span class="pc-slider"></span></label></div>' +
+    '<p class="card-sub" style="margin-bottom:0">A gentle, animated mountain scene with floating particles drifts behind your screens and follows your cursor or phone tilt. Turn it off for a flat background. Set per device; movement is reduced automatically if your system prefers less motion.</p>' +
+    '</div>';
+}
+
 // ─────────────────────────────────────────────────────────────
 // SETTINGS PAGE
 // ─────────────────────────────────────────────────────────────
@@ -7381,6 +7394,9 @@ function renderSettingsPage() {
 
     // Customize pillars (first — it's the headline feature)
     pillarCustomizerCard() +
+
+    // Appearance — animated 3D background toggle
+    renderAppearanceCard() +
 
     // Goals — labels follow your pillar names; only enabled pillars shown
     '<div class="card">' +
@@ -7591,6 +7607,88 @@ function showToast(msg, type) {
   document.body.appendChild(t);
   requestAnimationFrame(() => t.classList.add('visible'));
   setTimeout(() => { t.classList.remove('visible'); setTimeout(() => t.remove(), 300); }, 3200);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3D PARALLAX BACKGROUND
+// A layered mountain scene with floating particles that drifts behind
+// everything and follows the cursor / phone tilt / scroll. Pure CSS-3D —
+// no WebGL — so it stays light on load and battery. Honors reduced-motion.
+// ─────────────────────────────────────────────────────────────
+function bg3dEnabled() {
+  try { return localStorage.getItem('be_bg3d') !== 'off'; } catch { return true; } // default ON
+}
+function buildScene3d() {
+  if (typeof document === 'undefined' || !document.body) return;   // headless/test guard
+  if (!bg3dEnabled()) { document.getElementById('scene3d')?.remove(); return; }
+  if (document.getElementById('scene3d')) return;                  // built once — persists across pages
+  const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  const mtn = (cls, pts) => '<svg class="s3-mtn ' + cls + '" viewBox="0 0 1200 400" preserveAspectRatio="none" aria-hidden="true"><polygon points="' + pts + '"/></svg>';
+  // Three overlapping ranges — back is paler & flatter, front darker & taller
+  const far  = mtn('s3-far',  '0,400 0,250 150,180 320,240 480,150 650,225 820,140 1000,215 1200,165 1200,400');
+  const mid  = mtn('s3-mid',  '0,400 0,300 180,215 360,285 540,195 720,275 900,185 1080,265 1200,215 1200,400');
+  const near = mtn('s3-near', '0,400 0,340 220,265 430,335 620,255 820,325 1010,255 1200,305 1200,400');
+
+  // Floating particles — size + blur + opacity fake depth-of-field (bokeh)
+  let dots = '';
+  const N = reduce ? 0 : 24;
+  for (let i = 0; i < N; i++) {
+    const depth = Math.random();                       // 0 = far/small/blurred, 1 = near
+    const size = (3 + depth * 9).toFixed(1);
+    const left = (Math.random() * 100).toFixed(2);
+    const top  = (Math.random() * 96).toFixed(2);
+    const dur  = (15 + Math.random() * 20).toFixed(1);
+    const delay = (-Math.random() * 35).toFixed(1);
+    const blur = ((1 - depth) * 2.6).toFixed(2);
+    const op   = (0.10 + depth * 0.30).toFixed(2);
+    dots += '<span class="p3" style="left:' + left + '%;top:' + top + '%;width:' + size + 'px;height:' + size +
+      'px;filter:blur(' + blur + 'px);opacity:' + op +
+      ';animation-duration:' + dur + 's;animation-delay:' + delay + 's"></span>';
+  }
+
+  const scene = document.createElement('div');
+  scene.id = 'scene3d';
+  scene.setAttribute('aria-hidden', 'true');
+  if (reduce) scene.classList.add('s3-still');
+  scene.innerHTML = '<div class="s3-sky"></div>' +
+    '<div class="s3-stage">' + far + mid + near +
+    '<div class="s3-particles">' + dots + '</div></div>';
+  document.body.appendChild(scene);                    // z-index:-1 keeps it behind regardless of DOM order
+
+  if (!reduce) scene3dParallax(scene);
+}
+// Pointer / tilt / scroll → CSS custom properties (CSS transitions do the easing)
+function scene3dParallax(scene) {
+  if (scene._wired) return; scene._wired = true;
+  let mx = 0, my = 0, sc = 0, raf = 0;
+  const flush = () => {
+    raf = 0;
+    scene.style.setProperty('--mx', mx.toFixed(3));
+    scene.style.setProperty('--my', my.toFixed(3));
+    scene.style.setProperty('--sc', sc.toFixed(3));
+  };
+  const schedule = () => { if (!raf) raf = requestAnimationFrame(flush); };
+  window.addEventListener('mousemove', e => {
+    mx = ((e.clientX / (window.innerWidth || 1)) - 0.5) * 2;   // -1 … 1
+    my = ((e.clientY / (window.innerHeight || 1)) - 0.5) * 2;
+    schedule();
+  }, { passive: true });
+  window.addEventListener('deviceorientation', e => {
+    if (e.gamma == null && e.beta == null) return;             // tilt: left/right + front/back
+    mx = Math.max(-1, Math.min(1, (e.gamma || 0) / 30));
+    my = Math.max(-1, Math.min(1, ((e.beta || 0) - 45) / 40));
+    schedule();
+  }, { passive: true });
+  window.addEventListener('scroll', () => {
+    sc = Math.min(1, (window.scrollY || 0) / 700);             // mountains sink slightly as you scroll
+    schedule();
+  }, { passive: true });
+}
+// Settings toggle — per device (instant, works before login)
+function setBg3d(on) {
+  try { localStorage.setItem('be_bg3d', on ? 'on' : 'off'); } catch {}
+  if (on) buildScene3d(); else document.getElementById('scene3d')?.remove();
 }
 
 init();
