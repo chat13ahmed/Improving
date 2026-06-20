@@ -467,6 +467,35 @@ function animateCounters() {
   });
 }
 
+// Make cards tilt in 3D toward the cursor (with a light-following sheen).
+// Touch devices have no pointer hover, so they just get the CSS entrance/float.
+// Honors reduced-motion. Safe to call repeatedly (guards per element).
+function wireCardTilt(selector, maxDeg) {
+  if (typeof document === 'undefined') return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const md = maxDeg || 9;
+  document.querySelectorAll(selector).forEach(card => {
+    if (card._tilt) return; card._tilt = true;
+    card.addEventListener('pointermove', e => {
+      if (e.pointerType === 'touch') return;
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - 0.5;   // -0.5 … 0.5
+      const py = (e.clientY - r.top) / r.height - 0.5;
+      card.style.setProperty('--ry', (px * md).toFixed(2) + 'deg');
+      card.style.setProperty('--rx', (-py * md).toFixed(2) + 'deg');
+      card.style.setProperty('--lift', '-6px');
+      card.style.setProperty('--gx', (px * 90 + 50).toFixed(1) + '%');
+      card.style.setProperty('--gy', (py * 90 + 50).toFixed(1) + '%');
+      card.style.setProperty('--sheen', '1');
+    }, { passive: true });
+    const reset = () => {
+      card.style.setProperty('--rx', '0deg'); card.style.setProperty('--ry', '0deg');
+      card.style.setProperty('--lift', '0px'); card.style.setProperty('--sheen', '0');
+    };
+    card.addEventListener('pointerleave', reset);
+  });
+}
+
 // ─────────────────────────────────────────────────────────────
 // WEEKLY REVIEW MODAL  (shows on Sunday)
 // ─────────────────────────────────────────────────────────────
@@ -4133,6 +4162,7 @@ function renderStatsPage() {
     sec('Money', renderMoneyCircleCard()) +
     sec('Trends & history', chartsHtml + renderRecentNotesCard() + renderReviewCard() + renderAchievementsSection());
   setTimeout(animateCounters, 120);
+  setTimeout(() => wireCardTilt('.pillar-card'), 60);
   if (showIncomeChart) initIncomeChart(sortedWeeks);
   if (showGymChart) initGymChart(days);
   if ((state.data.weights || []).length >= 2) initWeightChart();

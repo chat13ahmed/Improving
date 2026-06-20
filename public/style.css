@@ -199,58 +199,69 @@ body {
 /* ─── 4-Pillar Grid ───────────────────────────── */
 .pillar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px; }
 .pillar-card {
+  --rx: 0deg; --ry: 0deg; --lift: 0px; --sheen: 0; --gx: 50%; --gy: 0%;
+  --pc: var(--accent); --pc-bg: var(--card); --pc-glow: rgba(15,23,42,.10); --pc-border: var(--border);
   border-radius: var(--radius);
   padding: 20px;
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--pc-border);
   border-left-width: 4px;
-  background: var(--card);
+  border-left-color: var(--pc);
+  background:
+    radial-gradient(140% 90% at var(--gx) var(--gy), rgba(255,255,255,calc(.55 * var(--sheen))), transparent 46%),
+    linear-gradient(155deg, var(--pc-bg), var(--card) 62%);
   position: relative;
   overflow: hidden;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transform-style: preserve-3d;
+  transform: perspective(720px) rotateX(var(--rx)) rotateY(var(--ry)) translateY(var(--lift));
+  box-shadow: -4px 0 24px var(--pc-glow), var(--shadow);
+  transition: transform .18s ease-out, box-shadow .25s ease;
+  animation: statRise .55s cubic-bezier(.2,.7,.2,1) backwards;
 }
-.pillar-card:hover { transform: translateY(-2px); }
+.pillar-card:hover { box-shadow: -6px 14px 36px var(--pc-glow), var(--shadow-lg); }
 .pillar-card::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--tint-3), transparent);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--pc), transparent);
+  opacity: .55;
 }
-.pillar-card.gym {
-  border-left-color: var(--gym-color);
-  box-shadow: -4px 0 24px var(--gym-glow), var(--shadow);
+.pillar-card.gym     { --pc: var(--gym-color);     --pc-bg: var(--gym-bg);     --pc-glow: var(--gym-glow);     --pc-border: var(--gym-border); }
+.pillar-card.food    { --pc: var(--food-color);    --pc-bg: var(--food-bg);    --pc-glow: var(--food-glow);    --pc-border: var(--food-border); }
+.pillar-card.network { --pc: var(--network-color); --pc-bg: var(--network-bg); --pc-glow: var(--network-glow); --pc-border: var(--network-border); }
+.pillar-card.money   { --pc: var(--money-color);   --pc-bg: var(--money-bg);   --pc-glow: var(--money-glow);   --pc-border: var(--money-border); }
+.pillar-card.read    { --pc: var(--read-color);    --pc-bg: var(--read-bg);    --pc-glow: var(--read-glow);    --pc-border: var(--read-border); }
+.pillar-card:nth-child(1) { animation-delay: .03s; }
+.pillar-card:nth-child(2) { animation-delay: .10s; }
+.pillar-card:nth-child(3) { animation-delay: .17s; }
+.pillar-card:nth-child(4) { animation-delay: .24s; }
+.pillar-card:nth-child(5) { animation-delay: .31s; }
+@keyframes statRise { from { opacity: 0; transform: perspective(720px) translateY(22px) rotateX(9deg); } }
+.pillar-icon {
+  font-size: 22px; flex-shrink: 0;
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--pc-bg);
+  box-shadow: inset 0 0 0 1px var(--pc-border);
 }
-.pillar-card.food {
-  border-left-color: var(--food-color);
-  box-shadow: -4px 0 24px var(--food-glow), var(--shadow);
-}
-.pillar-card.network {
-  border-left-color: var(--network-color);
-  box-shadow: -4px 0 24px var(--network-glow), var(--shadow);
-}
-.pillar-card.money {
-  border-left-color: var(--money-color);
-  box-shadow: -4px 0 24px var(--money-glow), var(--shadow);
-}
-.pillar-icon { font-size: 26px; flex-shrink: 0; margin-top: 2px; }
 .pillar-body { flex: 1; min-width: 0; }
 .pillar-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 5px; }
-.pillar-value { font-size: 24px; font-weight: 900; line-height: 1; color: var(--text); }
-.pillar-value span { font-size: 14px; font-weight: 500; color: var(--text-muted); }
+.pillar-value { font-size: 27px; font-weight: 900; line-height: 1; color: var(--pc); letter-spacing: -.5px; }
+.pillar-value .anim-count { color: var(--pc); }          /* the number: big + pillar colour */
+.pillar-value span:not(.anim-count) { font-size: 14px; font-weight: 600; color: var(--text-muted); letter-spacing: 0; }
 .pillar-sub { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
-.pillar-badge { position: absolute; top: 14px; right: 14px; font-size: 13px; font-weight: 800; }
+.pillar-badge { position: absolute; top: 14px; right: 14px; font-size: 13px; font-weight: 800; color: var(--pc); }
 .gym-badge     { color: var(--gym-color); }
 .food-badge    { color: var(--food-color); }
 .network-badge { color: var(--network-color); }
 .money-badge   { color: var(--money-color); }
-.pillar-card.read {
-  border-left-color: var(--read-color);
-  box-shadow: -4px 0 24px var(--read-glow), var(--shadow);
+.read-badge    { color: var(--read-color); }
+@media (prefers-reduced-motion: reduce) {
+  .pillar-card { animation: none; transform: none; transition: box-shadow .25s ease; }
 }
-.read-badge { color: var(--read-color); }
 
 /* ─── Weekly Score Card ───────────────────────── */
 .score-card {
