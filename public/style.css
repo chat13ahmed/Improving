@@ -2349,4 +2349,10 @@ body { background: transparent; }
 .mn-meal    { font-size: 18px; font-weight: 800; color: var(--text); margin-top: 2px; line-height: 1.2; }
 .mn-time    { font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .mn-macros  { font-size: 13px; font-weight: 600; color: var(--text); margin-top: 4px; }
-.mn-plate   { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+.mn-eg      { margin-top: 8px; border-top: 1px dashed rgba(29,158,117,.25); padding-top: 7px; }
+.mn-eg-row  { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--text); padding: 2px 0; }
+.mn-eg-row span:last-child { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mn-eg-row em { font-style: normal; font-weight: 700; color: #1D9E75; }
+.mn-eg-total { margin-top: 3px; padding-top: 5px; border-top: 1px solid rgba(29,158,117,.18); font-weight: 700; }
+.mn-eg-total span:last-child { color: #1D9E75; }
+.mn-plate   { font-size: 12.5px; color: var(--text-muted); margin-top: 8px; }

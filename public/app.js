@@ -1460,6 +1460,44 @@ function foodLogTotals(log) {
     kcal: t.kcal + (x.kcal || 0), p: t.p + (x.p || 0), c: t.c + (x.c || 0), f: t.f + (x.f || 0)
   }), { kcal: 0, p: 0, c: 0, f: 0 });
 }
+// Calories in one typical serving of a food (sg grams at k cal/100g)
+function foodByName(n) { return FOOD_DB.find(f => f.n === n); }
+function servingCal(f) { return f ? Math.round(f.k * f.sg / 100) : 0; }
+// Build a concrete example plate for a meal: real foods (whole servings) from
+// FOOD_DB chosen to land near the calorie target, each with its own calories.
+// Protein-first (the app's muscle bias). Returns { items:[{name,servings,cal}], total }.
+// Pure + testable.
+function mealExample(label, targetCal) {
+  const l = (label || '').toLowerCase();
+  const target = Math.max(120, +targetCal || 0);
+  let groups;
+  if (/breakfast/.test(l)) {
+    groups = [['Egg, whole', 'Greek yogurt, nonfat', 'Whey protein powder'], ['Oats, dry', 'Bread, whole wheat', 'Bagel'], ['Banana', 'Blueberries', 'Strawberries'], ['Peanut butter', 'Almonds']];
+  } else if (/snack/.test(l)) {
+    groups = [['Greek yogurt, nonfat', 'Cottage cheese, low-fat', 'String cheese (mozzarella)', 'Whey protein powder'], ['Apple', 'Banana', 'Grapes'], ['Almonds', 'Peanuts', 'Hummus']];
+  } else { // lunch / dinner / generic
+    groups = [['Chicken breast (cooked)', 'Salmon (cooked)', 'Lean beef steak (cooked)', 'Tilapia (cooked)'], ['Rice, brown (cooked)', 'Potato (baked)', 'Sweet potato (cooked)', 'Quinoa (cooked)'], ['Broccoli (cooked)', 'Green beans (cooked)', 'Spinach (raw)'], ['Avocado', 'Olive oil']];
+  }
+  const items = [];
+  let total = 0;
+  for (const g of groups) {                       // one serving from each block, in order
+    const f = g.map(foodByName).find(Boolean);
+    if (!f) continue;
+    const c = servingCal(f);
+    if (total + c > target * 1.15 && items.length >= 2) break;
+    items.push({ name: f.n, servings: 1, cal: c });
+    total += c;
+  }
+  const order = [0, 1, 0, 1, 2];                   // top up protein, then carb, then produce
+  for (let oi = 0; oi < order.length && total < target * 0.9; oi++) {
+    const it = items[order[oi]];
+    if (!it || it.servings >= 3) continue;
+    const c = servingCal(foodByName(it.name));
+    if (total + c > target * 1.12) continue;
+    it.servings += 1; it.cal += c; total += c;
+  }
+  return { items, total };
+}
 
 // Meal names for a given count, so the split feels like a real plan.
 function mealLabels(count) {
@@ -1520,10 +1558,17 @@ function mealNowHint(now) {
   const m = nut.meals.plan[i];
   if (!m) return '';
   const eyebrow = hour < 7 ? 'Up next' : hour >= 21 ? 'Last meal — keep it light' : 'Eat now';
+  const eg = mealExample(m.label, m.calories);
+  const clean = n => n.replace(/\s*\(.*?\)/g, '');     // drop "(cooked)" etc. for display
+  const rows = eg.items.map(it =>
+    '<div class="mn-eg-row"><span>' + escapeHtml(clean(it.name)) + (it.servings > 1 ? ' <em>×' + it.servings + '</em>' : '') +
+    '</span><span>' + it.cal.toLocaleString() + ' cal</span></div>').join('');
   return '<div class="meal-now">' +
     '<div class="mn-eyebrow">🍽️ ' + eyebrow + '</div>' +
     '<div class="mn-meal">' + escapeHtml(m.label) + '</div>' +
     '<div class="mn-macros">Aim ~' + (m.calories || 0).toLocaleString() + ' cal · ' + (m.protein || 0) + 'g protein</div>' +
+    (rows ? '<div class="mn-eg">' + rows +
+      '<div class="mn-eg-row mn-eg-total"><span>Example plate</span><span>≈ ' + eg.total.toLocaleString() + ' cal</span></div></div>' : '') +
     '<div class="mn-plate">' + escapeHtml(mealPlateHint(m.label)) + '</div>' +
     '</div>';
 }
