@@ -1508,6 +1508,25 @@ function mealPlateHint(label) {
   if (/snack/.test(l)) return 'Protein + fruit or nuts';
   return 'Protein + veg/fruit + healthy carb + healthy fat';
 }
+// Friendly "what should I be eating right now" hint from the meal plan + clock.
+// Returns '' when nutrition isn't set up. Reuses currentMealIndex (windows 7–21)
+// so it matches the Log page's meal focus. Used in the guided log + Quick Log.
+function mealNowHint(now) {
+  const nut = getNutrition();
+  if (!nut || !nut.meals || !nut.meals.plan || !nut.meals.plan.length) return '';
+  const d = now || new Date();
+  const hour = d.getHours();
+  const i = currentMealIndex(nut.meals.count, hour);
+  const m = nut.meals.plan[i];
+  if (!m) return '';
+  const eyebrow = hour < 7 ? 'Up next' : hour >= 21 ? 'Last meal — keep it light' : 'Eat now';
+  return '<div class="meal-now">' +
+    '<div class="mn-eyebrow">🍽️ ' + eyebrow + '</div>' +
+    '<div class="mn-meal">' + escapeHtml(m.label) + '</div>' +
+    '<div class="mn-macros">Aim ~' + (m.calories || 0).toLocaleString() + ' cal · ' + (m.protein || 0) + 'g protein</div>' +
+    '<div class="mn-plate">' + escapeHtml(mealPlateHint(m.label)) + '</div>' +
+    '</div>';
+}
 
 // Compute calories (Mifflin-St Jeor BMR → TDEE → goal) and a macro split.
 function computeNutrition(n) {
@@ -4233,7 +4252,8 @@ function renderGuidedLog() {
   } else if (key === 'food') {
     q = 'How did you eat today?'; sub = 'Rate it, then log your calories'; optional = true;
     const nut = getNutrition();
-    body = '<div class="gl-stars">' + [1, 2, 3, 4, 5].map(n => '<button type="button" class="gl-star' + ((d.food || 0) >= n ? ' gl-star-on' : '') + '" onclick="glSetFood(' + n + ')">' + ((d.food || 0) >= n ? '★' : '☆') + '</button>').join('') + '</div>' +
+    body = mealNowHint() +
+      '<div class="gl-stars">' + [1, 2, 3, 4, 5].map(n => '<button type="button" class="gl-star' + ((d.food || 0) >= n ? ' gl-star-on' : '') + '" onclick="glSetFood(' + n + ')">' + ((d.food || 0) >= n ? '★' : '☆') + '</button>').join('') + '</div>' +
       '<input id="gl-cals" class="gl-input gl-num" type="number" inputmode="numeric" placeholder="Calories eaten" value="' + (d.cals || '') + '">' +
       (nut ? '<div class="gl-hint">Target ' + nut.calories.toLocaleString() + ' cal · ' + nut.protein.g + 'g protein</div>' : '') +
       '<button type="button" class="gl-link-full" onclick="showFullLog()">Log foods one by one →</button>';
@@ -5588,6 +5608,7 @@ function showQuickLog() {
 
     (getNutrition() ?
     '<div class="ql-section">' +
+    mealNowHint() +
     '<div class="ql-label">Calories eaten today <span style="font-weight:400;color:var(--text-muted)">(target ' + getNutrition().calories.toLocaleString() + ')</span></div>' +
     '<input type="number" id="ql-calories" class="ql-input" min="0" step="10" placeholder="e.g. 2200" value="' + (existing?.calories || '') + '">' +
     '</div>' : '') +

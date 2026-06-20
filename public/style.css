@@ -2338,3 +2338,15 @@ body { background: transparent; }
   .p3 { animation: none !important; }
   .s3-stage, .s3-mtn, .s3-particles { transition: none !important; }
 }
+
+/* ─── "Eat now" meal hint (guided log + quick log) ─── */
+.meal-now {
+  margin: 0 0 12px; padding: 11px 14px; border-radius: 12px; text-align: left;
+  background: linear-gradient(135deg, rgba(29,158,117,.10), rgba(125,216,189,.16));
+  border: 1px solid rgba(29,158,117,.24);
+}
+.mn-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: #1D9E75; }
+.mn-meal    { font-size: 18px; font-weight: 800; color: var(--text); margin-top: 2px; line-height: 1.2; }
+.mn-time    { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.mn-macros  { font-size: 13px; font-weight: 600; color: var(--text); margin-top: 4px; }
+.mn-plate   { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
