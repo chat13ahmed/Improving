@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, yearRange, vocabStats, gymPlan, momentumScore, pointAlong,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, yearRange, vocabStats, weeklyGoalsReached, gymPlan, momentumScore, pointAlong,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -214,6 +214,11 @@ ok('yearRange needs a few weeks (null on tiny history)', A.yearRange(_yd.slice(0
 const _vs = A.vocabStats([{ word: 'a', sentence: 'I used a.' }, { word: 'b', sentence: '' }, { word: 'c' }]);
 ok('vocabStats counts total + practiced + needSentence', _vs.total === 3 && _vs.practiced === 1 && _vs.needSentence === 2);
 ok('vocabStats handles empty/null safely', A.vocabStats(null).total === 0 && A.vocabStats([]).practiced === 0);
+// weeklyGoalsReached — dashboard's "% of goals reached" hero number
+ok('weeklyGoalsReached averages active goals', A.weeklyGoalsReached({ gymDays: 4, readPages: 100 }, { gymDaysPerWeek: 4, weeklyReadGoal: 200 }, 0, { gym: true, reading: true }) === 75);
+ok('weeklyGoalsReached caps each goal at 100', A.weeklyGoalsReached({ gymDays: 10 }, { gymDaysPerWeek: 5 }, 0, { gym: true }) === 100);
+ok('weeklyGoalsReached ignores pillars that are off', A.weeklyGoalsReached({ gymDays: 0, readPages: 200 }, { gymDaysPerWeek: 5, weeklyReadGoal: 200 }, 0, { reading: true }) === 100);
+ok('weeklyGoalsReached is 0 with no goals', A.weeklyGoalsReached({}, {}, 0, {}) === 0);
 // Gym training plan by goal + weight
 ok('gymPlan lose → fat loss + cardio', /fat loss/i.test(A.gymPlan('lose', 80).headline) && /cardio/i.test(A.gymPlan('lose', 80).cardio));
 ok('gymPlan gain → progressive overload', /overload/i.test(A.gymPlan('gain', 80).strength));

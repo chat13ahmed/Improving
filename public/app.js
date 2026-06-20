@@ -3863,6 +3863,18 @@ function renderMountainHero() {
     '<div class="mtn-hero-text"><div class="mtn-greet">' + greet + (name ? ', ' + escapeHtml(name) : '') + '</div>' +
     '<div class="mtn-sub">' + escapeHtml(sub) + '</div></div></div>';
 }
+// How much of this week's goals you've reached — average % across active weekly
+// goals (gym days, networking, reading pages, savings). Pure + testable.
+function weeklyGoalsReached(stats, profile, moneyNet, on) {
+  stats = stats || {}; profile = profile || {}; on = on || {};
+  const pctOf = (c, g) => g > 0 ? Math.min(100, Math.round((c || 0) / g * 100)) : 0;
+  const pcts = [];
+  if (on.gym) pcts.push(pctOf(stats.gymDays, profile.gymDaysPerWeek || 5));
+  if (on.networking) pcts.push(pctOf(stats.networkCount, profile.weeklyNetworkGoal || 3));
+  if (on.reading && profile.weeklyReadGoal > 0) pcts.push(pctOf(stats.readPages, profile.weeklyReadGoal));
+  if (on.money && (profile.savingsGoal || 0) > 0) pcts.push(pctOf(Math.max(0, moneyNet || 0), profile.savingsGoal));
+  return pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : 0;
+}
 function renderDashboard() {
   const { days, weeks, profile } = state.data;
   const stats = getWeekStats();
@@ -3876,9 +3888,10 @@ function renderDashboard() {
   const hasWeeks = weeks.length > 0;
   updateNavBadges();
 
-  // Score color
-  const scoreColor = score >= 80 ? 'var(--success)' : score >= 60 ? 'var(--accent)' : score >= 40 ? 'var(--warning)' : 'var(--danger)';
-  const scoreLabel = score >= 80 ? 'Crushing It ' : score >= 60 ? 'Solid Week ' : score >= 40 ? 'Room to Grow ' : 'Time to Push ';
+  // How much of this week's goals you've reached — the dashboard's hero number
+  const goalsReachedPct = weeklyGoalsReached(stats, profile, getMoneyPeriod().net, { gym: isPillarOn('gym'), networking: isPillarOn('networking'), reading: isPillarOn('reading'), money: isPillarOn('money') });
+  const scoreColor = goalsReachedPct >= 80 ? 'var(--success)' : goalsReachedPct >= 60 ? 'var(--accent)' : goalsReachedPct >= 40 ? 'var(--warning)' : 'var(--danger)';
+  const scoreLabel = goalsReachedPct >= 80 ? 'Crushing your goals ' : goalsReachedPct >= 60 ? 'On track ' : goalsReachedPct >= 40 ? 'Getting there ' : 'Time to push ';
 
   // Pillar cards — generated from the live config (only enabled ones)
   const cardCtx = { stats, lastStats, profile, avgIncome, gymStreak: streak, readStreak: getReadingStreak() };
@@ -3945,12 +3958,12 @@ function renderDashboard() {
     '<div class="card score-card">' +
     '<div class="score-left">' +
     '<div class="score-circle" style="--score-color:' + scoreColor + '">' +
-    '<span class="score-num">' + score + '</span><span class="score-pct">%</span>' +
+    '<span class="score-num">' + goalsReachedPct + '</span><span class="score-pct">%</span>' +
     '</div>' +
     '</div>' +
     '<div class="score-right">' +
     '<div class="score-label">' + scoreLabel + '</div>' +
-    '<div class="score-sub">Weekly consistency score across your ' + onCount + ' active pillar' + (onCount === 1 ? '' : 's') + '</div>' +
+    '<div class="score-sub">of your weekly goals reached, across ' + onCount + ' active pillar' + (onCount === 1 ? '' : 's') + '</div>' +
     '<button class="btn btn-outline" style="margin-top:12px;padding:7px 14px;font-size:13px" onclick="navigate(\'log\')">Log Today</button>' +
     '</div>' +
     '<div class="score-goals">' +
