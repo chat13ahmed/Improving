@@ -2946,6 +2946,117 @@ function renderWeightTrend() {
     '<div class="chart-wrap" style="margin-top:14px"><canvas id="weightChart"></canvas></div></div>';
 }
 
+// ── Body-shape visual: a silhouette that gets thinner as you lose weight and
+// wider as you gain. Width is driven by BMI when height is known, otherwise by
+// how far you are from your starting weight. All pure/deterministic. ──
+function weightToBodyFactor(kg, heightCm, baselineKg) {
+  if (!(+kg > 0)) return 1;
+  const clamp = v => Math.max(0.7, Math.min(1.7, v));
+  if (+heightCm > 0) { const m = +heightCm / 100; return clamp((+kg / (m * m)) / 22); } // BMI 22 → average build
+  const base = +baselineKg > 0 ? +baselineKg : +kg;
+  return clamp(1 + (+kg - base) / base * 3); // no height: amplify change vs. start so it's visible
+}
+function bmiBand(b) { return b < 18.5 ? 'lean' : b < 25 ? 'healthy' : b < 30 ? 'above ideal' : 'higher'; }
+function bodyShapeStats(weights, profile) {
+  const ws = [...(weights || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+  if (!ws.length) return null;
+  const startKg = ws[0].kg, curKg = ws[ws.length - 1].kg;
+  const heightCm = +(profile && profile.nutrition && profile.nutrition.heightCm) || 0;
+  const out = {
+    startKg, curKg, deltaKg: curKg - startKg, startDate: ws[0].date, single: ws.length < 2,
+    startFactor: weightToBodyFactor(startKg, heightCm, startKg),
+    curFactor: weightToBodyFactor(curKg, heightCm, startKg),
+    bmi: 0, bmiLabel: ''
+  };
+  if (heightCm > 0) { const m = heightCm / 100; out.bmi = curKg / (m * m); out.bmiLabel = bmiBand(out.bmi); }
+  return out;
+}
+// Half-widths/thicknesses of the body at a given build factor (1 = average)
+function bodyDims(f) {
+  return {
+    neckHalf: 11,
+    shoulderHalf: 30 + (f - 1) * 20,
+    chestHalf:    28 + (f - 1) * 30,
+    waistHalf:    26 + (f - 1) * 40,   // belly is the most sensitive to weight
+    hipHalf:      30 + (f - 1) * 30,
+    headR:        22 + (f - 1) * 7,
+    armThick:     15 + (f - 1) * 12,
+    legThick:     22 + (f - 1) * 18
+  };
+}
+// Smooth, symmetric torso outline (neck → shoulders → belly → hips) at factor f
+function bodySilhouettePath(f) {
+  const cx = 100, d0 = bodyDims(f);
+  const stops = [[70, d0.neckHalf], [96, d0.shoulderHalf], [138, d0.chestHalf], [188, d0.waistHalf], [224, d0.hipHalf], [252, d0.hipHalf * 0.82]];
+  const L = stops.map(s => [+(cx - s[1]).toFixed(1), s[0]]);
+  const R = stops.map(s => [+(cx + s[1]).toFixed(1), s[0]]).reverse();
+  let d = 'M ' + L[0][0] + ',' + L[0][1];
+  for (let i = 1; i < L.length; i++) { const my = ((L[i - 1][1] + L[i][1]) / 2).toFixed(1); d += ' C ' + L[i - 1][0] + ',' + my + ' ' + L[i][0] + ',' + my + ' ' + L[i][0] + ',' + L[i][1]; }
+  d += ' C ' + L[L.length - 1][0] + ',' + (L[L.length - 1][1] + 16) + ' ' + R[0][0] + ',' + (R[0][1] + 16) + ' ' + R[0][0] + ',' + R[0][1]; // rounded belly bottom
+  for (let i = 1; i < R.length; i++) { const my = ((R[i - 1][1] + R[i][1]) / 2).toFixed(1); d += ' C ' + R[i - 1][0] + ',' + my + ' ' + R[i][0] + ',' + my + ' ' + R[i][0] + ',' + R[i][1]; }
+  return d + ' Z';
+}
+// Full body (legs + arms behind, torso, head) as SVG inner markup at factor f
+function bodyGroupSvg(f) {
+  const cx = 100, d = bodyDims(f);
+  const armOuter = Math.max(d.shoulderHalf, d.waistHalf) + d.armThick / 2 + 1; // arms hang just outside the torso
+  const legX = d.legThick / 2 + 3;                                             // a steady gap between the legs
+  const line = (x1, y1, x2, y2, w) => '<line x1="' + x1.toFixed(1) + '" y1="' + y1 + '" x2="' + x2.toFixed(1) + '" y2="' + y2 + '" stroke="url(#bodyGrad)" stroke-width="' + w.toFixed(1) + '" stroke-linecap="round"/>';
+  return (
+    line(cx - legX, 226, cx - legX, 372, d.legThick) +
+    line(cx + legX, 226, cx + legX, 372, d.legThick) +
+    line(cx - d.shoulderHalf * 0.85, 104, cx - armOuter, 250, d.armThick) +
+    line(cx + d.shoulderHalf * 0.85, 104, cx + armOuter, 250, d.armThick) +
+    '<path d="' + bodySilhouettePath(f) + '" fill="url(#bodyGrad)"/>' +
+    '<circle cx="' + cx + '" cy="42" r="' + d.headR.toFixed(1) + '" fill="url(#bodyGrad)"/>'
+  );
+}
+function renderBodyShapeCard() {
+  const st = bodyShapeStats(state.data.weights, state.data.profile);
+  if (!st) return '';
+  const unit = weightUnitPref();
+  const curDisp = kgToDisplay(st.curKg), deltaDisp = kgToDisplay(st.curKg) - kgToDisplay(st.startKg);
+  const lost = deltaDisp < -0.05, gained = deltaDisp > 0.05;
+  const gainGoal = (state.data.profile && state.data.profile.nutrition && state.data.profile.nutrition.goal) === 'gain';
+  const headline = st.single ? 'Your starting shape — log again to watch it change'
+    : lost ? "Leaner than when you started — keep going"
+    : gained ? (gainGoal ? 'Building up — nice work' : 'Up since you started')
+    : 'Holding steady';
+  const showGhost = !st.single && Math.abs(st.curFactor - st.startFactor) > 0.02;
+  const chCls = lost ? 'weight-down' : gained ? 'weight-up' : '';
+  const arrow = lost ? '▼' : gained ? '▲' : '•';
+  return '<div class="card body-shape-card">' +
+    '<div class="bsc-head"><h3 class="card-title" style="margin-bottom:2px">Your shape</h3>' +
+    '<span class="bsc-sub">' + headline + '</span></div>' +
+    '<div class="bsc-stage"><svg viewBox="0 0 200 384" class="bsc-svg" aria-hidden="true">' +
+    '<defs><linearGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0" stop-color="#A78BFA"/><stop offset="1" stop-color="#6366F1"/></linearGradient></defs>' +
+    (showGhost ? '<g class="bsc-ghost">' + bodyGroupSvg(st.startFactor) + '</g>' : '') +
+    '<g id="body-live" data-start="' + st.startFactor.toFixed(3) + '" data-cur="' + st.curFactor.toFixed(3) + '">' +
+    bodyGroupSvg(st.single ? st.curFactor : st.startFactor) + '</g></svg></div>' +
+    '<div class="bsc-stats">' +
+    '<div class="bsc-stat"><div class="bsc-v">' + curDisp.toFixed(1) + '<span>' + unit + '</span></div><div class="bsc-l">now</div></div>' +
+    (st.single ? '' : '<div class="bsc-stat"><div class="bsc-v ' + chCls + '">' + arrow + ' ' + Math.abs(deltaDisp).toFixed(1) + '<span>' + unit + '</span></div><div class="bsc-l">since ' + fmtDateShort(st.startDate) + '</div></div>') +
+    (st.bmi ? '<div class="bsc-stat"><div class="bsc-v">' + st.bmi.toFixed(1) + '</div><div class="bsc-l">BMI · ' + st.bmiLabel + '</div></div>' : '') +
+    '</div>' +
+    (showGhost ? '<div class="bsc-legend">The faint figure is where you started — ' + (lost ? "you've slimmed down since." : 'how far you’ve come.') + '</div>' : '') +
+    '</div>';
+}
+// Animate the live body from its start shape to its current shape on load
+function playBodyMorph() {
+  const live = document.getElementById('body-live'); if (!live) return;
+  const sF = parseFloat(live.dataset.start), cF = parseFloat(live.dataset.cur);
+  if (!isFinite(sF) || !isFinite(cF)) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { live.innerHTML = bodyGroupSvg(cF); return; }
+  const t0 = performance.now(), dur = 1500;
+  function tick(now) {
+    const p = Math.min((now - t0) / dur, 1), e = 1 - Math.pow(1 - p, 3);
+    live.innerHTML = bodyGroupSvg(sF + (cF - sF) * e);
+    if (p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
 function initWeightChart() {
   if (typeof Chart === 'undefined') return;
   const ctx = document.getElementById('weightChart')?.getContext('2d');
@@ -4158,11 +4269,12 @@ function renderStatsPage() {
     sec('Your year', renderYearRange()) +
     sec('This week', pillarsHtml + renderHydrationStrip(stats) + renderFocusCard(stats, lastStats)) +
     sec('Your coach', renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard()) +
-    sec('Health', renderNutritionWeekCard() + renderGymPlanCard() + renderWeightTrend()) +
+    sec('Health', renderBodyShapeCard() + renderNutritionWeekCard() + renderGymPlanCard() + renderWeightTrend()) +
     sec('Money', renderMoneyCircleCard()) +
     sec('Trends & history', chartsHtml + renderRecentNotesCard() + renderReviewCard() + renderAchievementsSection());
   setTimeout(animateCounters, 120);
   setTimeout(() => wireCardTilt('.pillar-card'), 60);
+  setTimeout(playBodyMorph, 220);
   if (showIncomeChart) initIncomeChart(sortedWeeks);
   if (showGymChart) initGymChart(days);
   if ((state.data.weights || []).length >= 2) initWeightChart();

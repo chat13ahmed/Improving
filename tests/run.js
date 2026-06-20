@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, yearRange, vocabStats, weeklyGoalsReached, gymPlan, momentumScore, pointAlong,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, yearRange, vocabStats, weeklyGoalsReached, gymPlan, momentumScore, pointAlong, weightToBodyFactor, bodyShapeStats,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -219,6 +219,13 @@ ok('weeklyGoalsReached averages active goals', A.weeklyGoalsReached({ gymDays: 4
 ok('weeklyGoalsReached caps each goal at 100', A.weeklyGoalsReached({ gymDays: 10 }, { gymDaysPerWeek: 5 }, 0, { gym: true }) === 100);
 ok('weeklyGoalsReached ignores pillars that are off', A.weeklyGoalsReached({ gymDays: 0, readPages: 200 }, { gymDaysPerWeek: 5, weeklyReadGoal: 200 }, 0, { reading: true }) === 100);
 ok('weeklyGoalsReached is 0 with no goals', A.weeklyGoalsReached({}, {}, 0, {}) === 0);
+// weightToBodyFactor / bodyShapeStats — the morphing body silhouette
+ok('bodyFactor: BMI 22 → ~average build (1.0)', Math.abs(A.weightToBodyFactor(71.3, 180, 71.3) - 1) < 0.05);
+ok('bodyFactor: lighter is thinner than heavier (with height)', A.weightToBodyFactor(60, 180, 80) < A.weightToBodyFactor(100, 180, 80));
+ok('bodyFactor: clamped to [0.7,1.7]', A.weightToBodyFactor(40, 150, 40) >= 0.7 && A.weightToBodyFactor(140, 150, 70) <= 1.7);
+ok('bodyFactor: no height → gaining widens vs. start', A.weightToBodyFactor(110, 0, 100) > 1 && A.weightToBodyFactor(90, 0, 100) < 1);
+ok('bodyShapeStats: losing weight shrinks the factor', (() => { const s = A.bodyShapeStats([{ date: '2026-01-01', kg: 90 }, { date: '2026-02-01', kg: 80 }], { nutrition: { heightCm: 180 } }); return s.curFactor < s.startFactor && s.deltaKg === -10; })());
+ok('bodyShapeStats: null when no weigh-ins', A.bodyShapeStats([], {}) === null);
 // Gym training plan by goal + weight
 ok('gymPlan lose → fat loss + cardio', /fat loss/i.test(A.gymPlan('lose', 80).headline) && /cardio/i.test(A.gymPlan('lose', 80).cardio));
 ok('gymPlan gain → progressive overload', /overload/i.test(A.gymPlan('gain', 80).strength));
