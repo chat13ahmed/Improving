@@ -2959,6 +2959,57 @@ async function shareMyWeek() {
   }
 }
 
+// ── Milestone share-prompt: at an emotional peak (a streak milestone or a
+// perfect-goals week) invite the user to post their card. Once per milestone. ──
+// Returns the milestone to celebrate, or null. Pure-ish (reads state). Testable.
+function pendingShareMilestone() {
+  const p = state.data.profile || {};
+  const seen = p._sharePrompts || {};
+  const streak = loggingStreak();
+  for (const t of [100, 50, 30, 21, 14, 7]) {          // highest reached & unseen wins
+    if (streak >= t && !seen['s' + t]) return { key: 's' + t, kind: 'streak', n: t };
+  }
+  const rows = weekGoalRows();                          // a perfect week — all weekly goals hit
+  if (rows.length >= 2 && rows.every(r => r.hit)) {
+    const wk = getWeekStart(todayStr());
+    if (seen.goalsWeek !== wk) return { key: 'goalsWeek', kind: 'goals', week: wk };
+  }
+  return null;
+}
+function maybeShowShareMilestone() {
+  if (state._previewMode) return;                       // don't nag in the demo (nothing persists)
+  if (document.querySelector('.modal-overlay')) return; // never stack on another dialog
+  const m = pendingShareMilestone();
+  if (!m) return;
+  const p = state.data.profile = state.data.profile || {};
+  const seen = p._sharePrompts = p._sharePrompts || {};
+  if (m.kind === 'streak') seen['s' + m.n] = true; else seen.goalsWeek = m.week;  // mark before showing
+  saveData();
+  showShareMilestone(m);
+}
+function showShareMilestone(m) {
+  if (document.getElementById('milestone-overlay')) return;
+  const emoji = m.kind === 'streak' ? '🔥' : '🎯';
+  const title = m.kind === 'streak' ? m.n + '-day streak!' : 'Perfect week!';
+  const sub = m.kind === 'streak'
+    ? "You've shown up " + m.n + " days straight. That's the climb — share it and pull someone up with you."
+    : 'You hit 100% of your weekly goals. Take the victory lap — post your card.';
+  const o = document.createElement('div');
+  o.id = 'milestone-overlay'; o.className = 'modal-overlay';
+  o.innerHTML = '<div class="modal-box milestone-box">' +
+    '<div class="ms-emoji">' + emoji + '</div>' +
+    '<div class="ms-title">' + title + '</div>' +
+    '<div class="ms-sub">' + sub + '</div>' +
+    '<div class="ms-actions">' +
+    '<button class="btn btn-primary" onclick="milestoneShare()">Share my week</button>' +
+    '<button class="btn-link" onclick="closeMilestone()">Maybe later</button>' +
+    '</div></div>';
+  o.addEventListener('click', e => { if (e.target === o) closeMilestone(); });
+  document.body.appendChild(o);
+}
+function milestoneShare() { closeMilestone(); shareMyWeek(); }
+function closeMilestone() { document.getElementById('milestone-overlay')?.remove(); }
+
 // Weight trend card — current weight + change + a line chart over time
 function renderWeightTrend() {
   const ws = [...(state.data.weights || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -4285,6 +4336,7 @@ function renderDashboard() {
   // Summit celebration once when momentum hits 100% (resets if it drops)
   const _mom = climbMomentum();
   if (_mom >= 100) { if (!state._summitShown) { state._summitShown = true; setTimeout(showSummitCelebration, 700); } } else { state._summitShown = false; }
+  setTimeout(maybeShowShareMilestone, 1100);   // nudge a share at streak / perfect-week milestones
 }
 
 // ── Statistics — all the numbers, insights, charts and trends in one place,
