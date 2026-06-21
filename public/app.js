@@ -2981,34 +2981,50 @@ function bodyDims(f) {
     hipHalf:      30 + (f - 1) * 30,
     headR:        22 + (f - 1) * 7,
     armThick:     15 + (f - 1) * 12,
-    legThick:     22 + (f - 1) * 18
+    legThick:     26 + (f - 1) * 28
   };
 }
-// Smooth, symmetric torso outline (neck → shoulders → belly → hips) at factor f
+// Smooth, symmetric torso outline (neck → shoulders → chest → belly → hips),
+// ending at a rounded pelvis so the thighs flow out of the hips. At factor f.
 function bodySilhouettePath(f) {
   const cx = 100, d0 = bodyDims(f);
-  const stops = [[70, d0.neckHalf], [96, d0.shoulderHalf], [138, d0.chestHalf], [188, d0.waistHalf], [224, d0.hipHalf], [252, d0.hipHalf * 0.82]];
+  const stops = [[70, d0.neckHalf], [96, d0.shoulderHalf], [140, d0.chestHalf], [182, d0.waistHalf], [214, d0.hipHalf], [238, d0.hipHalf * 0.86]];
   const L = stops.map(s => [+(cx - s[1]).toFixed(1), s[0]]);
   const R = stops.map(s => [+(cx + s[1]).toFixed(1), s[0]]).reverse();
   let d = 'M ' + L[0][0] + ',' + L[0][1];
   for (let i = 1; i < L.length; i++) { const my = ((L[i - 1][1] + L[i][1]) / 2).toFixed(1); d += ' C ' + L[i - 1][0] + ',' + my + ' ' + L[i][0] + ',' + my + ' ' + L[i][0] + ',' + L[i][1]; }
-  d += ' C ' + L[L.length - 1][0] + ',' + (L[L.length - 1][1] + 16) + ' ' + R[0][0] + ',' + (R[0][1] + 16) + ' ' + R[0][0] + ',' + R[0][1]; // rounded belly bottom
+  d += ' C ' + L[L.length - 1][0] + ',' + (L[L.length - 1][1] + 8) + ' ' + R[0][0] + ',' + (R[0][1] + 8) + ' ' + R[0][0] + ',' + R[0][1]; // rounded pelvis
   for (let i = 1; i < R.length; i++) { const my = ((R[i - 1][1] + R[i][1]) / 2).toFixed(1); d += ' C ' + R[i - 1][0] + ',' + my + ' ' + R[i][0] + ',' + my + ' ' + R[i][0] + ',' + R[i][1]; }
   return d + ' Z';
 }
-// Full body (legs + arms behind, torso, head) as SVG inner markup at factor f
+// A tapered limb (arm/leg): wide at the top, narrower at the bottom, rounded foot/hand.
+function taperLimb(x1, y1, w1, x2, y2, w2) {
+  const r1 = w1 / 2, r2 = w2 / 2;
+  return 'M ' + (x1 - r1).toFixed(1) + ',' + y1 +
+    ' L ' + (x2 - r2).toFixed(1) + ',' + y2 +
+    ' Q ' + (x2 - r2).toFixed(1) + ',' + (y2 + r2).toFixed(1) + ' ' + x2.toFixed(1) + ',' + (y2 + r2).toFixed(1) +
+    ' Q ' + (x2 + r2).toFixed(1) + ',' + (y2 + r2).toFixed(1) + ' ' + (x2 + r2).toFixed(1) + ',' + y2 +
+    ' L ' + (x1 + r1).toFixed(1) + ',' + y1 + ' Z';
+}
+// Full body — neck, tapered legs + feet, tapered arms, torso, head — at factor f
 function bodyGroupSvg(f) {
-  const cx = 100, d = bodyDims(f);
-  const armOuter = Math.max(d.shoulderHalf, d.waistHalf) + d.armThick / 2 + 1; // arms hang just outside the torso
-  const legX = d.legThick / 2 + 3;                                             // a steady gap between the legs
-  const line = (x1, y1, x2, y2, w) => '<line x1="' + x1.toFixed(1) + '" y1="' + y1 + '" x2="' + x2.toFixed(1) + '" y2="' + y2 + '" stroke="url(#bodyGrad)" stroke-width="' + w.toFixed(1) + '" stroke-linecap="round"/>';
+  const cx = 100, d = bodyDims(f), F = 'fill="url(#bodyGrad)"';
+  const headRy = 23 + (f - 1) * 5, headRx = headRy * 0.82;
+  const thighW = d.legThick, ankleW = Math.max(8, d.legThick * 0.36);
+  const legX = thighW / 2 + 1.5;                       // thighs sit together to form the hips
+  const upperArmW = d.armThick, wristW = Math.max(6, d.armThick * 0.55);
+  const torsoEdge = Math.max(d.waistHalf, d.hipHalf);
+  const armTopX = d.shoulderHalf * 0.82, armBotX = torsoEdge + wristW / 2 + 1;
+  const foot = x => '<ellipse cx="' + (x).toFixed(1) + '" cy="376" rx="' + (ankleW * 0.9).toFixed(1) + '" ry="' + (ankleW * 0.5).toFixed(1) + '" ' + F + '/>';
   return (
-    line(cx - legX, 226, cx - legX, 372, d.legThick) +
-    line(cx + legX, 226, cx + legX, 372, d.legThick) +
-    line(cx - d.shoulderHalf * 0.85, 104, cx - armOuter, 250, d.armThick) +
-    line(cx + d.shoulderHalf * 0.85, 104, cx + armOuter, 250, d.armThick) +
-    '<path d="' + bodySilhouettePath(f) + '" fill="url(#bodyGrad)"/>' +
-    '<circle cx="' + cx + '" cy="42" r="' + d.headR.toFixed(1) + '" fill="url(#bodyGrad)"/>'
+    '<rect x="' + (cx - d.neckHalf).toFixed(1) + '" y="58" width="' + (d.neckHalf * 2).toFixed(1) + '" height="34" rx="6" ' + F + '/>' +
+    '<path d="' + taperLimb(cx - legX, 202, thighW, cx - legX, 372, ankleW) + '" ' + F + '/>' +
+    '<path d="' + taperLimb(cx + legX, 202, thighW, cx + legX, 372, ankleW) + '" ' + F + '/>' +
+    foot(cx - legX) + foot(cx + legX) +
+    '<path d="' + taperLimb(cx - armTopX, 100, upperArmW, cx - armBotX, 236, wristW) + '" ' + F + '/>' +
+    '<path d="' + taperLimb(cx + armTopX, 100, upperArmW, cx + armBotX, 236, wristW) + '" ' + F + '/>' +
+    '<path d="' + bodySilhouettePath(f) + '" ' + F + '/>' +
+    '<ellipse cx="' + cx + '" cy="40" rx="' + headRx.toFixed(1) + '" ry="' + headRy.toFixed(1) + '" ' + F + '/>'
   );
 }
 function renderBodyShapeCard() {
