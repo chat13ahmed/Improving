@@ -4306,7 +4306,7 @@ function renderDashboard() {
   // Group the cards into scannable sections — a label only shows if its group has content
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
   // Light, goal-focused home — all the analytics live on the Statistics page.
-  const gHero  = renderNextStep() + renderClimbCard() + renderQuestCard() + renderWeekStrip() + renderPillarNav();
+  const gHero  = renderWhyCard() + renderNextStep() + renderClimbCard() + renderQuestCard() + renderWeekStrip() + renderPillarNav();
   const gGoals = renderGoalCard() + scoreHtml;
   const gLight = renderChecklistCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
   document.getElementById('main').innerHTML =
@@ -4329,6 +4329,109 @@ function renderDashboard() {
   if (_mom >= 100) { if (!state._summitShown) { state._summitShown = true; setTimeout(showSummitCelebration, 700); } } else { state._summitShown = false; }
   setTimeout(maybeShowShareMilestone, 1100);   // nudge a share at streak / perfect-week milestones
 }
+
+// ─────────────────────────────────────────────────────────────
+// WHOLE-LIFE BALANCE  (inspired by the four dimensions of renewal —
+// body, mind, heart, spirit — and a personal "why" / mission)
+// ─────────────────────────────────────────────────────────────
+// Score each of the four dimensions 0–100 from the week, and a "balance" that
+// rewards the weakest side (a saw dull in one area drags the whole). Pure/testable.
+function sharpenScore(inp) {
+  inp = inp || {};
+  const pct = (c, g) => g > 0 ? Math.min(100, Math.round((+c || 0) / g * 100)) : ((+c || 0) > 0 ? 100 : 0);
+  const body = pct(inp.gymDays, inp.gymGoal || 5);
+  const mind = inp.readGoal > 0 ? pct(inp.readPages, inp.readGoal) : ((+inp.readPages || 0) > 0 ? 100 : 0);
+  const heart = pct(inp.networkCount, inp.networkGoal || 3);
+  const reflect = Math.min(100, Math.round((+inp.reflectDays || 0) / 7 * 100));
+  const spirit = Math.min(100, reflect + (inp.hasMission ? 25 : 0));
+  const dims = { body, mind, heart, spirit }, keys = ['body', 'mind', 'heart', 'spirit'];
+  const vals = keys.map(k => dims[k]);
+  const avg = vals.reduce((a, b) => a + b, 0) / 4, min = Math.min.apply(null, vals);
+  const balance = Math.round(avg * 0.6 + min * 0.4);     // balance, not just total
+  let weakest = keys[0]; keys.forEach(k => { if (dims[k] < dims[weakest]) weakest = k; });
+  return { body, mind, heart, spirit, balance, weakest };
+}
+function sharpenInputs() {
+  const s = getWeekStats(), p = state.data.profile || {};
+  const wkStart = getWeekStart(todayStr());
+  const reflectDays = (state.data.days || []).filter(d => d.date >= wkStart && d.notes && String(d.notes).trim()).length;
+  return {
+    gymDays: s.gymDays, gymGoal: p.gymDaysPerWeek || 5,
+    readPages: s.readPages, readGoal: +p.weeklyReadGoal || 0,
+    networkCount: s.networkCount, networkGoal: p.weeklyNetworkGoal || 3,
+    reflectDays, hasMission: !!(p.mission && String(p.mission).trim())
+  };
+}
+function renderSharpenCard() {
+  const sc = sharpenScore(sharpenInputs());
+  const dims = [
+    { k: 'body', icon: '💪', label: 'Body', sub: 'Move & fuel', color: '#10B981' },
+    { k: 'mind', icon: '🧠', label: 'Mind', sub: 'Read & learn', color: '#22D3EE' },
+    { k: 'heart', icon: '❤️', label: 'Heart', sub: 'Connect', color: '#F472B6' },
+    { k: 'spirit', icon: '✨', label: 'Spirit', sub: 'Reflect', color: '#A78BFA' }
+  ];
+  const tips = { body: 'train or log a meal', mind: 'read a few pages', heart: 'reach out to someone', spirit: 'jot a note on what mattered today' };
+  const allHigh = dims.every(d => sc[d.k] >= 70);
+  const weak = dims.find(d => d.k === sc.weakest);
+  const insight = allHigh ? 'Beautifully balanced — all four parts of you are sharp this week.'
+    : 'Your <b>' + weak.label.toLowerCase() + '</b> needs love — ' + tips[sc.weakest] + '.';
+  const rows = dims.map(d =>
+    '<div class="ss-row"><div class="ss-name"><span class="ss-ic">' + d.icon + '</span><span class="ss-lbl"><b>' + d.label + '</b><em>' + d.sub + '</em></span></div>' +
+    '<div class="ss-bar"><div class="ss-fill" style="width:' + sc[d.k] + '%;background:' + d.color + '"></div></div>' +
+    '<div class="ss-pct">' + sc[d.k] + '%</div></div>').join('');
+  return '<div class="card sharpen-card">' +
+    '<div class="ss-head"><div><h3 class="card-title" style="margin-bottom:2px">Stay sharp</h3>' +
+    '<span class="ss-sub">Keep all four parts of you in balance</span></div>' +
+    '<div class="ss-balance"><div class="ss-bal-n">' + sc.balance + '%</div><div class="ss-bal-l">balance</div></div></div>' +
+    '<div class="ss-rows">' + rows + '</div>' +
+    '<div class="ss-insight">' + insight + '</div></div>';
+}
+// Personal "why" / mission — the reason behind the climb
+function getMission() { return (state.data.profile && state.data.profile.mission) ? String(state.data.profile.mission) : ''; }
+function renderWhyEditorCard() {
+  const m = getMission();
+  if (!m) {
+    return '<div class="card why-card why-empty">' +
+      '<div class="why-eyebrow">✦ YOUR WHY</div>' +
+      '<p class="why-prompt">Behind every climb is a reason. In a sentence or two — who are you becoming, and why does it matter?</p>' +
+      '<button class="btn btn-primary btn-sm" onclick="showMissionEditor()">Write my why</button></div>';
+  }
+  return '<div class="card why-card">' +
+    '<div class="why-eyebrow">✦ YOUR WHY</div>' +
+    '<p class="why-text">' + escapeHtml(m) + '</p>' +
+    '<button class="btn-link" onclick="showMissionEditor()">Edit</button></div>';
+}
+// Compact dashboard anchor — only appears once a why is set
+function renderWhyCard() {
+  const m = getMission();
+  if (!m) return '';
+  return '<div class="card why-mini" onclick="navigate(\'stats\')"><span class="why-mini-label">YOUR WHY</span>' +
+    '<span class="why-mini-text">' + escapeHtml(m) + '</span></div>';
+}
+function showMissionEditor() {
+  if (document.getElementById('mission-overlay')) return;
+  const o = document.createElement('div');
+  o.id = 'mission-overlay'; o.className = 'modal-overlay';
+  o.innerHTML = '<div class="modal-box mission-box">' +
+    '<h3 class="card-title" style="margin-bottom:4px">Your Why</h3>' +
+    '<p class="card-sub">The reason behind the climb. Keep it short and true — you\'ll see it every day.</p>' +
+    '<textarea id="mission-input" class="mission-ta" maxlength="240" placeholder="e.g. To grow stronger, sharper and more present — so I can show up fully for the people and work I care about."></textarea>' +
+    '<div class="mission-actions"><button class="btn-link" onclick="closeMissionEditor()">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="saveMission()">Save my why</button></div></div>';
+  o.addEventListener('click', e => { if (e.target === o) closeMissionEditor(); });
+  document.body.appendChild(o);
+  const ta = document.getElementById('mission-input'); if (ta) { ta.value = getMission(); setTimeout(() => ta.focus(), 60); }
+}
+async function saveMission() {
+  const v = (document.getElementById('mission-input')?.value || '').trim();
+  state.data.profile = state.data.profile || {};
+  state.data.profile.mission = v;
+  await saveData();
+  closeMissionEditor();
+  showToast(v ? 'Your why is set ✦' : 'Cleared', 'success');
+  navigate(state.page || 'dashboard');
+}
+function closeMissionEditor() { document.getElementById('mission-overlay')?.remove(); }
 
 // ── Statistics — all the numbers, insights, charts and trends in one place,
 // so the dashboard can stay light and goal-focused. ──
@@ -4362,6 +4465,7 @@ function renderStatsPage() {
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
   document.getElementById('main').innerHTML = header +
     sec('How it all connects', renderConnectionCard() + renderLifeWeb()) +
+    sec('Your why & balance', renderWhyEditorCard() + renderSharpenCard()) +
     sec("Where it's heading", renderFutureCard()) +
     sec('Your year', renderYearRange()) +
     sec('This week', pillarsHtml + renderHydrationStrip(stats) + renderFocusCard(stats, lastStats)) +

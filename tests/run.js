@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, yearRange, vocabStats, weeklyGoalsReached, gymPlan, momentumScore, pointAlong, weightToBodyFactor, bodyShapeStats,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, yearRange, vocabStats, weeklyGoalsReached, gymPlan, momentumScore, pointAlong, weightToBodyFactor, bodyShapeStats, sharpenScore,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -226,6 +226,13 @@ ok('bodyFactor: clamped to [0.7,1.7]', A.weightToBodyFactor(40, 150, 40) >= 0.7 
 ok('bodyFactor: no height → gaining widens vs. start', A.weightToBodyFactor(110, 0, 100) > 1 && A.weightToBodyFactor(90, 0, 100) < 1);
 ok('bodyShapeStats: losing weight shrinks the factor', (() => { const s = A.bodyShapeStats([{ date: '2026-01-01', kg: 90 }, { date: '2026-02-01', kg: 80 }], { nutrition: { heightCm: 180 } }); return s.curFactor < s.startFactor && s.deltaKg === -10; })());
 ok('bodyShapeStats: null when no weigh-ins', A.bodyShapeStats([], {}) === null);
+// sharpenScore — four dimensions of balance (body/mind/heart/spirit)
+const _shBal = A.sharpenScore({ gymDays: 4, gymGoal: 5, readPages: 80, readGoal: 100, networkCount: 3, networkGoal: 3, reflectDays: 6, hasMission: true });
+ok('sharpenScore: each dimension is a 0–100 percent', _shBal.body === 80 && _shBal.mind === 80 && _shBal.heart === 100);
+const _shWeak = A.sharpenScore({ gymDays: 5, gymGoal: 5, readPages: 0, readGoal: 100, networkCount: 3, networkGoal: 3, reflectDays: 7, hasMission: true });
+ok('sharpenScore: flags the weakest dimension', _shWeak.mind === 0 && _shWeak.weakest === 'mind');
+ok('sharpenScore: imbalance drags the balance below the average', _shWeak.balance < (_shWeak.body + _shWeak.mind + _shWeak.heart + _shWeak.spirit) / 4);
+ok('sharpenScore: a mission lifts the spirit dimension', A.sharpenScore({ reflectDays: 0, hasMission: true }).spirit === 25 && A.sharpenScore({ reflectDays: 0, hasMission: false }).spirit === 0);
 // Gym training plan by goal + weight
 ok('gymPlan lose → fat loss + cardio', /fat loss/i.test(A.gymPlan('lose', 80).headline) && /cardio/i.test(A.gymPlan('lose', 80).cardio));
 ok('gymPlan gain → progressive overload', /overload/i.test(A.gymPlan('gain', 80).strength));

@@ -2395,3 +2395,40 @@ body { background: transparent; }
 .ms-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 20px; }
 .ms-actions .btn-primary { width: 100%; }
 @media (prefers-reduced-motion: reduce) { .ms-emoji { animation: none; } }
+
+/* ─── Your Why (mission) + Stay Sharp (four dimensions) ─── */
+.why-card { background: linear-gradient(135deg, rgba(124,58,237,.06), rgba(167,139,250,.10)); border: 1px solid rgba(124,58,237,.18); }
+.why-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #7C3AED; }
+.why-prompt { font-size: 14.5px; color: var(--text-muted); line-height: 1.55; margin: 8px 0 14px; }
+.why-text { font-size: 18px; font-weight: 600; font-style: italic; color: var(--text); line-height: 1.5; margin: 8px 0 6px; }
+.why-card .btn-link { padding: 0; }
+/* Compact dashboard anchor */
+.why-mini { display: flex; flex-direction: column; gap: 3px; cursor: pointer;
+  background: linear-gradient(135deg, rgba(124,58,237,.05), rgba(167,139,250,.09)); border: 1px solid rgba(124,58,237,.16); }
+.why-mini-label { font-size: 10px; font-weight: 800; letter-spacing: 1.5px; color: #7C3AED; }
+.why-mini-text { font-size: 15px; font-weight: 600; font-style: italic; color: var(--text); line-height: 1.45; }
+
+.ss-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.ss-sub { font-size: 13px; color: var(--text-muted); }
+.ss-balance { text-align: center; flex-shrink: 0; }
+.ss-bal-n { font-size: 30px; font-weight: 900; line-height: 1; color: var(--accent, #7C3AED); letter-spacing: -1px; }
+.ss-bal-l { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin-top: 2px; }
+.ss-rows { display: flex; flex-direction: column; gap: 12px; }
+.ss-row { display: flex; align-items: center; gap: 12px; }
+.ss-name { display: flex; align-items: center; gap: 9px; width: 132px; flex-shrink: 0; }
+.ss-ic { font-size: 20px; }
+.ss-lbl { display: flex; flex-direction: column; line-height: 1.15; }
+.ss-lbl b { font-size: 14px; color: var(--text); }
+.ss-lbl em { font-size: 11px; font-style: normal; color: var(--text-muted); }
+.ss-bar { flex: 1; height: 12px; border-radius: 6px; background: rgba(120,130,150,.14); overflow: hidden; }
+.ss-fill { height: 100%; border-radius: 6px; transition: width .6s cubic-bezier(.2,.7,.2,1); }
+.ss-pct { width: 44px; text-align: right; font-size: 14px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.ss-insight { margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+.ss-insight b { color: var(--text); }
+
+.mission-box { max-width: 440px; }
+.mission-ta { width: 100%; min-height: 120px; margin-top: 12px; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 10px;
+  font-family: var(--font); font-size: 15px; line-height: 1.55; color: var(--text); background: var(--bg); resize: vertical; outline: none; box-sizing: border-box; }
+.mission-ta:focus { border-color: var(--accent, #7C3AED); }
+.mission-actions { display: flex; align-items: center; justify-content: flex-end; gap: 14px; margin-top: 16px; }
+@media (max-width: 560px) { .ss-name { width: 110px; } .ss-lbl em { display: none; } }
