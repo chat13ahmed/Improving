@@ -3045,8 +3045,11 @@ function renderBodyShapeCard() {
     '<div class="bsc-head"><h3 class="card-title" style="margin-bottom:2px">Your shape</h3>' +
     '<span class="bsc-sub">' + headline + '</span></div>' +
     '<div class="bsc-stage"><svg viewBox="0 0 200 384" class="bsc-svg" aria-hidden="true">' +
-    '<defs><linearGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">' +
-    '<stop offset="0" stop-color="#A78BFA"/><stop offset="1" stop-color="#6366F1"/></linearGradient></defs>' +
+    // Per-part radial gradient = light from the upper-left, so every limb, the
+    // torso and the head read as rounded 3D forms instead of flat shapes.
+    '<defs><radialGradient id="bodyGrad" cx="0.37" cy="0.3" r="0.9" fx="0.31" fy="0.24">' +
+    '<stop offset="0" stop-color="#CDBEFF"/><stop offset="0.4" stop-color="#9A85F1"/>' +
+    '<stop offset="0.75" stop-color="#6E59DE"/><stop offset="1" stop-color="#4C3BB2"/></radialGradient></defs>' +
     (showGhost ? '<g class="bsc-ghost">' + bodyGroupSvg(st.startFactor) + '</g>' : '') +
     '<g id="body-live" data-start="' + st.startFactor.toFixed(3) + '" data-cur="' + st.curFactor.toFixed(3) + '">' +
     bodyGroupSvg(st.single ? st.curFactor : st.startFactor) + '</g></svg></div>' +

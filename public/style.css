@@ -2376,9 +2376,8 @@ body { background: transparent; }
   background: radial-gradient(70% 60% at 50% 38%, rgba(99,102,241,.08), transparent 70%); }
 .bsc-svg { width: 165px; height: auto; max-height: 290px;
   filter: drop-shadow(0 10px 20px rgba(99,102,241,.22)); }
-.bsc-ghost { opacity: .2; }
-.bsc-ghost path, .bsc-ghost circle { fill: var(--text-muted); }
-.bsc-ghost line { stroke: var(--text-muted); }
+.bsc-ghost { opacity: .22; }
+.bsc-ghost path, .bsc-ghost ellipse, .bsc-ghost rect, .bsc-ghost circle { fill: var(--text-muted); }
 .bsc-stats { display: flex; justify-content: space-around; gap: 10px;
   margin-top: 10px; border-top: 1px solid var(--border); padding-top: 12px; }
 .bsc-stat { text-align: center; flex: 1; }
