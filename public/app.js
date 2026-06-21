@@ -2835,12 +2835,21 @@ function weekShareStats() {
 }
 // Up to 4 brag-worthy, non-sensitive stats from enabled pillars (no $ amounts)
 function weekShareTiles(s) {
-  const tiles = [{ icon: '', value: s.daysLogged + '/7', label: 'Days logged' }];
-  if (isPillarOn('gym') && s.workouts) tiles.push({ icon: '', value: s.workouts, label: 'Workouts' });
-  if (isPillarOn('reading') && s.pages) tiles.push({ icon: '', value: s.pages, label: 'Pages read' });
-  if (isPillarOn('networking') && s.connections) tiles.push({ icon: '', value: s.connections, label: 'Connections' });
-  if (tiles.length < 4 && s.water) tiles.push({ icon: '', value: s.water, label: 'Gal water' });
+  const tiles = [{ icon: '✅', value: s.daysLogged + '/7', label: 'Days logged', color: '#2dd4bf' }];
+  if (isPillarOn('gym') && s.workouts) tiles.push({ icon: '🏋️', value: s.workouts, label: 'Workouts', color: '#10B981' });
+  if (isPillarOn('reading') && s.pages) tiles.push({ icon: '📚', value: s.pages, label: 'Pages read', color: '#22D3EE' });
+  if (isPillarOn('networking') && s.connections) tiles.push({ icon: '🤝', value: s.connections, label: 'Connections', color: '#60A5FA' });
+  if (tiles.length < 4 && s.water) tiles.push({ icon: '💧', value: s.water, label: 'Gal water', color: '#38BDF8' });
   return tiles.slice(0, 4);
+}
+// A punchy one-liner for the share card based on the week's standout stat
+function weekShareCaption(s) {
+  if (s.streak >= 7) return s.streak + ' days strong — unstoppable.';
+  if (s.workouts >= 4) return s.workouts + ' workouts in. Beast mode.';
+  if (s.pages >= 100) return s.pages + ' pages deep this week.';
+  if (s.connections >= 3) return 'Grew my circle by ' + s.connections + '.';
+  if (s.daysLogged >= 5) return 'Showed up ' + s.daysLogged + ' days this week.';
+  return 'One life. One climb.';
 }
 function buildWeekCardBlob() {
   return new Promise(resolve => {
@@ -2852,54 +2861,70 @@ function buildWeekCardBlob() {
       if (x.roundRect) x.roundRect(px, py, w, h, r);
       else { x.moveTo(px + r, py); x.arcTo(px + w, py, px + w, py + h, r); x.arcTo(px + w, py + h, px, py + h, r); x.arcTo(px, py + h, px, py, r); x.arcTo(px, py, px + w, py, r); x.closePath(); }
     };
+    const range = (baseY, peaks, height, color) => {
+      x.fillStyle = color; x.beginPath(); x.moveTo(0, baseY - peaks[0] * height);
+      for (let i = 1; i < peaks.length; i++) x.lineTo((i / (peaks.length - 1)) * W, baseY - peaks[i] * height);
+      x.lineTo(W, H); x.lineTo(0, H); x.closePath(); x.fill();
+    };
     const FONT = '-apple-system,Segoe UI,Roboto,sans-serif';
-    // Background + glows
-    x.fillStyle = '#0F1117'; x.fillRect(0, 0, W, H);
-    let g = x.createRadialGradient(cx, 280, 60, cx, 280, 900);
-    g.addColorStop(0, 'rgba(45,212,191,0.22)'); g.addColorStop(1, 'rgba(45,212,191,0)');
+    // Background: night-mountain gradient + glows
+    const bg = x.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#10131C'); bg.addColorStop(0.55, '#141A2A'); bg.addColorStop(1, '#1A1530');
+    x.fillStyle = bg; x.fillRect(0, 0, W, H);
+    let g = x.createRadialGradient(cx, 360, 60, cx, 360, 980);
+    g.addColorStop(0, 'rgba(45,212,191,0.20)'); g.addColorStop(1, 'rgba(45,212,191,0)');
     x.fillStyle = g; x.fillRect(0, 0, W, H);
-    g = x.createRadialGradient(cx, H - 220, 60, cx, H - 220, 900);
-    g.addColorStop(0, 'rgba(167,139,250,0.20)'); g.addColorStop(1, 'rgba(167,139,250,0)');
+    g = x.createRadialGradient(cx, 1480, 60, cx, 1480, 980);
+    g.addColorStop(0, 'rgba(167,139,250,0.18)'); g.addColorStop(1, 'rgba(167,139,250,0)');
     x.fillStyle = g; x.fillRect(0, 0, W, H);
+    // Stars (upper half only)
+    for (let i = 0; i < 70; i++) { x.globalAlpha = Math.random() * 0.6 + 0.2; x.fillStyle = '#dbe6ff'; const r = Math.random() * 2 + 0.5; x.beginPath(); x.arc(Math.random() * W, Math.random() * 980, r, 0, 7); x.fill(); }
+    x.globalAlpha = 1;
 
+    // Brand mark (little mountain) + wordmark
+    x.beginPath(); x.moveTo(cx - 132, 296); x.lineTo(cx - 106, 244); x.lineTo(cx - 80, 296); x.closePath(); x.fillStyle = '#9FE1CB'; x.fill();
+    x.beginPath(); x.moveTo(cx - 112, 296); x.lineTo(cx - 78, 232); x.lineTo(cx - 44, 296); x.closePath(); x.fillStyle = '#1D9E75'; x.fill();
+    x.textAlign = 'left'; x.fillStyle = '#eef1f7'; x.font = '800 58px ' + FONT; x.fillText('Escalate', cx - 28, 292);
     x.textAlign = 'center';
-    x.fillStyle = '#eef1f7'; x.font = '700 46px ' + FONT;
-    x.fillText('Escalate', cx, 180);
+    x.fillStyle = '#7C8BA5'; x.font = '700 30px ' + FONT; x.fillText('W E E K L Y   R E C A P', cx, 366);
+    x.fillStyle = '#9aa3b2'; x.font = '500 38px ' + FONT; x.fillText(formatWeekRange(getWeekStart(todayStr())), cx, 418);
 
+    // Hero
     const s = weekShareStats();
     if (s.streak >= 2) {
-      x.font = '800 110px sans-serif'; x.fillText('', cx, 470);
-      const ng = x.createLinearGradient(cx - 220, 0, cx + 220, 0);
-      ng.addColorStop(0, '#2dd4bf'); ng.addColorStop(1, '#3b82f6');
-      x.fillStyle = ng; x.font = '900 260px ' + FONT; x.fillText(String(s.streak), cx, 730);
-      x.fillStyle = '#9aa3b2'; x.font = '700 52px ' + FONT; x.fillText('DAY STREAK', cx, 810);
+      const ng = x.createLinearGradient(cx - 260, 0, cx + 260, 0); ng.addColorStop(0, '#2dd4bf'); ng.addColorStop(1, '#7AA2FF');
+      x.fillStyle = ng; x.font = '900 300px ' + FONT; x.fillText(String(s.streak), cx, 700);
+      x.fillStyle = '#cbd5e1'; x.font = '800 56px ' + FONT; x.fillText('DAY STREAK', cx, 780);
     } else {
-      const ng = x.createLinearGradient(cx - 280, 0, cx + 280, 0);
-      ng.addColorStop(0, '#2dd4bf'); ng.addColorStop(1, '#a78bfa');
-      x.fillStyle = ng; x.font = '900 150px ' + FONT; x.fillText('My Week', cx, 560);
-      x.fillStyle = '#9aa3b2'; x.font = '500 46px ' + FONT; x.fillText(formatWeekRange(getWeekStart(todayStr())), cx, 660);
+      const ng = x.createLinearGradient(cx - 300, 0, cx + 300, 0); ng.addColorStop(0, '#2dd4bf'); ng.addColorStop(1, '#a78bfa');
+      x.fillStyle = ng; x.font = '900 168px ' + FONT; x.fillText('My Week', cx, 660);
+    }
+    x.fillStyle = '#e2e8f0'; x.font = '600 46px ' + FONT; x.fillText(weekShareCaption(s), cx, 858);
+
+    // Stat tiles — pillar-coloured, centered rows
+    const tiles = weekShareTiles(s);
+    const tileW = 442, tileH = 240, gap = 36, startY = 928;
+    for (let i = 0; i < tiles.length; i++) {
+      const row = Math.floor(i / 2), inRow = Math.min(2, tiles.length - row * 2);
+      const rowW = inRow * tileW + (inRow - 1) * gap, rsx = (W - rowW) / 2, col = i - row * 2;
+      const tx = rsx + col * (tileW + gap), ty = startY + row * (tileH + gap), t = tiles[i], mx = tx + tileW / 2;
+      x.fillStyle = 'rgba(255,255,255,0.05)'; rr(tx, ty, tileW, tileH, 30); x.fill();
+      x.strokeStyle = 'rgba(255,255,255,0.10)'; x.lineWidth = 2; rr(tx, ty, tileW, tileH, 30); x.stroke();
+      x.fillStyle = '#eef1f7'; x.font = '600 62px sans-serif'; x.fillText(t.icon, mx, ty + 98);
+      x.fillStyle = t.color; x.font = '900 88px ' + FONT; x.fillText(String(t.value), mx, ty + 182);
+      x.fillStyle = '#9aa3b2'; x.font = '600 34px ' + FONT; x.fillText(t.label, mx, ty + 224);
     }
 
-    const tiles = weekShareTiles(s);
-    const tileW = 430, tileH = 230, gap = 40, cols = 2;
-    const gridW = cols * tileW + (cols - 1) * gap;
-    const sx = (W - gridW) / 2, sy = 910;
-    tiles.forEach((t, i) => {
-      const col = i % cols, row = Math.floor(i / cols);
-      const tx = sx + col * (tileW + gap), ty = sy + row * (tileH + gap);
-      x.fillStyle = 'rgba(255,255,255,0.05)'; rr(tx, ty, tileW, tileH, 28); x.fill();
-      x.strokeStyle = 'rgba(255,255,255,0.10)'; x.lineWidth = 2; rr(tx, ty, tileW, tileH, 28); x.stroke();
-      const mx = tx + tileW / 2;
-      x.fillStyle = '#eef1f7'; x.font = '700 62px sans-serif'; x.fillText(t.icon, mx, ty + 92);
-      x.fillStyle = '#ffffff'; x.font = '900 78px ' + FONT; x.fillText(String(t.value), mx, ty + 165);
-      x.fillStyle = '#9aa3b2'; x.font = '600 34px ' + FONT; x.fillText(t.label, mx, ty + 207);
-    });
+    // Marketing payload — what it is + where to find it (kept in the safe zone)
+    x.fillStyle = '#eef1f7'; x.font = '800 52px ' + FONT; x.fillText('Track your whole life — free', cx, 1512);
+    x.fillStyle = '#2dd4bf'; x.font = '700 44px ' + FONT; x.fillText(location.host || 'Escalate', cx, 1576);
 
-    const fg = x.createLinearGradient(cx - 320, 0, cx + 320, 0);
-    fg.addColorStop(0, '#2dd4bf'); fg.addColorStop(1, '#3b82f6');
-    x.fillStyle = fg; x.font = '800 54px ' + FONT; x.fillText('See what connects your life', cx, H - 240);
-    x.fillStyle = '#9aa3b2'; x.font = '500 42px ' + FONT; x.fillText('One app for your whole life', cx, H - 165);
-    x.fillStyle = '#eef1f7'; x.font = '700 44px ' + FONT; x.fillText('Escalate', cx, H - 95);
+    // Mountain range (back then front), then a flag planted on the visible summit
+    range(1830, [0.15, 0.45, 0.25, 0.6, 0.4, 0.7, 0.5, 0.6, 0.35, 0.55, 0.3], 130, '#222d44');
+    range(1884, [0.1, 0.3, 0.18, 0.4, 0.25, 0.36, 0.2, 0.32, 0.12], 110, '#1D6B50');
+    const fx = (3 / 8) * W, fy = 1884 - 0.4 * 110;   // tallest front-range peak
+    x.strokeStyle = '#cbd5e1'; x.lineWidth = 5; x.beginPath(); x.moveTo(fx, fy); x.lineTo(fx, fy - 64); x.stroke();
+    x.fillStyle = '#E8633A'; x.beginPath(); x.moveTo(fx, fy - 64); x.lineTo(fx + 44, fy - 51); x.lineTo(fx, fy - 38); x.closePath(); x.fill();
 
     cv.toBlob(b => resolve(b), 'image/png');
   });
