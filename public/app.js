@@ -2833,14 +2833,18 @@ function weekShareStats() {
     streak: loggingStreak()
   };
 }
-// Up to 4 brag-worthy, non-sensitive stats from enabled pillars (no $ amounts)
-function weekShareTiles(s) {
-  const tiles = [{ icon: '✅', value: s.daysLogged + '/7', label: 'Days logged', color: '#2dd4bf' }];
-  if (isPillarOn('gym') && s.workouts) tiles.push({ icon: '🏋️', value: s.workouts, label: 'Workouts', color: '#10B981' });
-  if (isPillarOn('reading') && s.pages) tiles.push({ icon: '📚', value: s.pages, label: 'Pages read', color: '#22D3EE' });
-  if (isPillarOn('networking') && s.connections) tiles.push({ icon: '🤝', value: s.connections, label: 'Connections', color: '#60A5FA' });
-  if (tiles.length < 4 && s.water) tiles.push({ icon: '💧', value: s.water, label: 'Gal water', color: '#38BDF8' });
-  return tiles.slice(0, 4);
+// Goal-progress rows for the share card — value vs. weekly target per enabled
+// pillar (no $ amounts). The Strava-style "how much of my goals I hit" view.
+function weekGoalRows() {
+  const p = state.data.profile || {}, s = weekShareStats();
+  const rows = [];
+  const add = (on, icon, label, value, target, color) => {
+    if (on && target > 0) rows.push({ icon, label, value, target, color, pct: Math.min(100, Math.round(value / target * 100)), hit: value >= target });
+  };
+  add(isPillarOn('gym'), '🏋️', 'Workouts', s.workouts, p.gymDaysPerWeek || 5, '#10B981');
+  add(isPillarOn('reading'), '📚', 'Pages', s.pages, +p.weeklyReadGoal || 0, '#22D3EE');
+  add(isPillarOn('networking'), '🤝', 'Connections', s.connections, p.weeklyNetworkGoal || 3, '#60A5FA');
+  return rows.slice(0, 4);
 }
 // A punchy one-liner for the share card based on the week's standout stat
 function weekShareCaption(s) {
@@ -2889,40 +2893,46 @@ function buildWeekCardBlob() {
     x.fillStyle = '#7C8BA5'; x.font = '700 30px ' + FONT; x.fillText('W E E K L Y   R E C A P', cx, 366);
     x.fillStyle = '#9aa3b2'; x.font = '500 38px ' + FONT; x.fillText(formatWeekRange(getWeekStart(todayStr())), cx, 418);
 
-    // Hero
+    // Goal progress — hero ring (overall %) + per-goal bars, Strava-style
     const s = weekShareStats();
-    if (s.streak >= 2) {
-      const ng = x.createLinearGradient(cx - 260, 0, cx + 260, 0); ng.addColorStop(0, '#2dd4bf'); ng.addColorStop(1, '#7AA2FF');
-      x.fillStyle = ng; x.font = '900 300px ' + FONT; x.fillText(String(s.streak), cx, 700);
-      x.fillStyle = '#cbd5e1'; x.font = '800 56px ' + FONT; x.fillText('DAY STREAK', cx, 780);
-    } else {
-      const ng = x.createLinearGradient(cx - 300, 0, cx + 300, 0); ng.addColorStop(0, '#2dd4bf'); ng.addColorStop(1, '#a78bfa');
-      x.fillStyle = ng; x.font = '900 168px ' + FONT; x.fillText('My Week', cx, 660);
-    }
-    x.fillStyle = '#e2e8f0'; x.font = '600 46px ' + FONT; x.fillText(weekShareCaption(s), cx, 858);
+    const rows = weekGoalRows();
+    const overall = rows.length ? Math.round(rows.reduce((a, r) => a + r.pct, 0) / rows.length) : Math.min(100, Math.round(s.daysLogged / 7 * 100));
 
-    // Stat tiles — pillar-coloured, centered rows
-    const tiles = weekShareTiles(s);
-    const tileW = 442, tileH = 240, gap = 36, startY = 928;
-    for (let i = 0; i < tiles.length; i++) {
-      const row = Math.floor(i / 2), inRow = Math.min(2, tiles.length - row * 2);
-      const rowW = inRow * tileW + (inRow - 1) * gap, rsx = (W - rowW) / 2, col = i - row * 2;
-      const tx = rsx + col * (tileW + gap), ty = startY + row * (tileH + gap), t = tiles[i], mx = tx + tileW / 2;
-      x.fillStyle = 'rgba(255,255,255,0.05)'; rr(tx, ty, tileW, tileH, 30); x.fill();
-      x.strokeStyle = 'rgba(255,255,255,0.10)'; x.lineWidth = 2; rr(tx, ty, tileW, tileH, 30); x.stroke();
-      x.fillStyle = '#eef1f7'; x.font = '600 62px sans-serif'; x.fillText(t.icon, mx, ty + 98);
-      x.fillStyle = t.color; x.font = '900 88px ' + FONT; x.fillText(String(t.value), mx, ty + 182);
-      x.fillStyle = '#9aa3b2'; x.font = '600 34px ' + FONT; x.fillText(t.label, mx, ty + 224);
-    }
+    const rcy = 648, rad = 188;
+    x.lineCap = 'round'; x.lineWidth = 36;
+    x.strokeStyle = 'rgba(255,255,255,0.08)'; x.beginPath(); x.arc(cx, rcy, rad, 0, Math.PI * 2); x.stroke();
+    const ring = x.createLinearGradient(cx - rad, rcy - rad, cx + rad, rcy + rad);
+    ring.addColorStop(0, '#2dd4bf'); ring.addColorStop(1, '#7AA2FF');
+    x.strokeStyle = ring; x.beginPath(); x.arc(cx, rcy, rad, -Math.PI / 2, -Math.PI / 2 + Math.max(0.02, overall / 100) * Math.PI * 2); x.stroke();
+    x.lineCap = 'butt';
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillStyle = '#ffffff'; x.font = '900 170px ' + FONT; x.fillText(overall + '%', cx, rcy - 4);
+    x.fillStyle = '#9aa3b2'; x.font = '700 36px ' + FONT; x.fillText('OF MY GOALS', cx, rcy + 88);
+    x.textBaseline = 'alphabetic';
+
+    if (s.streak >= 2) { x.textAlign = 'center'; x.fillStyle = '#F59E0B'; x.font = '700 42px ' + FONT; x.fillText('🔥 ' + s.streak + '-day streak', cx, 922); }
+
+    let gy = 1012;
+    rows.forEach(r => {
+      x.textAlign = 'left'; x.fillStyle = '#eef1f7'; x.font = '600 46px sans-serif'; x.fillText(r.icon, 92, gy + 6);
+      x.fillStyle = '#e2e8f0'; x.font = '700 44px ' + FONT; x.fillText(r.label, 172, gy + 4);
+      x.textAlign = 'right'; x.fillStyle = r.hit ? r.color : '#cbd5e1'; x.font = '800 44px ' + FONT;
+      x.fillText(r.value + ' / ' + r.target + (r.hit ? '  ✓' : ''), W - 92, gy + 4);
+      const bx = 92, bw = W - 184, by = gy + 34, bh = 22;
+      x.fillStyle = 'rgba(255,255,255,0.08)'; rr(bx, by, bw, bh, 11); x.fill();
+      if (r.pct > 0) { x.fillStyle = r.color; rr(bx, by, Math.max(bh, bw * r.pct / 100), bh, 11); x.fill(); }
+      gy += 128;
+    });
 
     // Marketing payload — what it is + where to find it (kept in the safe zone)
-    x.fillStyle = '#eef1f7'; x.font = '800 52px ' + FONT; x.fillText('Track your whole life — free', cx, 1512);
-    x.fillStyle = '#2dd4bf'; x.font = '700 44px ' + FONT; x.fillText(location.host || 'Escalate', cx, 1576);
+    x.textAlign = 'center';
+    x.fillStyle = '#eef1f7'; x.font = '800 52px ' + FONT; x.fillText('Track your whole life — free', cx, 1496);
+    x.fillStyle = '#2dd4bf'; x.font = '700 44px ' + FONT; x.fillText(location.host || 'Escalate', cx, 1560);
 
     // Mountain range (back then front), then a flag planted on the visible summit
-    range(1830, [0.15, 0.45, 0.25, 0.6, 0.4, 0.7, 0.5, 0.6, 0.35, 0.55, 0.3], 130, '#222d44');
-    range(1884, [0.1, 0.3, 0.18, 0.4, 0.25, 0.36, 0.2, 0.32, 0.12], 110, '#1D6B50');
-    const fx = (3 / 8) * W, fy = 1884 - 0.4 * 110;   // tallest front-range peak
+    range(1840, [0.15, 0.45, 0.25, 0.6, 0.4, 0.7, 0.5, 0.6, 0.35, 0.55, 0.3], 130, '#222d44');
+    range(1892, [0.1, 0.3, 0.18, 0.4, 0.25, 0.36, 0.2, 0.32, 0.12], 110, '#1D6B50');
+    const fx = (3 / 8) * W, fy = 1892 - 0.4 * 110;   // tallest front-range peak
     x.strokeStyle = '#cbd5e1'; x.lineWidth = 5; x.beginPath(); x.moveTo(fx, fy); x.lineTo(fx, fy - 64); x.stroke();
     x.fillStyle = '#E8633A'; x.beginPath(); x.moveTo(fx, fy - 64); x.lineTo(fx + 44, fy - 51); x.lineTo(fx, fy - 38); x.closePath(); x.fill();
 

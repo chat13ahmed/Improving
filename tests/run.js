@@ -58,7 +58,7 @@ function loadApp(fieldValues) {
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
-    ' loggingStreak, bestStreak, weekShareStats, weekShareTiles, getWeekStats, getWeekStart, daysSince,' +
+    ' loggingStreak, bestStreak, weekShareStats, weekGoalRows, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
@@ -364,8 +364,10 @@ ok('bestStreak empty = 0', (() => { A.state.data.days = []; return A.bestStreak(
 A.state.data.days = [{ date: _sd0, gym: { done: true }, reading: { pages: 15 }, networking: { count: 3 }, water: 1.5 }];
 const _ws = A.weekShareStats();
 ok('weekShareStats reads today', _ws.daysLogged === 1 && _ws.workouts === 1 && _ws.pages === 15 && _ws.connections === 3);
-const _tiles = A.weekShareTiles(_ws);
-ok('weekShareTiles ≤4 and leads with Days logged', _tiles.length <= 4 && _tiles[0].label === 'Days logged' && _tiles.some(t => t.label === 'Workouts'));
+const _rows = A.weekGoalRows();
+ok('weekGoalRows shows value vs weekly target per goal', _rows.length >= 1 &&
+  _rows.some(r => r.label === 'Workouts' && r.value === 1 && r.target === 5 && r.hit === false) &&
+  _rows.some(r => r.label === 'Connections' && r.value === 3 && r.target === 3 && r.hit === true));
 
 // Money: weekly net = income − summed DAILY spend (spending is logged per day now)
 const _wkS = A.getWeekStart(new Date().toISOString().split('T')[0]);
