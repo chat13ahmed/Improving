@@ -2846,15 +2846,6 @@ function weekGoalRows() {
   add(isPillarOn('networking'), '🤝', 'Connections', s.connections, p.weeklyNetworkGoal || 3, '#60A5FA');
   return rows.slice(0, 4);
 }
-// A punchy one-liner for the share card based on the week's standout stat
-function weekShareCaption(s) {
-  if (s.streak >= 7) return s.streak + ' days strong — unstoppable.';
-  if (s.workouts >= 4) return s.workouts + ' workouts in. Beast mode.';
-  if (s.pages >= 100) return s.pages + ' pages deep this week.';
-  if (s.connections >= 3) return 'Grew my circle by ' + s.connections + '.';
-  if (s.daysLogged >= 5) return 'Showed up ' + s.daysLogged + ' days this week.';
-  return 'One life. One climb.';
-}
 function buildWeekCardBlob() {
   return new Promise(resolve => {
     const W = 1080, H = 1920, cx = W / 2;
