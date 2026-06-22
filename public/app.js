@@ -4505,7 +4505,10 @@ function showDayComplete(day) {
   const streak = loggingStreak();
   const voteLine = (votes.length ? votes : [{ icon: '🧗', who: 'someone who shows up' }])
     .map(v => '<span class="dc-vote">' + v.icon + ' a vote for <b>' + v.who + '</b></span>').join('');
-  const close = getMission() ? 'One step closer to your why.' : 'Every vote builds the person you\'re becoming.';
+  const firstEver = (state.data.days || []).filter(d => Array.isArray(d._logged) && d._logged.length).length <= 1;
+  const title = firstEver ? 'You\'re on the board! 🧗' : 'Day logged' + (streak > 1 ? ' · ' + streak + '-day streak 🔥' : '');
+  const close = firstEver ? 'Day 1 of your climb. Come back tomorrow — that\'s where it compounds.'
+    : (getMission() ? 'One step closer to your why.' : 'Every vote builds the person you\'re becoming.');
   const cols = ['#10B981', '#22D3EE', '#F472B6', '#A78BFA', '#fbbf24'];
   let conf = '';
   for (let i = 0; i < 26; i++) { const left = Math.random() * 100, delay = Math.random() * 1.4, dur = 2 + Math.random() * 2, w = 6 + Math.random() * 7; conf += '<div class="conf-p" style="left:' + left + '%;width:' + w + 'px;height:' + (w * 1.5) + 'px;background:' + cols[i % cols.length] + ';border-radius:2px;animation-delay:' + delay + 's;animation-duration:' + dur + 's"></div>'; }
@@ -4515,7 +4518,7 @@ function showDayComplete(day) {
   el.innerHTML = conf +
     '<div class="celeb-box">' +
     '<div class="dc-check">✓</div>' +
-    '<div class="celeb-title">Day logged' + (streak > 1 ? ' · ' + streak + '-day streak 🔥' : '') + '</div>' +
+    '<div class="celeb-title">' + title + '</div>' +
     '<div class="dc-votes">' + voteLine + '</div>' +
     '<div class="celeb-sub">' + close + '</div>' +
     '<div class="celeb-tap">tap to continue</div>' +
@@ -4698,17 +4701,21 @@ function loggedKeysToday() {
 // itself (and drops off as you eat it through the day). Otherwise: one food step.
 function mealStepKeys() {
   if (!isPillarOn('food')) return [];
+  if (isFirstEverLog()) return ['food'];   // keep the very first log simple — per-meal kicks in from day 2
   const nut = getNutrition();
   if (nut && nut.meals && nut.meals.plan && nut.meals.plan.length > 1) return nut.meals.plan.map((m, i) => 'meal:' + i);
   return ['food'];
 }
+// A brand-new user (no history yet) gets a shorter first log — just the core +
+// water — so the first win is quick. Weight/notes return once they're rolling.
+function isFirstEverLog() { return !(state.data.days || []).some(d => d.date < todayStr()); }
 function guidedStepKeys() {
   const done = loggedKeysToday();
   const keys = [];
   if (isPillarOn('gym') && !done.includes('gym')) keys.push('gym');
   mealStepKeys().forEach(k => { if (!done.includes(k)) keys.push(k); });
   ['reading', 'networking', 'money'].forEach(id => { if (isPillarOn(id) && !done.includes(id)) keys.push(id); });
-  ['water', 'weight', 'notes'].forEach(k => { if (!done.includes(k)) keys.push(k); });   // light extras
+  (isFirstEverLog() ? ['water'] : ['water', 'weight', 'notes']).forEach(k => { if (!done.includes(k)) keys.push(k); });
   return keys;
 }
 // Shown when everything's already logged today — fresh again tomorrow
@@ -4805,8 +4812,11 @@ function renderGuidedLog() {
     body = '<textarea id="gl-notes" class="gl-input gl-area" placeholder="Wins, struggles, ideas — anything">' + escapeHtml(d.notes || '') + '</textarea>';
   }
   const isLast = g.step === total - 1;
+  const welcome = (isFirstEverLog() && g.step === 0)
+    ? '<div class="gl-welcome">🧗 <b>Your first log.</b> Tap through — about 15 seconds — and you\'re officially on the board.</div>' : '';
   document.getElementById('main').innerHTML =
     '<div class="gl-wrap">' +
+    welcome +
     '<div class="gl-head"><span class="gl-step-label">Log today · ' + (g.step + 1) + ' of ' + total + '</span><button type="button" class="gl-full" onclick="showFullLog()">Full form</button></div>' +
     '<div class="gl-progress">' + g.keys.map((k, i) => '<span class="gl-dot' + (i <= g.step ? ' gl-dot-on' : '') + '"></span>').join('') + '</div>' +
     '<div class="gl-step"><div class="gl-q">' + q + '</div>' + (sub ? '<div class="gl-sub">' + sub + '</div>' : '') + '<div class="gl-body">' + body + '</div></div>' +

@@ -2497,3 +2497,8 @@ body { background: transparent; }
 .auth-recovery[open] { padding-bottom: 10px; }
 .auth-recovery .auth-field { margin-top: 10px; }
 .auth-recovery-note { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-top: 8px; }
+
+/* ─── First-log welcome banner ─── */
+.gl-welcome { background: linear-gradient(135deg, rgba(16,185,129,.10), rgba(34,211,238,.12)); border: 1px solid rgba(16,185,129,.22);
+  border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; color: var(--text); line-height: 1.5; text-align: center; }
+.gl-welcome b { color: #0E9F6E; }
