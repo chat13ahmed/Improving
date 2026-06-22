@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, yearRange, vocabStats, weeklyGoalsReached, gymPlan, momentumScore, pointAlong, weightToBodyFactor, bodyShapeStats, sharpenScore, identityVotes, missedYesterday,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, yearRange, vocabStats, weeklyGoalsReached, gymPlan, momentumScore, pointAlong, weightToBodyFactor, bodyShapeStats, sharpenScore, identityVotes, missedYesterday, todaysVotes,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -245,6 +245,9 @@ ok('missedYesterday fires on one fresh miss', A.missedYesterday([{ date: '2026-0
 ok('missedYesterday quiet if logged yesterday', A.missedYesterday([{ date: '2026-06-20' }], '2026-06-21') === false);
 ok('missedYesterday quiet if already logged today', A.missedYesterday([{ date: '2026-06-21' }, { date: '2026-06-19' }], '2026-06-21') === false);
 ok('missedYesterday quiet on a longer lapse', A.missedYesterday([{ date: '2026-06-10' }], '2026-06-21') === false);
+// todaysVotes — the end-of-log moment maps today's actions to who you're becoming
+const _tv = A.todaysVotes({ gym: { done: true }, reading: { pages: 12 }, networking: { count: 0 }, food: { rating: 5 } }, { gym: true, reading: true, networking: true, food: true });
+ok('todaysVotes maps logged actions to identities', _tv.some(v => /athlete/.test(v.who)) && _tv.some(v => /reader/.test(v.who)) && _tv.some(v => /fuels/.test(v.who)) && !_tv.some(v => /connector/.test(v.who)));
 // Gym training plan by goal + weight
 ok('gymPlan lose → fat loss + cardio', /fat loss/i.test(A.gymPlan('lose', 80).headline) && /cardio/i.test(A.gymPlan('lose', 80).cardio));
 ok('gymPlan gain → progressive overload', /overload/i.test(A.gymPlan('gain', 80).strength));

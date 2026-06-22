@@ -2969,7 +2969,7 @@ function pendingShareMilestone() {
 }
 function maybeShowShareMilestone() {
   if (state._previewMode) return;                       // don't nag in the demo (nothing persists)
-  if (document.querySelector('.modal-overlay')) return; // never stack on another dialog
+  if (document.querySelector('.modal-overlay, .celebration-overlay')) return; // never stack on another dialog
   const m = pendingShareMilestone();
   if (!m) return;
   const p = state.data.profile = state.data.profile || {};
@@ -4478,6 +4478,45 @@ function renderNeverMissTwice() {
     '<span class="nmt-go">Log →</span></div>';
 }
 
+// Which identities today's entry voted for — the bridge from a logged action to
+// who you're becoming (used in the end-of-log moment). Pure/testable.
+function todaysVotes(day, on) {
+  on = on || {}; day = day || {};
+  const v = [];
+  if (on.gym && day.gym && day.gym.done) v.push({ icon: '💪', who: 'the athlete' });
+  if (on.reading && day.reading && day.reading.pages > 0) v.push({ icon: '📚', who: 'the reader' });
+  if (on.networking && day.networking && day.networking.count > 0) v.push({ icon: '🤝', who: 'the connector' });
+  if (on.food && day.food && day.food.rating >= 4) v.push({ icon: '🥗', who: 'someone who fuels well' });
+  return v;
+}
+// The end-of-day moment where it all comes together: the day is logged (the
+// system), it casts votes for who you're becoming (identity), it's a step up the
+// climb (progress), and it ties back to your why (meaning).
+function showDayComplete(day) {
+  const on = { gym: isPillarOn('gym'), reading: isPillarOn('reading'), networking: isPillarOn('networking'), food: isPillarOn('food') };
+  const votes = todaysVotes(day, on);
+  const streak = loggingStreak();
+  const voteLine = (votes.length ? votes : [{ icon: '🧗', who: 'someone who shows up' }])
+    .map(v => '<span class="dc-vote">' + v.icon + ' a vote for <b>' + v.who + '</b></span>').join('');
+  const close = getMission() ? 'One step closer to your why.' : 'Every vote builds the person you\'re becoming.';
+  const cols = ['#10B981', '#22D3EE', '#F472B6', '#A78BFA', '#fbbf24'];
+  let conf = '';
+  for (let i = 0; i < 26; i++) { const left = Math.random() * 100, delay = Math.random() * 1.4, dur = 2 + Math.random() * 2, w = 6 + Math.random() * 7; conf += '<div class="conf-p" style="left:' + left + '%;width:' + w + 'px;height:' + (w * 1.5) + 'px;background:' + cols[i % cols.length] + ';border-radius:2px;animation-delay:' + delay + 's;animation-duration:' + dur + 's"></div>'; }
+  const el = document.createElement('div');
+  el.className = 'celebration-overlay';
+  el.onclick = () => el.remove();
+  el.innerHTML = conf +
+    '<div class="celeb-box">' +
+    '<div class="dc-check">✓</div>' +
+    '<div class="celeb-title">Day logged' + (streak > 1 ? ' · ' + streak + '-day streak 🔥' : '') + '</div>' +
+    '<div class="dc-votes">' + voteLine + '</div>' +
+    '<div class="celeb-sub">' + close + '</div>' +
+    '<div class="celeb-tap">tap to continue</div>' +
+    '</div>';
+  document.body.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.remove(); }, 5200);
+}
+
 // ── Statistics — all the numbers, insights, charts and trends in one place,
 // so the dashboard can stay light and goal-focused. ──
 function renderStatsPage() {
@@ -4759,9 +4798,8 @@ async function finishGuidedLog() {
   if (d.weight) { const kg = Math.round(displayToKg(d.weight) * 10) / 10; upsertWeight(date, kg); if (state.data.profile.nutrition && state.data.profile.nutrition.heightCm) state.data.profile.nutrition.weightKg = kg; }
   state._guided = null;
   await saveData();
-  if (day.gym && day.gym.done) { const ns = getGymStreak(); if ([3, 7, 14, 21, 30].includes(ns)) setTimeout(() => showStreakCelebration(ns), 600); }
-  showToast('Logged — nice work!', 'success');
   navigate('dashboard');
+  setTimeout(() => showDayComplete(day), 250);   // the moment it all comes together: votes + streak + your why
 }
 function renderLogToday(editDay) {
   const isEditing = !!editDay;
