@@ -4306,7 +4306,7 @@ function renderDashboard() {
   // Group the cards into scannable sections — a label only shows if its group has content
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
   // Light, goal-focused home — all the analytics live on the Statistics page.
-  const gHero  = renderWhyCard() + renderNextStep() + renderClimbCard() + renderQuestCard() + renderWeekStrip() + renderPillarNav();
+  const gHero  = renderNeverMissTwice() + renderWhyCard() + renderNextStep() + renderClimbCard() + renderQuestCard() + renderWeekStrip() + renderPillarNav();
   const gGoals = renderGoalCard() + scoreHtml;
   const gLight = renderChecklistCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
   document.getElementById('main').innerHTML =
@@ -4433,6 +4433,51 @@ async function saveMission() {
 }
 function closeMissionEditor() { document.getElementById('mission-overlay')?.remove(); }
 
+// ── Identity & votes ("every action is a vote for who you're becoming") and
+// "never miss twice" — the two ideas from the small-habits playbook the app
+// didn't yet have. Both pure/testable. ──
+function identityVotes(days, on, windowDays, today) {
+  on = on || {}; windowDays = windowDays || 30;
+  const end = today || todayStr();
+  const s = new Date(end + 'T00:00:00'); s.setDate(s.getDate() - (windowDays - 1));
+  const start = s.toISOString().split('T')[0];
+  const inWin = (days || []).filter(d => d.date >= start && d.date <= end);
+  const cnt = fn => inWin.filter(fn).length;
+  const out = [{ id: 'show', icon: '🧗', label: 'someone who shows up', votes: inWin.length, color: '#7C3AED' }];
+  if (on.gym) out.push({ id: 'athlete', icon: '💪', label: 'an athlete', votes: cnt(d => d.gym && d.gym.done), color: '#10B981' });
+  if (on.reading) out.push({ id: 'reader', icon: '📚', label: 'a reader', votes: cnt(d => d.reading && d.reading.pages > 0), color: '#22D3EE' });
+  if (on.networking) out.push({ id: 'connector', icon: '🤝', label: 'a connector', votes: cnt(d => d.networking && d.networking.count > 0), color: '#F472B6' });
+  return out;
+}
+function renderIdentityCard() {
+  const votes = identityVotes(state.data.days, { gym: isPillarOn('gym'), reading: isPillarOn('reading'), networking: isPillarOn('networking') }, 30)
+    .filter(v => v.votes > 0);
+  if (!votes.length) return '';
+  const rows = votes.map(v =>
+    '<div class="iv-row"><span class="iv-ic">' + v.icon + '</span><span class="iv-lbl">' + escapeHtml(v.label) + '</span>' +
+    '<span class="iv-votes" style="color:' + v.color + '">' + v.votes + ' <em>vote' + (v.votes === 1 ? '' : 's') + '</em></span></div>').join('');
+  return '<div class="card identity-card">' +
+    '<div class="iv-eyebrow">🗳️ YOU\'RE BECOMING</div>' +
+    '<p class="iv-hero">Every action is a vote for the person you\'re becoming.</p>' +
+    '<div class="iv-rows">' + rows + '</div>' +
+    '<div class="iv-foot">Votes cast in the last 30 days — keep them coming.</div></div>';
+}
+// "Never miss twice": fired only on a single fresh miss (logged the day before
+// yesterday, not yesterday, not yet today) — catch the slip before it's a habit.
+function missedYesterday(days, today) {
+  const end = today || todayStr();
+  const set = new Set((days || []).map(d => d.date));
+  const shift = n => { const d = new Date(end + 'T00:00:00'); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]; };
+  return !set.has(end) && !set.has(shift(-1)) && set.has(shift(-2));
+}
+function renderNeverMissTwice() {
+  if (!missedYesterday(state.data.days)) return '';
+  return '<div class="card nmt-banner" onclick="navigate(\'log\')">' +
+    '<span class="nmt-ic">⚡</span><div class="nmt-body"><b>You missed yesterday — don\'t miss twice.</b>' +
+    '<div class="nmt-sub">Missing once is an accident. Log today and you\'re right back on.</div></div>' +
+    '<span class="nmt-go">Log →</span></div>';
+}
+
 // ── Statistics — all the numbers, insights, charts and trends in one place,
 // so the dashboard can stay light and goal-focused. ──
 function renderStatsPage() {
@@ -4465,7 +4510,7 @@ function renderStatsPage() {
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
   document.getElementById('main').innerHTML = header +
     sec('How it all connects', renderConnectionCard() + renderLifeWeb()) +
-    sec('Your why & balance', renderWhyEditorCard() + renderSharpenCard()) +
+    sec('Your why & balance', renderWhyEditorCard() + renderIdentityCard() + renderSharpenCard()) +
     sec("Where it's heading", renderFutureCard()) +
     sec('Your year', renderYearRange()) +
     sec('This week', pillarsHtml + renderHydrationStrip(stats) + renderFocusCard(stats, lastStats)) +
