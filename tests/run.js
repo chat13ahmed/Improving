@@ -253,6 +253,10 @@ A.state.data = { profile: { pillars: A.defaultPillars() }, days: [], weeks: [], 
 ok('guidedStepKeys shows everything when nothing is logged today', A.guidedStepKeys().includes('gym') && A.guidedStepKeys().includes('water'));
 A.state.data.days = [{ date: new Date().toISOString().split('T')[0], _logged: ['gym', 'food'] }];
 ok('guidedStepKeys drops the parts already logged today', !A.guidedStepKeys().includes('gym') && !A.guidedStepKeys().includes('food') && A.guidedStepKeys().includes('reading'));
+// food splits into one step per meal when a meal plan exists
+A.state.data = { profile: { pillars: A.defaultPillars(), nutrition: { age: 28, sex: 'male', heightCm: 180, weightKg: 80, mealsPerDay: 3, activity: 'moderate', goal: 'maintain', strategy: 'muscle' } }, days: [], weeks: [], weights: [] };
+const _mk = A.guidedStepKeys();
+ok('food becomes one step per meal with a plan', _mk.includes('meal:0') && _mk.includes('meal:2') && !_mk.includes('food'));
 // Gym training plan by goal + weight
 ok('gymPlan lose → fat loss + cardio', /fat loss/i.test(A.gymPlan('lose', 80).headline) && /cardio/i.test(A.gymPlan('lose', 80).cardio));
 ok('gymPlan gain → progressive overload', /overload/i.test(A.gymPlan('gain', 80).strength));

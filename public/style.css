@@ -2474,3 +2474,10 @@ body { background: transparent; }
 .gld-actions { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 28px; }
 .gld-actions .btn-primary { min-width: 220px; }
 @media (prefers-reduced-motion: reduce) { .gld-check { animation: none; } }
+
+/* ─── Per-meal log choices (each meal logs itself) ─── */
+.gl-meal-opts { display: flex; gap: 8px; margin-bottom: 12px; }
+.gl-meal-opt { flex: 1; padding: 15px 6px; border: 1.5px solid var(--border); border-radius: 12px;
+  background: var(--card); font-weight: 700; font-size: 15px; color: var(--text); cursor: pointer; transition: all .15s; }
+.gl-meal-opt:hover { border-color: var(--food-color, #F59E0B); }
+.gl-meal-opt.gl-on { border-color: var(--food-color, #F59E0B); background: var(--food-bg, rgba(245,158,11,.10)); color: #B45309; box-shadow: 0 0 0 3px rgba(245,158,11,.12); }

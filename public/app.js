@@ -4687,10 +4687,20 @@ function loggedKeysToday() {
   const day = (state.data.days || []).find(d => d.date === todayStr());
   return (day && Array.isArray(day._logged)) ? day._logged : [];
 }
+// Food becomes one step per meal when a meal plan exists, so each meal logs
+// itself (and drops off as you eat it through the day). Otherwise: one food step.
+function mealStepKeys() {
+  if (!isPillarOn('food')) return [];
+  const nut = getNutrition();
+  if (nut && nut.meals && nut.meals.plan && nut.meals.plan.length > 1) return nut.meals.plan.map((m, i) => 'meal:' + i);
+  return ['food'];
+}
 function guidedStepKeys() {
   const done = loggedKeysToday();
   const keys = [];
-  ['gym', 'food', 'reading', 'networking', 'money'].forEach(id => { if (isPillarOn(id) && !done.includes(id)) keys.push(id); });
+  if (isPillarOn('gym') && !done.includes('gym')) keys.push('gym');
+  mealStepKeys().forEach(k => { if (!done.includes(k)) keys.push(k); });
+  ['reading', 'networking', 'money'].forEach(id => { if (isPillarOn(id) && !done.includes(id)) keys.push(id); });
   ['water', 'weight', 'notes'].forEach(k => { if (!done.includes(k)) keys.push(k); });   // light extras
   return keys;
 }
@@ -4720,7 +4730,7 @@ function startGuidedLog() {
     draft: {
       _gymAnswered: !!prior.id, gymDone: !!(prior.gym && prior.gym.done),
       gymGroup: (prior.gym && prior.gym.muscleGroup) || '', gymDur: (prior.gym && prior.gym.duration) || '',
-      food: (prior.food && prior.food.rating) || 0, cals: prior.calories || '',
+      food: (prior.food && prior.food.rating) || 0, cals: prior.calories || '', meals: [],
       readPages: (prior.reading && prior.reading.pages) || '',
       net: (prior.networking && prior.networking.count) || '',
       spent: prior.spent || '', moneyActs: (prior.money && prior.money.activities) || '',
@@ -4744,6 +4754,20 @@ function renderGuidedLog() {
       '<div class="gl-sub2">What did you train?</div>' +
       '<div class="gl-muscles">' + ['Push', 'Pull', 'Legs', 'Chest', 'Back', 'Shoulders', 'Arms', 'Core', 'Full Body', 'Cardio'].map(grp => '<button type="button" class="gl-muscle' + (d.gymGroup === grp ? ' gl-muscle-on' : '') + '" onclick="glSetMuscle(\'' + grp + '\')">' + grp + '</button>').join('') + '</div>' +
       '<input id="gl-gym-dur" class="gl-input" type="number" inputmode="numeric" placeholder="Minutes (optional)" value="' + (d.gymDur || '') + '"></div>';
+  } else if (key.indexOf('meal:') === 0) {
+    const idx = parseInt(key.split(':')[1], 10);
+    const nut = getNutrition();
+    const m = (nut && nut.meals && nut.meals.plan[idx]) || { label: 'Meal ' + (idx + 1), calories: 0, protein: 0 };
+    const dm = (d.meals && d.meals[idx]) || {};
+    q = m.label + ' — how did it go?';
+    sub = m.calories ? 'Aim ~' + m.calories.toLocaleString() + ' cal · ' + m.protein + 'g protein' : '';
+    optional = true;
+    body = '<div class="gl-meal-opts">' +
+      [['ate', 'Ate it ✓'], ['light', 'Light'], ['skip', 'Skipped']].map(o =>
+        '<button type="button" class="gl-meal-opt' + (dm.status === o[0] ? ' gl-on' : '') + '" onclick="glSetMeal(' + idx + ',\'' + o[0] + '\')">' + o[1] + '</button>').join('') +
+      '</div>' +
+      '<input id="gl-meal-cals" class="gl-input gl-num" type="number" inputmode="numeric" placeholder="Calories (optional)" value="' + (dm.cals || '') + '">' +
+      (m.calories ? '<div class="gl-hint">Pick one — we\'ll count ~' + m.calories.toLocaleString() + ' cal if you don\'t enter a number.</div>' : '');
   } else if (key === 'food') {
     q = 'How did you eat today?'; sub = 'Rate it, then log your calories'; optional = true;
     const nut = getNutrition();
@@ -4790,6 +4814,7 @@ function glCapture() {
   const g = state._guided; if (!g) return;
   const key = g.keys[g.step], d = g.draft;
   if (key === 'gym') { d.gymDur = parseInt(document.getElementById('gl-gym-dur')?.value) || ''; }
+  else if (key.indexOf('meal:') === 0) { const idx = parseInt(key.split(':')[1], 10); d.meals = d.meals || []; d.meals[idx] = d.meals[idx] || {}; d.meals[idx].cals = parseFloat(document.getElementById('gl-meal-cals')?.value) || ''; }
   else if (key === 'food') d.cals = parseFloat(document.getElementById('gl-cals')?.value) || '';
   else if (key === 'reading') d.readPages = parseInt(document.getElementById('gl-read')?.value) || '';
   else if (key === 'networking') d.net = parseInt(document.getElementById('gl-net')?.value) || '';
@@ -4800,6 +4825,7 @@ function glCapture() {
 }
 function glSetGym(v) { glCapture(); state._guided.draft.gymDone = v; state._guided.draft._gymAnswered = true; renderGuidedLog(); }
 function glSetFood(n) { glCapture(); state._guided.draft.food = n; renderGuidedLog(); }
+function glSetMeal(idx, status) { glCapture(); const d = state._guided.draft; d.meals = d.meals || []; d.meals[idx] = d.meals[idx] || {}; d.meals[idx].status = status; renderGuidedLog(); }
 function glSetMuscle(g) { glCapture(); const d = state._guided.draft; d.gymGroup = (d.gymGroup === g ? '' : g); renderGuidedLog(); }
 function glWater(inc) { const el = document.getElementById('gl-water'); if (el) el.value = Math.round(((parseFloat(el.value) || 0) + inc) * 100) / 100; }
 function glNext() {
@@ -4815,6 +4841,20 @@ function glSkip() { glNext(); }
 // leave mid-flow — and that step drops off the list until tomorrow.
 function writeStepToDay(day, key, d) {
   if (key === 'gym') { if (isPillarOn('gym')) day.gym = { done: !!d.gymDone, muscleGroup: d.gymGroup || '', duration: d.gymDur || 0, notes: (day.gym && day.gym.notes) || '' }; }
+  else if (key.indexOf('meal:') === 0) {
+    const idx = parseInt(key.split(':')[1], 10);
+    const dm = (d.meals && d.meals[idx]) || {};
+    const nut = getNutrition();
+    const m = (nut && nut.meals && nut.meals.plan[idx]) || { label: 'Meal ' + (idx + 1), calories: 0 };
+    let cals = +dm.cals || 0;
+    if (!cals && dm.status) cals = dm.status === 'ate' ? m.calories : dm.status === 'light' ? Math.round(m.calories * 0.6) : 0;
+    day.mealLog = day.mealLog || {};
+    day.mealLog[idx] = { label: m.label, status: dm.status || '', cals };
+    const logged = Object.keys(day.mealLog).map(k => day.mealLog[k]);   // recompute the day's totals from logged meals
+    day.calories = logged.reduce((s, mm) => s + (mm.cals || 0), 0);
+    const rated = logged.filter(mm => mm.status);
+    if (rated.length) { const sc = rated.reduce((s, mm) => s + (mm.status === 'ate' ? 5 : mm.status === 'light' ? 3 : 1), 0) / rated.length; day.food = day.food || {}; day.food.rating = Math.round(sc); }
+  }
   else if (key === 'food') { if (isPillarOn('food')) { day.food = { rating: d.food || 0, notes: (day.food && day.food.notes) || '' }; if (d.cals) day.calories = d.cals; } }
   else if (key === 'reading') { if (isPillarOn('reading')) { const ab = (state.data.books || []).find(b => b.status === 'reading'); day.reading = { pages: d.readPages || 0, bookId: (ab && ab.id) || (day.reading && day.reading.bookId) || '', bookTitle: (ab && ab.title) || (day.reading && day.reading.bookTitle) || '', summary: (day.reading && day.reading.summary) || '' }; } }
   else if (key === 'networking') { if (isPillarOn('networking')) day.networking = { count: d.net || 0, notes: (day.networking && day.networking.notes) || '' }; }
