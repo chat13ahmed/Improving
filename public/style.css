@@ -2488,3 +2488,12 @@ body { background: transparent; }
 .wr-votes b { color: var(--text); font-weight: 700; }
 .wr-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 18px; }
 .wr-actions .btn-primary { width: 100%; }
+
+/* ─── Signup: optional password-recovery expander (keeps the form short) ─── */
+.auth-recovery { margin: 2px 0 14px; border: 1px solid var(--border); border-radius: 10px; padding: 0 14px; }
+.auth-recovery summary { cursor: pointer; padding: 12px 2px; font-size: 13.5px; font-weight: 700; color: var(--accent, #7C3AED); list-style: none; }
+.auth-recovery summary::-webkit-details-marker { display: none; }
+.auth-recovery summary span { color: var(--text-muted); font-weight: 400; }
+.auth-recovery[open] { padding-bottom: 10px; }
+.auth-recovery .auth-field { margin-top: 10px; }
+.auth-recovery-note { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-top: 8px; }

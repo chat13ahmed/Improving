@@ -703,8 +703,8 @@ function renderAuthScreen(mode) {
     '<div class="auth-brand"><span class="brand-icon"></span><div>' +
     '<div class="auth-title">Escalate</div><div class="auth-sub">Life Progress</div></div></div>' +
     '<div class="auth-hook">' +
-    '<div class="auth-hook-title">See what connects your life</div>' +
-    '<div class="auth-hook-sub">One place for your gym, money, nutrition, reading and habits — with an AI coach that watches every area at once and reveals how they pull on each other.</div>' +
+    '<div class="auth-hook-title">Build habits. Track your life. Get better.</div>' +
+    '<div class="auth-hook-sub">One simple place for your fitness, money, reading and habits — 30 seconds a day, with an AI coach that keeps you accountable and shows how it all connects.</div>' +
     '</div>' +
     '<div class="auth-tabs">' +
     '<button class="auth-tab' + (!isSignup ? ' active' : '') + '" onclick="renderAuthScreen(\'login\')">Log In</button>' +
@@ -722,11 +722,13 @@ function renderAuthScreen(mode) {
     '<div class="auth-field"><label>Password</label>' +
     '<input type="password" id="auth-password" autocomplete="' + (isSignup ? 'new-password' : 'current-password') + '" placeholder="' + (isSignup ? 'At least 6 characters' : 'Your password') + '"></div>' +
     (isSignup
-      ? '<div class="auth-field"><label>Security question <span style="font-weight:400;color:var(--text-muted)">(optional — lets you reset your password)</span></label>' +
+      ? '<details class="auth-recovery"><summary>+ Add password recovery <span>(optional)</span></summary>' +
+        '<div class="auth-field"><label>Security question</label>' +
         '<select id="auth-secq">' + SECURITY_QUESTIONS.map(q => '<option value="' + escapeHtml(q) + '">' + escapeHtml(q) + '</option>').join('') + '</select></div>' +
-        '<div class="auth-field"><label>Your answer <span style="font-weight:400;color:var(--text-muted)">(recommended)</span></label>' +
+        '<div class="auth-field"><label>Your answer</label>' +
         '<input type="text" id="auth-seca" autocomplete="off" placeholder="So you can reset your password later"></div>' +
-        '<div class="auth-warn">Without a security question, you can\'t recover your account if you forget your password.</div>'
+        '<div class="auth-recovery-note">Lets you reset your password if you forget it. You can also add this anytime in Settings.</div>' +
+        '</details>'
       : '') +
     '<div class="auth-error" id="auth-error"></div>' +
     '<div class="auth-status" id="auth-status" style="display:none"></div>' +
@@ -807,11 +809,7 @@ async function doSignup(e) {
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { authError('Please enter a valid email — one account per email.'); return; }
   if (password.length < 6) { authError('Password must be at least 6 characters.'); return; }
   if (securityAnswer && securityAnswer.length < 2) { authError('Your security answer is too short (or leave it blank).'); return; }
-  // Lockout nudge — make skipping a deliberate choice
-  if (!securityAnswer) {
-    const proceed = confirm("No security question set.\n\nIf you forget your password, you won't be able to recover your account.\n\nPress OK to create it anyway, or Cancel to go back and add one.");
-    if (!proceed) { document.getElementById('auth-seca')?.focus(); return; }
-  }
+  // Password recovery is optional — no blocking popup. You can add it later in Settings.
   authError(''); if (btn) btn.disabled = true;
   try {
     const res = await authFetch('/api/signup', { username, password, email, phone, securityQuestion, securityAnswer });
