@@ -2481,3 +2481,10 @@ body { background: transparent; }
   background: var(--card); font-weight: 700; font-size: 15px; color: var(--text); cursor: pointer; transition: all .15s; }
 .gl-meal-opt:hover { border-color: var(--food-color, #F59E0B); }
 .gl-meal-opt.gl-on { border-color: var(--food-color, #F59E0B); background: var(--food-bg, rgba(245,158,11,.10)); color: #B45309; box-shadow: 0 0 0 3px rgba(245,158,11,.12); }
+
+/* ─── Week recap modal (works any day, no AI key) ─── */
+.wr-box { max-width: 420px; }
+.wr-votes { font-size: 13.5px; color: var(--text-muted); text-align: center; line-height: 1.6; margin: 14px 0 2px; }
+.wr-votes b { color: var(--text); font-weight: 700; }
+.wr-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 18px; }
+.wr-actions .btn-primary { width: 100%; }

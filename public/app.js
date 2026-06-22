@@ -499,62 +499,62 @@ function wireCardTilt(selector, maxDeg) {
 // ─────────────────────────────────────────────────────────────
 // WEEKLY REVIEW MODAL  (shows on Sunday)
 // ─────────────────────────────────────────────────────────────
+// Auto-show the recap on Sunday (once). The recap itself works any day — see
+// openWeekRecap(), reachable from the dashboard + the Stats "Weekly Recap" card.
 function showWeeklyReview() {
   if (new Date().getDay() !== 0) return;
   const key = 'wkReview_' + todayStr();
   if (localStorage.getItem(key)) return;
-  const { days, weeks, profile } = state.data;
-  if (days.length === 0) return;
+  if (!(state.data.days || []).length) return;
   localStorage.setItem(key, '1');
-
+  setTimeout(openWeekRecap, 1800);
+}
+// A client-side week recap (no AI key needed) — goals %, the week's headline
+// numbers, the votes you cast and your balance, with a one-tap share.
+function openWeekRecap() {
+  if (typeof document === 'undefined') return;
+  document.getElementById('weekly-modal')?.remove();
+  const { days, profile } = state.data;
+  const stats = getWeekStats();
   const ws = getWeekStart(todayStr());
-  const wd = days.filter(d => d.date >= ws);
-  if (wd.length === 0) return;
-
-  const gymDays = wd.filter(d => d.gym?.done).length;
-  const fr = wd.filter(d => d.food?.rating > 0).map(d => d.food.rating);
-  const avgFood = fr.length ? fr.reduce((a,b)=>a+b,0)/fr.length : 0;
-  const net = wd.reduce((s,d)=>s+(d.networking?.count||0),0);
-  const inc = weeks.find(w => w.weekStart === ws)?.income || 0;
-
-  const scores = [];
-  if (profile.gymDaysPerWeek > 0) scores.push(Math.min(100,(gymDays/profile.gymDaysPerWeek)*100));
-  if (avgFood > 0) scores.push((avgFood/5)*100);
-  if (profile.weeklyNetworkGoal > 0) scores.push(Math.min(100,(net/profile.weeklyNetworkGoal)*100));
-  if (profile.weeklyIncomeGoal > 0) scores.push(Math.min(100,(inc/profile.weeklyIncomeGoal)*100));
-  const score = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
-
-  const scoreColor = score>=80?'#10B981':score>=60?'#F59E0B':score>=40?'#F97316':'#EF4444';
-  const scoreLabel = score>=80?'Crushing It ':score>=60?'Solid Week ':score>=40?'Room to Grow ':'Time to Push ';
+  const daysLogged = (days || []).filter(d => d.date >= ws).length;
+  const on = { gym: isPillarOn('gym'), networking: isPillarOn('networking'), reading: isPillarOn('reading'), money: isPillarOn('money') };
+  const moneyNet = (typeof getMoneyPeriod === 'function') ? (getMoneyPeriod().net || 0) : 0;
+  const goalsPct = weeklyGoalsReached(stats, profile, moneyNet, on);
+  const balance = sharpenScore(sharpenInputs()).balance;
+  const votes = identityVotes(days, { gym: on.gym, reading: on.reading, networking: on.networking }, 7).filter(v => v.votes > 0);
+  const color = goalsPct >= 80 ? '#10B981' : goalsPct >= 60 ? '#F59E0B' : goalsPct >= 40 ? '#F97316' : '#EF4444';
+  const label = goalsPct >= 80 ? 'Crushing it' : goalsPct >= 60 ? 'Solid week' : goalsPct >= 40 ? 'Room to grow' : 'Time to push';
+  const grid = [];
+  if (on.gym) grid.push('<div class="rv-item"><span>' + escapeHtml(pillar('gym').label) + '</span><strong>' + (stats.gymDays || 0) + '/' + (profile.gymDaysPerWeek || 5) + '</strong></div>');
+  if (on.reading) grid.push('<div class="rv-item"><span>' + escapeHtml(pillar('reading').label) + '</span><strong>' + (stats.readPages || 0) + ' pg</strong></div>');
+  if (on.networking) grid.push('<div class="rv-item"><span>' + escapeHtml(pillar('networking').label) + '</span><strong>' + (stats.networkCount || 0) + '</strong></div>');
+  grid.push('<div class="rv-item"><span>Balance</span><strong>' + balance + '%</strong></div>');
+  grid.push('<div class="rv-item"><span>Days logged</span><strong>' + daysLogged + '/7</strong></div>');
+  const votesLine = votes.length ? '<div class="wr-votes">You voted for ' + votes.map(v => v.icon + ' <b>' + escapeHtml(v.label) + '</b> ×' + v.votes).join(' · ') + '</div>' : '';
   const tips = [
-    'You showed up this week. That\'s what separates you from 90% of people.',
-    'Every connection you made this week is a seed. Water it with follow-ups.',
-    'The gym is where confidence is forged. Never skip the work.',
-    'Your income goal isn\'t a ceiling — it\'s a floor. Push past it next week.',
-    'Consistency beats intensity. One more week logged is one more week of data.',
-    'What you do in the off days defines the champion. Rest smart, come back harder.'
+    'You showed up this week — that\'s what separates you from most people.',
+    'Every connection is a seed. Water it with a follow-up next week.',
+    'Consistency beats intensity. One more week logged is one more vote for who you\'re becoming.',
+    'Look at the balance — feed your weakest side next week and the rest lifts with it.',
+    'Small days still count. The climb is made of them.'
   ];
-
-  setTimeout(() => {
-    const el = document.createElement('div');
-    el.className = 'modal-overlay';
-    el.id = 'weekly-modal';
-    el.innerHTML =
-      '<div class="modal-box">' +
-      '<div class="modal-badge">Weekly Review</div>' +
-      '<div class="modal-score" style="color:' + scoreColor + '">' + score + '<span>%</span></div>' +
-      '<div class="modal-score-label">' + scoreLabel + '</div>' +
-      '<div class="review-grid">' +
-      '<div class="rv-item"><span>Gym</span><strong>' + gymDays + '/' + profile.gymDaysPerWeek + ' days</strong></div>' +
-      '<div class="rv-item"><span>Food avg</span><strong>' + (avgFood>0?avgFood.toFixed(1)+'/5':'—') + '</strong></div>' +
-      '<div class="rv-item"><span>Network</span><strong>' + net + ' contacts</strong></div>' +
-      '<div class="rv-item"><span>Income</span><strong>' + formatCurrency(inc) + '</strong></div>' +
-      '</div>' +
-      '<div class="review-tip">' + tips[Math.floor(Math.random()*tips.length)] + '</div>' +
-      '<button class="btn btn-primary" style="width:100%;margin-top:16px" onclick="document.getElementById(\'weekly-modal\').remove()">Start the New Week →</button>' +
-      '</div>';
-    document.body.appendChild(el);
-  }, 1800);
+  const el = document.createElement('div');
+  el.className = 'modal-overlay'; el.id = 'weekly-modal';
+  el.innerHTML =
+    '<div class="modal-box wr-box">' +
+    '<div class="modal-badge">Your week · ' + formatWeekRange(ws, true) + '</div>' +
+    '<div class="modal-score" style="color:' + color + '">' + goalsPct + '<span>%</span></div>' +
+    '<div class="modal-score-label">' + label + ' · of your weekly goals</div>' +
+    '<div class="review-grid">' + grid.join('') + '</div>' +
+    votesLine +
+    '<div class="review-tip">' + tips[Math.floor(Math.random() * tips.length)] + '</div>' +
+    '<div class="wr-actions">' +
+    '<button class="btn btn-primary" onclick="document.getElementById(\'weekly-modal\').remove(); shareMyWeek();">📲 Share my week</button>' +
+    '<button class="btn-link" onclick="document.getElementById(\'weekly-modal\').remove()">Close</button>' +
+    '</div></div>';
+  el.addEventListener('click', e => { if (e.target === el) el.remove(); });
+  document.body.appendChild(el);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -2732,8 +2732,16 @@ async function fetchPatterns(force) {
 
 // ── Weekly Life Review: the Sunday ritual ──
 function renderReviewCard() {
-  if (!state.hasApiKey) return '';
   const days = state.data.days || [];
+  if (!days.length) return '';
+  // No AI key (e.g. live before keys are set): still offer the client-side recap.
+  if (!state.hasApiKey) {
+    return '<div class="card review-card">' +
+      '<div class="di-head"><span class="di-icon"></span><span class="di-title">Weekly Recap</span>' +
+      '<button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="shareMyWeek()">Share</button></div>' +
+      '<div class="di-body"><p class="review-sub">Your week across every pillar — goals hit, the votes you cast, and your balance.</p>' +
+      '<button class="btn btn-primary" onclick="openWeekRecap()">Open week recap</button></div></div>';
+  }
   if (days.length < PATTERNS_MIN_DAYS) return '';
   const wkStart = getWeekStart(todayStr());
   const saved = state.data.weeklyReview;
@@ -4316,6 +4324,7 @@ function renderDashboard() {
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="navigate(\'stats\')">All stats</button>' : '') +
+    (hasDays ? '<button class="btn btn-outline btn-sm" onclick="openWeekRecap()">Week recap</button>' : '') +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">Share</button>' : '') +
     '</div></div>' +
     gHero +
