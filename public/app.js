@@ -7794,12 +7794,26 @@ async function subscribeToPush() {
 }
 
 async function sendTestPush() {
-  try {
-    const r = await fetch('/api/push/test', { method: 'POST', headers: authHeaders() });
-    const j = await r.json();
-    if (r.ok && j.sent > 0) showToast('Test sent — check your notifications ', 'success');
-    else showToast(j.error || 'Enable notifications first, then try again.', 'error');
-  } catch { showToast('Could not send test.', 'error'); }
+  // If subscribed to server push, test the real path that works when the app is closed.
+  if (isPushSubscribed()) {
+    try {
+      const r = await fetch('/api/push/test', { method: 'POST', headers: authHeaders() });
+      const j = await r.json();
+      if (r.ok && j.sent > 0) { showToast('Test push sent — check your notifications.', 'success'); return; }
+    } catch {}
+  }
+  // Otherwise fire a local notification right now — works on desktop (and phone)
+  // while Escalate is open, with no server setup needed.
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      const n = new Notification('Escalate 🧗', { body: 'Test notification — it works on this device!', icon: 'icons/icon-192.png', tag: 'escalate-test' });
+      n.onclick = () => { window.focus(); n.close(); };
+      showToast('Sent a test — look at the corner of your screen.', 'success');
+      return;
+    } catch {}
+  }
+  if ('Notification' in window && Notification.permission !== 'denied') { await enableNotifications(); return; }
+  showToast('Notifications are blocked — allow them in your browser settings.', 'error');
 }
 
 // Pure: is this reminder due to fire right now? (testable)
@@ -8064,9 +8078,10 @@ function renderSettingsPage() {
     '<div class="card">' +
     '<h3 class="card-title">Notifications & Reminders</h3>' +
     '<div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);padding:14px 16px;font-size:14px;color:var(--text-muted);line-height:1.7;margin-bottom:12px">' +
-    'Get your reminders and a daily <strong style="color:var(--text)">streak nudge</strong> on your phone — <strong style="color:var(--text)">even when the app is closed</strong>. ' +
+    'Get your reminders and a daily <strong style="color:var(--text)">streak nudge</strong> — <strong style="color:var(--text)">on your desktop or phone</strong>. ' +
     'Turn them on in <strong style="color:var(--text)">Checklist → Reminders → Enable notifications</strong>, then add your own reminder times and set the nudge.' +
-    '<br><br><strong style="color:var(--text)">On iPhone:</strong> add the app to your Home Screen first (Share → Add to Home Screen), then allow notifications.' +
+    '<br><br><strong style="color:var(--text)">On desktop</strong> (Chrome, Edge, Firefox): click Enable notifications and you\'ll get system pop-ups while Escalate is open in a tab — try the <strong style="color:var(--text)">Send test</strong> button to see one. For reminders when the browser is fully closed, the server\'s push keys need to be set.' +
+    '<br><strong style="color:var(--text)">On iPhone:</strong> add the app to your Home Screen first (Share → Add to Home Screen), then allow notifications.' +
     '</div>' +
     '<button class="btn btn-outline" onclick="navigate(\'checklist\')">Open Checklist & Reminders →</button>' +
     '</div>';
