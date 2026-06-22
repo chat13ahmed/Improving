@@ -2462,3 +2462,15 @@ body { background: transparent; }
 .dc-vote { font-size: 15px; color: #cbd5e1; }
 .dc-vote b { color: #fff; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .dc-check { animation: none; } }
+
+/* ─── "All logged for today" (the log empties + resets daily) ─── */
+.gl-alldone { text-align: center; max-width: 440px; margin: 0 auto; padding: 52px 20px; }
+.gld-check { width: 76px; height: 76px; margin: 0 auto 20px; border-radius: 50%;
+  background: linear-gradient(135deg, #10B981, #22D3EE); color: #fff; font-size: 42px; font-weight: 900;
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 32px rgba(16,185,129,.35);
+  animation: msPop .5s cubic-bezier(.2,1.3,.5,1) both; }
+.gld-title { font-size: 27px; font-weight: 900; color: var(--text); letter-spacing: -.5px; }
+.gld-sub { font-size: 15px; color: var(--text-muted); line-height: 1.6; margin-top: 10px; }
+.gld-actions { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 28px; }
+.gld-actions .btn-primary { min-width: 220px; }
+@media (prefers-reduced-motion: reduce) { .gld-check { animation: none; } }

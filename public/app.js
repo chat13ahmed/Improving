@@ -4677,23 +4677,46 @@ function renderLogEntry() {
     }
     return;
   }
+  if (guidedStepKeys().length === 0) { renderAllLoggedToday(); return; }   // everything's already in for today
   startGuidedLog();
 }
 function showFullLog() { state._fullLog = true; state._guided = null; renderLogEntry(); }
-function backToGuided() { state._fullLog = false; state._editDayId = null; startGuidedLog(); }
+function backToGuided() { state._fullLog = false; state._editDayId = null; renderLogEntry(); }
+// Which parts of today you've already logged (they drop off the flow until tomorrow)
+function loggedKeysToday() {
+  const day = (state.data.days || []).find(d => d.date === todayStr());
+  return (day && Array.isArray(day._logged)) ? day._logged : [];
+}
 function guidedStepKeys() {
+  const done = loggedKeysToday();
   const keys = [];
-  ['gym', 'food', 'reading', 'networking', 'money'].forEach(id => { if (isPillarOn(id)) keys.push(id); });
-  keys.push('water', 'weight', 'notes'); // light extras (all skippable)
+  ['gym', 'food', 'reading', 'networking', 'money'].forEach(id => { if (isPillarOn(id) && !done.includes(id)) keys.push(id); });
+  ['water', 'weight', 'notes'].forEach(k => { if (!done.includes(k)) keys.push(k); });   // light extras
   return keys;
+}
+// Shown when everything's already logged today — fresh again tomorrow
+function renderAllLoggedToday() {
+  const streak = loggingStreak();
+  document.getElementById('main').innerHTML =
+    '<div class="gl-wrap gl-alldone">' +
+    '<div class="gld-check">✓</div>' +
+    '<div class="gld-title">All logged for today</div>' +
+    '<div class="gld-sub">' + (streak > 1 ? '<b>' + streak + '-day streak</b> 🔥 · ' : '') +
+    'Your day is in. Come back tomorrow to keep the chain going.</div>' +
+    '<div class="gld-actions">' +
+    '<button type="button" class="btn btn-primary" onclick="navigate(\'dashboard\')">Back to dashboard</button>' +
+    '<button type="button" class="btn-link" onclick="showFullLog()">Edit today’s entry</button>' +
+    '</div></div>';
 }
 function startGuidedLog() {
   state._fullLog = false; state._editDayId = null;
+  const keys = guidedStepKeys();
+  if (!keys.length) { renderAllLoggedToday(); return; }   // nothing left to log today
   const date = todayStr();
   const prior = (state.data.days || []).find(d => d.date === date) || {};
   const w = (state.data.weights || []).find(x => x.date === date);
   state._guided = {
-    step: 0, keys: guidedStepKeys(),
+    step: 0, keys: keys,
     draft: {
       _gymAnswered: !!prior.id, gymDone: !!(prior.gym && prior.gym.done),
       gymGroup: (prior.gym && prior.gym.muscleGroup) || '', gymDur: (prior.gym && prior.gym.duration) || '',
@@ -4779,27 +4802,44 @@ function glSetGym(v) { glCapture(); state._guided.draft.gymDone = v; state._guid
 function glSetFood(n) { glCapture(); state._guided.draft.food = n; renderGuidedLog(); }
 function glSetMuscle(g) { glCapture(); const d = state._guided.draft; d.gymGroup = (d.gymGroup === g ? '' : g); renderGuidedLog(); }
 function glWater(inc) { const el = document.getElementById('gl-water'); if (el) el.value = Math.round(((parseFloat(el.value) || 0) + inc) * 100) / 100; }
-function glNext() { glCapture(); if (state._guided.step < state._guided.keys.length - 1) { state._guided.step++; renderGuidedLog(); } else finishGuidedLog(); }
+function glNext() {
+  glCapture();
+  const g = state._guided;
+  persistStep(g.keys[g.step]);   // save this part of the day immediately, so it sticks and drops off the flow
+  if (g.step < g.keys.length - 1) { g.step++; renderGuidedLog(); }
+  else finishGuidedLog();
+}
 function glBack() { glCapture(); if (state._guided.step > 0) { state._guided.step--; renderGuidedLog(); } }
 function glSkip() { glNext(); }
-async function finishGuidedLog() {
-  glCapture();
-  const d = state._guided.draft, date = todayStr();
+// Saves one part of today's entry and marks it logged, so it sticks even if you
+// leave mid-flow — and that step drops off the list until tomorrow.
+function writeStepToDay(day, key, d) {
+  if (key === 'gym') { if (isPillarOn('gym')) day.gym = { done: !!d.gymDone, muscleGroup: d.gymGroup || '', duration: d.gymDur || 0, notes: (day.gym && day.gym.notes) || '' }; }
+  else if (key === 'food') { if (isPillarOn('food')) { day.food = { rating: d.food || 0, notes: (day.food && day.food.notes) || '' }; if (d.cals) day.calories = d.cals; } }
+  else if (key === 'reading') { if (isPillarOn('reading')) { const ab = (state.data.books || []).find(b => b.status === 'reading'); day.reading = { pages: d.readPages || 0, bookId: (ab && ab.id) || (day.reading && day.reading.bookId) || '', bookTitle: (ab && ab.title) || (day.reading && day.reading.bookTitle) || '', summary: (day.reading && day.reading.summary) || '' }; } }
+  else if (key === 'networking') { if (isPillarOn('networking')) day.networking = { count: d.net || 0, notes: (day.networking && day.networking.notes) || '' }; }
+  else if (key === 'money') { if (isPillarOn('money')) { day.spent = d.spent || 0; day.money = { activities: d.moneyActs || '', income: (day.money && day.money.income) || 0 }; } }
+  else if (key === 'water') day.water = d.water || 0;
+  else if (key === 'weight') { if (d.weight) { const kg = Math.round(displayToKg(d.weight) * 10) / 10; upsertWeight(day.date, kg); if (state.data.profile.nutrition && state.data.profile.nutrition.heightCm) state.data.profile.nutrition.weightKg = kg; } }
+  else if (key === 'notes') day.notes = d.notes || '';
+}
+function persistStep(key) {
+  const date = todayStr();
   const days = state.data.days = state.data.days || [];
   let day = days.find(x => x.date === date);
   if (!day) { day = { id: uid(), date }; days.push(day); }
-  if (isPillarOn('gym')) day.gym = { done: !!d.gymDone, muscleGroup: d.gymGroup || '', duration: d.gymDur || 0, notes: (day.gym && day.gym.notes) || '' };
-  if (isPillarOn('food')) { day.food = { rating: d.food || 0, notes: (day.food && day.food.notes) || '' }; if (d.cals) day.calories = d.cals; }
-  if (isPillarOn('reading')) { const ab = (state.data.books || []).find(b => b.status === 'reading'); day.reading = { pages: d.readPages || 0, bookId: (ab && ab.id) || (day.reading && day.reading.bookId) || '', bookTitle: (ab && ab.title) || (day.reading && day.reading.bookTitle) || '', summary: (day.reading && day.reading.summary) || '' }; }
-  if (isPillarOn('networking')) day.networking = { count: d.net || 0, notes: (day.networking && day.networking.notes) || '' };
-  if (isPillarOn('money')) { day.spent = d.spent || 0; day.money = { activities: d.moneyActs || '', income: (day.money && day.money.income) || 0 }; }
-  day.water = d.water || 0;
-  day.notes = d.notes || '';
-  if (d.weight) { const kg = Math.round(displayToKg(d.weight) * 10) / 10; upsertWeight(date, kg); if (state.data.profile.nutrition && state.data.profile.nutrition.heightCm) state.data.profile.nutrition.weightKg = kg; }
+  if (!Array.isArray(day._logged)) day._logged = [];
+  writeStepToDay(day, key, state._guided.draft);
+  if (!day._logged.includes(key)) day._logged.push(key);
+  saveData();
+  return day;
+}
+function finishGuidedLog() {
+  // Every step was already saved by glNext; just celebrate the finished day.
+  const day = (state.data.days || []).find(x => x.date === todayStr());
   state._guided = null;
-  await saveData();
   navigate('dashboard');
-  setTimeout(() => showDayComplete(day), 250);   // the moment it all comes together: votes + streak + your why
+  if (day) setTimeout(() => showDayComplete(day), 250);   // votes + streak + your why
 }
 function renderLogToday(editDay) {
   const isEditing = !!editDay;
