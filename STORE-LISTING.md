@@ -1,4 +1,4 @@
-# Escalate — Store Listing Copy
+# Onward — Store Listing Copy
 
 Ready-to-paste copy for the Google Play Console and Microsoft Partner Center.
 Two required links: **Privacy policy URL** = `https://YOUR-DOMAIN/privacy.html`
@@ -7,8 +7,8 @@ Two required links: **Privacy policy URL** = `https://YOUR-DOMAIN/privacy.html`
 ---
 
 ## App name / title
-**Escalate — Life Progress**
-(alt: `Escalate: Track Your Whole Life`)
+**Onward — Life Progress**
+(alt: `Onward: Track Your Whole Life`)
 
 ## Category
 - Primary: **Health & Fitness**
@@ -23,7 +23,7 @@ Two required links: **Privacy policy URL** = `https://YOUR-DOMAIN/privacy.html`
 
 **One app for your whole life — and an AI coach that sees how it all connects.**
 
-Most trackers do one thing. Escalate brings your gym, nutrition, money, reading, networking and habits into one place, then shows you how they pull on each other — so a strong week in one area lifts the rest.
+Most trackers do one thing. Onward brings your gym, nutrition, money, reading, networking and habits into one place, then shows you how they pull on each other — so a strong week in one area lifts the rest.
 
 Every day you log takes you one step further up the climb. Watch your streaks grow, your goals fill in, and your progress turn into something you'll actually want to share.
 

@@ -701,7 +701,7 @@ function renderAuthScreen(mode) {
   screen.innerHTML =
     '<div class="auth-card">' +
     '<div class="auth-brand"><span class="brand-icon"></span><div>' +
-    '<div class="auth-title">Escalate</div><div class="auth-sub">Life Progress</div></div></div>' +
+    '<div class="auth-title">Onward</div><div class="auth-sub">Life Progress</div></div></div>' +
     '<div class="auth-hook">' +
     '<div class="auth-hook-title">Build habits. Track your life. Get better.</div>' +
     '<div class="auth-hook-sub">One simple place for your fitness, money, reading and habits — 30 seconds a day, with an AI coach that keeps you accountable and shows how it all connects.</div>' +
@@ -741,7 +741,7 @@ function renderAuthScreen(mode) {
     '<div class="auth-note">Your account is private — only you can see your data.</div>' +
     '<div style="margin-top:10px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap">' +
     '<button type="button" class="btn-link" onclick="startDemo()">See a live demo</button>' +
-    '<a class="btn-link" href="about.html">What is Escalate? →</a></div>' +
+    '<a class="btn-link" href="about.html">What is Onward? →</a></div>' +
     '</div>' +
     '</div>';
   document.body.appendChild(screen);
@@ -1099,7 +1099,7 @@ function renderPaywall() {
   s.innerHTML =
     '<div class="auth-card" style="text-align:center">' +
     '<div class="auth-brand" style="justify-content:center"><span class="brand-icon"></span><div>' +
-    '<div class="auth-title">Your free trial has ended</div><div class="auth-sub">Escalate Pro</div></div></div>' +
+    '<div class="auth-title">Your free trial has ended</div><div class="auth-sub">Onward Pro</div></div></div>' +
     '<p style="color:var(--text-muted);line-height:1.6;margin:6px 0 18px">Keep your streak, your AI coach, and all your progress. Subscribe to unlock the full app.</p>' +
     '<div style="font-size:32px;font-weight:900;color:var(--text);line-height:1.1">' + escapeHtml(state.priceLabel || '$7.99/mo') + '</div>' +
     '<div style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Cancel anytime</div>' +
@@ -2885,7 +2885,7 @@ function buildWeekCardBlob() {
     // Brand mark (little mountain) + wordmark
     x.beginPath(); x.moveTo(cx - 132, 296); x.lineTo(cx - 106, 244); x.lineTo(cx - 80, 296); x.closePath(); x.fillStyle = '#9FE1CB'; x.fill();
     x.beginPath(); x.moveTo(cx - 112, 296); x.lineTo(cx - 78, 232); x.lineTo(cx - 44, 296); x.closePath(); x.fillStyle = '#1D9E75'; x.fill();
-    x.textAlign = 'left'; x.fillStyle = '#eef1f7'; x.font = '800 58px ' + FONT; x.fillText('Escalate', cx - 28, 292);
+    x.textAlign = 'left'; x.fillStyle = '#eef1f7'; x.font = '800 58px ' + FONT; x.fillText('Onward', cx - 28, 292);
     x.textAlign = 'center';
     x.fillStyle = '#7C8BA5'; x.font = '700 30px ' + FONT; x.fillText('W E E K L Y   R E C A P', cx, 366);
     x.fillStyle = '#9aa3b2'; x.font = '500 38px ' + FONT; x.fillText(formatWeekRange(getWeekStart(todayStr())), cx, 418);
@@ -2924,7 +2924,7 @@ function buildWeekCardBlob() {
     // Marketing payload — what it is + where to find it (kept in the safe zone)
     x.textAlign = 'center';
     x.fillStyle = '#eef1f7'; x.font = '800 52px ' + FONT; x.fillText('Track your whole life — free', cx, 1496);
-    x.fillStyle = '#2dd4bf'; x.font = '700 44px ' + FONT; x.fillText(location.host || 'Escalate', cx, 1560);
+    x.fillStyle = '#2dd4bf'; x.font = '700 44px ' + FONT; x.fillText(location.host || 'Onward', cx, 1560);
 
     // Mountain range (back then front), then a flag planted on the visible summit
     range(1840, [0.15, 0.45, 0.25, 0.6, 0.4, 0.7, 0.5, 0.6, 0.35, 0.55, 0.3], 130, '#222d44');
@@ -2943,7 +2943,7 @@ async function shareMyWeek() {
     if (!blob) { showToast('Could not create the card.', 'error'); return; }
     const file = new File([blob], 'my-week.png', { type: 'image/png' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'My week on Escalate', text: 'See what connects your life ' });
+      await navigator.share({ files: [file], title: 'My week on Onward', text: 'See what connects your life ' });
     } else {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = 'my-week.png'; a.click();
@@ -3296,7 +3296,7 @@ function renderGoalCard() {
   if (!goal || goal.target == null) {
     return '<div class="card goal-card goal-empty">' +
       '<div><div class="goal-empty-title">Set your goal</div>' +
-      '<div class="goal-empty-sub">Pick one thing to work toward — Escalate guides you there and shows your pace.</div></div>' +
+      '<div class="goal-empty-sub">Pick one thing to work toward — Onward guides you there and shows your pace.</div></div>' +
       '<button type="button" class="btn btn-primary btn-sm" onclick="openGoalForm()">Set a goal</button></div>';
   }
   const cur = currentGoalValue(goal);
@@ -3692,7 +3692,7 @@ function climbShareSvg(size) {
     '<text x="540" y="320" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="200" font-weight="900" fill="url(#climbDone)">' + m + '%</text>' +
     '<text x="540" y="392" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="40" font-weight="600" fill="#cbd5e1">' + streak + '-day streak · toward ' + goalLabel + '</text>' +
     '<svg x="110" y="450" width="860" height="510" viewBox="0 0 320 190"><rect width="320" height="190" rx="14" fill="url(#climbSky)"/>' + climbScene(pts, m, streak, false) + '</svg>' +
-    '<text x="540" y="1008" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="38" font-weight="700" fill="#e2e8f0">' + escapeHtml(climbCaption(m)) + '  ·  Escalate</text>' +
+    '<text x="540" y="1008" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="38" font-weight="700" fill="#e2e8f0">' + escapeHtml(climbCaption(m)) + '  ·  Onward</text>' +
     '</svg>';
 }
 function buildClimbShareBlob(size) {
@@ -3710,7 +3710,7 @@ async function shareMyClimb() {
     if (!blob) { showToast('Could not create the image.', 'error'); return; }
     const file = new File([blob], 'my-climb.png', { type: 'image/png' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'My climb on Escalate', text: 'Escalating across my whole life.' });
+      await navigator.share({ files: [file], title: 'My climb on Onward', text: 'Onward, across my whole life.' });
     } else {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = 'my-climb.png'; a.click();
@@ -3854,7 +3854,7 @@ function renderConnectionCard() {
     return '<div class="card conn-card conn-building">' +
       '<div class="conn-tag">Life Connection</div>' +
       '<div class="conn-headline">Your first life connection is forming.</div>' +
-      '<div class="conn-sub">Keep logging — in a week or two, Escalate shows how your pillars pull on each other. No single-purpose app can do that.</div>' +
+      '<div class="conn-sub">Keep logging — in a week or two, Onward shows how your pillars pull on each other. No single-purpose app can do that.</div>' +
       '</div>';
   }
   const hl = escapeHtml(c.headline).replace(/(\d+%)/, '<span class="conn-pct">$1</span>');
@@ -3868,8 +3868,8 @@ function renderConnectionCard() {
 async function shareConnection() {
   const c = weekConnection(state.data.days || []);
   if (!c) return;
-  const text = 'Escalate spotted this in my life — ' + c.headline + ' One app that connects your whole life.';
-  try { if (navigator.share) { await navigator.share({ title: 'Escalate', text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+  const text = 'Onward spotted this in my life — ' + c.headline + ' One app that connects your whole life.';
+  try { if (navigator.share) { await navigator.share({ title: 'Onward', text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
   try { await navigator.clipboard.writeText(text); showToast('Copied — paste it anywhere.', 'success'); } catch { showToast('Share not available here.', 'error'); }
 }
 // ── The Climb Ahead — a momentum forecast of your future self (no AI needed) ──
@@ -4108,7 +4108,7 @@ function yearRangeShareSvg(size, data) {
     '<text x="540" y="432" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="44" font-weight="600" fill="#334155">weeks climbed — every one a peak</text>' +
     '<svg x="0" y="520" width="1080" height="540" viewBox="0 0 400 200" preserveAspectRatio="none">' +
     '<path d="' + r.back + '" fill="url(#yShareFar)"/><path d="' + r.near + '" fill="url(#yShareNear)"/>' + r.caps + '</svg>' +
-    '<text x="540" y="1024" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="36" font-weight="700" fill="#ffffff">Tallest peak: week of ' + escapeHtml(fmtDateShort(data.best.weekStart)) + '  ·  Escalate</text>' +
+    '<text x="540" y="1024" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="36" font-weight="700" fill="#ffffff">Tallest peak: week of ' + escapeHtml(fmtDateShort(data.best.weekStart)) + '  ·  Onward</text>' +
     '</svg>';
 }
 function buildYearShareBlob(size, data) {
@@ -4127,12 +4127,12 @@ async function shareYearRange() {
     const blob = await buildYearShareBlob(1080, data);
     if (blob) {
       const file = new File([blob], 'my-year.png', { type: 'image/png' });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'My year on Escalate', text: 'Every week a peak.' }); return; }
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'My year on Onward', text: 'Every week a peak.' }); return; }
       const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'my-year.png'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 5000); showToast('Saved — post your range!', 'success'); return;
     }
   } catch (e) { if (e && e.name === 'AbortError') return; }
-  const text = 'My year on Escalate — ' + data.activeWeeks + ' weeks logged, each one a peak in my range. ↗';
-  try { if (navigator.share) { await navigator.share({ title: 'Escalate', text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+  const text = 'My year on Onward — ' + data.activeWeeks + ' weeks logged, each one a peak in my range. ↗';
+  try { if (navigator.share) { await navigator.share({ title: 'Onward', text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
   try { await navigator.clipboard.writeText(text); showToast('Copied — paste it anywhere.', 'success'); } catch { showToast('Share not available here.', 'error'); }
 }
 // A living mountain sky that greets you — time-of-day gradient, drifting clouds,
@@ -7246,7 +7246,7 @@ function renderOnboardStep() {
       '<div class="modal-box onboard-wizard onboard-hero">' +
       '<div class="ob-hero-art">' + obMountainSvg() + '</div>' +
       '<h2 class="onboard-title">One life. One climb.</h2>' +
-      '<p class="onboard-sub">Escalate is the only app that shows how your whole life moves together — your body, your money, your mind, all pulling on each other. Let\'s find your summit.</p>' +
+      '<p class="onboard-sub">Onward is the only app that shows how your whole life moves together — your body, your money, your mind, all pulling on each other. Let\'s find your summit.</p>' +
       '<div class="onboard-actions onboard-actions-center">' +
       '<button type="button" class="btn btn-primary" onclick="onboardNext()">Begin your climb →</button>' +
       '</div>' +
@@ -7660,7 +7660,7 @@ async function importData(input) {
     const parsed = JSON.parse(await file.text());
     const data = (parsed && parsed.data) ? parsed.data : parsed; // accept wrapped or raw
     if (!data || typeof data !== 'object' || !('days' in data) || !('profile' in data)) {
-      showToast('That doesn\'t look like a Escalate backup.', 'error'); input.value = ''; return;
+      showToast('That doesn\'t look like a Onward backup.', 'error'); input.value = ''; return;
     }
     if (!confirm('Import this backup? It will REPLACE all current data for this account.')) { input.value = ''; return; }
     data.profile = data.profile || {};
@@ -7803,10 +7803,10 @@ async function sendTestPush() {
     } catch {}
   }
   // Otherwise fire a local notification right now — works on desktop (and phone)
-  // while Escalate is open, with no server setup needed.
+  // while Onward is open, with no server setup needed.
   if ('Notification' in window && Notification.permission === 'granted') {
     try {
-      const n = new Notification('Escalate 🧗', { body: 'Test notification — it works on this device!', icon: 'icons/icon-192.png', tag: 'escalate-test' });
+      const n = new Notification('Onward 🧗', { body: 'Test notification — it works on this device!', icon: 'icons/icon-192.png', tag: 'escalate-test' });
       n.onclick = () => { window.focus(); n.close(); };
       showToast('Sent a test — look at the corner of your screen.', 'success');
       return;
@@ -7830,7 +7830,7 @@ function fireReminder(r) {
   // If the device is subscribed to server push, the cron already delivers this
   // reminder — don't also raise a local system notification (would double-notify).
   if (!isPushSubscribed() && 'Notification' in window && Notification.permission === 'granted') {
-    try { new Notification('' + (name ? name + ', ' : '') + r.label, { body: 'Escalate', tag: r.id }); } catch {}
+    try { new Notification('' + (name ? name + ', ' : '') + r.label, { body: 'Onward', tag: r.id }); } catch {}
   }
 }
 function checkReminders() {
@@ -8080,7 +8080,7 @@ function renderSettingsPage() {
     '<div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);padding:14px 16px;font-size:14px;color:var(--text-muted);line-height:1.7;margin-bottom:12px">' +
     'Get your reminders and a daily <strong style="color:var(--text)">streak nudge</strong> — <strong style="color:var(--text)">on your desktop or phone</strong>. ' +
     'Turn them on in <strong style="color:var(--text)">Checklist → Reminders → Enable notifications</strong>, then add your own reminder times and set the nudge.' +
-    '<br><br><strong style="color:var(--text)">On desktop</strong> (Chrome, Edge, Firefox): click Enable notifications and you\'ll get system pop-ups while Escalate is open in a tab — try the <strong style="color:var(--text)">Send test</strong> button to see one. For reminders when the browser is fully closed, the server\'s push keys need to be set.' +
+    '<br><br><strong style="color:var(--text)">On desktop</strong> (Chrome, Edge, Firefox): click Enable notifications and you\'ll get system pop-ups while Onward is open in a tab — try the <strong style="color:var(--text)">Send test</strong> button to see one. For reminders when the browser is fully closed, the server\'s push keys need to be set.' +
     '<br><strong style="color:var(--text)">On iPhone:</strong> add the app to your Home Screen first (Share → Add to Home Screen), then allow notifications.' +
     '</div>' +
     '<button class="btn btn-outline" onclick="navigate(\'checklist\')">Open Checklist & Reminders →</button>' +
@@ -8125,7 +8125,7 @@ function renderAdminStatsCard() {
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
     '<h3 class="card-title" style="margin-bottom:0">Your app — live numbers</h3>' +
     '<button class="btn btn-outline btn-sm" onclick="loadAdminStats()">↻ Refresh</button></div>' +
-    '<p class="card-sub">Owner only. How many people use Escalate and how active they are.</p>' +
+    '<p class="card-sub">Owner only. How many people use Onward and how active they are.</p>' +
     '<div id="admin-stats" class="admin-grid"><div class="di-loading"><div class="spinner"></div><span>Loading…</span></div></div>' +
     '<div id="admin-recent"></div></div>';
 }

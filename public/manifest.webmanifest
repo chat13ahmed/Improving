@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Escalate — Life Progress",
-  "short_name": "Escalate",
+  "name": "Onward — Life Progress",
+  "short_name": "Onward",
   "description": "Track fitness, nutrition, networking, income and reading — with a Claude AI coach that sees how every area of your life connects.",
   "start_url": "./",
   "scope": "./",

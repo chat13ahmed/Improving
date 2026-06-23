@@ -1,5 +1,5 @@
 /*
- * Business Escalate — automated test suite.
+ * Onward — automated test suite.
  * Run with:  npm test   (from resources/app)
  *
  * Loads public/app.js inside a mocked DOM and exercises the core logic,
@@ -65,7 +65,7 @@ function loadApp(fieldValues) {
   return sandbox.__exports__;
 }
 
-console.log('Running Business Escalate test suite…\n');
+console.log('Running Onward test suite…\n');
 
 // ─────────────────────────────────────────────────────────────
 // APP LOGIC
