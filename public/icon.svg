@@ -1,16 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Escalate">
   <defs>
-    <linearGradient id="bg" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#FB923C"/>
-      <stop offset="0.45" stop-color="#EF4444"/>
-      <stop offset="1" stop-color="#A855F7"/>
+    <linearGradient id="sky" x1="0" y1="0" x2="0.25" y2="1">
+      <stop offset="0" stop-color="#0C2C50"/>
+      <stop offset="0.55" stop-color="#10657A"/>
+      <stop offset="1" stop-color="#0FA071"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
-  <!-- escalator handrail (subtle diagonal) -->
-  <line x1="120" y1="404" x2="404" y2="148" stroke="#ffffff" stroke-opacity="0.45" stroke-width="22" stroke-linecap="round"/>
-  <!-- ascending steps -->
-  <path d="M120 372 H192 V300 H264 V228 H336 V156" fill="none" stroke="#ffffff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- up arrowhead at the top step -->
-  <path d="M300 192 L336 156 L372 192" fill="none" stroke="#ffffff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect width="512" height="512" rx="116" fill="url(#sky)"/>
+  <!-- sun -->
+  <circle cx="372" cy="142" r="50" fill="#FCE0AE" opacity="0.85"/>
+  <!-- distant range -->
+  <path d="M0 372 L96 286 L188 352 L300 250 L408 330 L512 270 L512 512 L0 512 Z" fill="#5BC9A4" opacity="0.4"/>
+  <!-- main peak (two faces for depth) -->
+  <path d="M256 146 L150 374 L256 374 Z" fill="#12805E"/>
+  <path d="M256 146 L362 374 L256 374 Z" fill="#0C6146"/>
+  <!-- snow cap -->
+  <path d="M256 146 L298 238 L270 226 L256 244 L242 226 L214 238 Z" fill="#EAF7F1"/>
+  <!-- summit flag -->
+  <line x1="256" y1="146" x2="256" y2="88" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round"/>
+  <polygon points="256,88 308,104 256,120" fill="#F97316"/>
 </svg>
