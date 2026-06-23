@@ -1,7 +1,7 @@
 /* Onward service worker — makes the app installable & offline-capable.
    Strategy: network-first for the app shell (so edits are picked up online,
    cache is the offline fallback). API calls and writes are never cached. */
-const CACHE = 'be-shell-v1';
+const CACHE = 'onward-shell-v2';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'vendor/chart.umd.min.js', 'vendor/marked.min.js', 'manifest.webmanifest', 'icon.svg'];
 
 self.addEventListener('install', (e) => {
