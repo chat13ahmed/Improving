@@ -1,0 +1,7 @@
+# Onward — open to search engines
+User-agent: *
+Allow: /
+Disallow: /api/
+
+# Add this once you have a custom domain:
+# Sitemap: https://YOUR-DOMAIN/sitemap.xml
