@@ -16,5 +16,10 @@
     { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "screenshots": [
+    { "src": "store/screenshot-1.png", "sizes": "1080x1920", "type": "image/png", "form_factor": "narrow", "label": "Track your whole life — one climb" },
+    { "src": "store/screenshot-2.png", "sizes": "1080x1920", "type": "image/png", "form_factor": "narrow", "label": "See how your life connects, with an AI coach" },
+    { "src": "store/feature-graphic.png", "sizes": "1024x500", "type": "image/png", "form_factor": "wide", "label": "Onward — build habits, track your life" }
   ]
 }
