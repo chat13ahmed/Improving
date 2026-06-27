@@ -3893,14 +3893,16 @@ function restNotify() {
 }
 
 // ── Open / save the workout session ──
-function openWorkout(ret) {
+function openWorkout(ret, presetMuscle) {
   state._workoutReturn = ret || 'log';
+  // If they picked a body part in the gym log, open the library straight to it
+  const preset = normalizeLibMuscle(presetMuscle || document.getElementById('gym-group')?.value || '');
   // Make sure anything typed in the full Log form is saved before we leave it
   if (document.getElementById('day-form')) { try { commitDayFromForm(); } catch {} }
   const day = (state.data.days || []).find(x => x.date === todayStr());
   const ex = (day && day.gym && Array.isArray(day.gym.exercises)) ? day.gym.exercises : [];
   state._workout = { exercises: ex.map(e => ({ name: e.name, muscle: e.muscle || '', sets: (e.sets || []).map(s => ({ reps: +s.reps || 0, weight: +s.weight || 0 })) })) };
-  state._lib = { open: false, q: '', muscle: 'All' };
+  state._lib = { open: false, q: '', muscle: preset };
   state.page = 'workout';
   renderWorkout();
 }
@@ -3991,25 +3993,48 @@ function woAddRest(delta) {
 function woCancelRest() { woStopRest(); renderWorkout(); }
 function woStopRest() { const t = state._restTimer; if (t && t.id) { try { clearInterval(t.id); } catch {} } state._restTimer = null; }
 
-// ── Exercise library overlay ──
-function woOpenLibrary() { state._lib = state._lib || { q: '', muscle: 'All' }; state._lib.open = true; state._lib.q = ''; renderWorkout(); }
-function closeLibrary() { if (state._lib) state._lib.open = false; renderWorkout(); }
-function woLibFilter(m) { state._lib.muscle = m; renderWorkout(); }
-function woLibSearch() {
-  state._lib.q = document.getElementById('wo-lib-search')?.value || '';
-  const list = document.getElementById('wo-lib-list');
-  if (list) list.innerHTML = renderLibList();
+// ── Exercise library overlay — body-part first ──
+// Map a free-text muscle label (e.g. from the gym log) to a library group, if it
+// matches one exactly. Push / Pull / Full Body have no single group → '' (picker).
+function normalizeLibMuscle(g) {
+  if (!g) return '';
+  const key = String(g).trim().toLowerCase();
+  for (const m of Object.keys(EXERCISE_LIBRARY)) if (m.toLowerCase() === key) return m;
+  return '';
 }
-function renderLibList() {
-  const q = state._lib.q, m = state._lib.muscle;
-  const res = searchExercises(q, m);
-  const rows = res.map(e =>
-    '<button type="button" class="wo-lib-item" onclick="woAddExercise(' + JSON.stringify(e.name).replace(/"/g, '&quot;') + ',' + JSON.stringify(e.muscle).replace(/"/g, '&quot;') + ')">' +
-    '<span class="wo-lib-name">' + escapeHtml(e.name) + '</span><span class="wo-lib-tag">' + escapeHtml(e.muscle) + '</span></button>').join('');
-  const custom = q.trim()
-    ? '<button type="button" class="wo-lib-item wo-lib-custom" onclick="woAddCustomExercise()">＋ Add &ldquo;' + escapeHtml(q.trim()) + '&rdquo;</button>'
-    : '';
-  return (rows || '<div class="wo-lib-empty">No matches.</div>') + custom;
+function woOpenLibrary() { state._lib = state._lib || { q: '', muscle: '' }; state._lib.open = true; state._lib.q = ''; renderWorkout(); }
+function closeLibrary() { if (state._lib) state._lib.open = false; renderWorkout(); }
+function woLibFilter(m) { state._lib.muscle = m; state._lib.q = ''; const s = document.getElementById('wo-lib-search'); if (s) s.value = ''; woLibRefresh(); }   // pick a body part
+function woLibBack() { state._lib.muscle = ''; state._lib.q = ''; const s = document.getElementById('wo-lib-search'); if (s) s.value = ''; woLibRefresh(); }       // back to the body-part list
+function woLibSearch() { state._lib.q = document.getElementById('wo-lib-search')?.value || ''; woLibRefresh(); }
+function woLibRefresh() { const el = document.getElementById('wo-lib-list'); if (el) el.innerHTML = renderLibBody(); }
+function libItemHtml(e) {
+  return '<button type="button" class="wo-lib-item" onclick="woAddExercise(' + JSON.stringify(e.name).replace(/"/g, '&quot;') + ',' + JSON.stringify(e.muscle).replace(/"/g, '&quot;') + ')">' +
+    '<span class="wo-lib-name">' + escapeHtml(e.name) + '</span><span class="wo-lib-tag">' + escapeHtml(e.muscle) + '</span></button>';
+}
+// The library body switches between three views: a typed search (across all
+// parts), a chosen body part (only its exercises), or the body-part picker.
+function renderLibBody() {
+  const q = (state._lib.q || '').trim();
+  if (q) {
+    const res = searchExercises(q, 'All');
+    const rows = res.map(libItemHtml).join('') || '<div class="wo-lib-empty">No matches in the library.</div>';
+    return '<div class="wo-lib-sec">Results for &ldquo;' + escapeHtml(q) + '&rdquo;</div>' + rows +
+      '<button type="button" class="wo-lib-item wo-lib-custom" onclick="woAddCustomExercise()">＋ Add &ldquo;' + escapeHtml(q) + '&rdquo; as a custom exercise</button>';
+  }
+  const m = state._lib.muscle;
+  if (!m || m === 'All') {
+    return '<div class="wo-lib-sec">Choose a body part</div>' +
+      '<div class="wo-bp-grid">' + Object.keys(EXERCISE_LIBRARY).map(part =>
+        '<button type="button" class="wo-bp" onclick="woLibFilter(\'' + part + '\')">' +
+        '<span class="wo-bp-name">' + part + '</span>' +
+        '<span class="wo-bp-count">' + EXERCISE_LIBRARY[part].length + ' exercises ›</span></button>').join('') +
+      '</div>';
+  }
+  const res = searchExercises('', m);
+  return '<button type="button" class="wo-lib-back" onclick="woLibBack()">‹ All body parts</button>' +
+    '<div class="wo-lib-part-title">' + escapeHtml(m) + ' · ' + res.length + ' exercises</div>' +
+    res.map(libItemHtml).join('');
 }
 
 function renderWorkout() {
@@ -4058,9 +4083,8 @@ function renderWorkout() {
 
   const lib = (state._lib && state._lib.open)
     ? '<div class="wo-lib-overlay" onclick="if(event.target===this)closeLibrary()"><div class="wo-lib">' +
-      '<div class="wo-lib-head"><input id="wo-lib-search" class="wo-lib-search" placeholder="Search exercises…" oninput="woLibSearch()" value="' + escapeAttr(state._lib.q || '') + '"><button type="button" class="wo-lib-close" onclick="closeLibrary()">✕</button></div>' +
-      '<div class="wo-lib-filters">' + ['All'].concat(Object.keys(EXERCISE_LIBRARY)).map(m => '<button type="button" class="wo-lib-chip' + (state._lib.muscle === m ? ' on' : '') + '" onclick="woLibFilter(\'' + m + '\')">' + m + '</button>').join('') + '</div>' +
-      '<div class="wo-lib-list" id="wo-lib-list">' + renderLibList() + '</div>' +
+      '<div class="wo-lib-head"><input id="wo-lib-search" class="wo-lib-search" placeholder="Search all exercises…" oninput="woLibSearch()" value="' + escapeAttr(state._lib.q || '') + '"><button type="button" class="wo-lib-close" onclick="closeLibrary()">✕</button></div>' +
+      '<div class="wo-lib-list" id="wo-lib-list">' + renderLibBody() + '</div>' +
       '</div></div>'
     : '';
 
@@ -4090,7 +4114,7 @@ function glOpenWorkout() {
   glCapture();
   g.draft.gymDone = true; g.draft._gymAnswered = true;
   persistStep('gym');           // lock in "trained today" + group/duration before leaving
-  openWorkout('log');
+  openWorkout('log', g.draft.gymGroup || '');   // open the library to the body part they picked, if any
 }
 
 // ── Connection of the Week — the cross-pillar "wow" (rule-based, no AI needed) ──

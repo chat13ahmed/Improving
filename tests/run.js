@@ -60,7 +60,7 @@ function loadApp(fieldValues) {
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
     ' loggingStreak, bestStreak, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
-    ' workoutTotals, searchExercises, formatClock, topMuscle, EXERCISE_LIBRARY });';
+    ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, EXERCISE_LIBRARY });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -636,6 +636,17 @@ eq('formatClock: clamps negatives', A.formatClock(-10), '0:00');
 // Day label from the workout
 eq('topMuscle: most-trained group wins', A.topMuscle(_wo), 'Chest');
 eq('topMuscle: empty → ""', A.topMuscle([]), '');
+// Body-part filter: a chosen group shows ONLY that group's exercises
+['Chest','Back','Legs','Shoulders','Arms','Core','Cardio'].forEach(part => {
+  const only = A.searchExercises('', part);
+  ok('library filter "' + part + '" returns only ' + part + ' exercises', only.length > 0 && only.every(e => e.muscle === part));
+});
+// Gym-log muscle label → library group (so picking a part in the log pre-filters)
+eq('normalizeLibMuscle: exact group matches', A.normalizeLibMuscle('Chest'), 'Chest');
+eq('normalizeLibMuscle: case-insensitive (from full form)', A.normalizeLibMuscle('legs'), 'Legs');
+eq('normalizeLibMuscle: Push has no single group → ""', A.normalizeLibMuscle('Push'), '');
+eq('normalizeLibMuscle: Full Body → "" (picker)', A.normalizeLibMuscle('Full Body'), '');
+eq('normalizeLibMuscle: empty → ""', A.normalizeLibMuscle(''), '');
 
 // ─────────────────────────────────────────────────────────────
 // CLOUD DATABASE — real SQLite round-trip (in-memory, no install)
