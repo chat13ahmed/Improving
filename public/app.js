@@ -995,7 +995,7 @@ function navigate(page) {
   const moreBtn = document.getElementById('bnav-more');
   if (moreBtn) moreBtn.classList.toggle('active', !['dashboard', 'log', 'coach'].includes(page));
   document.getElementById('more-sheet')?.remove();
-  const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
+  const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, workout: renderWorkout, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
   injectFAB();
   (pages[page] || renderDashboard)();
 }
@@ -3809,6 +3809,290 @@ function renderGymPlanHint() {
     (nut ? ' · eat ~' + nut.calories.toLocaleString() + ' cal / ' + nut.protein.g + 'g protein' : '') + '</div>';
 }
 
+// ─────────────────────────────────────────────────────────────
+// WORKOUT TRACKER — exercise library, set/rep logging, rest timer
+// A day's workout lives on day.gym.exercises = [{ name, muscle, sets:[{reps,weight}] }].
+// Everything else about day.gym (done/muscleGroup/duration/notes) is preserved, so
+// this is purely additive to the existing boolean "did you train?" pillar.
+// ─────────────────────────────────────────────────────────────
+const EXERCISE_LIBRARY = {
+  Chest:     ['Barbell Bench Press', 'Incline Dumbbell Press', 'Push-Up', 'Chest Fly', 'Cable Crossover', 'Dips', 'Machine Chest Press', 'Decline Bench Press'],
+  Back:      ['Pull-Up', 'Lat Pulldown', 'Bent-Over Row', 'Seated Cable Row', 'Deadlift', 'T-Bar Row', 'Dumbbell Row', 'Face Pull'],
+  Legs:      ['Back Squat', 'Front Squat', 'Leg Press', 'Romanian Deadlift', 'Walking Lunge', 'Leg Extension', 'Leg Curl', 'Calf Raise', 'Hip Thrust'],
+  Shoulders: ['Overhead Press', 'Dumbbell Shoulder Press', 'Lateral Raise', 'Front Raise', 'Rear Delt Fly', 'Arnold Press', 'Upright Row', 'Shrug'],
+  Arms:      ['Barbell Curl', 'Dumbbell Curl', 'Hammer Curl', 'Preacher Curl', 'Triceps Pushdown', 'Skull Crusher', 'Overhead Triceps Extension', 'Close-Grip Bench Press'],
+  Core:      ['Plank', 'Hanging Leg Raise', 'Crunch', 'Russian Twist', 'Cable Woodchop', 'Ab Wheel Rollout', 'Mountain Climber', 'Bicycle Crunch'],
+  Cardio:    ['Treadmill Run', 'Cycling', 'Rowing Machine', 'Stair Climber', 'Elliptical', 'Jump Rope', 'Incline Walk', 'HIIT Intervals']
+};
+// Pure: roll up a workout into headline numbers. (testable)
+function workoutTotals(exercises) {
+  const list = Array.isArray(exercises) ? exercises : [];
+  let sets = 0, reps = 0, volume = 0;
+  for (const ex of list) {
+    const ss = (ex && Array.isArray(ex.sets)) ? ex.sets : [];
+    for (const s of ss) {
+      const r = Math.max(0, +(s && s.reps) || 0), w = Math.max(0, +(s && s.weight) || 0);
+      if (r > 0 || w > 0) { sets++; reps += r; volume += r * w; }
+    }
+  }
+  return { exercises: list.length, sets, reps, volume: Math.round(volume) };
+}
+// Pure: search the library by name or muscle group. Empty query → everything. (testable)
+function searchExercises(query, muscle) {
+  const q = String(query || '').trim().toLowerCase();
+  const mf = muscle && muscle !== 'All' ? muscle : '';
+  const out = [];
+  for (const m of Object.keys(EXERCISE_LIBRARY)) {
+    if (mf && m !== mf) continue;
+    for (const name of EXERCISE_LIBRARY[m]) {
+      if (!q || name.toLowerCase().includes(q) || m.toLowerCase().includes(q)) out.push({ name, muscle: m });
+    }
+  }
+  return out;
+}
+// Pure: seconds → "M:SS". (testable)
+function formatClock(seconds) {
+  const s = Math.max(0, Math.round(+seconds || 0));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+// Pure: the most-trained muscle group in a workout, for the day's label. (testable)
+function topMuscle(exercises) {
+  const count = {};
+  (Array.isArray(exercises) ? exercises : []).forEach(e => { if (e && e.muscle) count[e.muscle] = (count[e.muscle] || 0) + 1; });
+  let best = '', n = 0;
+  for (const k of Object.keys(count)) if (count[k] > n) { n = count[k]; best = k; }
+  return best;
+}
+
+// ── Rest-over alert: notification + vibrate + beep, so it reaches them mid-set ──
+function restBeep() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const blip = (at, freq) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = freq; o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.0001, at);
+      g.gain.exponentialRampToValueAtTime(0.35, at + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + 0.22);
+      o.start(at); o.stop(at + 0.24);
+    };
+    blip(ctx.currentTime, 880); blip(ctx.currentTime + 0.28, 1175);
+    setTimeout(() => { try { ctx.close(); } catch {} }, 900);
+  } catch {}
+}
+function restNotify() {
+  try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 90, 200]); } catch {}
+  restBeep();
+  try {
+    if ('Notification' in window && Notification.permission === 'granted')
+      new Notification('Rest over — next set! 💪', { body: 'Time to get back under the bar.', icon: 'icons/icon-192.png', tag: 'rest-timer', renotify: true });
+  } catch {}
+  showToast('Rest over — next set! 💪', 'success');
+}
+
+// ── Open / save the workout session ──
+function openWorkout(ret) {
+  state._workoutReturn = ret || 'log';
+  // Make sure anything typed in the full Log form is saved before we leave it
+  if (document.getElementById('day-form')) { try { commitDayFromForm(); } catch {} }
+  const day = (state.data.days || []).find(x => x.date === todayStr());
+  const ex = (day && day.gym && Array.isArray(day.gym.exercises)) ? day.gym.exercises : [];
+  state._workout = { exercises: ex.map(e => ({ name: e.name, muscle: e.muscle || '', sets: (e.sets || []).map(s => ({ reps: +s.reps || 0, weight: +s.weight || 0 })) })) };
+  state._lib = { open: false, q: '', muscle: 'All' };
+  state.page = 'workout';
+  renderWorkout();
+}
+function saveWorkout() {
+  if (!state._workout) return;
+  const date = todayStr();
+  const days = state.data.days = state.data.days || [];
+  let day = days.find(x => x.date === date);
+  if (!day) { day = { id: uid(), date }; days.push(day); }
+  const exercises = state._workout.exercises.map(e => ({ name: e.name, muscle: e.muscle || '', sets: e.sets.map(s => ({ reps: +s.reps || 0, weight: +s.weight || 0 })) }));
+  const tot = workoutTotals(exercises);
+  const prev = day.gym || {};
+  day.gym = {
+    done: tot.sets > 0 ? true : !!prev.done,
+    muscleGroup: (topMuscle(exercises) || prev.muscleGroup || '').toLowerCase(),
+    duration: prev.duration || 0,
+    notes: prev.notes || '',
+    exercises
+  };
+  if (!Array.isArray(day._logged)) day._logged = [];
+  if (tot.sets > 0 && !day._logged.includes('gym')) day._logged.push('gym');
+  saveData();
+}
+function closeWorkout() {
+  woStopRest();
+  saveWorkout();
+  const tot = workoutTotals(state._workout ? state._workout.exercises : []);
+  state._workout = null; state._lib = null;
+  navigate(state._workoutReturn || 'log');
+  if (tot.sets > 0) showToast('Workout saved — ' + tot.sets + ' sets · ' + tot.reps + ' reps 💪', 'success');
+}
+
+// ── Exercises + sets ──
+function woAddExercise(name, muscle) {
+  if (!state._workout || !name) return;
+  state._workout.exercises.push({ name: name, muscle: muscle || '', sets: [] });
+  state._lib.open = false;
+  saveWorkout(); renderWorkout();
+}
+function woAddCustomExercise() {
+  const v = (document.getElementById('wo-lib-search')?.value || '').trim();
+  if (!v) return;
+  woAddExercise(v, state._lib.muscle && state._lib.muscle !== 'All' ? state._lib.muscle : '');
+}
+function woRemoveExercise(i) {
+  if (!state._workout) return;
+  state._workout.exercises.splice(i, 1);
+  saveWorkout(); renderWorkout();
+}
+function woAddSet(i) {
+  const ex = state._workout && state._workout.exercises[i]; if (!ex) return;
+  const reps = parseInt(document.getElementById('wo-reps-' + i)?.value) || 0;
+  const weight = parseFloat(document.getElementById('wo-weight-' + i)?.value) || 0;
+  if (reps <= 0 && weight <= 0) { showToast('Enter reps (and weight, if any)', 'error'); return; }
+  ex.sets.push({ reps, weight });
+  saveWorkout();
+  woStartRest(state._restDefault || 90);   // auto-start the rest clock after each set (also re-renders)
+}
+function woRemoveSet(i, j) {
+  const ex = state._workout && state._workout.exercises[i]; if (!ex) return;
+  ex.sets.splice(j, 1);
+  saveWorkout(); renderWorkout();
+}
+
+// ── Rest timer ──
+function woStartRest(sec) {
+  woStopRest();
+  const total = Math.max(5, Math.round(+sec) || 90);
+  state._restDefault = total;
+  state._restTimer = { left: total, total, running: true, id: 0 };
+  state._restTimer.id = setInterval(woRestTick, 1000);
+  renderWorkout();
+}
+function woRestTick() {
+  const t = state._restTimer; if (!t || !t.running) return;
+  t.left -= 1;
+  if (t.left <= 0) { woStopRest(); restNotify(); if (state.page === 'workout') renderWorkout(); return; }
+  const clock = document.getElementById('wo-rest-clock');
+  const fill = document.getElementById('wo-rest-fill');
+  if (clock) clock.textContent = formatClock(t.left);
+  if (fill) fill.style.width = Math.round((t.left / t.total) * 100) + '%';
+}
+function woAddRest(delta) {
+  const t = state._restTimer; if (!t || !t.running) return;
+  t.left = Math.max(1, t.left + delta); t.total = Math.max(t.total, t.left);
+  const clock = document.getElementById('wo-rest-clock'); if (clock) clock.textContent = formatClock(t.left);
+}
+function woCancelRest() { woStopRest(); renderWorkout(); }
+function woStopRest() { const t = state._restTimer; if (t && t.id) { try { clearInterval(t.id); } catch {} } state._restTimer = null; }
+
+// ── Exercise library overlay ──
+function woOpenLibrary() { state._lib = state._lib || { q: '', muscle: 'All' }; state._lib.open = true; state._lib.q = ''; renderWorkout(); }
+function closeLibrary() { if (state._lib) state._lib.open = false; renderWorkout(); }
+function woLibFilter(m) { state._lib.muscle = m; renderWorkout(); }
+function woLibSearch() {
+  state._lib.q = document.getElementById('wo-lib-search')?.value || '';
+  const list = document.getElementById('wo-lib-list');
+  if (list) list.innerHTML = renderLibList();
+}
+function renderLibList() {
+  const q = state._lib.q, m = state._lib.muscle;
+  const res = searchExercises(q, m);
+  const rows = res.map(e =>
+    '<button type="button" class="wo-lib-item" onclick="woAddExercise(' + JSON.stringify(e.name).replace(/"/g, '&quot;') + ',' + JSON.stringify(e.muscle).replace(/"/g, '&quot;') + ')">' +
+    '<span class="wo-lib-name">' + escapeHtml(e.name) + '</span><span class="wo-lib-tag">' + escapeHtml(e.muscle) + '</span></button>').join('');
+  const custom = q.trim()
+    ? '<button type="button" class="wo-lib-item wo-lib-custom" onclick="woAddCustomExercise()">＋ Add &ldquo;' + escapeHtml(q.trim()) + '&rdquo;</button>'
+    : '';
+  return (rows || '<div class="wo-lib-empty">No matches.</div>') + custom;
+}
+
+function renderWorkout() {
+  if (!state._workout) { navigate('dashboard'); return; }
+  const unit = weightUnitPref() === 'lbs' ? 'lb' : 'kg';
+  const exs = state._workout.exercises;
+  const tot = workoutTotals(exs);
+  const t = state._restTimer;
+
+  const totals =
+    '<div class="wo-totals">' +
+    '<div class="wo-tot"><span class="wo-tot-n">' + tot.exercises + '</span><span class="wo-tot-l">exercises</span></div>' +
+    '<div class="wo-tot"><span class="wo-tot-n">' + tot.sets + '</span><span class="wo-tot-l">sets</span></div>' +
+    '<div class="wo-tot"><span class="wo-tot-n">' + tot.reps + '</span><span class="wo-tot-l">reps</span></div>' +
+    '<div class="wo-tot"><span class="wo-tot-n">' + (tot.volume ? tot.volume.toLocaleString() : '0') + '</span><span class="wo-tot-l">' + unit + ' lifted</span></div>' +
+    '</div>';
+
+  const exCards = exs.length ? exs.map((ex, i) => {
+    const last = ex.sets[ex.sets.length - 1];
+    const setRows = ex.sets.map((s, j) =>
+      '<div class="wo-set"><span class="wo-set-n">' + (j + 1) + '</span>' +
+      '<span class="wo-set-v">' + (s.reps || 0) + ' reps' + (s.weight ? ' × ' + s.weight + ' ' + unit : '') + '</span>' +
+      '<button type="button" class="wo-set-del" onclick="woRemoveSet(' + i + ',' + j + ')" title="Remove set">✕</button></div>').join('');
+    return '<div class="wo-ex">' +
+      '<div class="wo-ex-head"><div><div class="wo-ex-name">' + escapeHtml(ex.name) + '</div>' +
+      (ex.muscle ? '<div class="wo-ex-muscle">' + escapeHtml(ex.muscle) + '</div>' : '') + '</div>' +
+      '<button type="button" class="wo-ex-del" onclick="woRemoveExercise(' + i + ')" title="Remove exercise">✕</button></div>' +
+      (setRows ? '<div class="wo-sets">' + setRows + '</div>' : '<div class="wo-sets-empty">No sets yet — log your first below.</div>') +
+      '<div class="wo-set-add">' +
+      '<input id="wo-reps-' + i + '" class="wo-set-in" type="number" inputmode="numeric" placeholder="reps" value="' + (last ? last.reps : '') + '">' +
+      '<span class="wo-x">×</span>' +
+      '<input id="wo-weight-' + i + '" class="wo-set-in" type="number" inputmode="decimal" placeholder="' + unit + '" value="' + (last && last.weight ? last.weight : '') + '">' +
+      '<button type="button" class="wo-set-btn" onclick="woAddSet(' + i + ')">＋ Set</button>' +
+      '</div></div>';
+  }).join('') : '<div class="wo-empty">🏋️<div class="wo-empty-t">No exercises yet</div><div class="wo-empty-s">Add one from the library and start logging your sets.</div></div>';
+
+  // Rest timer: live bar while running, preset buttons otherwise
+  const restBlock = (t && t.running)
+    ? '<div class="wo-rest wo-rest-live">' +
+      '<div class="wo-rest-top"><span class="wo-rest-label">Resting</span><span class="wo-rest-clock" id="wo-rest-clock">' + formatClock(t.left) + '</span></div>' +
+      '<div class="wo-rest-track"><div class="wo-rest-fill" id="wo-rest-fill" style="width:' + Math.round((t.left / t.total) * 100) + '%"></div></div>' +
+      '<div class="wo-rest-btns"><button type="button" onclick="woAddRest(15)">+15s</button><button type="button" onclick="woAddRest(30)">+30s</button><button type="button" class="wo-rest-stop" onclick="woCancelRest()">Stop</button></div>' +
+      '</div>'
+    : '<div class="wo-rest"><div class="wo-rest-top"><span class="wo-rest-label">Rest timer</span><span class="wo-rest-hint">starts after each set</span></div>' +
+      '<div class="wo-rest-presets">' + [60, 90, 120, 180].map(n => '<button type="button"' + ((state._restDefault || 90) === n ? ' class="on"' : '') + ' onclick="woStartRest(' + n + ')">' + formatClock(n) + '</button>').join('') + '</div></div>';
+
+  const lib = (state._lib && state._lib.open)
+    ? '<div class="wo-lib-overlay" onclick="if(event.target===this)closeLibrary()"><div class="wo-lib">' +
+      '<div class="wo-lib-head"><input id="wo-lib-search" class="wo-lib-search" placeholder="Search exercises…" oninput="woLibSearch()" value="' + escapeAttr(state._lib.q || '') + '"><button type="button" class="wo-lib-close" onclick="closeLibrary()">✕</button></div>' +
+      '<div class="wo-lib-filters">' + ['All'].concat(Object.keys(EXERCISE_LIBRARY)).map(m => '<button type="button" class="wo-lib-chip' + (state._lib.muscle === m ? ' on' : '') + '" onclick="woLibFilter(\'' + m + '\')">' + m + '</button>').join('') + '</div>' +
+      '<div class="wo-lib-list" id="wo-lib-list">' + renderLibList() + '</div>' +
+      '</div></div>'
+    : '';
+
+  document.getElementById('main').innerHTML =
+    '<div class="wo-wrap">' +
+    '<div class="wo-top"><button type="button" class="wo-back" onclick="closeWorkout()">‹ Done</button><div class="wo-title">Workout</div><span style="width:54px"></span></div>' +
+    totals +
+    '<div class="wo-ex-list">' + exCards + '</div>' +
+    '<button type="button" class="wo-add" onclick="woOpenLibrary()">＋ Add exercise</button>' +
+    restBlock +
+    '</div>' + lib;
+  if (state._lib && state._lib.open) setTimeout(() => document.getElementById('wo-lib-search')?.focus(), 60);
+}
+// Compact entry point shown inside the Log form's gym section (today only)
+function renderWorkoutEntry(day) {
+  const tot = workoutTotals(day && day.gym && day.gym.exercises);
+  const unit = weightUnitPref() === 'lbs' ? 'lb' : 'kg';
+  return '<div class="wo-entry">' +
+    (tot.sets
+      ? '<div class="wo-entry-sum">🏋️ ' + tot.exercises + ' exercise' + (tot.exercises === 1 ? '' : 's') + ' · ' + tot.sets + ' sets · ' + tot.reps + ' reps' + (tot.volume ? ' · ' + tot.volume.toLocaleString() + ' ' + unit : '') + '</div>'
+      : '') +
+    '<button type="button" class="btn-workout" onclick="openWorkout()">' + (tot.sets ? '✏️ Edit workout — sets, reps & rest timer' : '🏋️ Track exercises — sets, reps & rest timer') + '</button>' +
+    '</div>';
+}
+function glOpenWorkout() {
+  const g = state._guided; if (!g) { openWorkout('log'); return; }
+  glCapture();
+  g.draft.gymDone = true; g.draft._gymAnswered = true;
+  persistStep('gym');           // lock in "trained today" + group/duration before leaving
+  openWorkout('log');
+}
+
 // ── Connection of the Week — the cross-pillar "wow" (rule-based, no AI needed) ──
 // Compares a numeric metric on days you trained vs days you didn't and surfaces the
 // biggest honest gap. This is the one insight no single-purpose app can give you.
@@ -4767,7 +5051,8 @@ function renderGuidedLog() {
       '<div id="gl-gym-extra" class="gl-extra"' + (d.gymDone ? '' : ' style="display:none"') + '>' +
       '<div class="gl-sub2">What did you train?</div>' +
       '<div class="gl-muscles">' + ['Push', 'Pull', 'Legs', 'Chest', 'Back', 'Shoulders', 'Arms', 'Core', 'Full Body', 'Cardio'].map(grp => '<button type="button" class="gl-muscle' + (d.gymGroup === grp ? ' gl-muscle-on' : '') + '" onclick="glSetMuscle(\'' + grp + '\')">' + grp + '</button>').join('') + '</div>' +
-      '<input id="gl-gym-dur" class="gl-input" type="number" inputmode="numeric" placeholder="Minutes (optional)" value="' + (d.gymDur || '') + '"></div>';
+      '<input id="gl-gym-dur" class="gl-input" type="number" inputmode="numeric" placeholder="Minutes (optional)" value="' + (d.gymDur || '') + '">' +
+      '<button type="button" class="btn-workout gl-workout" onclick="glOpenWorkout()">🏋️ Track sets, reps &amp; rest timer →</button></div>';
   } else if (key.indexOf('meal:') === 0) {
     const idx = parseInt(key.split(':')[1], 10);
     const nut = getNutrition();
@@ -4958,6 +5243,7 @@ function renderLogToday(editDay) {
     '</div>' +
     '<div class="form-group"><label>Notes</label>' +
     '<textarea id="gym-notes" rows="2" placeholder="How it went, anything to remember…">' + gymNotes + '</textarea></div>' +
+    (isEditing ? '' : renderWorkoutEntry(d)) +
     '</div>';
 
   // Food rating buttons
@@ -5169,7 +5455,8 @@ function readDayForm(date, prior) {
       done: gymDone === true,
       muscleGroup: document.getElementById('gym-group')?.value || '',
       duration: parseInt(document.getElementById('gym-dur')?.value) || 0,
-      notes: document.getElementById('gym-notes')?.value?.trim() || ''
+      notes: document.getElementById('gym-notes')?.value?.trim() || '',
+      exercises: (prior.gym && prior.gym.exercises) || []   // logged in the workout tracker, kept across saves
     } : (prior.gym || { done: false, muscleGroup: '', duration: 0, notes: '' }),
     food: foodEl ? {
       rating: parseInt(foodEl.value) || 0,

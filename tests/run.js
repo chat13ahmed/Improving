@@ -59,7 +59,8 @@ function loadApp(fieldValues) {
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
     ' loggingStreak, bestStreak, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
-    ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus });';
+    ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
+    ' workoutTotals, searchExercises, formatClock, topMuscle, EXERCISE_LIBRARY });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -600,6 +601,41 @@ if (P) {
   ok('motivationFor prepends the name', P.motivationFor('2026-06-27', 'Ahmed').body.indexOf('Ahmed — ') === 0);
   ok('motivationFor without a name has no separator prefix', P.motivationFor('2026-06-27').body.indexOf(' — ') !== 0);
 }
+
+// ─────────────────────────────────────────────────────────────
+// WORKOUT TRACKER — exercise library + set/rep totals + rest clock
+// ─────────────────────────────────────────────────────────────
+const _wo = [
+  { name: 'Bench Press', muscle: 'Chest', sets: [{ reps: 10, weight: 60 }, { reps: 8, weight: 70 }] },
+  { name: 'Push-Up', muscle: 'Chest', sets: [{ reps: 20, weight: 0 }] }
+];
+const _wt = A.workoutTotals(_wo);
+eq('workoutTotals: exercise count', _wt.exercises, 2);
+eq('workoutTotals: total sets', _wt.sets, 3);
+eq('workoutTotals: total reps (10+8+20)', _wt.reps, 38);
+eq('workoutTotals: volume (10*60 + 8*70)', _wt.volume, 1160);
+ok('workoutTotals: bodyweight set counts (reps>0, weight 0)', _wt.sets === 3);
+const _wtEmpty = A.workoutTotals([]);
+ok('workoutTotals: empty workout → zeros', _wtEmpty.sets === 0 && _wtEmpty.reps === 0 && _wtEmpty.volume === 0);
+ok('workoutTotals: ignores a set with no reps and no weight', A.workoutTotals([{ name: 'x', sets: [{ reps: 0, weight: 0 }] }]).sets === 0);
+ok('workoutTotals: handles junk input', A.workoutTotals(null).exercises === 0 && A.workoutTotals(undefined).sets === 0);
+// Library search
+ok('searchExercises: empty query returns the whole library', A.searchExercises('').length === Object.values(A.EXERCISE_LIBRARY).reduce((s, a) => s + a.length, 0));
+ok('searchExercises: matches by name', A.searchExercises('squat').some(e => /Squat/.test(e.name)));
+ok('searchExercises: name search is case-insensitive', A.searchExercises('BENCH').some(e => /Bench/.test(e.name)));
+ok('searchExercises: filters by muscle group', A.searchExercises('', 'Back').every(e => e.muscle === 'Back'));
+ok('searchExercises: "All" filter is the same as no filter', A.searchExercises('', 'All').length === A.searchExercises('').length);
+ok('searchExercises: no match → empty', A.searchExercises('zzzznotreal').length === 0);
+ok('EXERCISE_LIBRARY: has the 7 muscle groups', ['Chest','Back','Legs','Shoulders','Arms','Core','Cardio'].every(k => Array.isArray(A.EXERCISE_LIBRARY[k]) && A.EXERCISE_LIBRARY[k].length));
+// Rest clock formatting
+eq('formatClock: 90s → 1:30', A.formatClock(90), '1:30');
+eq('formatClock: 60s → 1:00', A.formatClock(60), '1:00');
+eq('formatClock: 5s → 0:05 (pads)', A.formatClock(5), '0:05');
+eq('formatClock: 0 → 0:00', A.formatClock(0), '0:00');
+eq('formatClock: clamps negatives', A.formatClock(-10), '0:00');
+// Day label from the workout
+eq('topMuscle: most-trained group wins', A.topMuscle(_wo), 'Chest');
+eq('topMuscle: empty → ""', A.topMuscle([]), '');
 
 // ─────────────────────────────────────────────────────────────
 // CLOUD DATABASE — real SQLite round-trip (in-memory, no install)
