@@ -8125,9 +8125,10 @@ function renderAdminStatsCard() {
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
     '<h3 class="card-title" style="margin-bottom:0">Your app — live numbers</h3>' +
     '<button class="btn btn-outline btn-sm" onclick="loadAdminStats()">↻ Refresh</button></div>' +
-    '<p class="card-sub">Owner only. How many people use Onward and how active they are.</p>' +
+    '<p class="card-sub">Owner only — how many people use Onward, how often, and what it earns.</p>' +
     '<div id="admin-stats" class="admin-grid"><div class="di-loading"><div class="spinner"></div><span>Loading…</span></div></div>' +
-    '<div id="admin-recent"></div></div>';
+    '<div id="admin-recent"></div>' +
+    '<p class="card-sub" style="margin-top:12px;font-size:12px">Revenue is estimated from Pro members × your price — your exact figure lives in your Stripe dashboard.</p></div>';
 }
 async function loadAdminStats() {
   const grid = document.getElementById('admin-stats');
@@ -8138,11 +8139,11 @@ async function loadAdminStats() {
     if (!grid) return;
     const tile = (n, label, hint) => '<div class="admin-tile"><div class="admin-n">' + n + '</div><div class="admin-l">' + label + '</div>' + (hint ? '<div class="admin-h">' + hint + '</div>' : '') + '</div>';
     grid.innerHTML =
-      tile(j.totalUsers, 'Total users', j.new7 ? '+' + j.new7 + ' this week' : '') +
+      tile(j.totalUsers, 'People using Onward', j.new7 ? '+' + j.new7 + ' this week' : '') +
+      tile((j.avgDaysWeek != null ? j.avgDaysWeek : '—'), 'Avg days / week', 'among weekly users') +
+      tile('$' + (j.estRevenue || 0), 'Est. revenue / mo', (j.proUsers || 0) + ' Pro member' + (j.proUsers === 1 ? '' : 's')) +
       tile(j.loggedToday, 'Logged today', j.totalUsers ? Math.round(j.loggedToday / j.totalUsers * 100) + '% of users' : '') +
-      tile(j.active7, 'Active · 7 days') +
-      tile(j.active30, 'Active · 30 days') +
-      tile(j.avgDays, 'Avg days / user') +
+      tile(j.active7, 'Active this week') +
       tile(j.pushDevices, 'Push devices');
     if (recent) {
       const rowsHtml = (j.recent || []).map(r => '<tr><td>' + escapeHtml(r.username) + '</td><td style="text-align:center">' + r.days + '</td><td style="text-align:right;color:var(--text-muted)">' + (r.last ? fmtDateShort(r.last) : '—') + '</td></tr>').join('');

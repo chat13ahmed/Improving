@@ -619,20 +619,29 @@ app.get('/api/admin/stats', requireAuth, async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const dayWithin = (ds, n) => { if (!ds) return false; const t = Date.parse(ds + 'T00:00:00Z'); return !isNaN(t) && Date.now() - t < n * DAY && Date.now() - t > -DAY; };
     const createdWithin = (c, n) => { if (!c) return false; const t = Date.parse(c); return !isNaN(t) && Date.now() - t < n * DAY; };
-    let loggedToday = 0, active7 = 0, active30 = 0, totalDays = 0;
+    let loggedToday = 0, active7 = 0, active30 = 0, totalDays = 0, weekDaysSum = 0, proUsers = 0;
     const rows = users.map(u => {
-      const days = Array.isArray((byId[String(u.id)] || {}).days) ? byId[String(u.id)].days : [];
+      const d0 = byId[String(u.id)] || {};
+      const prof = d0.profile || {};
+      const days = Array.isArray(d0.days) ? d0.days : [];
       const dates = days.map(d => d && d.date).filter(Boolean);
       totalDays += days.length;
+      const week = dates.filter(d => dayWithin(d, 7)).length;   // days they logged in the last 7
+      weekDaysSum += week;
       if (dates.includes(today)) loggedToday++;
-      if (dates.some(d => dayWithin(d, 7))) active7++;
+      if (week > 0) active7++;
       if (dates.some(d => dayWithin(d, 30))) active30++;
+      if (prof.pro === true && !isOwner(u.username)) proUsers++;   // paying members (owner excluded)
       return { username: u.username, days: days.length, last: dates.sort().slice(-1)[0] || null };
     });
     rows.sort((a, b) => String(b.last || '').localeCompare(String(a.last || '')) || b.days - a.days);
+    const priceLabel = process.env.PRICE_LABEL || '$7.99/mo';
+    const monthlyPrice = parseFloat((priceLabel.match(/[\d.]+/) || ['0'])[0]) || 0;
     res.json({
       totalUsers: users.length, loggedToday, active7, active30, totalDays,
       avgDays: users.length ? +(totalDays / users.length).toFixed(1) : 0,
+      avgDaysWeek: active7 ? +(weekDaysSum / active7).toFixed(1) : 0,   // avg days/week among weekly-active users
+      proUsers, priceLabel, monthlyPrice, estRevenue: +(proUsers * monthlyPrice).toFixed(2),
       pushDevices: subs.length,
       newToday: users.filter(u => createdWithin(u.created_at, 1)).length,
       new7: users.filter(u => createdWithin(u.created_at, 7)).length,
