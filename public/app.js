@@ -7871,9 +7871,12 @@ function renderNudgeCard() {
   const p = state.data.profile || {};
   const on = p.dailyNudge !== false; // default ON
   const proteinOn = p.proteinNudge !== false; // default ON
+  const motivationOn = p.dailyMotivation !== false; // default ON
   const hour = Number.isFinite(+p.nudgeHour) ? +p.nudgeHour : 19;
+  const mHour = Number.isFinite(+p.motivationHour) ? +p.motivationHour : 8;
   const fmt = h => ((h % 12) || 12) + ':00 ' + (h < 12 ? 'AM' : 'PM');
   const opts = Array.from({ length: 24 }, (_, h) => '<option value="' + h + '"' + (h === hour ? ' selected' : '') + '>' + fmt(h) + '</option>').join('');
+  const mopts = Array.from({ length: 24 }, (_, h) => '<option value="' + h + '"' + (h === mHour ? ' selected' : '') + '>' + fmt(h) + '</option>').join('');
   return '<div class="card">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
     '<h3 class="card-title" style="margin-bottom:0">Daily streak nudge</h3>' +
@@ -7886,8 +7889,28 @@ function renderNudgeCard() {
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
     '<h3 class="card-title" style="margin-bottom:0">Protein reminder</h3>' +
     '<label class="pc-toggle"><input type="checkbox" ' + (proteinOn ? 'checked' : '') + ' onchange="toggleProteinNudge()"><span class="pc-slider"></span></label></div>' +
-    '<p class="card-sub" style="margin-bottom:0">Logged food but came up short on protein? Around your reminder time we\'ll let you know there\'s still time for a shake — so you hit your target. (Needs nutrition set up.)</p>' +
+    '<p class="card-sub">Logged food but came up short on protein? Around your reminder time we\'ll let you know there\'s still time for a shake — so you hit your target. (Needs nutrition set up.)</p>' +
+    '<div style="height:1px;background:var(--border);margin:16px 0"></div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+    '<h3 class="card-title" style="margin-bottom:0">Daily motivation ⛰️</h3>' +
+    '<label class="pc-toggle"><input type="checkbox" ' + (motivationOn ? 'checked' : '') + ' onchange="toggleMotivation()"><span class="pc-slider"></span></label></div>' +
+    '<p class="card-sub">A short hit of motivation every morning — one line to get you moving. Goes out whether or not you\'ve logged. No streak required.</p>' +
+    '<div class="rem-add"><label style="align-self:center;color:var(--text-muted);font-size:14px;white-space:nowrap">Send at</label>' +
+    '<select id="motivation-hour" onchange="setMotivationHour(this.value)"' + (motivationOn ? '' : ' disabled') + '>' + mopts + '</select></div>' +
     '</div>';
+}
+async function toggleMotivation() {
+  const p = state.data.profile = state.data.profile || {};
+  p.dailyMotivation = !(p.dailyMotivation !== false);
+  if (p.dailyMotivation) p.tz = -new Date().getTimezoneOffset(); // so the server knows your morning
+  await saveData();
+  renderChecklistPage();
+}
+async function setMotivationHour(v) {
+  const p = state.data.profile = state.data.profile || {};
+  const h = parseInt(v, 10);
+  p.motivationHour = Number.isFinite(h) ? h : 8;
+  await saveData();
 }
 async function toggleProteinNudge() {
   const p = state.data.profile = state.data.profile || {};

@@ -584,6 +584,21 @@ if (P) {
   ok('vocab nudge not due if already nudged today', P.isVocabNudgeDue({ hhmm: '15:00', date: D, wordCount: 5, lastNudge: D, roll: 0.1 }) === false);
   ok('vocab nudge respects the random roll', P.isVocabNudgeDue({ hhmm: '15:00', date: D, wordCount: 5, lastNudge: '', roll: 0.9, chance: 0.5 }) === false);
   ok('vocab nudge disabled when off', P.isVocabNudgeDue({ hhmm: '15:00', date: D, wordCount: 5, lastNudge: '', roll: 0.1, enabled: false }) === false);
+
+  // daily motivation push (unconditional encouragement, morning)
+  ok('motivation due (past morning hour)', P.isMotivationDue({ hhmm: '08:30', date: D, lastSent: '' }) === true);
+  ok('motivation not due before the hour', P.isMotivationDue({ hhmm: '06:00', date: D, lastSent: '' }) === false);
+  ok('motivation not due if already sent today', P.isMotivationDue({ hhmm: '10:00', date: D, lastSent: D }) === false);
+  ok('motivation disabled when off', P.isMotivationDue({ hhmm: '10:00', date: D, lastSent: '', enabled: false }) === false);
+  ok('motivation respects custom hour', P.isMotivationDue({ hhmm: '07:00', date: D, lastSent: '', hour: 7 }) === true);
+  ok('motivation fires regardless of logging (no loggedToday gate)', P.isMotivationDue({ hhmm: '09:00', date: D, lastSent: '', loggedToday: true }) === true);
+  const m1 = P.motivationFor('2026-06-27');
+  ok('motivationFor returns a title and body', !!(m1 && m1.title && m1.body));
+  ok('motivationFor is deterministic for a date', P.motivationFor('2026-06-27').body === m1.body);
+  ok('motivationFor differs across days', P.motivationFor('2026-06-27').body !== P.motivationFor('2026-06-28').body);
+  ok('motivationFor cycles (same line 24 days apart)', P.motivationFor('2026-06-27').body === P.motivationFor('2026-07-21').body);
+  ok('motivationFor prepends the name', P.motivationFor('2026-06-27', 'Ahmed').body.indexOf('Ahmed — ') === 0);
+  ok('motivationFor without a name has no separator prefix', P.motivationFor('2026-06-27').body.indexOf(' — ') !== 0);
 }
 
 // ─────────────────────────────────────────────────────────────

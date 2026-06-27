@@ -73,4 +73,50 @@ function isVocabNudgeDue(opts) {
   const chance = Number.isFinite(+o.chance) ? +o.chance : 0.5;
   return roll < chance;
 }
-module.exports = { sendPush, configured, isReminderDue, userLocal, isNudgeDue, isProteinNudgeDue, isVocabNudgeDue };
+// Pure: should the daily motivation push fire? Once/day, past a morning hour,
+// for everyone (no streak/logging condition — it's pure encouragement). (testable)
+function isMotivationDue(opts) {
+  const o = opts || {};
+  if (o.enabled === false) return false;          // user turned it off (default on)
+  if (o.lastSent === o.date) return false;        // already sent today
+  const hour = Number.isFinite(+o.hour) ? +o.hour : 8;
+  return (o.hhmm || '00:00') >= (String(hour).padStart(2, '0') + ':00');
+}
+// On-brand motivation lines: build habits, cast identity votes, never miss twice,
+// keep the climb going. Short enough to land as a phone notification.
+const MOTIVATION = [
+  { t: 'One small step', b: "You don't have to be great today — just don't skip. One log keeps the climb going." },
+  { t: 'Cast your vote', b: "Every action is a vote for who you're becoming. Log one thing today." },
+  { t: 'Never miss twice', b: "Missed yesterday? That's human. Missing twice is how habits die — get back on today." },
+  { t: 'Show up', b: "Motivation gets you started. Showing up when you don't feel like it is what makes you." },
+  { t: 'Future you', b: "The person you want to be is built on the boring days. Today is one of them. Show up." },
+  { t: 'Thirty seconds', b: "You're thirty seconds from keeping your streak alive. That's the whole ask. Go." },
+  { t: 'Small and steady', b: "Small steps repeated beat big plans abandoned. Take one step today." },
+  { t: 'Remember your why', b: "Remember why you started — then do one thing today that honors it." },
+  { t: 'Progress over perfect', b: "You don't need a perfect day. You need a logged one. Done beats ideal." },
+  { t: 'The climb', b: "Mountains aren't climbed in one leap — one foothold at a time. Find today's." },
+  { t: 'Be that person', b: "You're not trying to get fit. You're someone who shows up. Prove it today." },
+  { t: 'It compounds', b: "Today feels small. A year of todays is unrecognizable. Stack one more." },
+  { t: 'Just for you', b: "No one is watching but you. That's exactly why it counts. Log it." },
+  { t: 'Start ugly', b: "It doesn't have to be impressive. It has to be done. Start ugly — just start." },
+  { t: 'Win the morning', b: "Win one small thing early and the day tends to follow. What's your one thing?" },
+  { t: 'Discipline is freedom', b: "The discipline you build today is the freedom you'll feel tomorrow." },
+  { t: "Don't break the chain", b: "Every logged day is a link in the chain. Don't be the one who breaks it." },
+  { t: 'Beat yesterday', b: "Forget everyone else. Just beat yesterday by one percent. That's the whole game." },
+  { t: 'Sharpen the saw', b: "Take five minutes for what recharges you. You can't pour from an empty cup." },
+  { t: "Don't quit today", b: "The only way to fail at this is to quit. So don't quit today. Onward." },
+  { t: 'One percent', b: "One percent better is invisible today and undeniable in a year. Go get it." },
+  { t: 'Trust the reps', b: "You won't feel the change day to day. Trust the reps — they're adding up." },
+  { t: 'Tell the truth', b: "Track the real numbers, not the flattering ones. Honesty is where growth starts." },
+  { t: 'Onward', b: "Whatever yesterday was, today is a fresh climb. One step. Onward." }
+];
+// Pure: the motivation message for a given date. Deterministic by date so every
+// user gets the same line that day and it cycles without repeating for weeks.
+function motivationFor(date, name) {
+  const day = Math.floor(Date.parse((date || '1970-01-01') + 'T00:00:00Z') / 86400000);
+  const i = Number.isFinite(day) ? ((day % MOTIVATION.length) + MOTIVATION.length) % MOTIVATION.length : 0;
+  const m = MOTIVATION[i] || MOTIVATION[0];
+  const who = name ? String(name).trim() : '';
+  return { title: m.t, body: who ? who + ' — ' + m.b : m.b };
+}
+module.exports = { sendPush, configured, isReminderDue, userLocal, isNudgeDue, isProteinNudgeDue, isVocabNudgeDue, isMotivationDue, motivationFor };

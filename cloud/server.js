@@ -737,6 +737,18 @@ app.post('/api/cron/tick', async (req, res) => {
         data._lastVocabNudge = local.date; changed = true;
       }
 
+      // 5) Daily motivation — one positive push every morning, for everyone (no
+      // streak condition). Same line for all users each day; cycles over weeks.
+      if (push.isMotivationDue({ enabled: profile.dailyMotivation, hhmm: local.hhmm, date: local.date, hour: profile.motivationHour, lastSent: data._lastMotivation })) {
+        const name = profile.firstName || profile.name || '';
+        const m = push.motivationFor(local.date, name);
+        for (const sub of byUser[uid]) {
+          try { await push.sendPush(sub, { title: m.title, body: m.body, url: './', tag: 'daily-motivation' }); sent++; }
+          catch (e) { if (e && (e.statusCode === 404 || e.statusCode === 410)) { try { await DB.deletePushSub(sub.endpoint); } catch {} } }
+        }
+        data._lastMotivation = local.date; changed = true;
+      }
+
       // Conditional metadata write: only if the client hasn't saved since we read.
       // Never bumps the version, so it can't clobber user data or force client conflicts.
       if (changed) await DB.saveDataMeta(uid, data, d.version);
