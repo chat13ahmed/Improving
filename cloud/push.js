@@ -119,4 +119,15 @@ function motivationFor(date, name) {
   const who = name ? String(name).trim() : '';
   return { title: m.t, body: who ? who + ' — ' + m.b : m.b };
 }
-module.exports = { sendPush, configured, isReminderDue, userLocal, isNudgeDue, isProteinNudgeDue, isVocabNudgeDue, isMotivationDue, motivationFor };
+// Pure: should the "plan tomorrow's workout" nudge fire? Evening, once/day, only
+// for people who actually train and haven't already planned their next session. (testable)
+function isPlanWorkoutDue(opts) {
+  const o = opts || {};
+  if (o.enabled === false) return false;        // user turned it off (default on)
+  if (!o.trains) return false;                  // not an active gym-goer — skip
+  if (o.hasPlan) return false;                  // already planned — nothing to nudge
+  if (o.lastNudge === o.date) return false;     // already nudged today
+  const hour = Number.isFinite(+o.hour) ? +o.hour : 20;   // 8pm
+  return (o.hhmm || '00:00') >= (String(hour).padStart(2, '0') + ':00');
+}
+module.exports = { sendPush, configured, isReminderDue, userLocal, isNudgeDue, isProteinNudgeDue, isVocabNudgeDue, isMotivationDue, motivationFor, isPlanWorkoutDue };

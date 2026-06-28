@@ -685,8 +685,19 @@ async function startApp() {
   renderXPBar();
   if (!state.data.profile.onboarded && state.data.days.length === 0) showOnboarding();
   navigate('dashboard');
+  maybeOpenPlanFromLink();   // tapped the "plan tomorrow's workout" push → open the planner
   showWeeklyReview();
   startReminderLoop();
+}
+// If the app was opened from the plan-tomorrow notification (./?plan=1), pop the planner.
+function maybeOpenPlanFromLink() {
+  try {
+    const sp = new URLSearchParams(location.search);
+    if (sp.get('plan') === '1') {
+      history.replaceState(null, '', location.pathname);   // clean the URL so a refresh doesn't reopen it
+      if (isPillarOn('gym')) setTimeout(openWorkoutPlanner, 450);
+    }
+  } catch {}
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -8509,6 +8520,7 @@ function renderNudgeCard() {
   const on = p.dailyNudge !== false; // default ON
   const proteinOn = p.proteinNudge !== false; // default ON
   const motivationOn = p.dailyMotivation !== false; // default ON
+  const planOn = p.planWorkoutNudge !== false; // default ON
   const hour = Number.isFinite(+p.nudgeHour) ? +p.nudgeHour : 19;
   const mHour = Number.isFinite(+p.motivationHour) ? +p.motivationHour : 8;
   const fmt = h => ((h % 12) || 12) + ':00 ' + (h < 12 ? 'AM' : 'PM');
@@ -8534,7 +8546,21 @@ function renderNudgeCard() {
     '<p class="card-sub">A short hit of motivation every morning — one line to get you moving. Goes out whether or not you\'ve logged. No streak required.</p>' +
     '<div class="rem-add"><label style="align-self:center;color:var(--text-muted);font-size:14px;white-space:nowrap">Send at</label>' +
     '<select id="motivation-hour" onchange="setMotivationHour(this.value)"' + (motivationOn ? '' : ' disabled') + '>' + mopts + '</select></div>' +
+    (isPillarOn('gym') ?
+      '<div style="height:1px;background:var(--border);margin:16px 0"></div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+      '<h3 class="card-title" style="margin-bottom:0">Plan tomorrow\'s workout 🏋️</h3>' +
+      '<label class="pc-toggle"><input type="checkbox" ' + (planOn ? 'checked' : '') + ' onchange="togglePlanNudge()"><span class="pc-slider"></span></label></div>' +
+      '<p class="card-sub" style="margin-bottom:0">In the evening, if you haven\'t picked your next session, we\'ll nudge you to plan it — so it\'s loaded and ready when you get to the gym.</p>'
+      : '') +
     '</div>';
+}
+async function togglePlanNudge() {
+  const p = state.data.profile = state.data.profile || {};
+  p.planWorkoutNudge = !(p.planWorkoutNudge !== false);
+  if (p.planWorkoutNudge) p.tz = -new Date().getTimezoneOffset();
+  await saveData();
+  renderChecklistPage();
 }
 async function toggleMotivation() {
   const p = state.data.profile = state.data.profile || {};

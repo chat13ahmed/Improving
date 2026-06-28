@@ -601,6 +601,16 @@ if (P) {
   ok('motivationFor cycles (same line 24 days apart)', P.motivationFor('2026-06-27').body === P.motivationFor('2026-07-21').body);
   ok('motivationFor prepends the name', P.motivationFor('2026-06-27', 'Ahmed').body.indexOf('Ahmed — ') === 0);
   ok('motivationFor without a name has no separator prefix', P.motivationFor('2026-06-27').body.indexOf(' — ') !== 0);
+
+  // plan-tomorrow's-workout nudge (evening, active gym-goers, not yet planned)
+  ok('plan nudge due (evening, trains, no plan)', P.isPlanWorkoutDue({ trains: true, hasPlan: false, hhmm: '20:30', date: D, lastNudge: '' }) === true);
+  ok('plan nudge not due before the hour', P.isPlanWorkoutDue({ trains: true, hasPlan: false, hhmm: '17:00', date: D, lastNudge: '' }) === false);
+  ok('plan nudge not due if they already planned', P.isPlanWorkoutDue({ trains: true, hasPlan: true, hhmm: '21:00', date: D, lastNudge: '' }) === false);
+  ok('plan nudge not due for non-gym users', P.isPlanWorkoutDue({ trains: false, hasPlan: false, hhmm: '21:00', date: D, lastNudge: '' }) === false);
+  ok('plan nudge not due if already nudged today', P.isPlanWorkoutDue({ trains: true, hasPlan: false, hhmm: '21:00', date: D, lastNudge: D }) === false);
+  ok('plan nudge disabled when off', P.isPlanWorkoutDue({ trains: true, hasPlan: false, hhmm: '21:00', date: D, lastNudge: '', enabled: false }) === false);
+  ok('plan nudge respects a custom hour', P.isPlanWorkoutDue({ trains: true, hasPlan: false, hhmm: '18:00', date: D, lastNudge: '', hour: 18 }) === true);
+  ok('plan nudge default hour is 20 (8pm)', P.isPlanWorkoutDue({ trains: true, hasPlan: false, hhmm: '19:30', date: D, lastNudge: '' }) === false);
 }
 
 // ─────────────────────────────────────────────────────────────

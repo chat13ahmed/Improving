@@ -749,6 +749,19 @@ app.post('/api/cron/tick', async (req, res) => {
         data._lastMotivation = local.date; changed = true;
       }
 
+      // 6) Plan-tomorrow nudge — evening, for active gym-goers who haven't yet
+      // chosen their next workout. Self-resolving: once they plan, it stops.
+      const planCut = new Date(Date.parse(local.date + 'T00:00:00Z') - 14 * 86400000).toISOString().split('T')[0];
+      const recentGym = (data.days || []).some(x => x && x.gym && x.gym.done && x.date && x.date >= planCut);
+      const _plan = profile.plannedWorkout;
+      if (push.isPlanWorkoutDue({ enabled: profile.planWorkoutNudge, trains: recentGym, hasPlan: !!(_plan && (_plan.program || _plan.own)), hhmm: local.hhmm, date: local.date, hour: profile.planHour, lastNudge: data._lastPlanNudge })) {
+        for (const sub of byUser[uid]) {
+          try { await push.sendPush(sub, { title: "Plan tomorrow's workout 🏋️", body: "Pick your program now so it's loaded and ready when you hit the gym.", url: './?plan=1', tag: 'plan-workout' }); sent++; }
+          catch (e) { if (e && (e.statusCode === 404 || e.statusCode === 410)) { try { await DB.deletePushSub(sub.endpoint); } catch {} } }
+        }
+        data._lastPlanNudge = local.date; changed = true;
+      }
+
       // Conditional metadata write: only if the client hasn't saved since we read.
       // Never bumps the version, so it can't clobber user data or force client conflicts.
       if (changed) await DB.saveDataMeta(uid, data, d.version);
