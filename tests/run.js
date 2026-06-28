@@ -627,6 +627,9 @@ ok('searchExercises: filters by muscle group', A.searchExercises('', 'Back').eve
 ok('searchExercises: "All" filter is the same as no filter', A.searchExercises('', 'All').length === A.searchExercises('').length);
 ok('searchExercises: no match → empty', A.searchExercises('zzzznotreal').length === 0);
 ok('EXERCISE_LIBRARY: has the 7 muscle groups', ['Chest','Back','Legs','Shoulders','Arms','Core','Cardio'].every(k => Array.isArray(A.EXERCISE_LIBRARY[k]) && A.EXERCISE_LIBRARY[k].length));
+ok('EXERCISE_LIBRARY: 120+ exercises total', Object.values(A.EXERCISE_LIBRARY).reduce((s, a) => s + a.length, 0) >= 120);
+ok('EXERCISE_LIBRARY: every group has 15+ exercises', Object.values(A.EXERCISE_LIBRARY).every(a => a.length >= 15));
+ok('EXERCISE_LIBRARY: no duplicate names within a group', Object.values(A.EXERCISE_LIBRARY).every(a => new Set(a.map(n => n.toLowerCase())).size === a.length));
 // Rest clock formatting
 eq('formatClock: 90s → 1:30', A.formatClock(90), '1:30');
 eq('formatClock: 60s → 1:00', A.formatClock(60), '1:00');

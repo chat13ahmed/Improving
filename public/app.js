@@ -3816,13 +3816,34 @@ function renderGymPlanHint() {
 // this is purely additive to the existing boolean "did you train?" pillar.
 // ─────────────────────────────────────────────────────────────
 const EXERCISE_LIBRARY = {
-  Chest:     ['Barbell Bench Press', 'Incline Dumbbell Press', 'Push-Up', 'Chest Fly', 'Cable Crossover', 'Dips', 'Machine Chest Press', 'Decline Bench Press'],
-  Back:      ['Pull-Up', 'Lat Pulldown', 'Bent-Over Row', 'Seated Cable Row', 'Deadlift', 'T-Bar Row', 'Dumbbell Row', 'Face Pull'],
-  Legs:      ['Back Squat', 'Front Squat', 'Leg Press', 'Romanian Deadlift', 'Walking Lunge', 'Leg Extension', 'Leg Curl', 'Calf Raise', 'Hip Thrust'],
-  Shoulders: ['Overhead Press', 'Dumbbell Shoulder Press', 'Lateral Raise', 'Front Raise', 'Rear Delt Fly', 'Arnold Press', 'Upright Row', 'Shrug'],
-  Arms:      ['Barbell Curl', 'Dumbbell Curl', 'Hammer Curl', 'Preacher Curl', 'Triceps Pushdown', 'Skull Crusher', 'Overhead Triceps Extension', 'Close-Grip Bench Press'],
-  Core:      ['Plank', 'Hanging Leg Raise', 'Crunch', 'Russian Twist', 'Cable Woodchop', 'Ab Wheel Rollout', 'Mountain Climber', 'Bicycle Crunch'],
-  Cardio:    ['Treadmill Run', 'Cycling', 'Rowing Machine', 'Stair Climber', 'Elliptical', 'Jump Rope', 'Incline Walk', 'HIIT Intervals']
+  Chest: ['Barbell Bench Press', 'Incline Barbell Bench Press', 'Decline Bench Press', 'Flat Dumbbell Press', 'Incline Dumbbell Press',
+    'Machine Chest Press', 'Smith Machine Bench Press', 'Push-Up', 'Incline Push-Up', 'Dips',
+    'Chest Fly', 'Pec Deck Machine', 'Cable Crossover', 'Low Cable Fly', 'High Cable Fly',
+    'Landmine Press', 'Dumbbell Pullover', 'Svend Press'],
+  Back: ['Pull-Up', 'Chin-Up', 'Lat Pulldown', 'Wide-Grip Lat Pulldown', 'Straight-Arm Pulldown',
+    'Bent-Over Row', 'Pendlay Row', 'T-Bar Row', 'Seated Cable Row', 'Chest-Supported Row',
+    'Dumbbell Row', 'Meadows Row', 'Inverted Row', 'Deadlift', 'Rack Pull',
+    'Trap Bar Deadlift', 'Back Extension', 'Face Pull'],
+  Legs: ['Back Squat', 'Front Squat', 'Goblet Squat', 'Hack Squat', 'Leg Press',
+    'Bulgarian Split Squat', 'Walking Lunge', 'Reverse Lunge', 'Step-Up', 'Romanian Deadlift',
+    'Sumo Deadlift', 'Leg Extension', 'Leg Curl', 'Seated Leg Curl', 'Hip Thrust',
+    'Glute Bridge', 'Calf Raise', 'Seated Calf Raise', 'Adductor Machine', 'Box Jump'],
+  Shoulders: ['Overhead Press', 'Dumbbell Shoulder Press', 'Machine Shoulder Press', 'Arnold Press', 'Behind-the-Neck Press',
+    'Bradford Press', 'Landmine Shoulder Press', 'Pike Push-Up', 'Lateral Raise', 'Cable Lateral Raise',
+    'Front Raise', 'Cable Front Raise', 'Plate Front Raise', 'Rear Delt Fly', 'Reverse Pec Deck',
+    'Upright Row', 'Shrug'],
+  Arms: ['Barbell Curl', 'EZ-Bar Curl', 'Dumbbell Curl', 'Incline Dumbbell Curl', 'Hammer Curl',
+    'Preacher Curl', 'Concentration Curl', 'Cable Curl', 'Spider Curl', 'Zottman Curl',
+    'Triceps Pushdown', 'Rope Triceps Pushdown', 'Skull Crusher', 'Overhead Triceps Extension', 'Triceps Kickback',
+    'Close-Grip Bench Press', 'Bench Dip', 'Diamond Push-Up', 'Wrist Curl', 'Reverse Wrist Curl'],
+  Core: ['Plank', 'Side Plank', 'Hollow Hold', 'Crunch', 'Bicycle Crunch',
+    'Cable Crunch', 'Sit-Up', 'Decline Sit-Up', 'Hanging Leg Raise', 'Lying Leg Raise',
+    'Russian Twist', 'Cable Woodchop', 'Pallof Press', 'Ab Wheel Rollout', 'Mountain Climber',
+    'Dead Bug', 'Flutter Kicks', 'V-Up'],
+  Cardio: ['Treadmill Run', 'Sprints', 'Incline Walk', 'Hiking', 'Cycling',
+    'Assault Bike', 'Rowing Machine', 'Stair Climber', 'Elliptical', 'Jump Rope',
+    'Burpees', 'Battle Ropes', 'Kettlebell Swing', 'Sled Push', 'Shadow Boxing',
+    'Swimming', 'HIIT Intervals']
 };
 // Pure: roll up a workout into headline numbers. (testable)
 function workoutTotals(exercises) {
