@@ -3885,6 +3885,134 @@ function topMuscle(exercises) {
   return best;
 }
 
+// ─────────────────────────────────────────────────────────────
+// MUSCLE MAP — which muscles an exercise hits, on a front/back body
+// ─────────────────────────────────────────────────────────────
+const MUSCLE_NAMES = {
+  chest: 'Chest', frontDelts: 'Front Delts', sideDelts: 'Side Delts', rearDelts: 'Rear Delts',
+  biceps: 'Biceps', triceps: 'Triceps', forearms: 'Forearms', traps: 'Traps', lats: 'Lats',
+  lowerBack: 'Lower Back', abs: 'Abs', obliques: 'Obliques', glutes: 'Glutes',
+  quads: 'Quads', hamstrings: 'Hamstrings', calves: 'Calves', cardio: 'Full Body · Cardio'
+};
+// Pure: the primary + secondary muscles an exercise trains. Starts from the body
+// group, then refines by keywords in the name (so the 128-item library needs no
+// per-exercise table). (testable)
+function musclesForExercise(name, group) {
+  const n = String(name || '').toLowerCase();
+  let P = [], S = [];
+  switch (group) {
+    case 'Chest':
+      if (/dip|push-up|close-grip/.test(n)) { P = ['chest', 'triceps']; S = ['frontDelts']; }
+      else if (/pullover/.test(n)) { P = ['chest', 'lats']; S = ['frontDelts']; }
+      else { P = ['chest']; S = ['frontDelts', 'triceps']; }
+      break;
+    case 'Back':
+      if (/deadlift|rack pull|good morning/.test(n)) { P = ['lowerBack', 'glutes', 'hamstrings']; S = ['traps', 'lats']; }
+      else if (/back extension/.test(n)) { P = ['lowerBack']; S = ['glutes', 'hamstrings']; }
+      else if (/face pull/.test(n)) { P = ['rearDelts', 'traps']; S = []; }
+      else if (/straight-arm/.test(n)) { P = ['lats']; S = []; }
+      else if (/pull-up|chin-up|pulldown/.test(n)) { P = ['lats']; S = ['biceps', 'rearDelts']; }
+      else if (/row/.test(n)) { P = ['lats', 'traps']; S = ['biceps', 'rearDelts']; }
+      else { P = ['lats']; S = ['biceps', 'rearDelts', 'traps']; }
+      break;
+    case 'Legs':
+      if (/calf|calves/.test(n)) { P = ['calves']; S = []; }
+      else if (/leg extension/.test(n)) { P = ['quads']; S = []; }
+      else if (/curl/.test(n)) { P = ['hamstrings']; S = ['glutes']; }
+      else if (/romanian|sumo deadlift|hip thrust|glute bridge/.test(n)) { P = ['glutes', 'hamstrings']; S = ['lowerBack']; }
+      else if (/box jump/.test(n)) { P = ['quads', 'calves']; S = ['glutes']; }
+      else { P = ['quads', 'glutes']; S = ['hamstrings']; }
+      break;
+    case 'Shoulders':
+      if (/lateral raise|upright/.test(n)) { P = ['sideDelts']; S = ['traps']; }
+      else if (/front raise/.test(n)) { P = ['frontDelts']; S = []; }
+      else if (/rear delt|reverse pec/.test(n)) { P = ['rearDelts']; S = ['traps']; }
+      else if (/shrug/.test(n)) { P = ['traps']; S = []; }
+      else { P = ['frontDelts', 'sideDelts']; S = ['triceps', 'traps']; }
+      break;
+    case 'Arms':
+      if (/wrist/.test(n)) { P = ['forearms']; S = []; }
+      else if (/triceps|pushdown|skull|kickback|close-grip|dip|diamond|overhead/.test(n)) { P = ['triceps']; S = []; }
+      else { P = ['biceps']; S = (/hammer|zottman/.test(n) ? ['forearms'] : []); }
+      break;
+    case 'Core':
+      if (/twist|woodchop|side plank|pallof|oblique/.test(n)) { P = ['obliques']; S = ['abs']; }
+      else { P = ['abs']; S = ['obliques']; }
+      break;
+    case 'Cardio':
+      P = ['cardio']; S = []; break;
+    default:
+      P = []; S = [];
+  }
+  return { primary: P, secondary: S };
+}
+// A stylized front + back body that shades the targeted muscles. Not photoreal —
+// it's the shaded anatomical figure fitness apps use, drawn as lightweight SVG.
+function muscleMapSVG(primary, secondary) {
+  const pri = new Set(primary || []), sec = new Set(secondary || []);
+  const cardio = pri.has('cardio');
+  const BASE = '#AEB9CA', BONE = '#C7CFDC', STROKE = 'rgba(2,6,23,.08)';
+  const f = (...ids) => {
+    if (cardio) return 'rgba(16,185,129,.34)';
+    if (ids.some(i => pri.has(i))) return '#10B981';
+    if (ids.some(i => sec.has(i))) return 'rgba(16,185,129,.42)';
+    return BASE;
+  };
+  const E = (cx, cy, rx, ry, fl) => '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '" fill="' + fl + '"/>';
+  const R = (x, y, w, h, r, fl) => '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="' + r + '" fill="' + fl + '"/>';
+  const P = (d, fl) => '<path d="' + d + '" fill="' + fl + '"/>';
+  const base = cx =>
+    '<circle cx="' + cx + '" cy="22" r="12" fill="' + BONE + '"/>' + R(cx - 5, 32, 10, 8, 3, BONE) +
+    R(cx - 15, 44, 30, 62, 12, BASE) + R(cx - 13, 104, 26, 14, 6, BASE) +
+    R(cx - 32, 52, 9, 34, 4, BASE) + R(cx + 23, 52, 9, 34, 4, BASE) +
+    R(cx - 35, 86, 8, 32, 4, BASE) + R(cx + 27, 86, 8, 32, 4, BASE) +
+    R(cx - 13, 116, 12, 52, 6, BASE) + R(cx + 1, 116, 12, 52, 6, BASE) +
+    R(cx - 11, 168, 9, 46, 4, BASE) + R(cx + 2, 168, 9, 46, 4, BASE);
+  const front =
+    E(35, 53, 10, 8, f('frontDelts', 'sideDelts')) + E(85, 53, 10, 8, f('frontDelts', 'sideDelts')) +
+    P('M58 48 Q47 47 46 56 Q46 65 58 66 Z', f('chest')) + P('M62 48 Q73 47 74 56 Q74 65 62 66 Z', f('chest')) +
+    E(31, 75, 6, 13, f('biceps')) + E(89, 75, 6, 13, f('biceps')) +
+    E(28, 104, 5, 13, f('forearms')) + E(92, 104, 5, 13, f('forearms')) +
+    R(52, 68, 16, 34, 4, f('abs')) +
+    P('M51 70 Q45 80 49 100 L52 100 L52 70 Z', f('obliques')) + P('M69 70 Q75 80 71 100 L68 100 L68 70 Z', f('obliques')) +
+    E(53, 140, 8, 24, f('quads')) + E(67, 140, 8, 24, f('quads')) +
+    E(53, 188, 6, 17, f('calves')) + E(67, 188, 6, 17, f('calves'));
+  const back =
+    P('M168 45 L192 45 L186 62 L180 67 L174 62 Z', f('traps')) +
+    E(155, 53, 10, 8, f('rearDelts')) + E(205, 53, 10, 8, f('rearDelts')) +
+    E(151, 75, 6, 13, f('triceps')) + E(209, 75, 6, 13, f('triceps')) +
+    E(148, 104, 5, 13, f('forearms')) + E(212, 104, 5, 13, f('forearms')) +
+    P('M171 64 Q162 80 172 98 L176 96 L176 64 Z', f('lats')) + P('M189 64 Q198 80 188 98 L184 96 L184 64 Z', f('lats')) +
+    R(173, 92, 14, 14, 4, f('lowerBack')) +
+    E(173, 116, 8, 9, f('glutes')) + E(187, 116, 8, 9, f('glutes')) +
+    E(173, 145, 8, 22, f('hamstrings')) + E(187, 145, 8, 22, f('hamstrings')) +
+    E(173, 188, 6, 17, f('calves')) + E(187, 188, 6, 17, f('calves'));
+  return '<svg viewBox="0 0 240 240" class="mm-svg" xmlns="http://www.w3.org/2000/svg">' +
+    '<g>' + base(60) + base(180) + '</g>' +
+    '<g stroke="' + STROKE + '" stroke-width="0.6">' + front + back + '</g>' +
+    '<text x="60" y="232" class="mm-cap" text-anchor="middle">Front</text>' +
+    '<text x="180" y="232" class="mm-cap" text-anchor="middle">Back</text>' +
+    '</svg>';
+}
+function showMuscleMap(name, group) { state._mm = { name: name, muscle: group }; renderWorkout(); }
+function closeMuscleMap() { state._mm = null; renderWorkout(); }
+function renderMuscleOverlay(name, group) {
+  const mm = musclesForExercise(name, group);
+  const chip = (id, cls) => '<span class="mm-chip ' + cls + '">' + escapeHtml(MUSCLE_NAMES[id] || id) + '</span>';
+  const prim = mm.primary.map(id => chip(id, 'mm-prim')).join('');
+  const sec = mm.secondary.map(id => chip(id, 'mm-sec')).join('');
+  const a = JSON.stringify(name).replace(/"/g, '&quot;'), b = JSON.stringify(group).replace(/"/g, '&quot;');
+  return '<div class="mm-overlay" onclick="if(event.target===this)closeMuscleMap()"><div class="mm-card">' +
+    '<div class="mm-head"><div class="mm-title">' + escapeHtml(name) + '</div><button type="button" class="mm-close" onclick="closeMuscleMap()">✕</button></div>' +
+    muscleMapSVG(mm.primary, mm.secondary) +
+    '<div class="mm-legend">' +
+    (prim ? '<div class="mm-leg-row"><span class="mm-leg-label mm-prim-label">Primary</span><div class="mm-chips">' + prim + '</div></div>' : '') +
+    (sec ? '<div class="mm-leg-row"><span class="mm-leg-label">Also works</span><div class="mm-chips">' + sec + '</div></div>' : '') +
+    '</div>' +
+    '<button type="button" class="btn-workout mm-add" onclick="woAddExercise(' + a + ',' + b + ');closeMuscleMap()">＋ Add to workout</button>' +
+    '</div></div>';
+}
+
 // ── Rest-over alert: notification + vibrate + beep, so it reaches them mid-set ──
 function restBeep() {
   try {
@@ -3924,6 +4052,7 @@ function openWorkout(ret, presetMuscle) {
   const ex = (day && day.gym && Array.isArray(day.gym.exercises)) ? day.gym.exercises : [];
   state._workout = { exercises: ex.map(e => ({ name: e.name, muscle: e.muscle || '', sets: (e.sets || []).map(s => ({ reps: +s.reps || 0, weight: +s.weight || 0 })) })) };
   state._lib = { open: false, q: '', muscle: preset };
+  state._mm = null;
   state.page = 'workout';
   renderWorkout();
 }
@@ -3951,7 +4080,7 @@ function closeWorkout() {
   woStopRest();
   saveWorkout();
   const tot = workoutTotals(state._workout ? state._workout.exercises : []);
-  state._workout = null; state._lib = null;
+  state._workout = null; state._lib = null; state._mm = null;
   navigate(state._workoutReturn || 'log');
   if (tot.sets > 0) showToast('Workout saved — ' + tot.sets + ' sets · ' + tot.reps + ' reps 💪', 'success');
 }
@@ -4029,9 +4158,14 @@ function woLibFilter(m) { state._lib.muscle = m; state._lib.q = ''; const s = do
 function woLibBack() { state._lib.muscle = ''; state._lib.q = ''; const s = document.getElementById('wo-lib-search'); if (s) s.value = ''; woLibRefresh(); }       // back to the body-part list
 function woLibSearch() { state._lib.q = document.getElementById('wo-lib-search')?.value || ''; woLibRefresh(); }
 function woLibRefresh() { const el = document.getElementById('wo-lib-list'); if (el) el.innerHTML = renderLibBody(); }
+const BODY_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4.5" r="2.5"/><path d="M12 7.5v7M12 9.5l-5 2M12 9.5l5 2M9.5 21l2.5-6 2.5 6"/></svg>';
 function libItemHtml(e) {
-  return '<button type="button" class="wo-lib-item" onclick="woAddExercise(' + JSON.stringify(e.name).replace(/"/g, '&quot;') + ',' + JSON.stringify(e.muscle).replace(/"/g, '&quot;') + ')">' +
-    '<span class="wo-lib-name">' + escapeHtml(e.name) + '</span><span class="wo-lib-tag">' + escapeHtml(e.muscle) + '</span></button>';
+  const a = JSON.stringify(e.name).replace(/"/g, '&quot;'), b = JSON.stringify(e.muscle).replace(/"/g, '&quot;');
+  return '<div class="wo-lib-row">' +
+    '<button type="button" class="wo-lib-item wo-lib-pick" onclick="woAddExercise(' + a + ',' + b + ')">' +
+    '<span class="wo-lib-name">' + escapeHtml(e.name) + '</span><span class="wo-lib-tag">' + escapeHtml(e.muscle) + '</span></button>' +
+    '<button type="button" class="wo-lib-info" onclick="showMuscleMap(' + a + ',' + b + ')" aria-label="Muscles worked" title="See muscles worked">' + BODY_ICON + '</button>' +
+    '</div>';
 }
 // The library body switches between three views: a typed search (across all
 // parts), a chosen body part (only its exercises), or the body-part picker.
@@ -4079,10 +4213,13 @@ function renderWorkout() {
       '<div class="wo-set"><span class="wo-set-n">' + (j + 1) + '</span>' +
       '<span class="wo-set-v">' + (s.reps || 0) + ' reps' + (s.weight ? ' × ' + s.weight + ' ' + unit : '') + '</span>' +
       '<button type="button" class="wo-set-del" onclick="woRemoveSet(' + i + ',' + j + ')" title="Remove set">✕</button></div>').join('');
+    const exA = JSON.stringify(ex.name).replace(/"/g, '&quot;'), exB = JSON.stringify(ex.muscle || '').replace(/"/g, '&quot;');
     return '<div class="wo-ex">' +
       '<div class="wo-ex-head"><div><div class="wo-ex-name">' + escapeHtml(ex.name) + '</div>' +
       (ex.muscle ? '<div class="wo-ex-muscle">' + escapeHtml(ex.muscle) + '</div>' : '') + '</div>' +
-      '<button type="button" class="wo-ex-del" onclick="woRemoveExercise(' + i + ')" title="Remove exercise">✕</button></div>' +
+      '<div class="wo-ex-acts">' +
+      '<button type="button" class="wo-ex-info" onclick="showMuscleMap(' + exA + ',' + exB + ')" title="Muscles worked">' + BODY_ICON + '</button>' +
+      '<button type="button" class="wo-ex-del" onclick="woRemoveExercise(' + i + ')" title="Remove exercise">✕</button></div></div>' +
       (setRows ? '<div class="wo-sets">' + setRows + '</div>' : '<div class="wo-sets-empty">No sets yet — log your first below.</div>') +
       '<div class="wo-set-add">' +
       '<input id="wo-reps-' + i + '" class="wo-set-in" type="number" inputmode="numeric" placeholder="reps" value="' + (last ? last.reps : '') + '">' +
@@ -4116,8 +4253,9 @@ function renderWorkout() {
     '<div class="wo-ex-list">' + exCards + '</div>' +
     '<button type="button" class="wo-add" onclick="woOpenLibrary()">＋ Add exercise</button>' +
     restBlock +
-    '</div>' + lib;
-  if (state._lib && state._lib.open) setTimeout(() => document.getElementById('wo-lib-search')?.focus(), 60);
+    '</div>' + lib + (state._mm ? renderMuscleOverlay(state._mm.name, state._mm.muscle) : '');
+  if (state._mm) { /* muscle map open on top */ }
+  else if (state._lib && state._lib.open) setTimeout(() => document.getElementById('wo-lib-search')?.focus(), 60);
 }
 // Compact entry point shown inside the Log form's gym section (today only)
 function renderWorkoutEntry(day) {

@@ -2602,3 +2602,30 @@ body { background: transparent; }
 .wo-bp-count { font-size: 12px; color: var(--text-muted); font-weight: 600; }
 .wo-lib-back { background: none; border: none; color: var(--gym-color); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; padding: 4px 2px; margin-bottom: 2px; align-self: flex-start; }
 .wo-lib-part-title { font-size: 15px; font-weight: 800; color: var(--text); margin: 2px 2px 8px; }
+/* Library row = pick button + a "muscles worked" button */
+.wo-lib-row { display: flex; gap: 8px; align-items: stretch; }
+.wo-lib-pick { flex: 1; min-width: 0; }
+.wo-lib-info { flex: none; width: 46px; border: 1px solid var(--border); border-radius: 11px; background: var(--card); color: var(--text-muted); cursor: pointer; display: grid; place-items: center; transition: all .12s; }
+.wo-lib-info:hover { border-color: var(--gym-color); color: var(--gym-color); background: rgba(16,185,129,.06); }
+
+/* Muscle-map modal */
+.mm-overlay { position: fixed; inset: 0; background: rgba(2,6,23,.5); z-index: 70; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.mm-card { width: min(420px, 100%); max-height: 90vh; overflow-y: auto; background: var(--card); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-lg); padding: 16px; }
+.mm-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.mm-title { font-size: 17px; font-weight: 800; color: var(--text); letter-spacing: -.3px; }
+.mm-close { flex: none; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text-muted); font-size: 15px; cursor: pointer; }
+.mm-svg { display: block; width: 100%; max-width: 320px; height: auto; margin: 4px auto 8px; }
+.mm-svg .mm-cap { fill: var(--text-muted); font-size: 11px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; }
+.mm-legend { display: flex; flex-direction: column; gap: 8px; margin: 6px 2px 14px; }
+.mm-leg-row { display: flex; align-items: baseline; gap: 10px; }
+.mm-leg-label { flex: none; width: 78px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); }
+.mm-prim-label { color: var(--gym-color); }
+.mm-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mm-chip { font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
+.mm-chip.mm-prim { background: rgba(16,185,129,.16); color: #0E9F6E; border: 1px solid rgba(16,185,129,.4); }
+.mm-chip.mm-sec { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
+.mm-add { margin-top: 2px; }
+/* Muscles button on a logged exercise card */
+.wo-ex-acts { display: flex; align-items: center; gap: 4px; }
+.wo-ex-info { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px 5px; border-radius: 6px; display: grid; place-items: center; }
+.wo-ex-info:hover { color: var(--gym-color); background: var(--surface); }

@@ -60,7 +60,8 @@ function loadApp(fieldValues) {
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
     ' loggingStreak, bestStreak, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
-    ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, EXERCISE_LIBRARY });';
+    ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, EXERCISE_LIBRARY,' +
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -639,6 +640,32 @@ eq('formatClock: clamps negatives', A.formatClock(-10), '0:00');
 // Day label from the workout
 eq('topMuscle: most-trained group wins', A.topMuscle(_wo), 'Chest');
 eq('topMuscle: empty → ""', A.topMuscle([]), '');
+// Muscle map: which muscles each exercise hits
+const mfe = (n, g) => A.musclesForExercise(n, g);
+ok('muscles: Bench Press → chest primary', mfe('Barbell Bench Press', 'Chest').primary.includes('chest'));
+ok('muscles: Push-Up also hits triceps', mfe('Push-Up', 'Chest').primary.includes('triceps'));
+ok('muscles: Barbell Curl → biceps, not triceps', mfe('Barbell Curl', 'Arms').primary.includes('biceps') && !mfe('Barbell Curl', 'Arms').primary.includes('triceps'));
+ok('muscles: Triceps Pushdown → triceps', mfe('Triceps Pushdown', 'Arms').primary.includes('triceps'));
+ok('muscles: Wrist Curl → forearms', mfe('Wrist Curl', 'Arms').primary.includes('forearms'));
+ok('muscles: Hammer Curl adds forearms (secondary)', mfe('Hammer Curl', 'Arms').secondary.includes('forearms'));
+ok('muscles: Lateral Raise → side delts', mfe('Lateral Raise', 'Shoulders').primary.includes('sideDelts'));
+ok('muscles: Rear Delt Fly → rear delts', mfe('Rear Delt Fly', 'Shoulders').primary.includes('rearDelts'));
+ok('muscles: Deadlift → posterior chain (lower back/glutes/hamstrings)', ['lowerBack','glutes','hamstrings'].every(m => mfe('Deadlift', 'Back').primary.includes(m)));
+ok('muscles: Pull-Up → lats (biceps secondary)', mfe('Pull-Up', 'Back').primary.includes('lats') && mfe('Pull-Up', 'Back').secondary.includes('biceps'));
+ok('muscles: Back Squat → quads + glutes', ['quads','glutes'].every(m => mfe('Back Squat', 'Legs').primary.includes(m)));
+ok('muscles: Romanian Deadlift → hamstrings + glutes', ['hamstrings','glutes'].every(m => mfe('Romanian Deadlift', 'Legs').primary.includes(m)));
+ok('muscles: Calf Raise → calves', mfe('Calf Raise', 'Legs').primary.includes('calves'));
+ok('muscles: Russian Twist → obliques', mfe('Russian Twist', 'Core').primary.includes('obliques'));
+ok('muscles: Plank → abs', mfe('Plank', 'Core').primary.includes('abs'));
+ok('muscles: Treadmill Run → cardio/full body', mfe('Treadmill Run', 'Cardio').primary.includes('cardio'));
+ok('muscles: every library exercise maps to at least one muscle',
+  Object.keys(A.EXERCISE_LIBRARY).every(g => A.EXERCISE_LIBRARY[g].every(n => mfe(n, g).primary.length > 0)));
+ok('muscles: every primary id has a display name', Object.keys(A.MUSCLE_NAMES).length >= 16);
+// Body SVG highlights the targeted muscle in green, leaves an empty map neutral
+ok('muscleMapSVG: returns an <svg>', /^<svg[\s>]/.test(A.muscleMapSVG(['chest'], [])));
+ok('muscleMapSVG: targeted muscle is filled green', A.muscleMapSVG(['chest'], []).includes('#10B981'));
+ok('muscleMapSVG: empty map has no green fill', !A.muscleMapSVG([], []).includes('#10B981'));
+ok('muscleMapSVG: shows both Front and Back', A.muscleMapSVG([], []).includes('Front') && A.muscleMapSVG([], []).includes('Back'));
 // Body-part filter: a chosen group shows ONLY that group's exercises
 ['Chest','Back','Legs','Shoulders','Arms','Core','Cardio'].forEach(part => {
   const only = A.searchExercises('', part);
