@@ -2647,3 +2647,14 @@ body { background: transparent; }
 .wo-prog-count { font-size: 12px; color: var(--text-muted); font-weight: 600; flex: none; }
 .wo-prog-list { font-size: 13px; color: var(--text-muted); margin: 5px 0 8px; line-height: 1.45; }
 .wo-prog-go { font-size: 13px; font-weight: 700; color: var(--gym-color); }
+/* Goal-tailored banner on the program picker */
+.wo-goal-banner { background: rgba(16,185,129,.08); border: 1px solid rgba(16,185,129,.25); border-radius: 12px; padding: 12px 14px; margin: 4px 0 12px; }
+.wo-goal-top { font-size: 13px; color: var(--text); }
+.wo-goal-top b { color: var(--gym-color); }
+.wo-goal-rx { font-size: 16px; font-weight: 800; color: var(--text); margin-top: 2px; }
+.wo-goal-tip { font-size: 12px; color: var(--text-muted); margin-top: 3px; line-height: 1.4; }
+.wo-goal-generic { background: var(--surface); border-color: var(--border); }
+/* Compact rep-scheme hint inside the workout view */
+.wo-scheme { display: flex; align-items: center; gap: 8px; justify-content: center; margin: -6px 0 14px; font-size: 13px; }
+.wo-scheme-tag { font-weight: 700; color: var(--gym-color); background: rgba(16,185,129,.12); padding: 2px 9px; border-radius: 999px; }
+.wo-scheme-rx { color: var(--text-muted); font-weight: 600; }

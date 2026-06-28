@@ -3860,6 +3860,20 @@ function exerciseGroup(name) {
   for (const g of Object.keys(EXERCISE_LIBRARY)) if (EXERCISE_LIBRARY[g].indexOf(name) !== -1) return g;
   return '';
 }
+// Pure: the set/rep/rest scheme to suggest for a training goal. Drives the rep
+// hint AND the default rest timer, so the workout matches what they're after. (testable)
+function repSchemeForGoal(goal) {
+  if (goal === 'gain') return { label: 'Build muscle', sets: '4–5 sets', reps: '6–10 reps', rest: 120, tip: 'Heavier weight — add load when you hit the top of the rep range.' };
+  if (goal === 'lose') return { label: 'Lose fat', sets: '3–4 sets', reps: '12–15 reps', rest: 60, tip: 'Lighter weight, short rests, plus a quick conditioning finisher.' };
+  return { label: 'Stay strong', sets: '3–4 sets', reps: '8–12 reps', rest: 90, tip: 'Balanced volume — steady and consistent.' };
+}
+// Pure: nudge a program toward the goal. Fat loss gets a conditioning finisher;
+// muscle gain leans on the heavier rep scheme rather than extra exercises. (testable)
+function tailorProgram(list, goal) {
+  const out = (list || []).slice();
+  if (goal === 'lose' && out.length && out.indexOf('HIIT Intervals') === -1) out.push('HIIT Intervals');
+  return out;
+}
 // Pure: roll up a workout into headline numbers. (testable)
 function workoutTotals(exercises) {
   const list = Array.isArray(exercises) ? exercises : [];
@@ -4071,6 +4085,7 @@ function openWorkout(ret, presetMuscle) {
   // Empty workout → ask "program or your own?" first; resuming one skips straight in
   state._woChoose = state._workout.exercises.length === 0;
   state._woProgram = false;
+  state._restDefault = repSchemeForGoal(trainingGoal() || 'maintain').rest;   // goal-appropriate default rests
   state.page = 'workout';
   renderWorkout();
 }
@@ -4211,12 +4226,30 @@ function renderLibBody() {
 }
 
 // ── Start choice: a ready-made program, or build your own ──
+// The user's training goal (lose/gain/maintain) from nutrition, or '' if unset.
+function trainingGoal() {
+  const n = state.data.profile && state.data.profile.nutrition;
+  return (n && (n.goal === 'lose' || n.goal === 'gain' || n.goal === 'maintain')) ? n.goal : '';
+}
+function programGoalBanner() {
+  const goal = trainingGoal();
+  const s = repSchemeForGoal(goal || 'maintain');
+  if (goal) return '<div class="wo-goal-banner">' +
+    '<div class="wo-goal-top">Tailored to your goal · <b>' + s.label + '</b></div>' +
+    '<div class="wo-goal-rx">Aim ' + s.sets + ' · ' + s.reps + '</div>' +
+    '<div class="wo-goal-tip">' + escapeHtml(s.tip) + '</div></div>';
+  return '<div class="wo-goal-banner wo-goal-generic">' +
+    '<div class="wo-goal-rx">Aim ' + s.sets + ' · ' + s.reps + '</div>' +
+    '<div class="wo-goal-tip">Set your goal in Nutrition to tailor the reps, rests and finisher.</div></div>';
+}
 function woChooseProgram() { state._woProgram = true; renderWorkout(); }
 function woChooseOwn() { state._woChoose = false; state._woProgram = false; woOpenLibrary(); }
 function woProgramBack() { state._woProgram = false; renderWorkout(); }
 function woLoadProgram(name) {
-  const list = WORKOUT_PROGRAMS[name] || [];
+  const goal = trainingGoal();
+  const list = tailorProgram(WORKOUT_PROGRAMS[name] || [], goal);
   state._workout.exercises = list.map(n => ({ name: n, muscle: exerciseGroup(n), sets: [] }));
+  state._restDefault = repSchemeForGoal(goal || 'maintain').rest;   // goal-appropriate rests
   state._woChoose = false; state._woProgram = false;
   saveWorkout(); renderWorkout();
 }
@@ -4225,6 +4258,7 @@ function renderWoChooser() {
     return '<button type="button" class="wo-lib-back" onclick="woProgramBack()">‹ Back</button>' +
       '<div class="wo-choose-h">Pick a workout</div>' +
       '<div class="wo-choose-sub">Tap one to load it — then just log your sets and reps.</div>' +
+      programGoalBanner() +
       '<div class="wo-prog-grid">' + Object.keys(WORKOUT_PROGRAMS).map(name => {
         const exs = WORKOUT_PROGRAMS[name];
         return '<button type="button" class="wo-prog" onclick="woLoadProgram(' + JSON.stringify(name).replace(/"/g, '&quot;') + ')">' +
@@ -4264,6 +4298,12 @@ function renderWorkout() {
     '<div class="wo-tot"><span class="wo-tot-n">' + tot.reps + '</span><span class="wo-tot-l">reps</span></div>' +
     '<div class="wo-tot"><span class="wo-tot-n">' + (tot.volume ? tot.volume.toLocaleString() : '0') + '</span><span class="wo-tot-l">' + unit + ' lifted</span></div>' +
     '</div>';
+
+  const _goal = trainingGoal();
+  const _scheme = repSchemeForGoal(_goal || 'maintain');
+  const schemeHint = '<div class="wo-scheme" title="' + escapeAttr(_scheme.tip) + '">' +
+    (_goal ? '<span class="wo-scheme-tag">' + _scheme.label + '</span>' : '') +
+    '<span class="wo-scheme-rx">Aim ' + _scheme.sets + ' · ' + _scheme.reps + '</span></div>';
 
   const exCards = exs.length ? exs.map((ex, i) => {
     const last = ex.sets[ex.sets.length - 1];
@@ -4307,7 +4347,7 @@ function renderWorkout() {
   document.getElementById('main').innerHTML =
     '<div class="wo-wrap">' +
     '<div class="wo-top"><button type="button" class="wo-back" onclick="closeWorkout()">‹ Done</button><div class="wo-title">Workout</div><span style="width:54px"></span></div>' +
-    totals +
+    totals + schemeHint +
     '<div class="wo-ex-list">' + exCards + '</div>' +
     '<button type="button" class="wo-add" onclick="woOpenLibrary()">＋ Add exercise</button>' +
     restBlock +

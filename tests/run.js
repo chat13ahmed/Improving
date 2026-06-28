@@ -61,7 +61,7 @@ function loadApp(fieldValues) {
     ' loggingStreak, bestStreak, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, EXERCISE_LIBRARY,' +
-    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup });';
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -648,6 +648,18 @@ ok('WORKOUT_PROGRAMS: has several programs', Object.keys(A.WORKOUT_PROGRAMS).len
 ok('WORKOUT_PROGRAMS: every program has 4+ exercises', Object.values(A.WORKOUT_PROGRAMS).every(list => list.length >= 4));
 ok('WORKOUT_PROGRAMS: every exercise is a real library exercise', Object.values(A.WORKOUT_PROGRAMS).every(list => list.every(n => A.exerciseGroup(n) !== '')));
 ok('WORKOUT_PROGRAMS: a loaded program maps every exercise to a muscle', Object.values(A.WORKOUT_PROGRAMS).every(list => list.every(n => A.musclesForExercise(n, A.exerciseGroup(n)).primary.length > 0)));
+// Goal-tailored rep scheme + rests
+ok('repScheme: muscle gain = more sets, heavier, longer rest', A.repSchemeForGoal('gain').rest === 120 && /4–5/.test(A.repSchemeForGoal('gain').sets));
+ok('repScheme: fat loss = higher reps, short rest', A.repSchemeForGoal('lose').rest === 60 && /12–15/.test(A.repSchemeForGoal('lose').reps));
+ok('repScheme: maintain = balanced 90s rest', A.repSchemeForGoal('maintain').rest === 90 && /8–12/.test(A.repSchemeForGoal('maintain').reps));
+ok('repScheme: each goal has a label and tip', ['gain','lose','maintain'].every(g => A.repSchemeForGoal(g).label && A.repSchemeForGoal(g).tip));
+ok('repScheme: rest matches a timer preset', ['gain','lose','maintain'].every(g => [60,90,120,180].includes(A.repSchemeForGoal(g).rest)));
+// tailorProgram: fat loss adds a conditioning finisher; others unchanged
+const _base = A.WORKOUT_PROGRAMS['Push Day'];
+ok('tailorProgram: fat loss appends a cardio finisher', A.tailorProgram(_base, 'lose').length === _base.length + 1 && A.exerciseGroup(A.tailorProgram(_base, 'lose').slice(-1)[0]) === 'Cardio');
+ok('tailorProgram: muscle gain leaves the exercises as-is', A.tailorProgram(_base, 'gain').length === _base.length);
+ok('tailorProgram: no double finisher if already present', A.tailorProgram(A.tailorProgram(_base, 'lose'), 'lose').filter(n => n === 'HIIT Intervals').length === 1);
+ok('tailorProgram: handles empty input', A.tailorProgram(null, 'lose').length === 0);
 // Muscle map: which muscles each exercise hits
 const mfe = (n, g) => A.musclesForExercise(n, g);
 ok('muscles: Bench Press → chest primary', mfe('Barbell Bench Press', 'Chest').primary.includes('chest'));
