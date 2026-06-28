@@ -61,7 +61,7 @@ function loadApp(fieldValues) {
     ' loggingStreak, bestStreak, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, EXERCISE_LIBRARY,' +
-    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES });';
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -640,6 +640,14 @@ eq('formatClock: clamps negatives', A.formatClock(-10), '0:00');
 // Day label from the workout
 eq('topMuscle: most-trained group wins', A.topMuscle(_wo), 'Chest');
 eq('topMuscle: empty → ""', A.topMuscle([]), '');
+// Ready-made programs + exercise→group lookup
+eq('exerciseGroup: Back Squat → Legs', A.exerciseGroup('Back Squat'), 'Legs');
+eq('exerciseGroup: Plank → Core', A.exerciseGroup('Plank'), 'Core');
+eq('exerciseGroup: unknown → ""', A.exerciseGroup('Nonsense Lift'), '');
+ok('WORKOUT_PROGRAMS: has several programs', Object.keys(A.WORKOUT_PROGRAMS).length >= 5);
+ok('WORKOUT_PROGRAMS: every program has 4+ exercises', Object.values(A.WORKOUT_PROGRAMS).every(list => list.length >= 4));
+ok('WORKOUT_PROGRAMS: every exercise is a real library exercise', Object.values(A.WORKOUT_PROGRAMS).every(list => list.every(n => A.exerciseGroup(n) !== '')));
+ok('WORKOUT_PROGRAMS: a loaded program maps every exercise to a muscle', Object.values(A.WORKOUT_PROGRAMS).every(list => list.every(n => A.musclesForExercise(n, A.exerciseGroup(n)).primary.length > 0)));
 // Muscle map: which muscles each exercise hits
 const mfe = (n, g) => A.musclesForExercise(n, g);
 ok('muscles: Bench Press → chest primary', mfe('Barbell Bench Press', 'Chest').primary.includes('chest'));

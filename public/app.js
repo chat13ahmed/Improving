@@ -3845,6 +3845,21 @@ const EXERCISE_LIBRARY = {
     'Burpees', 'Battle Ropes', 'Kettlebell Swing', 'Sled Push', 'Shadow Boxing',
     'Swimming', 'HIIT Intervals']
 };
+// Ready-made workouts — each is a list of library exercises. Pick one and just
+// log your sets/reps, instead of building the workout from scratch.
+const WORKOUT_PROGRAMS = {
+  'Full Body': ['Back Squat', 'Barbell Bench Press', 'Bent-Over Row', 'Overhead Press', 'Plank'],
+  'Push Day': ['Barbell Bench Press', 'Incline Dumbbell Press', 'Overhead Press', 'Lateral Raise', 'Triceps Pushdown'],
+  'Pull Day': ['Pull-Up', 'Bent-Over Row', 'Lat Pulldown', 'Face Pull', 'Barbell Curl'],
+  'Leg Day': ['Back Squat', 'Romanian Deadlift', 'Leg Press', 'Leg Curl', 'Calf Raise'],
+  'Upper Body': ['Barbell Bench Press', 'Bent-Over Row', 'Overhead Press', 'Lat Pulldown', 'Barbell Curl', 'Triceps Pushdown'],
+  'Core & Abs': ['Plank', 'Hanging Leg Raise', 'Cable Crunch', 'Russian Twist', 'Ab Wheel Rollout']
+};
+// Which body group a library exercise belongs to (for its card label + muscle map).
+function exerciseGroup(name) {
+  for (const g of Object.keys(EXERCISE_LIBRARY)) if (EXERCISE_LIBRARY[g].indexOf(name) !== -1) return g;
+  return '';
+}
 // Pure: roll up a workout into headline numbers. (testable)
 function workoutTotals(exercises) {
   const list = Array.isArray(exercises) ? exercises : [];
@@ -4053,6 +4068,9 @@ function openWorkout(ret, presetMuscle) {
   state._workout = { exercises: ex.map(e => ({ name: e.name, muscle: e.muscle || '', sets: (e.sets || []).map(s => ({ reps: +s.reps || 0, weight: +s.weight || 0 })) })) };
   state._lib = { open: false, q: '', muscle: preset };
   state._mm = null;
+  // Empty workout → ask "program or your own?" first; resuming one skips straight in
+  state._woChoose = state._workout.exercises.length === 0;
+  state._woProgram = false;
   state.page = 'workout';
   renderWorkout();
 }
@@ -4080,7 +4098,7 @@ function closeWorkout() {
   woStopRest();
   saveWorkout();
   const tot = workoutTotals(state._workout ? state._workout.exercises : []);
-  state._workout = null; state._lib = null; state._mm = null;
+  state._workout = null; state._lib = null; state._mm = null; state._woChoose = false; state._woProgram = false;
   navigate(state._workoutReturn || 'log');
   if (tot.sets > 0) showToast('Workout saved — ' + tot.sets + ' sets · ' + tot.reps + ' reps 💪', 'success');
 }
@@ -4192,8 +4210,48 @@ function renderLibBody() {
     res.map(libItemHtml).join('');
 }
 
+// ── Start choice: a ready-made program, or build your own ──
+function woChooseProgram() { state._woProgram = true; renderWorkout(); }
+function woChooseOwn() { state._woChoose = false; state._woProgram = false; woOpenLibrary(); }
+function woProgramBack() { state._woProgram = false; renderWorkout(); }
+function woLoadProgram(name) {
+  const list = WORKOUT_PROGRAMS[name] || [];
+  state._workout.exercises = list.map(n => ({ name: n, muscle: exerciseGroup(n), sets: [] }));
+  state._woChoose = false; state._woProgram = false;
+  saveWorkout(); renderWorkout();
+}
+function renderWoChooser() {
+  if (state._woProgram) {
+    return '<button type="button" class="wo-lib-back" onclick="woProgramBack()">‹ Back</button>' +
+      '<div class="wo-choose-h">Pick a workout</div>' +
+      '<div class="wo-choose-sub">Tap one to load it — then just log your sets and reps.</div>' +
+      '<div class="wo-prog-grid">' + Object.keys(WORKOUT_PROGRAMS).map(name => {
+        const exs = WORKOUT_PROGRAMS[name];
+        return '<button type="button" class="wo-prog" onclick="woLoadProgram(' + JSON.stringify(name).replace(/"/g, '&quot;') + ')">' +
+          '<div class="wo-prog-top"><span class="wo-prog-name">' + escapeHtml(name) + '</span><span class="wo-prog-count">' + exs.length + ' exercises</span></div>' +
+          '<div class="wo-prog-list">' + exs.map(escapeHtml).join(' · ') + '</div>' +
+          '<span class="wo-prog-go">Start this workout ›</span></button>';
+      }).join('') + '</div>';
+  }
+  return '<div class="wo-choose-h">How do you want to train?</div>' +
+    '<div class="wo-choose-opts">' +
+    '<button type="button" class="wo-opt" onclick="woChooseProgram()">' +
+    '<div class="wo-opt-ic">📋</div><div class="wo-opt-t">Give me a program</div>' +
+    '<div class="wo-opt-s">Pick a ready-made workout — then just tap your sets &amp; reps.</div></button>' +
+    '<button type="button" class="wo-opt" onclick="woChooseOwn()">' +
+    '<div class="wo-opt-ic">✏️</div><div class="wo-opt-t">Choose my own</div>' +
+    '<div class="wo-opt-s">Build it yourself from 128 exercises across every body part.</div></button>' +
+    '</div>';
+}
 function renderWorkout() {
   if (!state._workout) { navigate('dashboard'); return; }
+  if (state._woChoose) {
+    document.getElementById('main').innerHTML =
+      '<div class="wo-wrap">' +
+      '<div class="wo-top"><button type="button" class="wo-back" onclick="closeWorkout()">‹ Done</button><div class="wo-title">Workout</div><span style="width:54px"></span></div>' +
+      renderWoChooser() + '</div>';
+    return;
+  }
   const unit = weightUnitPref() === 'lbs' ? 'lb' : 'kg';
   const exs = state._workout.exercises;
   const tot = workoutTotals(exs);
@@ -5210,7 +5268,7 @@ function startGuidedLog() {
     step: 0, keys: keys,
     draft: {
       _gymAnswered: !!prior.id, gymDone: !!(prior.gym && prior.gym.done),
-      gymGroup: (prior.gym && prior.gym.muscleGroup) || '', gymDur: (prior.gym && prior.gym.duration) || '',
+      gymGroup: (prior.gym && prior.gym.muscleGroup) || '',
       food: (prior.food && prior.food.rating) || 0, cals: prior.calories || '', meals: [],
       readPages: (prior.reading && prior.reading.pages) || '',
       net: (prior.networking && prior.networking.count) || '',
@@ -5234,7 +5292,6 @@ function renderGuidedLog() {
       '<div id="gl-gym-extra" class="gl-extra"' + (d.gymDone ? '' : ' style="display:none"') + '>' +
       '<div class="gl-sub2">What did you train?</div>' +
       '<div class="gl-muscles">' + ['Push', 'Pull', 'Legs', 'Chest', 'Back', 'Shoulders', 'Arms', 'Core', 'Full Body', 'Cardio'].map(grp => '<button type="button" class="gl-muscle' + (d.gymGroup === grp ? ' gl-muscle-on' : '') + '" onclick="glSetMuscle(\'' + grp + '\')">' + grp + '</button>').join('') + '</div>' +
-      '<input id="gl-gym-dur" class="gl-input" type="number" inputmode="numeric" placeholder="Minutes (optional)" value="' + (d.gymDur || '') + '">' +
       '<button type="button" class="btn-workout gl-workout" onclick="glOpenWorkout()">🏋️ Track sets, reps &amp; rest timer →</button></div>';
   } else if (key.indexOf('meal:') === 0) {
     const idx = parseInt(key.split(':')[1], 10);
@@ -5298,7 +5355,7 @@ function renderGuidedLog() {
 function glCapture() {
   const g = state._guided; if (!g) return;
   const key = g.keys[g.step], d = g.draft;
-  if (key === 'gym') { d.gymDur = parseInt(document.getElementById('gl-gym-dur')?.value) || ''; }
+  if (key === 'gym') { /* muscle group is captured on tap; nothing to read here */ }
   else if (key.indexOf('meal:') === 0) { const idx = parseInt(key.split(':')[1], 10); d.meals = d.meals || []; d.meals[idx] = d.meals[idx] || {}; d.meals[idx].cals = parseFloat(document.getElementById('gl-meal-cals')?.value) || ''; }
   else if (key === 'food') d.cals = parseFloat(document.getElementById('gl-cals')?.value) || '';
   else if (key === 'reading') d.readPages = parseInt(document.getElementById('gl-read')?.value) || '';
@@ -5325,7 +5382,7 @@ function glSkip() { glNext(); }
 // Saves one part of today's entry and marks it logged, so it sticks even if you
 // leave mid-flow — and that step drops off the list until tomorrow.
 function writeStepToDay(day, key, d) {
-  if (key === 'gym') { if (isPillarOn('gym')) day.gym = { done: !!d.gymDone, muscleGroup: d.gymGroup || '', duration: d.gymDur || 0, notes: (day.gym && day.gym.notes) || '' }; }
+  if (key === 'gym') { if (isPillarOn('gym')) day.gym = { done: !!d.gymDone, muscleGroup: d.gymGroup || '', duration: (day.gym && day.gym.duration) || 0, notes: (day.gym && day.gym.notes) || '', exercises: (day.gym && day.gym.exercises) || [] }; }
   else if (key.indexOf('meal:') === 0) {
     const idx = parseInt(key.split(':')[1], 10);
     const dm = (d.meals && d.meals[idx]) || {};
@@ -5375,7 +5432,6 @@ function renderLogToday(editDay) {
   const dateVal = d.date || todayStr();
   const gymDone = d.gym?.done ?? null;  // null = not set, true/false = set
   const gymGroup = d.gym?.muscleGroup || '';
-  const gymDur = d.gym?.duration || '';
   const gymNotes = d.gym?.notes || '';
   const foodRating = d.food?.rating || 0;
   const foodNotes = d.food?.notes || '';
@@ -5421,8 +5477,6 @@ function renderLogToday(editDay) {
         '</select></div>'
       : '<div class="form-group"><label>Category <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>' +
         '<input type="text" id="gym-group" placeholder="e.g. type / topic / focus" value="' + escapeHtml(gymGroup) + '"></div>') +
-    '<div class="form-group"><label>Duration (min)</label>' +
-    '<input type="number" id="gym-dur" min="0" step="5" placeholder="60" value="' + gymDur + '"></div>' +
     '</div>' +
     '<div class="form-group"><label>Notes</label>' +
     '<textarea id="gym-notes" rows="2" placeholder="How it went, anything to remember…">' + gymNotes + '</textarea></div>' +
@@ -5637,7 +5691,7 @@ function readDayForm(date, prior) {
     gym: document.querySelector('.gym-btn') ? {
       done: gymDone === true,
       muscleGroup: document.getElementById('gym-group')?.value || '',
-      duration: parseInt(document.getElementById('gym-dur')?.value) || 0,
+      duration: (prior.gym && prior.gym.duration) || 0,
       notes: document.getElementById('gym-notes')?.value?.trim() || '',
       exercises: (prior.gym && prior.gym.exercises) || []   // logged in the workout tracker, kept across saves
     } : (prior.gym || { done: false, muscleGroup: '', duration: 0, notes: '' }),
@@ -6172,7 +6226,7 @@ function renderHistoryRows(days) {
   if (!days.length) return '<div class="empty-state small"><p>No entries yet.</p></div>';
   const rows = days.map(d => {
     const gymCell = d.gym?.done
-      ? '<span class="pill pill-gym">' + (d.gym.muscleGroup ? d.gym.muscleGroup.charAt(0).toUpperCase() + d.gym.muscleGroup.slice(1) : 'Workout') + (d.gym.duration ? ' · ' + d.gym.duration + 'm' : '') + '</span>'
+      ? '<span class="pill pill-gym">' + (d.gym.muscleGroup ? d.gym.muscleGroup.charAt(0).toUpperCase() + d.gym.muscleGroup.slice(1) : 'Workout') + '</span>'
       : '<span style="color:var(--text-muted);font-size:12px">Rest</span>';
     const foodCell = d.food?.rating
       ? '<span class="pill pill-food">' + '★'.repeat(d.food.rating) + ' ' + d.food.rating + '/5</span>'
@@ -7539,7 +7593,7 @@ function showDayDetail(dateStr) {
   document.getElementById('day-detail-modal')?.remove();
 
   const gymLabel = day.gym?.done
-    ? (day.gym.muscleGroup ? day.gym.muscleGroup.charAt(0).toUpperCase() + day.gym.muscleGroup.slice(1) : 'Done ✓') + (day.gym.duration ? ' · ' + day.gym.duration + 'm' : '')
+    ? (day.gym.muscleGroup ? day.gym.muscleGroup.charAt(0).toUpperCase() + day.gym.muscleGroup.slice(1) : 'Done ✓')
     : 'Not done';
   const foodLabel = day.food?.rating
     ? '★'.repeat(day.food.rating) + '☆'.repeat(5 - day.food.rating) + ' ' + day.food.rating + '/5'
