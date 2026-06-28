@@ -61,7 +61,7 @@ function loadApp(fieldValues) {
     ' loggingStreak, bestStreak, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, EXERCISE_LIBRARY,' +
-    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram });';
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -660,6 +660,10 @@ ok('tailorProgram: fat loss appends a cardio finisher', A.tailorProgram(_base, '
 ok('tailorProgram: muscle gain leaves the exercises as-is', A.tailorProgram(_base, 'gain').length === _base.length);
 ok('tailorProgram: no double finisher if already present', A.tailorProgram(A.tailorProgram(_base, 'lose'), 'lose').filter(n => n === 'HIIT Intervals').length === 1);
 ok('tailorProgram: handles empty input', A.tailorProgram(null, 'lose').length === 0);
+// Plan-ahead label
+eq('plannedWorkoutLabel: a program', A.plannedWorkoutLabel({ program: 'Push Day' }), 'Push Day');
+eq('plannedWorkoutLabel: own choice', A.plannedWorkoutLabel({ own: true }), 'Choose at the gym');
+eq('plannedWorkoutLabel: nothing planned', A.plannedWorkoutLabel(null), '');
 // Muscle map: which muscles each exercise hits
 const mfe = (n, g) => A.musclesForExercise(n, g);
 ok('muscles: Bench Press → chest primary', mfe('Barbell Bench Press', 'Chest').primary.includes('chest'));

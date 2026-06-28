@@ -4082,12 +4082,32 @@ function openWorkout(ret, presetMuscle) {
   state._workout = { exercises: ex.map(e => ({ name: e.name, muscle: e.muscle || '', sets: (e.sets || []).map(s => ({ reps: +s.reps || 0, weight: +s.weight || 0 })) })) };
   state._lib = { open: false, q: '', muscle: preset };
   state._mm = null;
-  // Empty workout → ask "program or your own?" first; resuming one skips straight in
-  state._woChoose = state._workout.exercises.length === 0;
   state._woProgram = false;
+  state._wPlanned = '';
   state._restDefault = repSchemeForGoal(trainingGoal() || 'maintain').rest;   // goal-appropriate default rests
+  // If they planned this session in advance, load it straight away.
+  // Otherwise an empty workout asks "program or your own?"; a resumed one goes in.
+  const plan = getPlannedWorkout();
+  let openLib = false;
+  if (state._workout.exercises.length > 0) {
+    state._woChoose = false;
+  } else if (plan && plan.program && WORKOUT_PROGRAMS[plan.program]) {
+    const goal = trainingGoal();
+    state._workout.exercises = tailorProgram(WORKOUT_PROGRAMS[plan.program], goal).map(n => ({ name: n, muscle: exerciseGroup(n), sets: [] }));
+    state._restDefault = repSchemeForGoal(goal || 'maintain').rest;
+    state._wPlanned = plan.program;
+    state._woChoose = false;
+    clearPlannedWorkout();           // the plan has been used
+    saveWorkout();
+  } else if (plan && plan.own) {
+    state._woChoose = false; openLib = true;
+    clearPlannedWorkout();
+  } else {
+    state._woChoose = state._workout.exercises.length === 0;
+  }
   state.page = 'workout';
   renderWorkout();
+  if (openLib) woOpenLibrary();
 }
 function saveWorkout() {
   if (!state._workout) return;
@@ -4277,6 +4297,58 @@ function renderWoChooser() {
     '<div class="wo-opt-s">Build it yourself from 128 exercises across every body part.</div></button>' +
     '</div>';
 }
+
+// ── Plan your NEXT workout in advance (before you get to the gym) ──
+function getPlannedWorkout() { return (state.data.profile && state.data.profile.plannedWorkout) || null; }
+function plannedWorkoutLabel(plan) { return !plan ? '' : (plan.program || (plan.own ? 'Choose at the gym' : '')); }   // pure/testable
+function clearPlannedWorkout() { const p = state.data.profile = state.data.profile || {}; p.plannedWorkout = null; saveData(); }
+function clearPlanned() { clearPlannedWorkout(); renderDashboard(); }
+function planWorkout(name) {
+  const p = state.data.profile = state.data.profile || {};
+  p.plannedWorkout = { program: name }; saveData();
+  closeWorkoutPlanner(); showToast(name + ' is ready for your next session 💪', 'success'); renderDashboard();
+}
+function planWorkoutOwn() {
+  const p = state.data.profile = state.data.profile || {};
+  p.plannedWorkout = { own: true }; saveData();
+  closeWorkoutPlanner(); showToast("Noted — you'll pick at the gym", 'success'); renderDashboard();
+}
+function closeWorkoutPlanner() { document.getElementById('wplan-sheet')?.remove(); }
+function openWorkoutPlanner() {
+  closeWorkoutPlanner();
+  const goal = trainingGoal(), s = repSchemeForGoal(goal || 'maintain');
+  const sheet = document.createElement('div');
+  sheet.id = 'wplan-sheet';
+  sheet.className = 'wplan-overlay';
+  sheet.innerHTML = '<div class="wplan-card">' +
+    '<div class="wplan-head"><div class="wplan-title">Plan your next workout</div><button type="button" class="wplan-close" onclick="closeWorkoutPlanner()">✕</button></div>' +
+    '<div class="wplan-sub">Pick it now so it\'s loaded and ready when you get to the gym.</div>' +
+    (goal ? '<div class="wplan-goal">' + s.label + ' · aim ' + s.sets + ' · ' + s.reps + '</div>' : '') +
+    '<div class="wplan-list">' + Object.keys(WORKOUT_PROGRAMS).map(name =>
+      '<button type="button" class="wplan-prog" onclick="planWorkout(' + JSON.stringify(name).replace(/"/g, '&quot;') + ')">' +
+      '<span class="wplan-prog-name">' + escapeHtml(name) + '</span><span class="wplan-prog-ex">' + WORKOUT_PROGRAMS[name].length + ' exercises ›</span></button>').join('') +
+    '</div>' +
+    '<button type="button" class="wplan-own" onclick="planWorkoutOwn()">I\'ll choose at the gym</button>' +
+    '</div>';
+  sheet.addEventListener('click', e => { if (e.target === sheet) closeWorkoutPlanner(); });
+  document.body.appendChild(sheet);
+}
+// Dashboard card: the "ask before the gym" surface
+function renderNextWorkoutCard() {
+  if (!isPillarOn('gym')) return '';
+  const plan = getPlannedWorkout();
+  if (plan && (plan.program || plan.own)) {
+    const label = plan.program || "You'll pick at the gym";
+    return '<div class="card nextwo-card"><div class="nextwo-row">' +
+      '<div><div class="nextwo-label">Next workout' + (plan.program ? ' — ready' : '') + '</div><div class="nextwo-prog">🏋️ ' + escapeHtml(label) + '</div></div>' +
+      '<div class="nextwo-acts"><button type="button" class="btn-sm" onclick="openWorkoutPlanner()">Change</button><button type="button" class="btn-sm" onclick="clearPlanned()">Clear</button></div>' +
+      '</div></div>';
+  }
+  return '<button type="button" class="card nextwo-card nextwo-empty" onclick="openWorkoutPlanner()">' +
+    '<div class="nextwo-row"><div><div class="nextwo-label">🏋️ Plan your next workout</div>' +
+    '<div class="nextwo-hint">Pick a program now so it\'s ready at the gym.</div></div>' +
+    '<span class="nextwo-go">Plan ›</span></div></button>';
+}
 function renderWorkout() {
   if (!state._workout) { navigate('dashboard'); return; }
   if (state._woChoose) {
@@ -4304,6 +4376,7 @@ function renderWorkout() {
   const schemeHint = '<div class="wo-scheme" title="' + escapeAttr(_scheme.tip) + '">' +
     (_goal ? '<span class="wo-scheme-tag">' + _scheme.label + '</span>' : '') +
     '<span class="wo-scheme-rx">Aim ' + _scheme.sets + ' · ' + _scheme.reps + '</span></div>';
+  const plannedBanner = state._wPlanned ? '<div class="wo-planned">✓ Your planned session · ' + escapeHtml(state._wPlanned) + '</div>' : '';
 
   const exCards = exs.length ? exs.map((ex, i) => {
     const last = ex.sets[ex.sets.length - 1];
@@ -4347,7 +4420,7 @@ function renderWorkout() {
   document.getElementById('main').innerHTML =
     '<div class="wo-wrap">' +
     '<div class="wo-top"><button type="button" class="wo-back" onclick="closeWorkout()">‹ Done</button><div class="wo-title">Workout</div><span style="width:54px"></span></div>' +
-    totals + schemeHint +
+    plannedBanner + totals + schemeHint +
     '<div class="wo-ex-list">' + exCards + '</div>' +
     '<button type="button" class="wo-add" onclick="woOpenLibrary()">＋ Add exercise</button>' +
     restBlock +
@@ -4879,7 +4952,7 @@ function renderDashboard() {
   // Light, goal-focused home — all the analytics live on the Statistics page.
   const gHero  = renderNeverMissTwice() + renderWhyCard() + renderNextStep() + renderClimbCard() + renderQuestCard() + renderWeekStrip() + renderPillarNav();
   const gGoals = renderGoalCard() + scoreHtml;
-  const gLight = renderChecklistCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
+  const gLight = renderNextWorkoutCard() + renderChecklistCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
   document.getElementById('main').innerHTML =
     renderMountainHero() +
     '<div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">' +

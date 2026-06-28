@@ -2658,3 +2658,31 @@ body { background: transparent; }
 .wo-scheme { display: flex; align-items: center; gap: 8px; justify-content: center; margin: -6px 0 14px; font-size: 13px; }
 .wo-scheme-tag { font-weight: 700; color: var(--gym-color); background: rgba(16,185,129,.12); padding: 2px 9px; border-radius: 999px; }
 .wo-scheme-rx { color: var(--text-muted); font-weight: 600; }
+.wo-planned { text-align: center; font-size: 13px; font-weight: 700; color: var(--gym-color); background: rgba(16,185,129,.10); border: 1px solid rgba(16,185,129,.22); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; }
+
+/* Dashboard "plan your next workout" card */
+.nextwo-card { display: block; width: 100%; text-align: left; cursor: default; }
+.nextwo-empty { cursor: pointer; transition: border-color .15s; }
+.nextwo-empty:hover { border-color: var(--gym-color); }
+.nextwo-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.nextwo-label { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+.nextwo-prog { font-size: 16px; font-weight: 800; color: var(--text); margin-top: 2px; }
+.nextwo-hint { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+.nextwo-go { font-size: 14px; font-weight: 700; color: var(--gym-color); flex: none; }
+.nextwo-acts { display: flex; gap: 6px; flex: none; }
+
+/* Plan-ahead picker sheet */
+.wplan-overlay { position: fixed; inset: 0; background: rgba(2,6,23,.45); z-index: 80; display: flex; align-items: flex-end; justify-content: center; }
+.wplan-card { width: min(560px, 100%); max-height: 88vh; overflow-y: auto; background: var(--bg); border-radius: 18px 18px 0 0; box-shadow: var(--shadow-lg); padding: 18px 16px 24px; }
+.wplan-head { display: flex; align-items: center; justify-content: space-between; }
+.wplan-title { font-size: 18px; font-weight: 800; color: var(--text); }
+.wplan-close { width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text-muted); font-size: 15px; cursor: pointer; }
+.wplan-sub { font-size: 13px; color: var(--text-muted); margin: 4px 0 10px; line-height: 1.4; }
+.wplan-goal { font-size: 13px; font-weight: 700; color: var(--gym-color); background: rgba(16,185,129,.10); border-radius: 9px; padding: 8px 10px; margin-bottom: 10px; }
+.wplan-list { display: flex; flex-direction: column; gap: 8px; }
+.wplan-prog { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); font-family: inherit; cursor: pointer; transition: all .12s; }
+.wplan-prog:hover { border-color: var(--gym-color); background: rgba(16,185,129,.05); }
+.wplan-prog-name { font-size: 16px; font-weight: 700; }
+.wplan-prog-ex { font-size: 12px; color: var(--text-muted); font-weight: 600; flex: none; }
+.wplan-own { width: 100%; margin-top: 10px; padding: 13px; border: 1.5px dashed var(--border-bright); border-radius: 12px; background: var(--card); color: var(--text); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.wplan-own:hover { border-color: var(--gym-color); color: var(--gym-color); }
