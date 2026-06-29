@@ -4997,7 +4997,7 @@ function renderDashboard() {
   // Group the cards into scannable sections — a label only shows if its group has content
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
   // Light, goal-focused home — all the analytics live on the Statistics page.
-  const gHero  = renderNeverMissTwice() + renderWhyCard() + renderNextStep() + renderClimbCard() + renderQuestCard() + renderWeekStrip() + renderPillarNav();
+  const gHero  = renderNeverMissTwice() + renderWhyCard() + renderNextStep() + renderQuestCard() + renderWeekStrip() + renderPillarNav();
   const gGoals = renderGoalCard() + scoreHtml;
   const gLight = renderNextWorkoutCard() + renderChecklistCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
   document.getElementById('main').innerHTML =
