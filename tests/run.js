@@ -54,7 +54,7 @@ function loadApp(fieldValues) {
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
-  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, yearRange, vocabStats, weeklyGoalsReached, gymPlan, momentumScore, pointAlong, weightToBodyFactor, bodyShapeStats, sharpenScore, identityVotes, missedYesterday, todaysVotes, guidedStepKeys,' +
+  code += '\n;Object.assign(__exports__, { state, computeNutrition, mealLabels, foodMacros, findFood, foodLogTotals, unitToGrams, nutritionAdvice, goalStatus, pickNextStep, distributeMeals, groupFoodsByMeal, currentMealIndex, nutritionWeekStats, BOOK_DB, findBook, booksByAuthor, groupReadingByBook, backfillBookData, searchBooks, searchFoods, weekConnection, projectFuture, pearson, lifeWeb, yearRange, vocabStats, weeklyGoalsReached, gymPlan, momentumScore, pointAlong, peak3d, weightToBodyFactor, bodyShapeStats, sharpenScore, identityVotes, missedYesterday, todaysVotes, guidedStepKeys,' +
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
@@ -276,6 +276,12 @@ ok('momentum: goal progress factors in', A.momentumScore(5, 50, 90) > A.momentum
 ok('pointAlong: t=0 → first point', A.pointAlong([[0, 0], [10, 0]], 0)[0] === 0);
 ok('pointAlong: t=1 → last point', A.pointAlong([[0, 0], [10, 0]], 1)[0] === 10);
 ok('pointAlong: t=0.5 → midpoint', A.pointAlong([[0, 0], [10, 0]], 0.5)[0] === 5);
+// 3D peak: a lit face, a shadow face and a two-tone snow cap
+const _pk = A.peak3d(100, 20, 40, 160, 150, { lit: '#1', shadow: '#2', snowLit: '#3', snowShadow: '#4', edge: '#5' });
+ok('peak3d: draws 4 shaded polygons (lit/shadow/snow×2)', (_pk.match(/<polygon/g) || []).length === 4);
+ok('peak3d: uses all four shades', ['#1','#2','#3','#4'].every(c => _pk.indexOf('"' + c + '"') !== -1));
+ok('peak3d: apex sits above the base', _pk.indexOf('100.0,20.0') !== -1);
+ok('peak3d: a ridge edge line when an edge colour is given', /<line /.test(_pk) && A.peak3d(100,20,40,160,150,{lit:'#1',shadow:'#2',snowLit:'#3',snowShadow:'#4'}).indexOf('<line') === -1);
 
 // Goal status (pure)
 const _wg = { kind: 'weight', start: 180, target: 170, deadline: '2026-07-10', createdAt: '2026-06-10' };

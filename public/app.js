@@ -3606,6 +3606,22 @@ function momentumScore(streak, weeklyScore, goalPct) {
   return Math.round(s * 0.4 + w * 0.35 + g * 0.25);
 }
 // The mountain trail — switchback waypoints from base (bottom-left) to summit
+// One 3D-shaded, snow-capped peak — a sunlit face, a shadow face (ridge leans
+// right, light from the upper-left) and a two-tone snow cap. Returns SVG. (testable)
+function peak3d(ax, ay, blx, brx, baseY, pal) {
+  ax = +ax; ay = +ay; blx = +blx; brx = +brx; baseY = +baseY;
+  const f = n => (+n).toFixed(1);
+  const seamX = ax + (brx - ax) * 0.16;                 // ridgeline foot (shadow side)
+  const snowY = ay + (baseY - ay) * 0.30;               // snow line ~30% down
+  const snL = ax + (blx - ax) * 0.30, snR = ax + (brx - ax) * 0.30, snSeam = ax + (snR - ax) * 0.16;
+  return (
+    '<polygon points="' + f(ax) + ',' + f(ay) + ' ' + f(blx) + ',' + f(baseY) + ' ' + f(brx) + ',' + f(baseY) + '" fill="' + pal.lit + '"/>' +
+    '<polygon points="' + f(ax) + ',' + f(ay) + ' ' + f(seamX) + ',' + f(baseY) + ' ' + f(brx) + ',' + f(baseY) + '" fill="' + pal.shadow + '"/>' +
+    '<polygon points="' + f(ax) + ',' + f(ay) + ' ' + f(snL) + ',' + f(snowY) + ' ' + f(snR) + ',' + f(snowY) + '" fill="' + pal.snowLit + '"/>' +
+    '<polygon points="' + f(ax) + ',' + f(ay) + ' ' + f(snSeam) + ',' + f(snowY) + ' ' + f(snR) + ',' + f(snowY) + '" fill="' + pal.snowShadow + '"/>' +
+    (pal.edge ? '<line x1="' + f(ax) + '" y1="' + f(ay) + '" x2="' + f(seamX) + '" y2="' + f(baseY) + '" stroke="' + pal.edge + '" stroke-width="1" opacity="0.4"/>' : '')
+  );
+}
 function climbTrail() { return [[26, 176], [98, 150], [60, 122], [150, 104], [108, 74], [212, 60], [176, 38], [292, 26]]; }
 function trailTotal(pts) { let t = 0; for (let i = 1; i < pts.length; i++) t += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return t; }
 // The point a fraction t (0..1) of the way along the trail (testable)
@@ -3638,9 +3654,13 @@ function climbScene(pts, m, streak, animated) {
       '<text x="' + p[0].toFixed(1) + '" y="' + (p[1] + 10).toFixed(1) + '" text-anchor="middle" font-size="7" font-weight="800" fill="#64748b">' + k.days + 'd</text>' +
       '</g>';
   }).join('');
+  const cbk = { lit: '#9fbcc8', shadow: '#7f9eac', snowLit: '#eef5f7', snowShadow: '#cad9df' };
+  const cfg = { lit: '#5fa98a', shadow: '#3b7a62', snowLit: '#ffffff', snowShadow: '#dae8ef', edge: '#cdeede' };
   return '<circle cx="264" cy="36" r="15" fill="#fff" opacity="0.7"/>' +
-    '<polygon class="climb-peak-back" points="0,190 64,116 112,150 178,90 224,128 282,78 320,108 320,190" fill="#c4d0e6" opacity="0.55"/>' +
-    '<polygon points="0,190 92,148 152,168 214,118 274,150 320,132 320,190" fill="#a9b8d4" opacity="0.5"/>' +
+    '<polygon class="climb-peak-back" points="0,190 0,124 52,108 104,124 156,104 214,122 268,104 320,120 320,190" fill="#cdd9e6" opacity="0.6"/>' +
+    '<polygon points="0,190 0,140 44,128 92,142 150,126 206,140 262,126 320,140 320,190" fill="#aebfd2" opacity="0.55"/>' +
+    peak3d(248, 78, 150, 332, 190, cbk) +
+    peak3d(104, 60, -12, 214, 190, cfg) +
     '<path d="' + d + '" fill="none" stroke="#94a3b8" stroke-width="3" stroke-linecap="round" stroke-dasharray="2 7" opacity="0.6"/>' +
     '<path d="' + d + '" class="climb-trail-done" fill="none" stroke="url(#climbDone)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="' + climbed + ' 9999" style="--len:' + climbed + '"/>' +
     ms +
@@ -4805,15 +4825,31 @@ function renderMountainHero() {
   const stars = night
     ? '<g class="mtn-stars" fill="#ffffff">' + [[40, 30], [85, 52], [135, 24], [185, 44], [235, 30], [270, 56], [300, 22], [365, 38]].map((p, i) => '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="1.6" style="animation-delay:' + (i * 0.37).toFixed(2) + 's"/>').join('') + '</g>'
     : '';
+  // Time-of-day mountain palettes: foreground (fg), mid-distance back peak (bk),
+  // and the two hazy ridges that fade into the distance.
+  const fg = night ? { lit: '#2c3b5f', shadow: '#1b2742', snowLit: '#c9d4ee', snowShadow: '#8893bb', edge: '#5667a4' }
+    : dusk ? { lit: '#6b6a8f', shadow: '#474564', snowLit: '#ffe6cf', snowShadow: '#c8a7bd', edge: '#ffd6ad' }
+      : { lit: '#46946f', shadow: '#2c6450', snowLit: '#ffffff', snowShadow: '#d7e7f0', edge: '#bfe7d1' };
+  const bk = night ? { lit: '#34436d', shadow: '#283457', snowLit: '#b9c4e0', snowShadow: '#7e89b3' }
+    : dusk ? { lit: '#8c7a9f', shadow: '#6a5b81', snowLit: '#ffeede', snowShadow: '#caa9c2' }
+      : { lit: '#74a9a0', shadow: '#5b8c84', snowLit: '#eaf3f3', snowShadow: '#c4d9d6' };
+  const haze = night ? { far: '#2f3e68', mid: '#27325a', fo: 0.6, mo: 0.72 }
+    : dusk ? { far: '#b58fae', mid: '#8f6f96', fo: 0.5, mo: 0.58 }
+      : { far: '#a9cfca', mid: '#8fbcb3', fo: 0.55, mo: 0.62 };
+  const mountains =
+    '<polygon points="0,150 0,96 44,86 92,100 140,82 196,96 244,80 300,96 352,84 400,92 400,150" fill="' + haze.far + '" opacity="' + haze.fo + '"/>' +
+    '<polygon points="0,150 0,114 54,102 104,116 156,100 210,114 262,102 318,116 372,104 400,112 400,150" fill="' + haze.mid + '" opacity="' + haze.mo + '"/>' +
+    peak3d(298, 70, 192, 404, 150, bk) +
+    '<rect x="0" y="104" width="400" height="46" fill="url(#mtnMist)"/>' +
+    peak3d(120, 44, -4, 244, 150, fg) +
+    peak3d(258, 86, 176, 404, 150, fg);
   const svg =
     '<svg class="mtn-hero-svg" viewBox="0 0 400 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' +
-    '<defs><linearGradient id="mtnSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + sky1 + '"/><stop offset="1" stop-color="' + sky2 + '"/></linearGradient></defs>' +
+    '<defs><linearGradient id="mtnSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + sky1 + '"/><stop offset="1" stop-color="' + sky2 + '"/></linearGradient>' +
+    '<linearGradient id="mtnMist" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + (night ? '#141d3f' : '#ffffff') + '" stop-opacity="0"/><stop offset="1" stop-color="' + (night ? '#141d3f' : '#ffffff') + '" stop-opacity="' + (night ? 0.28 : 0.22) + '"/></linearGradient></defs>' +
     '<rect width="400" height="150" fill="url(#mtnSky)"/>' + stars + celestial +
     cloud(40, 1, 44, night ? 0.22 : 0.85) + cloud(70, 0.7, 64, night ? 0.15 : 0.6) +
-    '<polygon points="0,150 70,82 135,112 205,62 275,104 345,74 400,112 400,150" fill="#7fb8a3" opacity="0.55"/>' +
-    '<polygon points="0,150 60,106 130,130 195,96 265,122 335,94 400,122 400,150" fill="#1f7a5e"/>' +
-    '<polygon points="195,96 205,108 185,108" fill="#ffffff" opacity="0.85"/>' +
-    '<polygon points="335,94 343,104 327,104" fill="#ffffff" opacity="0.7"/>' +
+    mountains +
     '</svg>';
   return '<div class="mtn-hero">' + svg +
     '<div class="mtn-hero-text"><div class="mtn-greet">' + greet + (name ? ', ' + escapeHtml(name) : '') + '</div>' +
