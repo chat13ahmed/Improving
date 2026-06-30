@@ -4997,7 +4997,7 @@ function renderDashboard() {
   // Group the cards into scannable sections — a label only shows if its group has content
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
   // Light, goal-focused home — all the analytics live on the Statistics page.
-  const gHero  = renderNeverMissTwice() + renderWhyCard() + renderNextStep() + renderQuestCard() + renderWeekStrip() + renderPillarNav();
+  const gHero  = renderNeverMissTwice() + renderWhyCard() + renderNextStep() + renderWeekStrip() + renderPillarNav();
   const gGoals = renderGoalCard() + scoreHtml;
   const gLight = renderNextWorkoutCard() + renderChecklistCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
   document.getElementById('main').innerHTML =
@@ -5239,8 +5239,7 @@ function renderStatsPage() {
   const chartCards =
     (showIncomeChart ? '<div class="card"><h3 class="card-title">Money (last 12 weeks)</h3><div class="chart-wrap"><canvas id="incomeChart"></canvas></div></div>' : '') +
     (showGymChart ? '<div class="card"><h3 class="card-title">' + escapeHtml(pillar('gym').label) + ' Days per Week</h3><div class="chart-wrap"><canvas id="gymChart"></canvas></div></div>' : '');
-  const chartsHtml = (chartCards ? '<div class="charts-row">' + chartCards + '</div>' : '') +
-    '<div class="card"><h3 class="card-title">Recent Days</h3>' + renderRecentDaysTable(sortedDays.slice(0, 7)) + '</div>';
+  const chartsHtml = (chartCards ? '<div class="charts-row">' + chartCards + '</div>' : '');
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
   // Simplified: just the numbers, the trends and the history — the deeper "wow"
   // cards (life web, why/identity, projections, AI coach, body morph) live on the
