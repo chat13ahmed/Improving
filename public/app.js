@@ -5242,25 +5242,19 @@ function renderStatsPage() {
   const chartsHtml = (chartCards ? '<div class="charts-row">' + chartCards + '</div>' : '') +
     '<div class="card"><h3 class="card-title">Recent Days</h3>' + renderRecentDaysTable(sortedDays.slice(0, 7)) + '</div>';
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
+  // Simplified: just the numbers, the trends and the history — the deeper "wow"
+  // cards (life web, why/identity, projections, AI coach, body morph) live on the
+  // Dashboard and Coach pages, so the stats page stays scannable.
   document.getElementById('main').innerHTML = header +
-    sec('How it all connects', renderConnectionCard() + renderLifeWeb()) +
-    sec('Your why & balance', renderWhyEditorCard() + renderIdentityCard() + renderSharpenCard()) +
-    sec("Where it's heading", renderFutureCard()) +
-    sec('Your year', renderYearRange()) +
     sec('This week', pillarsHtml + renderHydrationStrip(stats) + renderFocusCard(stats, lastStats)) +
-    sec('Your coach', renderGamePlanCard() + renderCoachInsightCard() + renderPatternsCard()) +
-    sec('Health', renderBodyShapeCard() + renderNutritionWeekCard() + renderGymPlanCard() + renderWeightTrend()) +
-    sec('Money', renderMoneyCircleCard()) +
-    sec('Trends & history', chartsHtml + renderRecentNotesCard() + renderReviewCard() + renderAchievementsSection());
+    sec('Health & money', renderNutritionWeekCard() + renderWeightTrend() + renderMoneyCircleCard()) +
+    sec('Your year', renderYearRange()) +
+    sec('Trends & history', chartsHtml + renderAchievementsSection());
   setTimeout(animateCounters, 120);
   setTimeout(() => wireCardTilt('.pillar-card'), 60);
-  setTimeout(playBodyMorph, 220);
   if (showIncomeChart) initIncomeChart(sortedWeeks);
   if (showGymChart) initGymChart(days);
   if ((state.data.weights || []).length >= 2) initWeightChart();
-  maybeGeneratePlan();
-  maybeGenerateInsight();
-  maybeGeneratePatterns();
 }
 
 function renderStars(rating) {
