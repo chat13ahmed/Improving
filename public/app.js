@@ -5248,7 +5248,6 @@ function renderStatsPage() {
   document.getElementById('main').innerHTML = header +
     sec('This week', pillarsHtml + renderHydrationStrip(stats) + renderFocusCard(stats, lastStats)) +
     sec('Health & money', renderNutritionWeekCard() + renderWeightTrend() + renderMoneyCircleCard()) +
-    sec('Your year', renderYearRange()) +
     sec('Trends & history', chartsHtml + renderAchievementsSection());
   setTimeout(animateCounters, 120);
   setTimeout(() => wireCardTilt('.pillar-card'), 60);
