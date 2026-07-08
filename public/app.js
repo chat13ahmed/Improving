@@ -3905,18 +3905,26 @@ function tailorProgram(list, goal) {
   if (goal === 'lose' && out.length && out.indexOf('HIIT Intervals') === -1) out.push('HIIT Intervals');
   return out;
 }
-// Pure: roll up a workout into headline numbers. (testable)
+// Pure: is this exercise measured by time held/done, not reps? All cardio, plus
+// isometric holds (planks, hollow hold, wall sit). Those log a duration. (testable)
+function isTimedExercise(name, muscle) {
+  if (muscle === 'Cardio') return true;
+  const n = String(name || '').toLowerCase();
+  return /plank|hollow hold|wall sit|dead hang|l-sit|superman hold/.test(n);
+}
+// Pure: roll up a workout into headline numbers. Rep sets add reps + volume;
+// timed sets add seconds. Any set with something logged counts. (testable)
 function workoutTotals(exercises) {
   const list = Array.isArray(exercises) ? exercises : [];
-  let sets = 0, reps = 0, volume = 0;
+  let sets = 0, reps = 0, volume = 0, secs = 0;
   for (const ex of list) {
     const ss = (ex && Array.isArray(ex.sets)) ? ex.sets : [];
     for (const s of ss) {
-      const r = Math.max(0, +(s && s.reps) || 0), w = Math.max(0, +(s && s.weight) || 0);
-      if (r > 0 || w > 0) { sets++; reps += r; volume += r * w; }
+      const r = Math.max(0, +(s && s.reps) || 0), w = Math.max(0, +(s && s.weight) || 0), sc = Math.max(0, +(s && s.secs) || 0);
+      if (r > 0 || w > 0 || sc > 0) { sets++; reps += r; volume += r * w; secs += sc; }
     }
   }
-  return { exercises: list.length, sets, reps, volume: Math.round(volume) };
+  return { exercises: list.length, sets, reps, volume: Math.round(volume), secs };
 }
 // Pure: search the library by name or muscle group. Empty query → everything. (testable)
 function searchExercises(query, muscle) {
@@ -4110,7 +4118,7 @@ function openWorkout(ret, presetMuscle) {
   if (document.getElementById('day-form')) { try { commitDayFromForm(); } catch {} }
   const day = (state.data.days || []).find(x => x.date === todayStr());
   const ex = (day && day.gym && Array.isArray(day.gym.exercises)) ? day.gym.exercises : [];
-  state._workout = { exercises: ex.map(e => ({ name: e.name, muscle: e.muscle || '', sets: (e.sets || []).map(s => ({ reps: +s.reps || 0, weight: +s.weight || 0 })) })) };
+  state._workout = { exercises: ex.map(e => ({ name: e.name, muscle: e.muscle || '', sets: (e.sets || []).map(s => ({ reps: +s.reps || 0, weight: +s.weight || 0, secs: +s.secs || 0 })) })) };
   state._lib = { open: false, q: '', muscle: preset };
   state._mm = null;
   state._woProgram = false;
@@ -4146,7 +4154,7 @@ function saveWorkout() {
   const days = state.data.days = state.data.days || [];
   let day = days.find(x => x.date === date);
   if (!day) { day = { id: uid(), date }; days.push(day); }
-  const exercises = state._workout.exercises.map(e => ({ name: e.name, muscle: e.muscle || '', sets: e.sets.map(s => ({ reps: +s.reps || 0, weight: +s.weight || 0 })) }));
+  const exercises = state._workout.exercises.map(e => ({ name: e.name, muscle: e.muscle || '', sets: e.sets.map(s => ({ reps: +s.reps || 0, weight: +s.weight || 0, secs: +s.secs || 0 })) }));
   const tot = workoutTotals(exercises);
   const prev = day.gym || {};
   day.gym = {
@@ -4188,6 +4196,15 @@ function woRemoveExercise(i) {
 }
 function woAddSet(i) {
   const ex = state._workout && state._workout.exercises[i]; if (!ex) return;
+  if (isTimedExercise(ex.name, ex.muscle)) {
+    const min = parseInt(document.getElementById('wo-min-' + i)?.value) || 0;
+    const sec = parseInt(document.getElementById('wo-sec-' + i)?.value) || 0;
+    const secs = min * 60 + sec;
+    if (secs <= 0) { showToast('Enter a time (minutes and/or seconds)', 'error'); return; }
+    ex.sets.push({ secs });
+    saveWorkout(); renderWorkout();          // no rest clock for timed work
+    return;
+  }
   const reps = parseInt(document.getElementById('wo-reps-' + i)?.value) || 0;
   const weight = parseFloat(document.getElementById('wo-weight-' + i)?.value) || 0;
   if (reps <= 0 && weight <= 0) { showToast('Enter reps (and weight, if any)', 'error'); return; }
@@ -4403,7 +4420,7 @@ function renderWorkout() {
     '<div class="wo-tot"><span class="wo-tot-n">' + tot.exercises + '</span><span class="wo-tot-l">exercises</span></div>' +
     '<div class="wo-tot"><span class="wo-tot-n">' + tot.sets + '</span><span class="wo-tot-l">sets</span></div>' +
     '<div class="wo-tot"><span class="wo-tot-n">' + tot.reps + '</span><span class="wo-tot-l">reps</span></div>' +
-    '<div class="wo-tot"><span class="wo-tot-n">' + (tot.volume ? tot.volume.toLocaleString() : '0') + '</span><span class="wo-tot-l">' + unit + ' lifted</span></div>' +
+    '<div class="wo-tot"><span class="wo-tot-n">' + (tot.volume ? tot.volume.toLocaleString() : (tot.secs ? formatClock(tot.secs) : '0')) + '</span><span class="wo-tot-l">' + (!tot.volume && tot.secs ? 'time' : unit + ' lifted') + '</span></div>' +
     '</div>';
 
   const _goal = trainingGoal();
@@ -4414,25 +4431,33 @@ function renderWorkout() {
   const plannedBanner = state._wPlanned ? '<div class="wo-planned">✓ Your planned session · ' + escapeHtml(state._wPlanned) + '</div>' : '';
 
   const exCards = exs.length ? exs.map((ex, i) => {
+    const timed = isTimedExercise(ex.name, ex.muscle);
     const last = ex.sets[ex.sets.length - 1];
     const setRows = ex.sets.map((s, j) =>
       '<div class="wo-set"><span class="wo-set-n">' + (j + 1) + '</span>' +
-      '<span class="wo-set-v">' + (s.reps || 0) + ' reps' + (s.weight ? ' × ' + s.weight + ' ' + unit : '') + '</span>' +
+      '<span class="wo-set-v">' + (timed ? formatClock(s.secs || 0) : ((s.reps || 0) + ' reps' + (s.weight ? ' × ' + s.weight + ' ' + unit : ''))) + '</span>' +
       '<button type="button" class="wo-set-del" onclick="woRemoveSet(' + i + ',' + j + ')" title="Remove set">✕</button></div>').join('');
     const exA = JSON.stringify(ex.name).replace(/"/g, '&quot;'), exB = JSON.stringify(ex.muscle || '').replace(/"/g, '&quot;');
+    const lastSecs = last && last.secs ? last.secs : 0;
+    const addRow = timed
+      ? '<div class="wo-set-add">' +
+        '<input id="wo-min-' + i + '" class="wo-set-in" type="number" inputmode="numeric" placeholder="min" value="' + (lastSecs >= 60 ? Math.floor(lastSecs / 60) : '') + '">' +
+        '<span class="wo-x">:</span>' +
+        '<input id="wo-sec-' + i + '" class="wo-set-in" type="number" inputmode="numeric" placeholder="sec" value="' + (lastSecs ? (lastSecs % 60) : '') + '">' +
+        '<button type="button" class="wo-set-btn" onclick="woAddSet(' + i + ')">＋ Set</button></div>'
+      : '<div class="wo-set-add">' +
+        '<input id="wo-reps-' + i + '" class="wo-set-in" type="number" inputmode="numeric" placeholder="reps" value="' + (last ? last.reps : '') + '">' +
+        '<span class="wo-x">×</span>' +
+        '<input id="wo-weight-' + i + '" class="wo-set-in" type="number" inputmode="decimal" placeholder="' + unit + '" value="' + (last && last.weight ? last.weight : '') + '">' +
+        '<button type="button" class="wo-set-btn" onclick="woAddSet(' + i + ')">＋ Set</button></div>';
     return '<div class="wo-ex">' +
       '<div class="wo-ex-head"><div><div class="wo-ex-name">' + escapeHtml(ex.name) + '</div>' +
-      (ex.muscle ? '<div class="wo-ex-muscle">' + escapeHtml(ex.muscle) + '</div>' : '') + '</div>' +
+      (ex.muscle ? '<div class="wo-ex-muscle">' + escapeHtml(ex.muscle) + (timed ? ' · timed' : '') + '</div>' : '') + '</div>' +
       '<div class="wo-ex-acts">' +
       '<button type="button" class="wo-ex-info" onclick="showMuscleMap(' + exA + ',' + exB + ')" title="Muscles worked">' + BODY_ICON + '</button>' +
       '<button type="button" class="wo-ex-del" onclick="woRemoveExercise(' + i + ')" title="Remove exercise">✕</button></div></div>' +
-      (setRows ? '<div class="wo-sets">' + setRows + '</div>' : '<div class="wo-sets-empty">No sets yet — log your first below.</div>') +
-      '<div class="wo-set-add">' +
-      '<input id="wo-reps-' + i + '" class="wo-set-in" type="number" inputmode="numeric" placeholder="reps" value="' + (last ? last.reps : '') + '">' +
-      '<span class="wo-x">×</span>' +
-      '<input id="wo-weight-' + i + '" class="wo-set-in" type="number" inputmode="decimal" placeholder="' + unit + '" value="' + (last && last.weight ? last.weight : '') + '">' +
-      '<button type="button" class="wo-set-btn" onclick="woAddSet(' + i + ')">＋ Set</button>' +
-      '</div></div>';
+      (setRows ? '<div class="wo-sets">' + setRows + '</div>' : '<div class="wo-sets-empty">' + (timed ? 'No sets yet — log your time below.' : 'No sets yet — log your first below.') + '</div>') +
+      addRow + '</div>';
   }).join('') : '<div class="wo-empty">🏋️<div class="wo-empty-t">No exercises yet</div><div class="wo-empty-s">Add one from the library and start logging your sets.</div></div>';
 
   // Rest timer: live bar while running, preset buttons otherwise
@@ -4467,10 +4492,12 @@ function renderWorkout() {
 function renderWorkoutEntry(day) {
   const tot = workoutTotals(day && day.gym && day.gym.exercises);
   const unit = weightUnitPref() === 'lbs' ? 'lb' : 'kg';
+  const parts = [tot.exercises + ' exercise' + (tot.exercises === 1 ? '' : 's'), tot.sets + ' sets'];
+  if (tot.reps) parts.push(tot.reps + ' reps');
+  if (tot.volume) parts.push(tot.volume.toLocaleString() + ' ' + unit);
+  if (tot.secs) parts.push(formatClock(tot.secs) + ' time');
   return '<div class="wo-entry">' +
-    (tot.sets
-      ? '<div class="wo-entry-sum">🏋️ ' + tot.exercises + ' exercise' + (tot.exercises === 1 ? '' : 's') + ' · ' + tot.sets + ' sets · ' + tot.reps + ' reps' + (tot.volume ? ' · ' + tot.volume.toLocaleString() + ' ' + unit : '') + '</div>'
-      : '') +
+    (tot.sets ? '<div class="wo-entry-sum">🏋️ ' + parts.join(' · ') + '</div>' : '') +
     '<button type="button" class="btn-workout" onclick="openWorkout()">' + (tot.sets ? '✏️ Edit workout — sets, reps & rest timer' : '🏋️ Track exercises — sets, reps & rest timer') + '</button>' +
     '</div>';
 }

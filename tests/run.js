@@ -60,7 +60,7 @@ function loadApp(fieldValues) {
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
     ' loggingStreak, bestStreak, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
-    ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, EXERCISE_LIBRARY,' +
+    ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
@@ -634,6 +634,20 @@ eq('workoutTotals: volume (10*60 + 8*70)', _wt.volume, 1160);
 ok('workoutTotals: bodyweight set counts (reps>0, weight 0)', _wt.sets === 3);
 const _wtEmpty = A.workoutTotals([]);
 ok('workoutTotals: empty workout → zeros', _wtEmpty.sets === 0 && _wtEmpty.reps === 0 && _wtEmpty.volume === 0);
+// Timed exercises (cardio + isometric holds) log seconds, not reps/weight
+ok('isTimedExercise: all cardio is timed', A.EXERCISE_LIBRARY.Cardio.every(n => A.isTimedExercise(n, 'Cardio')));
+ok('isTimedExercise: Plank is timed', A.isTimedExercise('Plank', 'Core'));
+ok('isTimedExercise: Side Plank is timed', A.isTimedExercise('Side Plank', 'Core'));
+ok('isTimedExercise: Hollow Hold is timed', A.isTimedExercise('Hollow Hold', 'Core'));
+ok('isTimedExercise: Bench Press is NOT timed', !A.isTimedExercise('Barbell Bench Press', 'Chest'));
+ok('isTimedExercise: Back Squat is NOT timed', !A.isTimedExercise('Back Squat', 'Legs'));
+ok('isTimedExercise: Crunch (reps) is NOT timed', !A.isTimedExercise('Crunch', 'Core'));
+const _wtTimed = A.workoutTotals([{ name: 'Plank', muscle: 'Core', sets: [{ secs: 60 }, { secs: 45 }] }, { name: 'Treadmill Run', muscle: 'Cardio', sets: [{ secs: 1200 }] }]);
+ok('workoutTotals: timed sets counted (3 sets)', _wtTimed.sets === 3);
+ok('workoutTotals: timed adds seconds (60+45+1200)', _wtTimed.secs === 1305);
+ok('workoutTotals: timed adds no reps or volume', _wtTimed.reps === 0 && _wtTimed.volume === 0);
+const _wtMixed = A.workoutTotals([{ name: 'Bench', muscle: 'Chest', sets: [{ reps: 10, weight: 60 }] }, { name: 'Plank', muscle: 'Core', sets: [{ secs: 90 }] }]);
+ok('workoutTotals: mixed reps + time', _wtMixed.sets === 2 && _wtMixed.reps === 10 && _wtMixed.volume === 600 && _wtMixed.secs === 90);
 ok('workoutTotals: ignores a set with no reps and no weight', A.workoutTotals([{ name: 'x', sets: [{ reps: 0, weight: 0 }] }]).sets === 0);
 ok('workoutTotals: handles junk input', A.workoutTotals(null).exercises === 0 && A.workoutTotals(undefined).sets === 0);
 // Library search
