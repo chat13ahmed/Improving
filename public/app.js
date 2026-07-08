@@ -1765,6 +1765,9 @@ function renderLogNutritionSection(eatenVal) {
   }
   const totals = foodLogTotals(state._foodLog);
   const initEaten = totals.kcal > 0 ? Math.round(totals.kcal) : (parseFloat(eatenVal) || 0);
+  // Which meal new foods are added to (each meal is logged on its own below)
+  if (state._activeMeal == null || state._activeMeal < 0 || state._activeMeal >= nut.meals.count) state._activeMeal = currentMealIndex(nut.meals.count, new Date().getHours());
+  const activeMealName = nut.meals.labels[state._activeMeal] || ('Meal ' + (state._activeMeal + 1));
   // Food search uses a custom suggestion dropdown (renderFoodSuggest), not a native datalist
   // Quick-add chips from foods you've logged before
   state._recentFoods = getRecentFoods(8);
@@ -1787,12 +1790,12 @@ function renderLogNutritionSection(eatenVal) {
 
     // Food logger
     '<div class="food-logger">' +
-    '<label class="food-logger-label">What did you eat? <span style="font-weight:400;color:var(--text-muted)">Add foods and we\'ll count the macros</span></label>' +
+    '<label class="food-logger-label">What did you eat? <span style="font-weight:400;color:var(--text-muted)">Log each meal on its own — we\'ll total it all at the end</span></label>' +
+    '<div class="food-active-line">Adding to <b id="food-active-meal">' + escapeHtml(activeMealName) + '</b> · pick a meal with “+ Add food” below</div>' +
     '<div class="food-add-row">' +
     '<input type="text" id="food-pick" placeholder="Search a food (e.g. chicken breast)…" autocomplete="off" oninput="onFoodSearch()" onfocus="onFoodSearch()" onblur="setTimeout(hideFoodSuggest, 200)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();document.getElementById(\'food-qty\').focus();}">' +
     '<input type="number" id="food-qty" min="0" step="1" placeholder="amount" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addFoodToLog();}">' +
     '<select id="food-unit"><option value="g">grams</option><option value="ml">mL</option><option value="l">litres</option><option value="oz">oz</option><option value="serving">serving(s)</option></select>' +
-    '<select id="food-meal" title="Add to which meal">' + nut.meals.labels.map(function (lbl, i) { return '<option value="' + i + '"' + (i === currentMealIndex(nut.meals.count, new Date().getHours()) ? ' selected' : '') + '>' + escapeHtml(lbl) + '</option>'; }).join('') + '</select>' +
     '<button type="button" class="btn btn-outline food-add-btn" onclick="addFoodToLog()">+ Add</button>' +
     '<button type="button" class="btn btn-outline food-ai-btn" id="food-ai-btn" onclick="estimateFoodWithAI()" title="Estimate macros with AI for any food">AI</button>' +
     '</div>' +
@@ -1810,8 +1813,22 @@ function renderLogNutritionSection(eatenVal) {
     '</div>';
 }
 
-// Which meal the add-row is currently targeting
-function currentMeal() { const el = document.getElementById('food-meal'); return el ? (parseInt(el.value, 10) || 0) : 0; }
+// Which meal the add-row is currently targeting (each meal is logged separately)
+function currentMeal() {
+  if (typeof state._activeMeal === 'number' && state._activeMeal >= 0) return state._activeMeal;
+  const nut = getNutrition();
+  return nut && nut.meals ? currentMealIndex(nut.meals.count, new Date().getHours()) : 0;
+}
+// Focus a specific meal to log foods into it, then scroll to the search box
+function setActiveMeal(i) {
+  state._activeMeal = i;
+  refreshFoodLog();
+  const nut = getNutrition();
+  const nm = document.getElementById('food-active-meal');
+  if (nm && nut) nm.textContent = (nut.meals.labels[i] || ('Meal ' + (i + 1)));
+  const pick = document.getElementById('food-pick');
+  if (pick) { try { pick.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch {} setTimeout(() => pick.focus(), 220); }
+}
 // One food row
 function foodItemRow(x) {
   return '<div class="food-item">' +
@@ -1839,14 +1856,16 @@ function renderFoodLogByMeal() {
     const pStr = Math.round(t.p) + (pm ? ' / ' + pm.protein : '') + 'g P';
     const over = pm && t.kcal > pm.calories * 1.05;
     const name = labels[i] || ('Meal ' + (i + 1));
-    html += '<div class="meal-slot">' +
+    const active = i === state._activeMeal;
+    html += '<div class="meal-slot' + (active ? ' meal-slot-active' : '') + '">' +
       '<div class="meal-slot-head">' +
-      '<span class="ms-name">' + escapeHtml(name) + '</span>' +
+      '<span class="ms-name">' + escapeHtml(name) + (active ? ' <span class="ms-adding">adding</span>' : '') + '</span>' +
       '<span class="ms-total' + (over ? ' is-over' : '') + '">' + calStr + ' · <b class="mp">' + pStr + '</b></span>' +
       '</div>' +
       (foods.length
         ? '<div class="meal-slot-foods">' + foods.map(foodItemRow).join('') + '</div>'
-        : '<div class="meal-slot-empty">Nothing here yet — choose "' + escapeHtml(name) + '" above and add a food.</div>') +
+        : '<div class="meal-slot-empty">Nothing logged for ' + escapeHtml(name) + ' yet.</div>') +
+      '<button type="button" class="ms-add" onclick="setActiveMeal(' + i + ')">+ Add food to ' + escapeHtml(name) + '</button>' +
       '</div>';
   }
   return html;
@@ -1876,10 +1895,12 @@ function renderFoodLogTotals() {
   const nut = getNutrition();
   const pTarget = nut ? nut.protein.g : 0;
   const advice = nutritionAdvice(t, nut);
-  return '<div class="food-log-total">' +
-    'Logged: <b>' + Math.round(t.kcal).toLocaleString() + ' cal</b> · ' +
-    '<b class="mp">' + Math.round(t.p) + 'g</b> protein' + (pTarget ? ' / ' + pTarget + 'g' : '') + ' · ' +
-    '<b class="mc">' + Math.round(t.c) + 'g</b> carbs · <b class="mf">' + Math.round(t.f) + 'g</b> fat' +
+  const nMeals = new Set((state._foodLog || []).map(x => x.meal || 0)).size;
+  return '<div class="food-day-total">' +
+    '<div class="fdt-label">Day total · ' + nMeals + ' meal' + (nMeals === 1 ? '' : 's') + ' logged</div>' +
+    '<div class="fdt-nums"><b>' + Math.round(t.kcal).toLocaleString() + '</b>' + (nut ? ' / ' + nut.calories.toLocaleString() : '') + ' cal · ' +
+    '<b class="mp">' + Math.round(t.p) + 'g</b> P' + (pTarget ? ' / ' + pTarget + 'g' : '') + ' · ' +
+    '<b class="mc">' + Math.round(t.c) + 'g</b> C · <b class="mf">' + Math.round(t.f) + 'g</b> F</div>' +
     '</div>' +
     (advice ? '<div class="food-advice">' + advice + '</div>' : '');
 }

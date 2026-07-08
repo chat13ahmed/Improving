@@ -1979,6 +1979,19 @@ body.wo-fullscreen .bottom-nav { display: none !important; }   /* workout is an 
 .ms-total.is-over, .ms-total.is-over b { color: var(--danger); }
 .meal-slot-foods { padding: 6px 10px; display: flex; flex-direction: column; gap: 4px; }
 .meal-slot-empty { padding: 10px 12px; font-size: 12px; color: var(--text-muted); }
+/* Per-meal separate logging */
+.meal-slot-active { border-color: var(--success); box-shadow: 0 0 0 1px var(--success); }
+.ms-adding { font-size: 10px; font-weight: 700; color: #fff; background: var(--success); border-radius: 999px; padding: 1px 7px; letter-spacing: .3px; margin-left: 4px; text-transform: none; }
+.ms-add { width: calc(100% - 20px); margin: 4px 10px 10px; padding: 8px; border: 1px dashed var(--border-bright); border-radius: 8px; background: transparent; color: var(--success); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ms-add:hover { border-color: var(--success); background: rgba(16,185,129,0.06); }
+.food-active-line { font-size: 12px; color: var(--text-muted); margin: 4px 0 8px; }
+.food-active-line b { color: var(--success); }
+/* Day total — the sum shown after all meals are logged */
+.food-day-total { margin-top: 14px; padding: 12px 14px; border-radius: var(--radius-sm); background: rgba(16,185,129,0.10); border: 1.5px solid rgba(16,185,129,0.35); }
+.fdt-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--success); margin-bottom: 3px; }
+.fdt-nums { font-size: 15px; color: var(--text-muted); }
+.fdt-nums b { color: var(--text); font-weight: 800; }
+.fdt-nums b.mp { color: var(--success); } .fdt-nums b.mc { color: var(--accent); } .fdt-nums b.mf { color: #A78BFA; }
 /* Per-meal breakdown in the saved day detail */
 .dd-meals { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
 .dd-meal { background: var(--surface); border-radius: 8px; padding: 7px 10px; }
