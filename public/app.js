@@ -997,6 +997,7 @@ function applyNavVisibility() {
 // ─────────────────────────────────────────────────────────────
 function navigate(page) {
   state.page = page;
+  if (page !== 'workout') document.body.classList.remove('wo-fullscreen');   // restore the bottom nav when leaving the workout
   if (page !== 'log') { state._editDayId = null; state._fullLog = false; state._guided = null; }
   Object.values(charts).forEach(c => c.destroy());
   charts = {};
@@ -4403,6 +4404,7 @@ function renderNextWorkoutCard() {
 }
 function renderWorkout() {
   if (!state._workout) { navigate('dashboard'); return; }
+  document.body.classList.add('wo-fullscreen');   // hide the bottom nav so it can't cover the timer/exercises
   if (state._woChoose) {
     document.getElementById('main').innerHTML =
       '<div class="wo-wrap">' +

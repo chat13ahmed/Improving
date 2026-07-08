@@ -1375,6 +1375,7 @@ body {
 /* ─── Mobile bottom tab bar ──────────────────────── */
 .bottom-nav { display: none; }
 body.auth-active .bottom-nav { display: none !important; }
+body.wo-fullscreen .bottom-nav { display: none !important; }   /* workout is an immersive sub-page */
 @media (max-width: 820px) {
   .bottom-nav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 200;
     background: var(--bg-2); border-top: 1px solid var(--border);
@@ -2559,7 +2560,7 @@ body { background: transparent; }
 .wo-add:hover { border-color: var(--gym-color); color: var(--gym-color); }
 
 /* Rest timer — fixed at the bottom so it's always visible */
-.wo-rest { position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px; width: min(600px, calc(100% - 24px));
+.wo-rest { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: min(600px, calc(100% - 24px));
   background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px; box-shadow: var(--shadow-lg); z-index: 20; }
 .wo-rest-live { border-color: var(--gym-color); background: linear-gradient(135deg, rgba(16,185,129,.08), var(--card)); }
 .wo-rest-top { display: flex; align-items: center; justify-content: space-between; }
