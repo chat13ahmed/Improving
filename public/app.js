@@ -4201,28 +4201,32 @@ function woRemoveSet(i, j) {
   saveWorkout(); renderWorkout();
 }
 
-// ── Rest timer ──
+// ── Rest timer ── counts real wall-clock time (via an absolute end timestamp),
+// so it stays accurate even when the phone throttles/pauses timers between sets.
 function woStartRest(sec) {
   woStopRest();
   const total = Math.max(5, Math.round(+sec) || 90);
   state._restDefault = total;
-  state._restTimer = { left: total, total, running: true, id: 0 };
-  state._restTimer.id = setInterval(woRestTick, 1000);
+  state._restTimer = { total, left: total, endAt: Date.now() + total * 1000, running: true, id: 0 };
+  state._restTimer.id = setInterval(woRestTick, 500);
   renderWorkout();
 }
 function woRestTick() {
   const t = state._restTimer; if (!t || !t.running) return;
-  t.left -= 1;
-  if (t.left <= 0) { woStopRest(); restNotify(); if (state.page === 'workout') renderWorkout(); return; }
-  const clock = document.getElementById('wo-rest-clock');
-  const fill = document.getElementById('wo-rest-fill');
-  if (clock) clock.textContent = formatClock(t.left);
-  if (fill) fill.style.width = Math.round((t.left / t.total) * 100) + '%';
+  if (state.page !== 'workout') { woStopRest(); return; }   // left the workout — don't leak or buzz later
+  const left = Math.max(0, Math.round((t.endAt - Date.now()) / 1000));
+  t.left = left;
+  if (left <= 0) { woStopRest(); restNotify(); renderWorkout(); return; }
+  const clock = document.getElementById('wo-rest-clock'); if (clock) clock.textContent = formatClock(left);
+  const fill = document.getElementById('wo-rest-fill'); if (fill) fill.style.width = Math.round((left / t.total) * 100) + '%';
 }
 function woAddRest(delta) {
   const t = state._restTimer; if (!t || !t.running) return;
-  t.left = Math.max(1, t.left + delta); t.total = Math.max(t.total, t.left);
+  t.endAt += delta * 1000;
+  t.left = Math.max(1, Math.round((t.endAt - Date.now()) / 1000));
+  t.total = Math.max(t.total, t.left);
   const clock = document.getElementById('wo-rest-clock'); if (clock) clock.textContent = formatClock(t.left);
+  const fill = document.getElementById('wo-rest-fill'); if (fill) fill.style.width = Math.round((t.left / t.total) * 100) + '%';
 }
 function woCancelRest() { woStopRest(); renderWorkout(); }
 function woStopRest() { const t = state._restTimer; if (t && t.id) { try { clearInterval(t.id); } catch {} } state._restTimer = null; }
