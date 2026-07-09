@@ -61,6 +61,7 @@ function loadApp(fieldValues) {
     ' loggingStreak, bestStreak, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
+    ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS,' +
     ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
@@ -282,6 +283,28 @@ ok('peak3d: draws 4 shaded polygons (lit/shadow/snow×2)', (_pk.match(/<polygon/
 ok('peak3d: uses all four shades', ['#1','#2','#3','#4'].every(c => _pk.indexOf('"' + c + '"') !== -1));
 ok('peak3d: apex sits above the base', _pk.indexOf('100.0,20.0') !== -1);
 ok('peak3d: a ridge edge line when an edge colour is given', /<line /.test(_pk) && A.peak3d(100,20,40,160,150,{lit:'#1',shadow:'#2',snowLit:'#3',snowShadow:'#4'}).indexOf('<line') === -1);
+
+// Business-idea scoring
+ok('ideaScore: all 5s → 100', A.ideaScore({ income: 5, speed: 5, ease: 5, passion: 5 }) === 100);
+ok('ideaScore: unrated → 0', A.ideaScore({}) === 0 && A.ideaScore(null) === 0);
+ok('ideaScore: income is weighted heavier than passion',
+  A.ideaScore({ income: 5, speed: 1, ease: 1, passion: 1 }) > A.ideaScore({ income: 1, speed: 1, ease: 1, passion: 5 }));
+ok('ideaScore: clamps out-of-range values', A.ideaScore({ income: 9, speed: 5, ease: 5, passion: 5 }) === 100);
+ok('ideaRated: needs all four rated', A.ideaRated({ income: 5, speed: 5, ease: 5, passion: 5 }) === true && A.ideaRated({ income: 5, speed: 5, ease: 5 }) === false);
+eq('ideaScoreLabel: strong', A.ideaScoreLabel(90), 'Strong bet');
+eq('ideaScoreLabel: promising', A.ideaScoreLabel(60), 'Promising');
+eq('ideaScoreLabel: worth a look', A.ideaScoreLabel(40), 'Worth a look');
+eq('ideaScoreLabel: long shot', A.ideaScoreLabel(20), 'Long shot');
+ok('IDEA_DIMS: four dimensions', A.IDEA_DIMS.length === 4);
+const _ideas = [
+  { id: 'a', status: 'exploring', scores: { income: 5, speed: 5, ease: 5, passion: 5 } },   // 100
+  { id: 'b', status: 'active',    scores: { income: 2, speed: 2, ease: 2, passion: 2 } },   // 40
+  { id: 'c', status: 'dropped',   scores: { income: 5, speed: 5, ease: 5, passion: 5 } },   // dropped — ignored
+  { id: 'd', status: 'exploring', scores: { income: 3 } }                                     // unrated — ignored
+];
+ok('topIdea: picks highest-scoring non-dropped rated idea', A.topIdea(_ideas).id === 'a');
+ok('topIdea: ignores dropped even if high', A.topIdea([{ id: 'x', status: 'dropped', scores: { income: 5, speed: 5, ease: 5, passion: 5 } }]) === null);
+ok('topIdea: none rated → null', A.topIdea([{ id: 'y', status: 'active', scores: {} }]) === null);
 
 // Goal status (pure)
 const _wg = { kind: 'weight', start: 180, target: 170, deadline: '2026-07-10', createdAt: '2026-06-10' };

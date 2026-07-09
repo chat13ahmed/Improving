@@ -6025,28 +6025,61 @@ async function deleteDay(id) {
 // ─────────────────────────────────────────────────────────────
 // BUSINESS IDEAS
 // ─────────────────────────────────────────────────────────────
+// ── Idea scoring: rate each idea 1–5 on four dimensions → a 0–100 "pursue" score,
+// weighted toward money + speed since these are income ideas. All pure/testable. ──
+const IDEA_DIMS = [
+  { key: 'income',  label: 'Income potential', short: '$',     hint: 'How much could this realistically make?', w: 1.3 },
+  { key: 'speed',   label: 'Speed to first $', short: 'Speed', hint: 'How fast could it earn its first dollar?', w: 1.1 },
+  { key: 'ease',    label: 'Ease to start',    short: 'Ease',  hint: 'Low cost / low complexity to begin?',      w: 1 },
+  { key: 'passion', label: 'Passion & fit',    short: 'Fit',   hint: 'How suited to you — and do you care?',      w: 1 }
+];
+function ideaScore(scores) {
+  scores = scores || {};
+  let sum = 0, max = 0;
+  for (const d of IDEA_DIMS) { const v = Math.min(5, Math.max(0, +scores[d.key] || 0)); sum += v * d.w; max += 5 * d.w; }
+  return max ? Math.round(sum / max * 100) : 0;
+}
+function ideaRated(scores) { scores = scores || {}; return IDEA_DIMS.every(d => (+scores[d.key] || 0) > 0); }
+function ideaScoreLabel(score) { return score >= 78 ? 'Strong bet' : score >= 58 ? 'Promising' : score >= 38 ? 'Worth a look' : 'Long shot'; }
+function topIdea(ideas) {
+  const rated = (ideas || []).filter(i => i && i.status !== 'dropped' && ideaRated(i.scores));
+  return rated.length ? rated.slice().sort((a, b) => ideaScore(b.scores) - ideaScore(a.scores))[0] : null;
+}
 function renderIdeasPage() {
   const { ideas } = state.data;
-  const active    = ideas.filter(i => i.status === 'active');
-  const exploring = ideas.filter(i => i.status === 'exploring');
+  const byScore = list => list.slice().sort((a, b) => ideaScore(b.scores) - ideaScore(a.scores));
+  const active    = byScore(ideas.filter(i => i.status === 'active'));
+  const exploring = byScore(ideas.filter(i => i.status === 'exploring'));
   const dropped   = ideas.filter(i => i.status === 'dropped');
+  const top = topIdea(ideas);
 
-  const ideaCard = (idea) =>
-    '<div class="idea-card">' +
-    '<div class="idea-card-top">' +
-    '<div class="idea-title">' + idea.title + '</div>' +
-    '<span class="idea-status-badge ' + idea.status + '">' +
-    (idea.status === 'active' ? 'Active' : idea.status === 'exploring' ? 'Exploring' : 'Dropped') +
-    '</span>' +
-    '</div>' +
-    (idea.description ? '<div class="idea-desc">' + idea.description + '</div>' : '') +
-    (idea.notes ? '<div class="idea-notes">' + idea.notes + '</div>' : '') +
-    '<div class="idea-actions">' +
-    (idea.status !== 'active'    ? '<button class="btn-sm" onclick="setIdeaStatus(\'' + idea.id + '\',\'active\')">Go Active</button>' : '') +
-    (idea.status !== 'exploring' ? '<button class="btn-sm" onclick="setIdeaStatus(\'' + idea.id + '\',\'exploring\')">Exploring</button>' : '') +
-    (idea.status !== 'dropped'   ? '<button class="btn-sm btn-sm-danger" onclick="setIdeaStatus(\'' + idea.id + '\',\'dropped\')">Drop</button>' : '') +
-    '<button class="btn-sm btn-sm-danger" onclick="deleteIdea(\'' + idea.id + '\')"></button>' +
-    '</div></div>';
+  const bucket = s => s >= 78 ? 'strong' : s >= 58 ? 'good' : s >= 38 ? 'ok' : 'low';
+  const ideaCard = (idea) => {
+    const sc = idea.scores || {};
+    const score = ideaScore(sc), rated = ideaRated(sc);
+    const dims = '<div class="idea-dims">' + IDEA_DIMS.map(d => {
+      const v = Math.min(5, Math.max(0, +sc[d.key] || 0));
+      return '<div class="idim" title="' + escapeAttr(d.label) + '"><span class="idim-l">' + d.short + '</span><span class="idim-bar"><i style="width:' + (v * 20) + '%"></i></span></div>';
+    }).join('') + '</div>';
+    return '<div class="idea-card' + (top && top.id === idea.id ? ' idea-top' : '') + '">' +
+      '<div class="idea-card-top">' +
+      '<div class="idea-title">' + escapeHtml(idea.title) + '</div>' +
+      (rated
+        ? '<span class="idea-score s-' + bucket(score) + '">' + score + '<em>' + ideaScoreLabel(score) + '</em></span>'
+        : '<span class="idea-score idea-unrated">Rate it</span>') +
+      '</div>' +
+      '<span class="idea-status-badge ' + idea.status + '">' + (idea.status === 'active' ? 'Active' : idea.status === 'exploring' ? 'Exploring' : 'Dropped') + '</span>' +
+      (idea.description ? '<div class="idea-desc">' + escapeHtml(idea.description) + '</div>' : '') +
+      dims +
+      (idea.nextStep ? '<div class="idea-next">→ <b>Next:</b> ' + escapeHtml(idea.nextStep) + '</div>' : '') +
+      '<div class="idea-actions">' +
+      '<button class="btn-sm btn-eval" onclick="showIdeaEval(\'' + idea.id + '\')">Evaluate</button>' +
+      (idea.status !== 'active'    ? '<button class="btn-sm" onclick="setIdeaStatus(\'' + idea.id + '\',\'active\')">Go Active</button>' : '') +
+      (idea.status !== 'exploring' ? '<button class="btn-sm" onclick="setIdeaStatus(\'' + idea.id + '\',\'exploring\')">Exploring</button>' : '') +
+      (idea.status !== 'dropped'   ? '<button class="btn-sm btn-sm-danger" onclick="setIdeaStatus(\'' + idea.id + '\',\'dropped\')">Drop</button>' : '') +
+      '<button class="btn-sm btn-sm-danger" onclick="deleteIdea(\'' + idea.id + '\')">Delete</button>' +
+      '</div></div>';
+  };
 
   const section = (title, list) => list.length === 0 ? '' :
     '<h3 class="ideas-section-title">' + title + '</h3>' +
@@ -6055,8 +6088,15 @@ function renderIdeasPage() {
   document.getElementById('main').innerHTML =
     '<div class="page-header">' +
     '<h2 class="page-title">Business Ideas</h2>' +
-    '<p class="page-sub">Track the income opportunities and side hustles you\'re building toward</p>' +
+    '<p class="page-sub">Score every idea, then chase the one worth chasing</p>' +
     '</div>' +
+
+    (top
+      ? '<div class="idea-focus"><div class="if-label">🎯 Your strongest bet</div>' +
+        '<div class="if-title">' + escapeHtml(top.title) + ' <span class="if-score s-' + bucket(ideaScore(top.scores)) + '">' + ideaScore(top.scores) + '</span></div>' +
+        (top.nextStep ? '<div class="if-next">Next step: ' + escapeHtml(top.nextStep) + '</div>' : '<div class="if-next if-muted">Add its next step under “Evaluate” →</div>') +
+        '</div>'
+      : '') +
 
     '<div class="card">' +
     '<h3 class="card-title">Add New Idea</h3>' +
@@ -6095,7 +6135,7 @@ async function addIdea(e) {
     id: uid(), title,
     description: document.getElementById('idea-desc').value.trim(),
     status: document.getElementById('idea-status').value,
-    createdAt: todayStr(), notes: ''
+    createdAt: todayStr(), notes: '', scores: {}, nextStep: ''
   });
   await saveData();
   showToast('Idea added!', 'success');
@@ -6118,6 +6158,45 @@ async function deleteIdea(id) {
   showToast('Idea deleted.', 'success');
   renderIdeasPage();
 }
+
+// ── Evaluate an idea: rate the four dimensions + set its next step ──
+function showIdeaEval(id) {
+  const idea = state.data.ideas.find(i => i.id === id); if (!idea) return;
+  idea.scores = idea.scores || {};
+  document.getElementById('idea-eval-overlay')?.remove();
+  const o = document.createElement('div');
+  o.id = 'idea-eval-overlay'; o.className = 'modal-overlay';
+  o.innerHTML = renderIdeaEval(idea);
+  o.addEventListener('click', e => { if (e.target === o) closeIdeaEval(); });
+  document.body.appendChild(o);
+}
+function renderIdeaEval(idea) {
+  const sc = idea.scores || {};
+  const score = ideaScore(sc), rated = ideaRated(sc);
+  const bkt = score >= 78 ? 'strong' : score >= 58 ? 'good' : score >= 38 ? 'ok' : 'low';
+  const rows = IDEA_DIMS.map(d => {
+    const v = Math.min(5, Math.max(0, +sc[d.key] || 0));
+    const dots = [1, 2, 3, 4, 5].map(n => '<button type="button" class="ie-dot' + (v >= n ? ' on' : '') + '" onclick="setIdeaDim(\'' + idea.id + '\',\'' + d.key + '\',' + n + ')">' + n + '</button>').join('');
+    return '<div class="ie-row"><div class="ie-dim"><b>' + d.label + '</b><span>' + escapeHtml(d.hint) + '</span></div><div class="ie-dots">' + dots + '</div></div>';
+  }).join('');
+  return '<div class="modal-box idea-eval-box">' +
+    '<h3 class="card-title" style="margin-bottom:2px">Evaluate: ' + escapeHtml(idea.title) + '</h3>' +
+    '<p class="card-sub">Rate each 1–5 — we\'ll score the idea so you know which to chase.</p>' +
+    '<div class="ie-score-big s-' + bkt + '">' + (rated ? score + '<em>' + ideaScoreLabel(score) + '</em>' : '<em>Rate all four</em>') + '</div>' +
+    rows +
+    '<div class="form-group" style="margin-top:12px"><label>Next step — the one action that moves this forward</label>' +
+    '<input type="text" id="idea-next-input" placeholder="e.g. Call 3 gyms and pitch the referral deal" value="' + escapeAttr(idea.nextStep || '') + '" oninput="setIdeaNext(\'' + idea.id + '\', this.value)"></div>' +
+    '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px"><button type="button" class="btn btn-primary" onclick="closeIdeaEval()">Done</button></div>' +
+    '</div>';
+}
+function setIdeaDim(id, key, val) {
+  const idea = state.data.ideas.find(i => i.id === id); if (!idea) return;
+  idea.scores = idea.scores || {};
+  idea.scores[key] = (idea.scores[key] === val ? val - 1 : val);   // tap the same dot again to lower it
+  const o = document.getElementById('idea-eval-overlay'); if (o) o.innerHTML = renderIdeaEval(idea);
+}
+function setIdeaNext(id, val) { const idea = state.data.ideas.find(i => i.id === id); if (idea) idea.nextStep = val; }
+function closeIdeaEval() { document.getElementById('idea-eval-overlay')?.remove(); saveData(); renderIdeasPage(); }
 
 async function analyzeIdeas() {
   const btn = document.getElementById('btn-ideas-ai');

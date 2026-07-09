@@ -488,7 +488,42 @@ body {
 .idea-status-badge.exploring { background: var(--network-bg); color: var(--network-color); border: 1px solid var(--network-border); }
 .idea-status-badge.dropped   { background: var(--tint-2); color: var(--text-muted); border: 1px solid var(--border); }
 
-/* ─── AI Coach ────────────────────────────────── */
+/* ─── Idea scoring ─── */
+.idea-top { border-color: var(--success); box-shadow: 0 0 0 1px var(--success), var(--shadow); }
+.idea-score { flex-shrink: 0; display: inline-flex; align-items: baseline; gap: 5px; font-size: 20px; font-weight: 800; color: var(--text); line-height: 1; }
+.idea-score em { font-size: 10px; font-weight: 700; font-style: normal; text-transform: uppercase; letter-spacing: .4px; padding: 2px 7px; border-radius: 999px; }
+.idea-score.s-strong { color: #0E9F6E; } .idea-score.s-strong em { background: rgba(16,185,129,.14); color: #0E9F6E; }
+.idea-score.s-good   { color: var(--accent); } .idea-score.s-good em { background: var(--tint-1); color: var(--accent); }
+.idea-score.s-ok     { color: var(--warning); } .idea-score.s-ok em { background: rgba(245,158,11,.14); color: var(--warning); }
+.idea-score.s-low    { color: var(--text-muted); } .idea-score.s-low em { background: var(--surface); color: var(--text-muted); }
+.idea-score.idea-unrated { font-size: 12px; font-weight: 700; color: var(--text-muted); background: var(--surface); border: 1px dashed var(--border-bright); border-radius: 999px; padding: 4px 10px; }
+.idea-dims { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 14px; margin: 10px 0; }
+.idim { display: flex; align-items: center; gap: 7px; }
+.idim-l { font-size: 11px; color: var(--text-muted); width: 40px; flex: none; }
+.idim-bar { flex: 1; height: 5px; border-radius: 3px; background: var(--surface); overflow: hidden; }
+.idim-bar i { display: block; height: 100%; background: var(--gym-color); border-radius: 3px; }
+.idea-next { font-size: 13px; color: var(--text); background: var(--surface); border-radius: 8px; padding: 7px 10px; margin-bottom: 4px; }
+.idea-next b { color: var(--success); }
+.btn-eval { border-color: var(--success) !important; color: var(--success) !important; font-weight: 700; }
+/* Strongest-bet banner */
+.idea-focus { background: rgba(16,185,129,.08); border: 1px solid rgba(16,185,129,.28); border-radius: var(--radius); padding: 14px 18px; margin-bottom: 14px; }
+.if-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--success); }
+.if-title { font-size: 18px; font-weight: 800; color: var(--text); margin-top: 3px; display: flex; align-items: center; gap: 10px; }
+.if-score { font-size: 14px; font-weight: 800; color: #fff; background: var(--success); border-radius: 999px; padding: 2px 10px; }
+.if-next { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+.if-muted { font-style: italic; }
+/* Evaluate modal */
+.idea-eval-box { max-width: 460px; width: 100%; }
+.ie-score-big { text-align: center; font-size: 34px; font-weight: 800; margin: 6px 0 14px; display: flex; align-items: baseline; justify-content: center; gap: 8px; }
+.ie-score-big em { font-size: 12px; font-weight: 700; font-style: normal; text-transform: uppercase; letter-spacing: .5px; padding: 3px 9px; border-radius: 999px; }
+.ie-score-big.s-strong { color: #0E9F6E; } .ie-score-big.s-good { color: var(--accent); } .ie-score-big.s-ok { color: var(--warning); } .ie-score-big.s-low { color: var(--text-muted); }
+.ie-score-big.s-strong em { background: rgba(16,185,129,.14); } .ie-score-big.s-good em { background: var(--tint-1); } .ie-score-big.s-ok em { background: rgba(245,158,11,.14); } .ie-score-big.s-low em { background: var(--surface); }
+.ie-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border); }
+.ie-dim b { display: block; font-size: 14px; color: var(--text); }
+.ie-dim span { font-size: 11px; color: var(--text-muted); }
+.ie-dots { display: flex; gap: 5px; flex: none; }
+.ie-dot { width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text-muted); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.ie-dot.on { background: var(--gym-color); border-color: var(--gym-color); color: #fff; }
 .insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
 .insight-card { display: flex; flex-direction: column; gap: 12px; }
 .insight-card-header { display: flex; align-items: flex-start; gap: 12px; }
