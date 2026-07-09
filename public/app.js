@@ -20,9 +20,13 @@ let charts = {};
 // ─────────────────────────────────────────────────────────────
 // AUTH HELPERS
 // ─────────────────────────────────────────────────────────────
+// The user's own Claude key, stored in this browser (bring-your-own-key).
+function aiKey() { try { return localStorage.getItem('onward_ai_key') || ''; } catch { return ''; } }
 function authHeaders() {
   const h = { 'Content-Type': 'application/json' };
   if (state.token) h.Authorization = 'Bearer ' + state.token;
+  const k = aiKey();
+  if (k) h['X-Api-Key'] = k;   // server uses this if no ANTHROPIC_API_KEY env var is set
   return h;
 }
 
@@ -646,7 +650,7 @@ async function startApp() {
     ]);
     state.data = await dataRes.json();
     state._dataVersion = parseInt(dataRes.headers.get('X-Data-Version'), 10) || 1;
-    state.hasApiKey = ks.hasKey;
+    state.hasApiKey = ks.hasKey || !!aiKey();   // server env key OR a key saved in this browser
     state.payLink = ks.payLink || '';
     state.priceLabel = ks.price || '$7.99/mo';
     state.paymentsLive = !!ks.payLink;       // paywall only turns on once a Stripe link is set
@@ -6867,7 +6871,7 @@ async function streamAnalysis(question, resultEl, btn, btnText) {
   try {
     const resp = await fetch('/api/analyze-stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({ data: enrichedData(), question })
     });
 
@@ -7044,15 +7048,15 @@ async function saveApiKey() {
   const k = (document.getElementById('api-key-input')?.value || '').trim();
   if (!k) { showToast('Paste your API key first.', 'error'); return; }
   if (!k.startsWith('sk-ant-')) { showToast('Key should start with sk-ant-', 'error'); return; }
-  try {
-    const j = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: k }) }).then(r => r.json());
-    if (j.success) { state.hasApiKey = true; showToast('AI Coach unlocked! ', 'success'); renderCoachPage(); }
-  } catch { showToast('Could not save key.', 'error'); }
+  try { localStorage.setItem('onward_ai_key', k); } catch {}
+  state.hasApiKey = true;
+  showToast('AI Coach unlocked!', 'success');
+  renderCoachPage();
 }
 
 async function clearApiKey() {
   if (!confirm('Remove your API key?')) return;
-  await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: '' }) });
+  try { localStorage.removeItem('onward_ai_key'); } catch {}
   state.hasApiKey = false;
   showToast('Key removed.', 'success');
   renderCoachPage();

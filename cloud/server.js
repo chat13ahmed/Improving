@@ -112,7 +112,11 @@ function parseFoodEstimate(text) {
   if (kcal === 0 && p === 0 && c === 0 && f === 0) return null;
   return { name, grams, kcal, p, c, f };
 }
-function getApiKey() { return process.env.ANTHROPIC_API_KEY || null; }
+function getApiKey(req) {
+  const h = req && req.headers && req.headers['x-api-key'];
+  const fromHeader = (h && String(h).trim()) || '';
+  return fromHeader || process.env.ANTHROPIC_API_KEY || null;   // browser-supplied key, else the server env var
+}
 
 // ── Simple per-IP hourly AI rate limit ──
 const aiHits = new Map();
@@ -279,8 +283,8 @@ app.post('/api/data', requireAuth, async (req, res) => {
 });
 
 // ── AI (server-side key, rate-limited; no user key required) ──
-app.get('/api/key-status', (req, res) => res.json({ hasKey: !!getApiKey() }));
-app.get('/api/settings', (req, res) => res.json({ hasKey: !!getApiKey(), keyPreview: '', payLink: process.env.STRIPE_PAYMENT_LINK || '', price: process.env.PRICE_LABEL || '$7.99/mo' }));
+app.get('/api/key-status', (req, res) => res.json({ hasKey: !!getApiKey(req) }));
+app.get('/api/settings', (req, res) => res.json({ hasKey: !!getApiKey(req), keyPreview: '', payLink: process.env.STRIPE_PAYMENT_LINK || '', price: process.env.PRICE_LABEL || '$7.99/mo' }));
 
 // Owner-only: activate (or revoke) Pro for a user after they pay
 app.post('/api/admin/grant-pro', requireAuth, async (req, res) => {
@@ -299,7 +303,7 @@ app.post('/api/admin/grant-pro', requireAuth, async (req, res) => {
 app.post('/api/settings', (req, res) => res.json({ success: true }));
 
 function aiGuard(req, res) {
-  if (!getApiKey()) { res.status(400).json({ error: 'NO_KEY' }); return false; }
+  if (!getApiKey(req)) { res.status(400).json({ error: 'NO_KEY' }); return false; }
   if (!aiAllowed(req.ip || 'anon')) { res.status(429).json({ error: 'Rate limit reached — try again later.' }); return false; }
   return true;
 }
@@ -307,7 +311,7 @@ function aiGuard(req, res) {
 app.post('/api/analyze', async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
-    const client = new Anthropic({ apiKey: getApiKey() });
+    const client = new Anthropic({ apiKey: getApiKey(req) });
     const msg = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 2048, system: [{ type: 'text', text: buildSystemPrompt(req.body.data?.profile || {}), cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: buildUserMessage(req.body.data, req.body.question) }] });
     res.json({ analysis: msg.content[0].text });
   } catch (e) { res.status(500).json({ error: e.message || 'Analysis failed' }); }
@@ -318,7 +322,7 @@ app.post('/api/analyze-stream', async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream'); res.setHeader('Cache-Control', 'no-cache'); res.setHeader('Connection', 'keep-alive'); res.flushHeaders();
   let aborted = false; req.on('close', () => { aborted = true; });
   try {
-    const client = new Anthropic({ apiKey: getApiKey() });
+    const client = new Anthropic({ apiKey: getApiKey(req) });
     const stream = client.messages.stream({ model: 'claude-sonnet-4-6', max_tokens: 2048, system: [{ type: 'text', text: buildSystemPrompt(req.body.data?.profile || {}), cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: buildUserMessage(req.body.data, req.body.question) }] });
     stream.on('text', t => { if (!aborted) res.write(`data: ${JSON.stringify({ text: t })}\n\n`); });
     await stream.finalMessage();
@@ -356,7 +360,7 @@ app.post('/api/chat', async (req, res) => {
       .slice(-12)
       .map(m => ({ role: m.role, content: m.content.slice(0, 4000) }));
     if (!msgs.length || msgs[msgs.length - 1].role !== 'user') return res.status(400).json({ error: 'Ask a question first.' });
-    const client = new Anthropic({ apiKey: getApiKey() });
+    const client = new Anthropic({ apiKey: getApiKey(req) });
     let systemBlocks, maxTokens = 1024;
     if (req.body.mode === 'ideacoach') {
       maxTokens = 1400;
@@ -383,7 +387,7 @@ app.post('/api/estimate-food', async (req, res) => {
   const description = String(req.body.description || '').trim();
   if (!description) return res.status(400).json({ error: 'Describe the food first.' });
   try {
-    const client = new Anthropic({ apiKey: getApiKey() });
+    const client = new Anthropic({ apiKey: getApiKey(req) });
     const system = `You are a nutrition estimation engine. Given a description of food someone ate (it may include a quantity), respond with ONLY a JSON object — no prose, no markdown fences — of exactly this form:
 {"name": "<short food name>", "grams": <total grams as a number>, "calories": <integer>, "protein": <grams>, "carbs": <grams>, "fat": <grams>}
 Estimate realistic values for the WHOLE described amount. If no quantity is given, assume one typical serving. Output the JSON object only.`;
@@ -397,7 +401,7 @@ Estimate realistic values for the WHOLE described amount. If no quantity is give
 app.post('/api/insight', async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
-    const client = new Anthropic({ apiKey: getApiKey() });
+    const client = new Anthropic({ apiKey: getApiKey(req) });
     const system = `You are this person's personal life coach. Based on their recent tracking data, write ONE short, specific, motivating insight for today — at most 2 sentences (~45 words). Reference their real numbers or patterns when you can. End with a tiny concrete action if it fits. Output only the insight sentence(s), no markdown or preamble.`;
     const msg = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 160, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'My recent tracking data:\n\n```json\n' + JSON.stringify(req.body.data, null, 2) + '\n```\n\nGive me today\'s insight.' }] });
     const insight = ((msg.content && msg.content[0] && msg.content[0].text) || '').trim();
@@ -410,7 +414,7 @@ app.post('/api/insight', async (req, res) => {
 app.post('/api/plan', async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
-    const client = new Anthropic({ apiKey: getApiKey() });
+    const client = new Anthropic({ apiKey: getApiKey(req) });
     const system = `You are this person's personal coach and strategist. From their goals and tracking data, give them a short, concrete GAME PLAN for TODAY — the specific next actions that move them toward their goals.
 Rules:
 - Open with ONE short bold line naming today's #1 focus.
@@ -428,7 +432,7 @@ Rules:
 app.post('/api/patterns', async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
-    const client = new Anthropic({ apiKey: getApiKey() });
+    const client = new Anthropic({ apiKey: getApiKey(req) });
     const system = `You are this person's personal life coach with a rare advantage: you see EVERY area of their life at once — training, income/money, nutrition, weight, reading, networking, habits, mood notes. Find ONE genuine CROSS-DOMAIN connection in their data that a single-purpose app could never see: a way one area appears to affect another.
 Rules:
 - Connect TWO DIFFERENT areas (e.g. gym↔income, reading↔mood, protein↔weight, water↔workouts, sleep↔focus). Never an observation about a single area alone.
@@ -447,7 +451,7 @@ Rules:
 app.post('/api/review', async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
-    const client = new Anthropic({ apiKey: getApiKey() });
+    const client = new Anthropic({ apiKey: getApiKey(req) });
     const system = `You are this person's personal chief-of-staff and coach. Write their WEEKLY LIFE REVIEW from their tracking data across every area of life. Make it feel personal and earned — reference their real numbers.
 Use EXACTLY these three short markdown sections and nothing else:
 **Wins this week** — 2–3 bullets of what genuinely went well.
