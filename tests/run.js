@@ -61,7 +61,7 @@ function loadApp(fieldValues) {
     ' loggingStreak, bestStreak, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
-    ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS,' +
+    ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage,' +
     ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
@@ -305,6 +305,14 @@ const _ideas = [
 ok('topIdea: picks highest-scoring non-dropped rated idea', A.topIdea(_ideas).id === 'a');
 ok('topIdea: ignores dropped even if high', A.topIdea([{ id: 'x', status: 'dropped', scores: { income: 5, speed: 5, ease: 5, passion: 5 } }]) === null);
 ok('topIdea: none rated → null', A.topIdea([{ id: 'y', status: 'active', scores: {} }]) === null);
+// Lean Startup validation stage (Build-Measure-Learn)
+eq('validationStage: empty → untested', A.validationStage({}).key, 'untested');
+eq('validationStage: customer+value → hypotheses', A.validationStage({ customer: 'gym members', valueHyp: 'saves time' }).key, 'hypothesis');
+eq('validationStage: +experiment+metric → experiment ready', A.validationStage({ customer: 'x', valueHyp: 'y', experiment: 'presell', metric: '10 of 20' }).key, 'experiment');
+eq('validationStage: result but no verdict → measuring', A.validationStage({ customer: 'x', valueHyp: 'y', experiment: 'e', metric: 'm', result: '6 of 20 said yes' }).key, 'measuring');
+eq('validationStage: result + persevere → validated', A.validationStage({ result: 'nailed it', decision: 'persevere' }).key, 'validated');
+eq('validationStage: result + pivot → pivot', A.validationStage({ result: 'flopped', decision: 'pivot' }).key, 'pivot');
+ok('validationStage: progress climbs with each step', A.validationStage({}).pct === 0 && A.validationStage({ customer: 'x', valueHyp: 'y' }).pct > 0 && A.validationStage({ result: 'r', decision: 'persevere' }).pct === 100);
 
 // Goal status (pure)
 const _wg = { kind: 'weight', start: 180, target: 170, deadline: '2026-07-10', createdAt: '2026-06-10' };

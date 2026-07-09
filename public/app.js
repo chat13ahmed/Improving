@@ -6045,6 +6045,19 @@ function topIdea(ideas) {
   const rated = (ideas || []).filter(i => i && i.status !== 'dropped' && ideaRated(i.scores));
   return rated.length ? rated.slice().sort((a, b) => ideaScore(b.scores) - ideaScore(a.scores))[0] : null;
 }
+// Pure: where an idea sits in the Build-Measure-Learn loop (The Lean Startup),
+// from an untested guess to validated / pivot. Drives the card badge. (testable)
+function validationStage(v) {
+  v = v || {};
+  const has = k => !!(v[k] && String(v[k]).trim());
+  if (has('result') && v.decision === 'persevere') return { key: 'validated', label: 'Validated ✓', pct: 100 };
+  if (has('result') && v.decision === 'pivot') return { key: 'pivot', label: 'Pivot', pct: 100 };
+  if (has('result')) return { key: 'measuring', label: 'Results in — decide', pct: 85 };
+  if (has('experiment') && has('metric')) return { key: 'experiment', label: 'Experiment ready', pct: 60 };
+  if (has('customer') && has('valueHyp')) return { key: 'hypothesis', label: 'Hypotheses set', pct: 33 };
+  if (has('customer') || has('valueHyp') || has('growthHyp')) return { key: 'started', label: 'Getting clear', pct: 15 };
+  return { key: 'untested', label: 'Untested', pct: 0 };
+}
 function renderIdeasPage() {
   const { ideas } = state.data;
   const byScore = list => list.slice().sort((a, b) => ideaScore(b.scores) - ideaScore(a.scores));
@@ -6071,9 +6084,11 @@ function renderIdeasPage() {
       '<span class="idea-status-badge ' + idea.status + '">' + (idea.status === 'active' ? 'Active' : idea.status === 'exploring' ? 'Exploring' : 'Dropped') + '</span>' +
       (idea.description ? '<div class="idea-desc">' + escapeHtml(idea.description) + '</div>' : '') +
       dims +
+      (() => { const vs = validationStage(idea.validation); return '<div class="idea-val"><span class="iv-badge iv-' + vs.key + '">' + vs.label + '</span><span class="iv-bar"><i style="width:' + vs.pct + '%"></i></span></div>'; })() +
       (idea.nextStep ? '<div class="idea-next">→ <b>Next:</b> ' + escapeHtml(idea.nextStep) + '</div>' : '') +
       '<div class="idea-actions">' +
       '<button class="btn-sm btn-eval" onclick="showIdeaEval(\'' + idea.id + '\')">Evaluate</button>' +
+      '<button class="btn-sm btn-validate" onclick="showIdeaValidate(\'' + idea.id + '\')">Validate</button>' +
       (idea.status !== 'active'    ? '<button class="btn-sm" onclick="setIdeaStatus(\'' + idea.id + '\',\'active\')">Go Active</button>' : '') +
       (idea.status !== 'exploring' ? '<button class="btn-sm" onclick="setIdeaStatus(\'' + idea.id + '\',\'exploring\')">Exploring</button>' : '') +
       (idea.status !== 'dropped'   ? '<button class="btn-sm btn-sm-danger" onclick="setIdeaStatus(\'' + idea.id + '\',\'dropped\')">Drop</button>' : '') +
@@ -6135,7 +6150,7 @@ async function addIdea(e) {
     id: uid(), title,
     description: document.getElementById('idea-desc').value.trim(),
     status: document.getElementById('idea-status').value,
-    createdAt: todayStr(), notes: '', scores: {}, nextStep: ''
+    createdAt: todayStr(), notes: '', scores: {}, nextStep: '', validation: {}
   });
   await saveData();
   showToast('Idea added!', 'success');
@@ -6197,6 +6212,80 @@ function setIdeaDim(id, key, val) {
 }
 function setIdeaNext(id, val) { const idea = state.data.ideas.find(i => i.id === id); if (idea) idea.nextStep = val; }
 function closeIdeaEval() { document.getElementById('idea-eval-overlay')?.remove(); saveData(); renderIdeasPage(); }
+
+// ── Lean Startup validation: test the risky guesses before you build ──
+function showIdeaValidate(id) {
+  const idea = state.data.ideas.find(i => i.id === id); if (!idea) return;
+  idea.validation = idea.validation || {};
+  document.getElementById('idea-validate-overlay')?.remove();
+  const o = document.createElement('div');
+  o.id = 'idea-validate-overlay'; o.className = 'modal-overlay';
+  o.innerHTML = renderIdeaValidate(idea);
+  o.addEventListener('click', e => { if (e.target === o) closeIdeaValidate(); });
+  document.body.appendChild(o);
+}
+function renderIdeaValidate(idea) {
+  const v = idea.validation || {};
+  const st = validationStage(v);
+  const ta = (key, label, hint, ph, rows) =>
+    '<div class="iv-field"><label>' + label + '</label>' +
+    '<div class="iv-hint">' + hint + '</div>' +
+    '<textarea rows="' + (rows || 2) + '" placeholder="' + escapeAttr(ph) + '" oninput="setIdeaVal(\'' + idea.id + '\',\'' + key + '\',this.value)">' + escapeHtml(v[key] || '') + '</textarea></div>';
+  const aiBlock = state.hasApiKey
+    ? '<button type="button" class="btn btn-outline" id="iv-ai-btn" onclick="validateIdeaWithAI(\'' + idea.id + '\')" style="margin-top:8px">🧪 Pressure-test with the coach</button><div class="insight-result hidden" id="iv-ai-result"></div>'
+    : '<div class="iv-ai-hint">Add your Claude API key in Settings and the coach will pressure-test this plan for you.</div>';
+  return '<div class="modal-box iv-box">' +
+    '<div class="iv-head"><div><h3 class="card-title" style="margin-bottom:2px">Validate: ' + escapeHtml(idea.title) + '</h3>' +
+    '<p class="card-sub" style="margin-bottom:0">The Lean Startup way — test the risky guesses before you build.</p></div>' +
+    '<button type="button" class="mm-close" onclick="closeIdeaValidate()">✕</button></div>' +
+    '<div class="iv-stage"><span class="iv-badge iv-' + st.key + '">' + st.label + '</span><span class="iv-bar"><i style="width:' + st.pct + '%"></i></span></div>' +
+    '<div class="iv-sec">1 · Get out of the building</div>' +
+    ta('customer', 'Who exactly is the customer?', 'Be specific — “new members in their first month”, not “everyone”.', 'e.g. New gym members who want fast results', 2) +
+    ta('valueHyp', 'Value hypothesis — why will they want it?', 'The job it does that they would actually pay for.', 'They’ll want it because…', 2) +
+    ta('growthHyp', 'Growth hypothesis — how will it spread?', 'Where new customers come from (referrals, ads, word of mouth).', 'New customers will come from…', 2) +
+    '<div class="iv-sec">2 · The riskiest assumption</div>' +
+    ta('riskiest', 'If this one belief is wrong, the idea dies. Which is it?', 'Test the scariest assumption first — not the easiest.', 'The thing that would kill this is…', 2) +
+    '<div class="iv-sec">3 · Build — the smallest experiment (MVP)</div>' +
+    ta('experiment', 'The cheapest test that gives real evidence in a week', 'Pre-sell it · a one-page site · do it by hand for 5 people · a fake “buy” button.', 'To test it cheaply I will…', 2) +
+    '<div class="iv-sec">4 · Measure — the number that proves it</div>' +
+    ta('metric', 'One actionable metric + your pass mark', 'Avoid vanity metrics (likes, views). Use “10 of 20 pre-order”.', 'Success = …', 2) +
+    '<div class="iv-sec">5 · Learn — what happened, then decide</div>' +
+    ta('result', 'What actually happened when you ran it?', 'Real evidence beats opinion — including yours.', 'The result was…', 2) +
+    '<div class="iv-decide"><span>Verdict:</span>' +
+    '<button type="button" class="iv-dec' + (v.decision === 'persevere' ? ' on' : '') + '" data-dec="persevere" onclick="setIdeaDecision(\'' + idea.id + '\',\'persevere\')">Persevere ✓</button>' +
+    '<button type="button" class="iv-dec' + (v.decision === 'pivot' ? ' on' : '') + '" data-dec="pivot" onclick="setIdeaDecision(\'' + idea.id + '\',\'pivot\')">Pivot ↺</button>' +
+    '</div>' +
+    aiBlock +
+    '<div style="display:flex;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-primary" onclick="closeIdeaValidate()">Done</button></div>' +
+    '</div>';
+}
+function setIdeaVal(id, key, val) { const idea = state.data.ideas.find(i => i.id === id); if (!idea) return; idea.validation = idea.validation || {}; idea.validation[key] = val; }
+function setIdeaDecision(id, val) {
+  const idea = state.data.ideas.find(i => i.id === id); if (!idea) return;
+  idea.validation = idea.validation || {};
+  idea.validation.decision = (idea.validation.decision === val ? '' : val);
+  document.querySelectorAll('.iv-dec').forEach(b => b.classList.toggle('on', b.dataset.dec === idea.validation.decision));
+}
+function closeIdeaValidate() { document.getElementById('idea-validate-overlay')?.remove(); saveData(); renderIdeasPage(); }
+async function validateIdeaWithAI(id) {
+  const idea = state.data.ideas.find(i => i.id === id); if (!idea) return;
+  const v = idea.validation || {};
+  const btn = document.getElementById('iv-ai-btn');
+  const resultEl = document.getElementById('iv-ai-result');
+  const q = 'Act as a Lean Startup coach in the spirit of Eric Ries. Pressure-test this business idea and its validation plan — be direct and practical.\n\n' +
+    'IDEA: ' + idea.title + (idea.description ? ' — ' + idea.description : '') + '\n' +
+    'Customer: ' + (v.customer || '(not set)') + '\n' +
+    'Value hypothesis: ' + (v.valueHyp || '(not set)') + '\n' +
+    'Growth hypothesis: ' + (v.growthHyp || '(not set)') + '\n' +
+    'Their riskiest assumption: ' + (v.riskiest || '(not set)') + '\n' +
+    'Planned experiment / MVP: ' + (v.experiment || '(not set)') + '\n' +
+    'Success metric: ' + (v.metric || '(not set)') + '\n\n' +
+    '## 1. The real riskiest assumption\nIs their stated riskiest assumption truly the one that could kill this? If not, name the real one.\n\n' +
+    '## 2. The cheapest experiment\nDesign the smallest, fastest test (concierge MVP, smoke-test landing page, pre-sell) to get real evidence in under a week — give concrete steps.\n\n' +
+    '## 3. Vanity vs actionable metric\nIs their metric actionable? Give the single number and a pass/fail threshold to hold to.\n\n' +
+    '## 4. Pivot signals\nWhat result would mean pivot rather than persevere?';
+  await streamAnalysis(q, resultEl, btn, '🧪 Pressure-test with the coach');
+}
 
 async function analyzeIdeas() {
   const btn = document.getElementById('btn-ideas-ai');

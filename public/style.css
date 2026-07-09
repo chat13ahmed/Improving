@@ -524,6 +524,33 @@ body {
 .ie-dots { display: flex; gap: 5px; flex: none; }
 .ie-dot { width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text-muted); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .ie-dot.on { background: var(--gym-color); border-color: var(--gym-color); color: #fff; }
+
+/* ─── Lean Startup validation ─── */
+.btn-validate { border-color: var(--accent) !important; color: var(--accent) !important; font-weight: 700; }
+.idea-val { display: flex; align-items: center; gap: 8px; margin: 8px 0 4px; }
+.iv-bar { flex: 1; height: 5px; border-radius: 3px; background: var(--surface); overflow: hidden; }
+.iv-bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.iv-badge { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
+.iv-badge.iv-hypothesis, .iv-badge.iv-started { background: var(--network-bg); color: var(--network-color); border-color: var(--network-border); }
+.iv-badge.iv-experiment, .iv-badge.iv-measuring { background: rgba(245,158,11,.14); color: var(--warning); border-color: rgba(245,158,11,.3); }
+.iv-badge.iv-validated { background: var(--gym-bg); color: var(--gym-color); border-color: var(--gym-border); }
+.iv-badge.iv-pivot { background: rgba(239,68,68,.12); color: var(--danger); border-color: rgba(239,68,68,.3); }
+/* Validate modal */
+.iv-box { max-width: 500px; width: 100%; max-height: 88vh; overflow-y: auto; }
+.iv-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.iv-stage { display: flex; align-items: center; gap: 8px; margin: 8px 0 6px; }
+.iv-sec { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--accent); margin: 16px 0 6px; }
+.iv-field { margin-bottom: 10px; }
+.iv-field label { display: block; font-size: 14px; font-weight: 700; color: var(--text); }
+.iv-hint { font-size: 12px; color: var(--text-muted); margin: 2px 0 6px; line-height: 1.4; }
+.iv-field textarea { width: 100%; box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--field-bg, var(--bg-2)); color: var(--text); font-family: inherit; font-size: 14px; resize: vertical; }
+.iv-field textarea:focus { outline: none; border-color: var(--accent); }
+.iv-decide { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.iv-decide > span { font-size: 13px; font-weight: 700; color: var(--text-muted); }
+.iv-dec { padding: 8px 16px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.iv-dec[data-dec="persevere"].on { background: var(--gym-color); border-color: var(--gym-color); color: #fff; }
+.iv-dec[data-dec="pivot"].on { background: var(--danger); border-color: var(--danger); color: #fff; }
+.iv-ai-hint { font-size: 12px; color: var(--text-muted); margin-top: 10px; font-style: italic; }
 .insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
 .insight-card { display: flex; flex-direction: column; gap: 12px; }
 .insight-card-header { display: flex; align-items: flex-start; gap: 12px; }
