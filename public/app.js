@@ -6232,8 +6232,9 @@ function renderIdeaValidate(idea) {
     '<div class="iv-hint">' + hint + '</div>' +
     '<textarea rows="' + (rows || 2) + '" placeholder="' + escapeAttr(ph) + '" oninput="setIdeaVal(\'' + idea.id + '\',\'' + key + '\',this.value)">' + escapeHtml(v[key] || '') + '</textarea></div>';
   const aiBlock = state.hasApiKey
-    ? '<button type="button" class="btn btn-outline" id="iv-ai-btn" onclick="validateIdeaWithAI(\'' + idea.id + '\')" style="margin-top:8px">🧪 Pressure-test with the coach</button><div class="insight-result hidden" id="iv-ai-result"></div>'
-    : '<div class="iv-ai-hint">Add your Claude API key in Settings and the coach will pressure-test this plan for you.</div>';
+    ? '<button type="button" class="btn btn-primary" onclick="openIdeaCoach(\'' + idea.id + '\')" style="margin-top:10px;width:100%">🎯 Interview me — the validation coach</button>' +
+      '<div class="iv-ai-hint">A step-by-step stress-test drawn from The Mom Test, Running Lean, Zero to One &amp; more.</div>'
+    : '<div class="iv-ai-hint">Add your Claude API key in Settings and a validation coach will interview and stress-test this idea — Mom Test style.</div>';
   return '<div class="modal-box iv-box">' +
     '<div class="iv-head"><div><h3 class="card-title" style="margin-bottom:2px">Validate: ' + escapeHtml(idea.title) + '</h3>' +
     '<p class="card-sub" style="margin-bottom:0">The Lean Startup way — test the risky guesses before you build.</p></div>' +
@@ -6285,6 +6286,67 @@ async function validateIdeaWithAI(id) {
     '## 3. Vanity vs actionable metric\nIs their metric actionable? Give the single number and a pass/fail threshold to hold to.\n\n' +
     '## 4. Pivot signals\nWhat result would mean pivot rather than persevere?';
   await streamAnalysis(q, resultEl, btn, '🧪 Pressure-test with the coach');
+}
+
+// ── Interactive validation-coach interview (multi-turn chat, one idea) ──
+function openIdeaCoach(id) {
+  const idea = state.data.ideas.find(i => i.id === id); if (!idea) return;
+  if (!state.hasApiKey) { showToast('Add your Claude API key in Settings to use the validation coach.', 'error'); return; }
+  closeIdeaValidate();
+  const seeded = (Array.isArray(idea.coachChat) && idea.coachChat.length)
+    ? idea.coachChat.slice()
+    : [{ role: 'assistant', content: "I'm your validation coach — here to stress-test this, not cheer for it. One question at a time, and I want **evidence**, not opinions.\n\n**Stage 1 — the problem.**\nIn one sentence: what problem does **" + (idea.title || 'this idea') + "** solve, and *for whom*? (No features yet — describe the wound.)" }];
+  state._ideaCoach = { id, messages: seeded, busy: false };
+  renderIdeaCoach();
+}
+function renderIdeaCoachThread() {
+  const c = state._ideaCoach || { messages: [] };
+  return c.messages.map(m => '<div class="chat-msg ' + (m.role === 'user' ? 'chat-user' : 'chat-bot') + '">' + (m.role === 'user' ? escapeHtml(m.content) : renderMarkdown(m.content)) + '</div>').join('') +
+    (c.busy ? '<div class="chat-msg chat-bot chat-typing"><span></span><span></span><span></span></div>' : '');
+}
+function refreshIdeaCoachThread() { const el = document.getElementById('ic-thread'); if (el) { el.innerHTML = renderIdeaCoachThread(); el.scrollTop = el.scrollHeight; } }
+function renderIdeaCoach() {
+  const c = state._ideaCoach; if (!c) return;
+  const idea = state.data.ideas.find(i => i.id === c.id) || {};
+  document.getElementById('idea-coach-overlay')?.remove();
+  const o = document.createElement('div');
+  o.id = 'idea-coach-overlay'; o.className = 'modal-overlay';
+  o.innerHTML = '<div class="modal-box ic-box">' +
+    '<div class="iv-head"><div><h3 class="card-title" style="margin-bottom:2px">Validation coach 🎯</h3>' +
+    '<p class="card-sub" style="margin-bottom:0">' + escapeHtml(idea.title || 'Your idea') + '</p></div>' +
+    '<button type="button" class="mm-close" onclick="closeIdeaCoach()">✕</button></div>' +
+    '<div id="ic-thread" class="coach-thread ic-thread">' + renderIdeaCoachThread() + '</div>' +
+    '<div class="coach-input-row"><textarea id="ic-input" rows="1" placeholder="Answer honestly…" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();sendIdeaChat();}"></textarea>' +
+    '<button type="button" class="btn btn-primary" onclick="sendIdeaChat()">Send</button></div>' +
+    '</div>';
+  o.addEventListener('click', e => { if (e.target === o) closeIdeaCoach(); });
+  document.body.appendChild(o);
+  const th = document.getElementById('ic-thread'); if (th) th.scrollTop = th.scrollHeight;
+  setTimeout(() => document.getElementById('ic-input')?.focus(), 80);
+}
+async function sendIdeaChat() {
+  const c = state._ideaCoach; if (!c || c.busy) return;
+  const inp = document.getElementById('ic-input'); const text = (inp && inp.value || '').trim();
+  if (!text) return;
+  const idea = state.data.ideas.find(i => i.id === c.id) || {};
+  c.messages.push({ role: 'user', content: text });
+  if (inp) inp.value = '';
+  c.busy = true; refreshIdeaCoachThread();
+  try {
+    const res = await fetch('/api/chat', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ messages: c.messages, mode: 'ideacoach', idea: { title: idea.title, description: idea.description, scores: idea.scores, validation: idea.validation } }) });
+    const j = await res.json().catch(() => ({}));
+    c.busy = false;
+    if (!res.ok) c.messages.push({ role: 'assistant', content: j.error === 'NO_KEY' ? 'Add your Claude API key in Settings to use the coach.' : (j.error || 'Something went wrong — try again.') });
+    else c.messages.push({ role: 'assistant', content: j.reply || 'Try rephrasing that.' });
+  } catch { c.busy = false; c.messages.push({ role: 'assistant', content: 'Could not reach the coach — check your connection.' }); }
+  refreshIdeaCoachThread();
+}
+function closeIdeaCoach() {
+  const c = state._ideaCoach;
+  if (c) { const idea = state.data.ideas.find(i => i.id === c.id); if (idea) { idea.coachChat = c.messages; saveData(); } }
+  document.getElementById('idea-coach-overlay')?.remove();
+  state._ideaCoach = null;
+  renderIdeasPage();
 }
 
 async function analyzeIdeas() {

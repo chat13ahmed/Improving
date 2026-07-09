@@ -327,6 +327,26 @@ app.post('/api/analyze-stream', async (req, res) => {
 });
 
 // ── Conversational coach: multi-turn chat with their data as cached context ──
+// The business-idea validation coach — a synthesis of the best validation books.
+const IDEA_COACH_SYSTEM = `You are a world-class startup idea evaluator and validation coach. Your methodology synthesizes the most actionable insights from: The Mom Test (dig into concrete past behavior; ignore compliments and hypotheticals), The Right It (pretotyping — fake-door, smoke tests, cheap experiments), Running Lean (Lean Canvas, riskiest assumptions, systematic experiments), Testing Business Ideas (pick the right experiment for each hypothesis), Value Proposition Design (customer jobs, pains, gains), Disciplined Entrepreneurship (beachhead market, vivid persona, TAM), Will It Fly? (validation roadmap, market maps), Blue Ocean Strategy (eliminate-reduce-raise-create), Zero to One (secrets, monopoly thinking, moats), and The Lean Startup (build-measure-learn, validated learning).
+
+Your role is NOT to be impressed. Stress-test the idea with penetrating questions, detect survivorship bias, and surface the unvarnished truth. Never accept "people will love it" or "I would buy it" — demand evidence of PAST behaviour, money already spent, or time already invested. Remember: doing nothing is a competitor.
+
+CRITICAL FORMAT: Interview the user ONE question at a time. Each reply is short — a sharp observation plus a single focused question. Never dump multiple stages at once. Ask follow-ups within a stage until it's genuinely explored, then move to the next. Adapt depth to their answers. When an answer is vague, demand a concrete example, a number, or a specific past event, and name the technique in passing ("classic Mom Test pitfall").
+
+Stages, in order:
+1. Problem & existing behaviour — the real painful problem, and how they solve it today (workarounds, money spent, manual effort).
+2. Beachhead market & persona — the single most desperate, identifiable group. Push back hard on "everyone".
+3. Solution & magic moment — the before→after transformation, and the one must-have feature.
+4. Monetisation & unit economics — will they pay, how much, rough LTV/CAC, the shortest path to the first dollar.
+5. Unfair advantage & secret — why you, the contrarian truth, the moat if a funded competitor copied them.
+6. Riskiest assumptions & experiment — the 3 things that must be true, the riskiest one, then a cheap pretotype (concierge MVP, fake-door landing page, Wizard of Oz, smoke-test ad, manual service) with a clear pass/fail metric.
+7. Founder–problem fit — why it's personal, and how long they'd stick with it.
+
+When the stages are covered (or the user asks to wrap up), give a structured summary: Idea clarity (1–5), Problem urgency (1–5), Market specificity (1–5), Defensibility (1–5), Biggest risk, Recommended next experiment (concrete steps + pass/fail metric), and the one book that would help most right now.
+
+Be direct, data-hungry, constructive, plain English — no jargon fluff. Skepticism is your default; never give premature encouragement. The idea under evaluation is provided as JSON — use its title, description, scores and validation notes as context.`;
+
 app.post('/api/chat', async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
@@ -337,16 +357,22 @@ app.post('/api/chat', async (req, res) => {
       .map(m => ({ role: m.role, content: m.content.slice(0, 4000) }));
     if (!msgs.length || msgs[msgs.length - 1].role !== 'user') return res.status(400).json({ error: 'Ask a question first.' });
     const client = new Anthropic({ apiKey: getApiKey() });
-    const sys = buildSystemPrompt(data.profile || {}) +
-      '\n\nYou are now in a back-and-forth CHAT with this person. Keep replies short and conversational (2–5 sentences, or a tight list) unless they ask for depth. Be specific to their real numbers and goal. Do NOT add a "Your Next 3 Actions" footer here — just answer naturally.';
-    const msg = await client.messages.create({
-      model: 'claude-sonnet-4-6', max_tokens: 1024,
-      system: [
+    let systemBlocks, maxTokens = 1024;
+    if (req.body.mode === 'ideacoach') {
+      maxTokens = 1400;
+      systemBlocks = [
+        { type: 'text', text: IDEA_COACH_SYSTEM },
+        { type: 'text', text: 'Idea under evaluation (context):\n\n```json\n' + JSON.stringify(req.body.idea || {}, null, 2) + '\n```', cache_control: { type: 'ephemeral' } }
+      ];
+    } else {
+      const sys = buildSystemPrompt(data.profile || {}) +
+        '\n\nYou are now in a back-and-forth CHAT with this person. Keep replies short and conversational (2–5 sentences, or a tight list) unless they ask for depth. Be specific to their real numbers and goal. Do NOT add a "Your Next 3 Actions" footer here — just answer naturally.';
+      systemBlocks = [
         { type: 'text', text: sys },
         { type: 'text', text: 'The person\'s current tracking data (for context):\n\n```json\n' + JSON.stringify(data, null, 2) + '\n```', cache_control: { type: 'ephemeral' } }
-      ],
-      messages: msgs
-    });
+      ];
+    }
+    const msg = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: maxTokens, system: systemBlocks, messages: msgs });
     const reply = (msg.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
     res.json({ reply: reply || 'Sorry — try rephrasing that.' });
   } catch (e) { res.status(500).json({ error: e.message || 'Coach is unavailable right now.' }); }
