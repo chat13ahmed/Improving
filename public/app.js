@@ -998,6 +998,7 @@ function applyNavVisibility() {
 function navigate(page) {
   state.page = page;
   if (page !== 'workout') document.body.classList.remove('wo-fullscreen');   // restore the bottom nav when leaving the workout
+  state._openIdea = null;   // leaving to any page closes an open idea workspace
   if (page !== 'log') { state._editDayId = null; state._fullLog = false; state._guided = null; }
   Object.values(charts).forEach(c => c.destroy());
   charts = {};
@@ -6074,9 +6075,11 @@ function renderIdeasPage() {
       const v = Math.min(5, Math.max(0, +sc[d.key] || 0));
       return '<div class="idim" title="' + escapeAttr(d.label) + '"><span class="idim-l">' + d.short + '</span><span class="idim-bar"><i style="width:' + (v * 20) + '%"></i></span></div>';
     }).join('') + '</div>';
+    const pros = (idea.pros || []).length, cons = (idea.cons || []).length;
+    const pcMini = (pros || cons) ? '<div class="pc-mini">👍 ' + pros + ' · 👎 ' + cons + (idea.notes && idea.notes.trim() ? ' · 📝 notes' : '') + '</div>' : '';
     return '<div class="idea-card' + (top && top.id === idea.id ? ' idea-top' : '') + '">' +
       '<div class="idea-card-top">' +
-      '<div class="idea-title">' + escapeHtml(idea.title) + '</div>' +
+      '<div class="idea-title" onclick="openIdea(\'' + idea.id + '\')" style="cursor:pointer">' + escapeHtml(idea.title) + '</div>' +
       (rated
         ? '<span class="idea-score s-' + bucket(score) + '">' + score + '<em>' + ideaScoreLabel(score) + '</em></span>'
         : '<span class="idea-score idea-unrated">Rate it</span>') +
@@ -6085,10 +6088,10 @@ function renderIdeasPage() {
       (idea.description ? '<div class="idea-desc">' + escapeHtml(idea.description) + '</div>' : '') +
       dims +
       (() => { const vs = validationStage(idea.validation); return '<div class="idea-val"><span class="iv-badge iv-' + vs.key + '">' + vs.label + '</span><span class="iv-bar"><i style="width:' + vs.pct + '%"></i></span></div>'; })() +
+      pcMini +
       (idea.nextStep ? '<div class="idea-next">→ <b>Next:</b> ' + escapeHtml(idea.nextStep) + '</div>' : '') +
       '<div class="idea-actions">' +
-      '<button class="btn-sm btn-eval" onclick="showIdeaEval(\'' + idea.id + '\')">Evaluate</button>' +
-      '<button class="btn-sm btn-validate" onclick="showIdeaValidate(\'' + idea.id + '\')">Validate</button>' +
+      '<button class="btn-sm btn-open" onclick="openIdea(\'' + idea.id + '\')">Open ›</button>' +
       (idea.status !== 'active'    ? '<button class="btn-sm" onclick="setIdeaStatus(\'' + idea.id + '\',\'active\')">Go Active</button>' : '') +
       (idea.status !== 'exploring' ? '<button class="btn-sm" onclick="setIdeaStatus(\'' + idea.id + '\',\'exploring\')">Exploring</button>' : '') +
       (idea.status !== 'dropped'   ? '<button class="btn-sm btn-sm-danger" onclick="setIdeaStatus(\'' + idea.id + '\',\'dropped\')">Drop</button>' : '') +
@@ -6150,7 +6153,7 @@ async function addIdea(e) {
     id: uid(), title,
     description: document.getElementById('idea-desc').value.trim(),
     status: document.getElementById('idea-status').value,
-    createdAt: todayStr(), notes: '', scores: {}, nextStep: '', validation: {}
+    createdAt: todayStr(), notes: '', scores: {}, nextStep: '', validation: {}, pros: [], cons: []
   });
   await saveData();
   showToast('Idea added!', 'success');
@@ -6163,15 +6166,68 @@ async function setIdeaStatus(id, status) {
   idea.status = status;
   await saveData();
   showToast('Updated to ' + status + '!', 'success');
-  renderIdeasPage();
+  refreshIdeasView();
 }
 
 async function deleteIdea(id) {
   if (!confirm('Delete this idea?')) return;
   state.data.ideas = state.data.ideas.filter(i => i.id !== id);
+  state._openIdea = null;
   await saveData();
   showToast('Idea deleted.', 'success');
   renderIdeasPage();
+}
+
+// ── Idea workspace: the whole picture for one idea in one place ──
+function openIdea(id) { state._openIdea = id; renderIdeaDetail(id); }
+function backToIdeas() { state._openIdea = null; renderIdeasPage(); }
+function refreshIdeasView() { if (state._openIdea && state.data.ideas.some(i => i.id === state._openIdea)) renderIdeaDetail(state._openIdea); else renderIdeasPage(); }
+function addIdeaPro(id) { const el = document.getElementById('pro-input-' + id); const v = (el && el.value || '').trim(); if (!v) return; const idea = state.data.ideas.find(i => i.id === id); if (!idea) return; idea.pros = idea.pros || []; idea.pros.push(v); saveData(); renderIdeaDetail(id); document.getElementById('pro-input-' + id)?.focus(); }
+function addIdeaCon(id) { const el = document.getElementById('con-input-' + id); const v = (el && el.value || '').trim(); if (!v) return; const idea = state.data.ideas.find(i => i.id === id); if (!idea) return; idea.cons = idea.cons || []; idea.cons.push(v); saveData(); renderIdeaDetail(id); document.getElementById('con-input-' + id)?.focus(); }
+function removeIdeaPro(id, i) { const idea = state.data.ideas.find(x => x.id === id); if (!idea || !idea.pros) return; idea.pros.splice(i, 1); saveData(); renderIdeaDetail(id); }
+function removeIdeaCon(id, i) { const idea = state.data.ideas.find(x => x.id === id); if (!idea || !idea.cons) return; idea.cons.splice(i, 1); saveData(); renderIdeaDetail(id); }
+function setIdeaField(id, key, val) { const idea = state.data.ideas.find(i => i.id === id); if (!idea) return; idea[key] = val; saveData(); }
+function renderIdeaDetail(id) {
+  const idea = state.data.ideas.find(i => i.id === id);
+  if (!idea) { backToIdeas(); return; }
+  idea.pros = idea.pros || []; idea.cons = idea.cons || [];
+  const sc = idea.scores || {}, score = ideaScore(sc), rated = ideaRated(sc);
+  const bucket = score >= 78 ? 'strong' : score >= 58 ? 'good' : score >= 38 ? 'ok' : 'low';
+  const vs = validationStage(idea.validation);
+  const statusLabel = idea.status === 'active' ? 'Active' : idea.status === 'exploring' ? 'Exploring' : 'Dropped';
+  const pcList = (arr, kind) => arr.length
+    ? '<ul class="pc-list">' + arr.map((t, i) => '<li><span>' + escapeHtml(t) + '</span><button type="button" onclick="removeIdea' + kind + '(\'' + id + '\',' + i + ')" aria-label="Remove">✕</button></li>').join('') + '</ul>'
+    : '<div class="pc-empty">None yet.</div>';
+  document.getElementById('main').innerHTML =
+    '<div class="idw-wrap">' +
+    '<div class="idw-top"><button type="button" class="wo-back" onclick="backToIdeas()">‹ All ideas</button>' +
+    '<span class="idea-status-badge ' + idea.status + '">' + statusLabel + '</span></div>' +
+    '<h2 class="idw-title">' + escapeHtml(idea.title) + '</h2>' +
+    '<div class="idw-badges">' +
+    (rated ? '<span class="idea-score s-' + bucket + '">' + score + '<em>' + ideaScoreLabel(score) + '</em></span>' : '<span class="idea-score idea-unrated">Rate it</span>') +
+    '<span class="iv-badge iv-' + vs.key + '">' + vs.label + '</span></div>' +
+    '<div class="idw-tools">' +
+    '<button type="button" class="btn btn-outline btn-sm" onclick="showIdeaEval(\'' + id + '\')">Score it</button>' +
+    '<button type="button" class="btn btn-outline btn-sm" onclick="showIdeaValidate(\'' + id + '\')">Validate</button>' +
+    (state.hasApiKey ? '<button type="button" class="btn btn-primary btn-sm" onclick="openIdeaCoach(\'' + id + '\')">🎯 Interview me</button>' : '') +
+    '</div>' +
+    '<div class="idw-sec-h">What it is</div>' +
+    '<textarea class="idw-ta" placeholder="Describe the idea in a line or two…" onchange="setIdeaField(\'' + id + '\',\'description\',this.value)">' + escapeHtml(idea.description || '') + '</textarea>' +
+    '<div class="idw-pc">' +
+    '<div class="pc-col"><div class="pc-h pc-pros-h">👍 Pros</div>' + pcList(idea.pros, 'Pro') +
+    '<div class="pc-add"><input id="pro-input-' + id + '" placeholder="Add a pro…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addIdeaPro(\'' + id + '\');}"><button type="button" onclick="addIdeaPro(\'' + id + '\')">+</button></div></div>' +
+    '<div class="pc-col"><div class="pc-h pc-cons-h">👎 Cons</div>' + pcList(idea.cons, 'Con') +
+    '<div class="pc-add"><input id="con-input-' + id + '" placeholder="Add a con…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addIdeaCon(\'' + id + '\');}"><button type="button" onclick="addIdeaCon(\'' + id + '\')">+</button></div></div>' +
+    '</div>' +
+    (idea.nextStep ? '<div class="idw-sec-h">Next step</div><div class="idea-next">→ ' + escapeHtml(idea.nextStep) + '</div>' : '') +
+    '<div class="idw-sec-h">Notes</div>' +
+    '<textarea class="idw-ta idw-notes" placeholder="Everything else — research, contacts, numbers, links, thoughts…" onchange="setIdeaField(\'' + id + '\',\'notes\',this.value)">' + escapeHtml(idea.notes || '') + '</textarea>' +
+    '<div class="idw-actions">' +
+    (idea.status !== 'active' ? '<button type="button" class="btn-sm" onclick="setIdeaStatus(\'' + id + '\',\'active\')">Go Active</button>' : '') +
+    (idea.status !== 'exploring' ? '<button type="button" class="btn-sm" onclick="setIdeaStatus(\'' + id + '\',\'exploring\')">Exploring</button>' : '') +
+    (idea.status !== 'dropped' ? '<button type="button" class="btn-sm btn-sm-danger" onclick="setIdeaStatus(\'' + id + '\',\'dropped\')">Drop</button>' : '') +
+    '<button type="button" class="btn-sm btn-sm-danger" onclick="deleteIdea(\'' + id + '\')">Delete</button>' +
+    '</div></div>';
 }
 
 // ── Evaluate an idea: rate the four dimensions + set its next step ──
@@ -6211,7 +6267,7 @@ function setIdeaDim(id, key, val) {
   const o = document.getElementById('idea-eval-overlay'); if (o) o.innerHTML = renderIdeaEval(idea);
 }
 function setIdeaNext(id, val) { const idea = state.data.ideas.find(i => i.id === id); if (idea) idea.nextStep = val; }
-function closeIdeaEval() { document.getElementById('idea-eval-overlay')?.remove(); saveData(); renderIdeasPage(); }
+function closeIdeaEval() { document.getElementById('idea-eval-overlay')?.remove(); saveData(); refreshIdeasView(); }
 
 // ── Lean Startup validation: test the risky guesses before you build ──
 function showIdeaValidate(id) {
@@ -6267,7 +6323,7 @@ function setIdeaDecision(id, val) {
   idea.validation.decision = (idea.validation.decision === val ? '' : val);
   document.querySelectorAll('.iv-dec').forEach(b => b.classList.toggle('on', b.dataset.dec === idea.validation.decision));
 }
-function closeIdeaValidate() { document.getElementById('idea-validate-overlay')?.remove(); saveData(); renderIdeasPage(); }
+function closeIdeaValidate() { document.getElementById('idea-validate-overlay')?.remove(); saveData(); refreshIdeasView(); }
 async function validateIdeaWithAI(id) {
   const idea = state.data.ideas.find(i => i.id === id); if (!idea) return;
   const v = idea.validation || {};
@@ -6346,7 +6402,7 @@ function closeIdeaCoach() {
   if (c) { const idea = state.data.ideas.find(i => i.id === c.id); if (idea) { idea.coachChat = c.messages; saveData(); } }
   document.getElementById('idea-coach-overlay')?.remove();
   state._ideaCoach = null;
-  renderIdeasPage();
+  refreshIdeasView();
 }
 
 async function analyzeIdeas() {
