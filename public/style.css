@@ -583,6 +583,17 @@ body {
 .pc-add button { flex: none; width: 38px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 18px; font-weight: 700; cursor: pointer; }
 .pc-add button:hover { border-color: var(--accent); color: var(--accent); }
 .idw-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--border); }
+/* Idea checklist */
+.idw-cl-bar { height: 6px; border-radius: 3px; background: var(--surface); overflow: hidden; margin: 0 0 8px; }
+.idw-cl-bar i { display: block; height: 100%; background: var(--gym-color); border-radius: 3px; transition: width .2s; }
+.idw-cl { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+.clx-row { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; }
+.clx-box { width: 22px; height: 22px; flex: none; border: 1.5px solid var(--border-bright); border-radius: 6px; background: var(--card); color: #fff; font-size: 13px; font-weight: 800; cursor: pointer; display: grid; place-items: center; }
+.clx-row.clx-done .clx-box { background: var(--gym-color); border-color: var(--gym-color); }
+.clx-text { flex: 1; font-size: 14px; color: var(--text); line-height: 1.4; }
+.clx-row.clx-done .clx-text { text-decoration: line-through; color: var(--text-muted); }
+.clx-del { background: none; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; flex: none; padding: 0 2px; }
+.clx-del:hover { color: var(--danger); }
 .insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
 .insight-card { display: flex; flex-direction: column; gap: 12px; }
 .insight-card-header { display: flex; align-items: flex-start; gap: 12px; }

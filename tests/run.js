@@ -61,7 +61,7 @@ function loadApp(fieldValues) {
     ' loggingStreak, bestStreak, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
-    ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage,' +
+    ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress,' +
     ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
@@ -313,6 +313,11 @@ eq('validationStage: result but no verdict → measuring', A.validationStage({ c
 eq('validationStage: result + persevere → validated', A.validationStage({ result: 'nailed it', decision: 'persevere' }).key, 'validated');
 eq('validationStage: result + pivot → pivot', A.validationStage({ result: 'flopped', decision: 'pivot' }).key, 'pivot');
 ok('validationStage: progress climbs with each step', A.validationStage({}).pct === 0 && A.validationStage({ customer: 'x', valueHyp: 'y' }).pct > 0 && A.validationStage({ result: 'r', decision: 'persevere' }).pct === 100);
+// Idea checklist progress
+ok('ideaTaskProgress: empty → 0/0', (() => { const p = A.ideaTaskProgress([]); return p.done === 0 && p.total === 0 && p.pct === 0; })());
+ok('ideaTaskProgress: counts done + pct', (() => { const p = A.ideaTaskProgress([{ done: true }, { done: false }, { done: true }, { done: false }]); return p.done === 2 && p.total === 4 && p.pct === 50; })());
+ok('ideaTaskProgress: all done → 100', A.ideaTaskProgress([{ done: true }, { done: true }]).pct === 100);
+ok('ideaTaskProgress: handles junk', A.ideaTaskProgress(null).total === 0 && A.ideaTaskProgress(undefined).pct === 0);
 
 // Goal status (pure)
 const _wg = { kind: 'weight', start: 180, target: 170, deadline: '2026-07-10', createdAt: '2026-06-10' };

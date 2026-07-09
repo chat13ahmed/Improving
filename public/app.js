@@ -6075,8 +6075,8 @@ function renderIdeasPage() {
       const v = Math.min(5, Math.max(0, +sc[d.key] || 0));
       return '<div class="idim" title="' + escapeAttr(d.label) + '"><span class="idim-l">' + d.short + '</span><span class="idim-bar"><i style="width:' + (v * 20) + '%"></i></span></div>';
     }).join('') + '</div>';
-    const pros = (idea.pros || []).length, cons = (idea.cons || []).length;
-    const pcMini = (pros || cons) ? '<div class="pc-mini">👍 ' + pros + ' · 👎 ' + cons + (idea.notes && idea.notes.trim() ? ' · 📝 notes' : '') + '</div>' : '';
+    const pros = (idea.pros || []).length, cons = (idea.cons || []).length, cp = ideaTaskProgress(idea.checklist);
+    const pcMini = (pros || cons || cp.total) ? '<div class="pc-mini">👍 ' + pros + ' · 👎 ' + cons + (cp.total ? ' · ✓ ' + cp.done + '/' + cp.total : '') + (idea.notes && idea.notes.trim() ? ' · 📝 notes' : '') + '</div>' : '';
     return '<div class="idea-card' + (top && top.id === idea.id ? ' idea-top' : '') + '">' +
       '<div class="idea-card-top">' +
       '<div class="idea-title" onclick="openIdea(\'' + idea.id + '\')" style="cursor:pointer">' + escapeHtml(idea.title) + '</div>' +
@@ -6153,7 +6153,7 @@ async function addIdea(e) {
     id: uid(), title,
     description: document.getElementById('idea-desc').value.trim(),
     status: document.getElementById('idea-status').value,
-    createdAt: todayStr(), notes: '', scores: {}, nextStep: '', validation: {}, pros: [], cons: []
+    createdAt: todayStr(), notes: '', scores: {}, nextStep: '', validation: {}, pros: [], cons: [], checklist: []
   });
   await saveData();
   showToast('Idea added!', 'success');
@@ -6187,6 +6187,11 @@ function addIdeaCon(id) { const el = document.getElementById('con-input-' + id);
 function removeIdeaPro(id, i) { const idea = state.data.ideas.find(x => x.id === id); if (!idea || !idea.pros) return; idea.pros.splice(i, 1); saveData(); renderIdeaDetail(id); }
 function removeIdeaCon(id, i) { const idea = state.data.ideas.find(x => x.id === id); if (!idea || !idea.cons) return; idea.cons.splice(i, 1); saveData(); renderIdeaDetail(id); }
 function setIdeaField(id, key, val) { const idea = state.data.ideas.find(i => i.id === id); if (!idea) return; idea[key] = val; saveData(); }
+// Pure: checklist progress for an idea. (testable)
+function ideaTaskProgress(list) { const a = Array.isArray(list) ? list : []; const total = a.length, done = a.filter(t => t && t.done).length; return { done, total, pct: total ? Math.round(done / total * 100) : 0 }; }
+function addIdeaTask(id) { const el = document.getElementById('task-input-' + id); const v = (el && el.value || '').trim(); if (!v) return; const idea = state.data.ideas.find(i => i.id === id); if (!idea) return; idea.checklist = idea.checklist || []; idea.checklist.push({ id: uid(), text: v, done: false }); saveData(); renderIdeaDetail(id); document.getElementById('task-input-' + id)?.focus(); }
+function toggleIdeaTask(id, tid) { const idea = state.data.ideas.find(i => i.id === id); if (!idea || !idea.checklist) return; const t = idea.checklist.find(x => x.id === tid); if (t) { t.done = !t.done; saveData(); renderIdeaDetail(id); } }
+function removeIdeaTask(id, tid) { const idea = state.data.ideas.find(i => i.id === id); if (!idea || !idea.checklist) return; idea.checklist = idea.checklist.filter(x => x.id !== tid); saveData(); renderIdeaDetail(id); }
 function renderIdeaDetail(id) {
   const idea = state.data.ideas.find(i => i.id === id);
   if (!idea) { backToIdeas(); return; }
@@ -6219,6 +6224,17 @@ function renderIdeaDetail(id) {
     '<div class="pc-col"><div class="pc-h pc-cons-h">👎 Cons</div>' + pcList(idea.cons, 'Con') +
     '<div class="pc-add"><input id="con-input-' + id + '" placeholder="Add a con…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addIdeaCon(\'' + id + '\');}"><button type="button" onclick="addIdeaCon(\'' + id + '\')">+</button></div></div>' +
     '</div>' +
+    (() => {
+      const list = idea.checklist || [], cp = ideaTaskProgress(list);
+      return '<div class="idw-sec-h">Checklist' + (cp.total ? ' · ' + cp.done + '/' + cp.total + ' done' : '') + '</div>' +
+        (cp.total ? '<div class="idw-cl-bar"><i style="width:' + cp.pct + '%"></i></div>' : '') +
+        (list.length ? '<div class="idw-cl">' + list.map(t =>
+          '<div class="clx-row' + (t.done ? ' clx-done' : '') + '">' +
+          '<button type="button" class="clx-box" onclick="toggleIdeaTask(\'' + id + '\',\'' + t.id + '\')">' + (t.done ? '✓' : '') + '</button>' +
+          '<span class="clx-text">' + escapeHtml(t.text) + '</span>' +
+          '<button type="button" class="clx-del" onclick="removeIdeaTask(\'' + id + '\',\'' + t.id + '\')" aria-label="Remove">✕</button></div>').join('') + '</div>' : '') +
+        '<div class="pc-add"><input id="task-input-' + id + '" placeholder="Add a task — e.g. Call 3 gyms" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addIdeaTask(\'' + id + '\');}"><button type="button" onclick="addIdeaTask(\'' + id + '\')">+</button></div>';
+    })() +
     (idea.nextStep ? '<div class="idw-sec-h">Next step</div><div class="idea-next">→ ' + escapeHtml(idea.nextStep) + '</div>' : '') +
     '<div class="idw-sec-h">Notes</div>' +
     '<textarea class="idw-ta idw-notes" placeholder="Everything else — research, contacts, numbers, links, thoughts…" onchange="setIdeaField(\'' + id + '\',\'notes\',this.value)">' + escapeHtml(idea.notes || '') + '</textarea>' +
