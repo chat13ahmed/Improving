@@ -22,6 +22,9 @@ let charts = {};
 // ─────────────────────────────────────────────────────────────
 // The user's own Claude key, stored in this browser (bring-your-own-key).
 function aiKey() { try { return localStorage.getItem('onward_ai_key') || ''; } catch { return ''; } }
+// A safe preview of the saved key — enough to spot a truncated/partial paste.
+// A real Anthropic key is ~108 chars and starts with "sk-ant-api03-".
+function maskKey(k) { k = String(k || ''); if (!k) return ''; const tail = k.length > 8 ? k.slice(-4) : ''; return k.slice(0, 12) + '…' + tail + ' · ' + k.length + ' chars'; }
 function authHeaders() {
   const h = { 'Content-Type': 'application/json' };
   if (state.token) h.Authorization = 'Bearer ' + state.token;
@@ -6792,9 +6795,9 @@ function renderCoachPage() {
       '<input type="password" id="api-key-input" placeholder="sk-ant-api03-…" style="flex:1;padding:10px 14px;border:1.5px solid var(--accent);border-radius:8px;font-size:14px;font-family:monospace;background:#fff;outline:none">' +
       '<button class="btn btn-primary" onclick="saveApiKey()">Save Key</button></div>' +
       '<p style="margin-top:8px;font-size:12px;color:var(--text-muted)">Stored only on your computer.</p></div></div>'
-    : '<div style="background:var(--success-bg);border:1px solid #b8e0cc;border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;font-size:13px;color:var(--success);display:flex;justify-content:space-between;align-items:center">' +
-      '<span>AI Coach is ready</span>' +
-      '<button onclick="clearApiKey()" style="background:none;border:none;font-size:12px;color:var(--text-muted);cursor:pointer">Change key</button></div>';
+    : '<div style="background:var(--success-bg);border:1px solid #b8e0cc;border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;font-size:13px;color:var(--success);display:flex;justify-content:space-between;align-items:center;gap:10px">' +
+      '<span>AI Coach is ready' + (aiKey() ? ' · <span style="font-family:monospace;color:var(--text-muted)">' + escapeHtml(maskKey(aiKey())) + '</span>' : ' · using the server key') + '</span>' +
+      '<button onclick="clearApiKey()" style="background:none;border:none;font-size:12px;color:var(--text-muted);cursor:pointer;flex:none">Change key</button></div>';
 
   const cards = ANALYSES.map(a =>
     '<div class="insight-card card">' +
