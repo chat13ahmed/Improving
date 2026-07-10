@@ -677,16 +677,7 @@ async function startApp() {
   if (!state.data.profile.pillars) state.data.profile.pillars = defaultPillars();
   if (backfillBookData()) saveData(); // fill missing author/pages on saved books
 
-  // Dark mode chart defaults (guarded — app still works if Chart didn't load)
-  if (typeof Chart !== 'undefined') {
-  Chart.defaults.color = '#64748B';
-  Chart.defaults.borderColor = '#252D3D';
-  Chart.defaults.plugins.tooltip.backgroundColor = '#1E2438';
-  Chart.defaults.plugins.tooltip.titleColor = '#E2E8F0';
-  Chart.defaults.plugins.tooltip.bodyColor = '#94A3B8';
-  Chart.defaults.plugins.tooltip.borderColor = '#2E3A52';
-  Chart.defaults.plugins.tooltip.borderWidth = 1;
-  }
+  applyChartTheme();   // on-brand, theme-aware chart styling (guarded if Chart didn't load)
 
   wireNav();
   renderUserChip();
@@ -9817,10 +9808,44 @@ function applyTheme() {
   root.setAttribute('data-theme', eff);
   const m = document.querySelector('meta[name="theme-color"]');
   if (m) m.setAttribute('content', eff === 'dark' ? '#0B1120' : '#F4F6FB');
+  applyChartTheme();
   // Follow the OS when on Auto — wire the listener once
   if (!window.__themeWired && window.matchMedia) {
     window.__themeWired = true;
     try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (themePref() === 'system') applyTheme(); }); } catch {}
+  }
+}
+// On-brand Chart.js styling — Inter labels, subtle gridlines, clean tooltips,
+// theme-aware so graphs read right in both light and dark.
+function applyChartTheme() {
+  if (typeof Chart === 'undefined' || !Chart.defaults || !Chart.defaults.font) return;
+  const dark = effectiveTheme() === 'dark';
+  const fam = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  Chart.defaults.font.family = fam;
+  Chart.defaults.font.weight = 600;
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = dark ? '#8A9AB5' : '#64748B';
+  Chart.defaults.borderColor = dark ? 'rgba(255,255,255,0.06)' : 'rgba(16,24,40,0.06)';
+  if (Chart.defaults.elements) {
+    if (Chart.defaults.elements.line)  { Chart.defaults.elements.line.tension = 0.38; Chart.defaults.elements.line.borderWidth = 2.5; }
+    if (Chart.defaults.elements.point) { Chart.defaults.elements.point.radius = 0; Chart.defaults.elements.point.hoverRadius = 5; Chart.defaults.elements.point.hitRadius = 12; }
+    if (Chart.defaults.elements.bar)   { Chart.defaults.elements.bar.borderRadius = 6; }
+  }
+  const tt = Chart.defaults.plugins.tooltip;
+  tt.backgroundColor = dark ? '#0B1120' : '#0F172A';
+  tt.titleColor = '#F1F5F9';
+  tt.bodyColor = '#CBD5E1';
+  tt.borderColor = 'rgba(255,255,255,0.10)';
+  tt.borderWidth = 1;
+  tt.padding = 10;
+  tt.cornerRadius = 10;
+  tt.displayColors = false;
+  tt.titleFont = { family: fam, weight: 700, size: 13 };
+  tt.bodyFont = { family: fam, weight: 600, size: 12 };
+  if (Chart.defaults.plugins.legend && Chart.defaults.plugins.legend.labels) {
+    Chart.defaults.plugins.legend.labels.font = { family: fam, weight: 600, size: 12 };
+    Chart.defaults.plugins.legend.labels.usePointStyle = true;
+    Chart.defaults.plugins.legend.labels.boxWidth = 8;
   }
 }
 function setTheme(pref) {
