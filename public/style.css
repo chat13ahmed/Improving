@@ -1593,6 +1593,58 @@ body.wo-fullscreen .bottom-nav { display: none !important; }   /* workout is an 
   .pc-list-head span:last-child, .pc-row .pc-type { display: none; }
 }
 
+/* ══════════════════════════════════════════════════
+   MOBILE NATIVE-FEEL POLISH  (phones ≤ 820px)
+   Instant taps, frosted sticky chrome, smooth page-ins.
+   ════════════════════════════════════════════════ */
+@media (max-width: 820px) {
+  /* Kill the grey tap-flash + 300ms delay so touches register instantly */
+  a, button, [onclick], [role="button"], .card, .nav-item, .bnav-item, .pnav-pill,
+  .biz-card, .biz-tab, .more-item, .gym-btn, .meal-chip, .recent-chip, .rating-btn, .tk-item {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  /* Stop the scroll from chaining/bouncing past the app — feels contained, native */
+  html, body { overscroll-behavior-y: contain; }
+
+  /* Frosted, fixed top bar: stays put and blurs the content sliding beneath it.
+     (Fixed — not sticky — because body's overflow-x:hidden makes it a scroll
+     container while the real scroll is on <html>, which breaks position:sticky.) */
+  .sidebar {
+    position: fixed; top: 0; left: 0; right: 0; height: 54px; z-index: 150;
+    background: rgba(255,255,255,0.80);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    backdrop-filter: saturate(180%) blur(16px);
+    border-bottom: 1px solid rgba(228,233,240,0.9);
+  }
+  .sidebar-brand { height: 54px; padding: 0 16px; border-bottom: none; background: none; }
+  .main { padding-top: 66px; }   /* clear the fixed 54px header */
+
+  /* Matching frosted bottom tab bar */
+  .bottom-nav {
+    background: rgba(255,255,255,0.82);
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
+    backdrop-filter: saturate(180%) blur(18px);
+  }
+  .bnav-item.active .bnav-ico svg { transform: translateY(-1px); }
+
+  /* Dashboard quick-jump: a tidy 3-col grid, not an awkward wrapping/stretching row.
+     (.main outranks the base .pnav rule that is defined later in this file.) */
+  .main .pnav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .main .pnav-pill { min-width: 0; flex: none; }
+}
+
+/* Tactile press feedback on the remaining genuinely-tappable surfaces (all sizes) */
+.biz-card:active, .pnav-pill:active, .nav-item:active, .btn-sm:active,
+.km-another:active, .more-logout:active, .contact-card:active, .biz-tab:active { transform: scale(0.97); }
+.fab-btn:active { transform: scale(0.93); }
+
+/* Smooth page-in when navigating between sections (honours reduced-motion) */
+@media (prefers-reduced-motion: no-preference) {
+  #main.page-anim > * { animation: pageIn 0.26s cubic-bezier(.22,.61,.36,1) both; }
+  @keyframes pageIn { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+}
+
 /* ─── Water / Hydration ───────────────────────── */
 .water-section { border-color: var(--water-border); }
 .water-section:hover { box-shadow: 0 0 20px var(--water-glow); }

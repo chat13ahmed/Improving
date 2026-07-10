@@ -1022,6 +1022,9 @@ function navigate(page) {
   const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, workout: renderWorkout, business: renderBusinessPage, health: renderHealthPage, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, knowledge: renderKnowledgePage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
   injectFAB();
   (pages[page] || renderDashboard)();
+  // Subtle fade-up so section changes feel like a native screen transition
+  const mainEl = document.getElementById('main');
+  if (mainEl) { mainEl.classList.remove('page-anim'); void mainEl.offsetWidth; mainEl.classList.add('page-anim'); }
 }
 
 // Bind nav clicks once (sidebar + mobile bottom bar + the More button). Called
@@ -7343,6 +7346,8 @@ function exitDemo() { state._previewMode = false; location.reload(); }
 // ─────────────────────────────────────────────────────────────
 function injectFAB() {
   document.querySelector('.fab-btn')?.remove();
+  // Redundant during the guided log and distracting in the immersive workout — skip it there
+  if (state.page === 'log' || state.page === 'workout') return;
   const fab = document.createElement('button');
   fab.className = 'fab-btn';
   fab.innerHTML = '＋';
