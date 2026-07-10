@@ -993,10 +993,10 @@ function renderUserChip() {
   footer.prepend(chip);
 }
 
-// Hide nav items whose pillar is turned off (Reading ↔ reading pillar)
+// Hide nav items whose pillar is turned off (Knowledge ↔ reading pillar)
 function applyNavVisibility() {
-  const readingNav = document.querySelector('.nav-item[data-page="reading"]');
-  if (readingNav) readingNav.style.display = isPillarOn('reading') ? '' : 'none';
+  const knowledgeNav = document.querySelector('.nav-item[data-page="knowledge"]');
+  if (knowledgeNav) knowledgeNav.style.display = isPillarOn('reading') ? '' : 'none';
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1017,7 +1017,9 @@ function navigate(page) {
   document.getElementById('more-sheet')?.remove();
   // Ideas + Contacts live under the Business hub, so keep that nav item lit on their tabs
   if (['business', 'ideas', 'contacts'].includes(page)) document.querySelector('.nav-item[data-page="business"]')?.classList.add('active');
-  const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, workout: renderWorkout, business: renderBusinessPage, health: renderHealthPage, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
+  // Reading lives under the Knowledge hub, so keep that nav item lit on its tab
+  if (['knowledge', 'reading'].includes(page)) document.querySelector('.nav-item[data-page="knowledge"]')?.classList.add('active');
+  const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, workout: renderWorkout, business: renderBusinessPage, health: renderHealthPage, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, knowledge: renderKnowledgePage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
   injectFAB();
   (pages[page] || renderDashboard)();
 }
@@ -7615,7 +7617,7 @@ async function ensureBookCovers() {
     } catch { b.cover = ''; }
     changed = true;
   }
-  if (changed) { saveData(); if (state.page === 'reading') renderReadingPage(); }
+  if (changed) { saveData(); if (state.page === 'reading' || state.page === 'knowledge') renderKnowledgePage(); }
 }
 // ── Vocabulary — capture words from books, their meaning, then use each in a
 // sentence. Active recall beats passive highlighting. ──
@@ -7673,7 +7675,7 @@ async function addVocabWord() {
   state.data.vocab.push({ id: uid(), word, meaning, book, sentence: '', createdAt: todayStr() });
   await saveData();
   showToast('Added “' + word + '” — now use it in a sentence!', 'success');
-  renderReadingPage();
+  renderKnowledgePage();
 }
 async function saveVocabSentence(id) {
   const el = document.getElementById('vs-' + id);
@@ -7684,15 +7686,15 @@ async function saveVocabSentence(id) {
   w.sentence = sentence;
   await saveData();
   showToast('Nice — you used “' + w.word + '”.', 'success');
-  renderReadingPage();
+  renderKnowledgePage();
 }
 async function deleteVocabWord(id) {
   if (!confirm('Remove this word?')) return;
   state.data.vocab = (state.data.vocab || []).filter(x => x.id !== id);
   await saveData();
-  renderReadingPage();
+  renderKnowledgePage();
 }
-function renderReadingPage() {
+function readingBody() {
   const books      = state.data.books || [];
   const activeBook = books.find(b => b.status === 'reading');
   const finished   = books.filter(b => b.status === 'finished');
@@ -7793,14 +7795,87 @@ function renderReadingPage() {
       '</div></div>'
     : '';
 
+  return statsBar + bookCard + historyCard + finishedCard;
+}
+
+// ---- Knowledge hub (Reading + Vocabulary) ----------------------------------
+function knowledgeTabs(active) {
+  const tab = (id, label) =>
+    '<button type="button" class="biz-tab' + (active === id ? ' on' : '') +
+    '" onclick="setKnowledgeTab(\'' + id + '\')">' + label + '</button>';
+  return '<div class="biz-tabs">' +
+    tab('overview', 'Overview') + tab('reading', 'Reading') + tab('vocabulary', 'Vocabulary') +
+    '</div>';
+}
+function setKnowledgeTab(t) { state._knowledgeTab = t; renderKnowledgePage(); }
+
+function renderKnowledgeOverview() {
+  const stats    = getWeekStats();
+  const books    = state.data.books || [];
+  const active   = books.find(b => b.status === 'reading');
+  const finished = books.filter(b => b.status === 'finished').length;
+  const streak   = getReadingStreak();
+  const vs       = vocabStats(state.data.vocab || []);
+  const readPages = stats.readPages || 0;
+
+  let bookPct = null, bookTitle = '', bookPagesRead = 0;
+  if (active) {
+    bookTitle = active.title;
+    bookPagesRead = state.data.days.filter(d => d.reading?.bookId === active.id)
+      .reduce((s, d) => s + (d.reading?.pages || 0), 0);
+    bookPct = (active.totalPages && active.totalPages > 0)
+      ? Math.min(100, Math.round((bookPagesRead / active.totalPages) * 100)) : null;
+  }
+
+  let insight;
+  if (!active && !(state.data.vocab || []).length && !finished)
+    insight = '📚 Pick your current book — a few pages a day compounds fast.';
+  else if (vs.needSentence > 0)
+    insight = '📝 ' + vs.needSentence + ' new word' + (vs.needSentence === 1 ? '' : 's') +
+      ' waiting to be used in a sentence — lock them in.';
+  else if (readPages === 0)
+    insight = '📖 No pages logged this week yet — open your book and read a little today.';
+  else
+    insight = '🔥 ' + readPages.toLocaleString() + ' pages this week' +
+      (streak > 1 ? ' · ' + streak + '-day streak' : '') + ' — keep the momentum going.';
+
+  const card = (inner, onclick) =>
+    '<button type="button" class="biz-card" onclick="' + onclick + '">' + inner + '</button>';
+  const shortTitle = bookTitle.length > 26 ? escapeHtml(bookTitle.slice(0, 25)) + '…' : escapeHtml(bookTitle);
+
+  return '<div class="biz-insight">' + insight + '</div>' +
+    '<div class="biz-grid">' +
+    card('<div class="biz-k">Pages this week</div><div class="biz-big">' + readPages.toLocaleString() +
+      '</div><div class="biz-sub">' + (streak > 1 ? streak + '-day streak 🔥' : 'read a little daily') + '</div>',
+      "setKnowledgeTab('reading')") +
+    card('<div class="biz-k">Current book</div><div class="biz-big">' +
+      (bookPct != null ? bookPct + '%' : (active ? (bookPagesRead ? bookPagesRead.toLocaleString() : '—') : '—')) +
+      '</div><div class="biz-sub">' + (active ? shortTitle + (bookPct == null && bookPagesRead ? ' · pages in' : '') : 'set your book') + '</div>',
+      "setKnowledgeTab('reading')") +
+    card('<div class="biz-k">Words learning</div><div class="biz-big">' + vs.total +
+      '</div><div class="biz-sub">' + (vs.needSentence > 0 ? vs.needSentence + ' to practice' : (vs.total ? 'all practiced ✓' : 'add from books')) + '</div>',
+      "setKnowledgeTab('vocabulary')") +
+    card('<div class="biz-k">Books finished</div><div class="biz-big">' + finished +
+      '</div><div class="biz-sub">' + (finished ? 'nice work' : 'finish your first') + '</div>',
+      "setKnowledgeTab('reading')") +
+    '</div>';
+}
+
+function renderKnowledgePage() {
+  const tab = state._knowledgeTab || 'overview';
+  let body;
+  if (tab === 'reading') body = readingBody();
+  else if (tab === 'vocabulary') body = renderVocabCard();
+  else body = renderKnowledgeOverview();
   document.getElementById('main').innerHTML =
     '<div class="page-header">' +
-    '<h2 class="page-title">Reading</h2>' +
-    '<p class="page-sub">Track your books, build a daily reading habit, and retain what you learn</p>' +
+    '<h2 class="page-title">Knowledge</h2>' +
+    '<p class="page-sub">Read, learn and remember — grow your mind, one page at a time</p>' +
     '</div>' +
-    statsBar + bookCard + renderVocabCard() + historyCard + finishedCard;
-  ensureBookCovers(); // resolve any missing covers, then re-render
+    knowledgeTabs(tab) + body;
+  if (tab === 'reading') ensureBookCovers(); // resolve any missing covers, then re-render
 }
+function renderReadingPage() { state._knowledgeTab = 'reading'; renderKnowledgePage(); }
 
 // Curated list of popular growth/business/self-development books with page counts,
 // so people pick instead of typing title + author + pages. Custom entries still work.
