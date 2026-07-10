@@ -1017,7 +1017,7 @@ function navigate(page) {
   document.getElementById('more-sheet')?.remove();
   // Ideas + Contacts live under the Business hub, so keep that nav item lit on their tabs
   if (['business', 'ideas', 'contacts'].includes(page)) document.querySelector('.nav-item[data-page="business"]')?.classList.add('active');
-  const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, workout: renderWorkout, business: renderBusinessPage, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
+  const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, workout: renderWorkout, business: renderBusinessPage, health: renderHealthPage, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
   injectFAB();
   (pages[page] || renderDashboard)();
 }
@@ -6446,6 +6446,85 @@ async function analyzeIdeas() {
 // ─────────────────────────────────────────────────────────────
 // CONTACTS  (mini-CRM for networking → commission)
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// HEALTH HUB — training + nutrition + body, in one smart place
+// ─────────────────────────────────────────────────────────────
+function healthTabs(active) {
+  const tab = (id, label) => '<button type="button" class="biz-tab' + (active === id ? ' on' : '') + '" onclick="setHealthTab(\'' + id + '\')">' + label + '</button>';
+  return '<div class="biz-tabs">' + tab('overview', 'Overview') + tab('training', 'Training') + tab('nutrition', 'Nutrition') + '</div>';
+}
+function setHealthTab(t) { state._healthTab = t; renderHealthPage(); }
+function renderHealthPage() {
+  const tab = state._healthTab || 'overview';
+  const stats = getWeekStats();
+  const nut = getNutrition();
+  const profile = state.data.profile || {};
+  const gymGoal = profile.gymDaysPerWeek || 5;
+  const gymDays = stats.gymDays || 0;
+  const streak = getGymStreak();
+  const td = (state.data.days || []).find(d => d.date === todayStr()) || {};
+  const eatenCal = td.calories || 0;
+  const eatenP = (td.eaten && td.eaten.protein) || 0;
+  const weights = (state.data.weights || []).slice().sort((a, b) => a.date < b.date ? -1 : 1);
+  const latestW = weights.length ? weights[weights.length - 1] : null;
+  const wDisp = latestW ? Math.round(kgToDisplay(latestW.kg) * 10) / 10 : null;
+  const wUnit = weightUnitPref() === 'lbs' ? 'lb' : 'kg';
+
+  let body;
+  if (tab === 'training') body = renderHealthTraining(gymDays, gymGoal, streak);
+  else if (tab === 'nutrition') body = renderHealthNutrition(nut, td, eatenCal, eatenP);
+  else body = renderHealthOverview(nut, gymDays, gymGoal, streak, eatenCal, eatenP, wDisp, wUnit);
+
+  document.getElementById('main').innerHTML =
+    '<div class="page-header"><h2 class="page-title">Health</h2>' +
+    '<p class="page-sub">Training, nutrition and your body — in one place.</p></div>' +
+    healthTabs(tab) + body;
+  if (tab === 'nutrition' && (state.data.weights || []).length >= 2) initWeightChart();
+}
+function renderHealthOverview(nut, gymDays, gymGoal, streak, eatenCal, eatenP, wDisp, wUnit) {
+  const gymLeft = Math.max(0, gymGoal - gymDays);
+  const pTarget = nut ? nut.protein.g : 0;
+  const pLeft = pTarget ? Math.max(0, pTarget - Math.round(eatenP)) : 0;
+  let insight;
+  if (gymLeft > 0) insight = '🏔️ ' + gymLeft + ' more workout' + (gymLeft === 1 ? '' : 's') + ' to hit your weekly goal of ' + gymGoal + '.';
+  else if (pTarget && pLeft >= 20) insight = '🍗 ' + pLeft + 'g of protein to go today — make your next meal count.';
+  else if (gymDays >= gymGoal) insight = '💪 Weekly training goal smashed — recover well and keep eating for your goal.';
+  else insight = 'Log your training and food to see how your week is shaping up.';
+  const card = (inner, onclick) => '<button type="button" class="biz-card" onclick="' + onclick + '">' + inner + '</button>';
+  return '<div class="biz-insight">' + insight + '</div>' +
+    '<div class="biz-grid">' +
+    card('<div class="biz-k">Training this week</div><div class="biz-big">' + gymDays + ' / ' + gymGoal + '</div><div class="biz-sub">' + (streak > 1 ? streak + '-day streak 🔥' : 'days trained') + '</div>', "setHealthTab('training')") +
+    card('<div class="biz-k">Calories today</div><div class="biz-big">' + eatenCal.toLocaleString() + '</div><div class="biz-sub">' + (nut ? 'of ' + nut.calories.toLocaleString() + ' target' : 'set up nutrition') + '</div>', "setHealthTab('nutrition')") +
+    card('<div class="biz-k">Protein today</div><div class="biz-big">' + Math.round(eatenP) + 'g</div><div class="biz-sub">' + (pTarget ? 'of ' + pTarget + 'g target' : 'set a target') + '</div>', "setHealthTab('nutrition')") +
+    card('<div class="biz-k">Weight</div><div class="biz-big">' + (wDisp != null ? wDisp + ' <span style="font-size:14px">' + wUnit + '</span>' : '—') + '</div><div class="biz-sub">' + (wDisp != null ? 'latest weigh-in' : 'log your weight') + '</div>', "setHealthTab('nutrition')") +
+    '</div>' +
+    '<button type="button" class="wo-add" style="margin-top:4px" onclick="openWorkout(\'health\')">🏋️ Track a workout — sets, reps & rest timer</button>';
+}
+function renderHealthTraining(gymDays, gymGoal, streak) {
+  const list = (state.data.days || []).filter(d => d.gym && d.gym.done).sort((a, b) => a.date < b.date ? 1 : -1).slice(0, 6);
+  const recent = list.length ? '<div class="idw-sec-h">Recent workouts</div>' + list.map(d => {
+    const tot = workoutTotals(d.gym.exercises);
+    const label = d.gym.muscleGroup ? d.gym.muscleGroup.charAt(0).toUpperCase() + d.gym.muscleGroup.slice(1) : 'Workout';
+    const meta = tot.sets ? tot.sets + ' sets · ' + tot.reps + ' reps' : (tot.secs ? formatClock(tot.secs) + ' logged' : 'done ✓');
+    return '<div class="hl-workout"><span class="hl-w-date">' + fmtDate(d.date) + '</span><span class="hl-w-label">' + escapeHtml(label) + '</span><span class="hl-w-meta">' + meta + '</span></div>';
+  }).join('') : '<div class="pc-empty" style="margin-top:8px">No workouts logged yet — track your first above.</div>';
+  return '<div class="biz-insight">' + gymDays + ' / ' + gymGoal + ' workouts this week' + (streak > 1 ? ' · ' + streak + '-day streak 🔥' : '') + '</div>' +
+    '<button type="button" class="wo-add" onclick="openWorkout(\'health\')">🏋️ Track a workout</button>' +
+    renderGymPlanCard() + recent;
+}
+function renderHealthNutrition(nut, td, eatenCal, eatenP) {
+  if (!nut) return '<div class="empty-state small"><p>Set up your calorie & protein targets to track nutrition.</p><div class="empty-actions"><button class="btn btn-primary" onclick="navigate(\'settings\')">Set up nutrition →</button></div></div>';
+  const eaten = td.eaten || {};
+  const bar = (val, target, label, unit, color) => '<div class="hl-macro"><div class="hl-macro-top"><span>' + label + '</span><span>' + val.toLocaleString() + ' / ' + target.toLocaleString() + unit + '</span></div><div class="hl-macro-bar"><i style="width:' + Math.min(100, target ? Math.round(val / target * 100) : 0) + '%;background:' + color + '"></i></div></div>';
+  const today = '<div class="idw-sec-h">Today</div><div class="hl-today">' +
+    bar(eatenCal, nut.calories, 'Calories', '', 'var(--gym-color)') +
+    bar(Math.round(eatenP), nut.protein.g, 'Protein', 'g', 'var(--success)') +
+    bar(Math.round(eaten.carbs || 0), nut.carbs.g, 'Carbs', 'g', 'var(--accent)') +
+    bar(Math.round(eaten.fat || 0), nut.fat.g, 'Fat', 'g', '#A78BFA') +
+    '</div><button type="button" class="wo-add" onclick="navigate(\'log\')">＋ Log today\'s food</button>';
+  return today + renderMealPlan(nut) + renderNutritionWeekCard() + renderWeightTrend();
+}
+
 // ─────────────────────────────────────────────────────────────
 // BUSINESS HUB — ideas + pipeline + money, in one smart place
 // ─────────────────────────────────────────────────────────────
