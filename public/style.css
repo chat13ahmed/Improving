@@ -896,6 +896,29 @@ body {
 .contact-card.contact-cold { border-left: 3px solid #38BDF8; }
 .btn-touch { border-color: var(--gym-color) !important; color: var(--gym-color) !important; font-weight: 700; }
 
+/* ─── Business hub ─── */
+.biz-tabs { display: flex; gap: 6px; margin-bottom: 18px; background: var(--surface); padding: 4px; border-radius: 12px; }
+.biz-tab { flex: 1; padding: 9px 6px; border: none; border-radius: 9px; background: transparent; color: var(--text-muted); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: all .15s; }
+.biz-tab.on { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+.biz-insight { background: var(--tint-1); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 16px; line-height: 1.5; }
+.biz-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 14px; }
+.biz-card { text-align: left; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; cursor: pointer; box-shadow: var(--shadow); transition: border-color .15s, transform .15s; font-family: inherit; }
+.biz-card:hover { border-color: var(--border-bright); transform: translateY(-1px); }
+.biz-card.biz-alert { border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.04); }
+.biz-k { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); }
+.biz-big { font-size: 26px; font-weight: 800; color: var(--text); letter-spacing: -.5px; margin: 3px 0 2px; }
+.biz-sub { font-size: 12px; color: var(--text-muted); }
+.biz-top { display: block; width: 100%; text-align: left; background: rgba(16,185,129,.07); border: 1px solid rgba(16,185,129,.28); border-radius: var(--radius); padding: 14px 16px; cursor: pointer; font-family: inherit; }
+.biz-top:hover { border-color: var(--gym-color); }
+.biz-top-title { font-size: 17px; font-weight: 800; color: var(--text); margin-top: 3px; display: flex; align-items: center; gap: 10px; }
+.biz-top-title span { font-size: 13px; font-weight: 800; color: #fff; background: var(--gym-color); border-radius: 999px; padding: 2px 9px; }
+.biz-muted { font-style: italic; }
+.biz-reach { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.biz-reach-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; cursor: pointer; font-family: inherit; text-align: left; }
+.biz-reach-row:hover { border-color: var(--accent); }
+.brr-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.brr-meta { font-size: 12px; color: var(--text-muted); flex: none; }
+
 /* ─── Floating Action Button ──────────────────── */
 .fab-btn {
   position: fixed; bottom: 28px; right: 28px;

@@ -1015,7 +1015,9 @@ function navigate(page) {
   const moreBtn = document.getElementById('bnav-more');
   if (moreBtn) moreBtn.classList.toggle('active', !['dashboard', 'log', 'coach'].includes(page));
   document.getElementById('more-sheet')?.remove();
-  const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, workout: renderWorkout, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
+  // Ideas + Contacts live under the Business hub, so keep that nav item lit on their tabs
+  if (['business', 'ideas', 'contacts'].includes(page)) document.querySelector('.nav-item[data-page="business"]')?.classList.add('active');
+  const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, workout: renderWorkout, business: renderBusinessPage, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
   injectFAB();
   (pages[page] || renderDashboard)();
 }
@@ -2565,7 +2567,7 @@ function renderFocusCard(thisWeek, lastWeek) {
 
 function updateNavBadges() {
   const count = getFollowUpCount();
-  const badge = document.getElementById('contacts-badge');
+  const badge = document.getElementById('business-badge');
   if (badge) {
     if (count > 0) { badge.textContent = count; badge.style.display = 'inline-flex'; }
     else { badge.style.display = 'none'; }
@@ -6115,6 +6117,7 @@ function renderIdeasPage() {
     '<h2 class="page-title">Business Ideas</h2>' +
     '<p class="page-sub">Score every idea, then chase the one worth chasing</p>' +
     '</div>' +
+    businessTabs('ideas') +
 
     (top
       ? '<div class="idea-focus"><div class="if-label">🎯 Your strongest bet</div>' +
@@ -6443,6 +6446,71 @@ async function analyzeIdeas() {
 // ─────────────────────────────────────────────────────────────
 // CONTACTS  (mini-CRM for networking → commission)
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// BUSINESS HUB — ideas + pipeline + money, in one smart place
+// ─────────────────────────────────────────────────────────────
+function businessTabs(active) {
+  const tab = (id, target, label) => '<button type="button" class="biz-tab' + (active === id ? ' on' : '') + '" onclick="navigate(\'' + target + '\')">' + label + '</button>';
+  return '<div class="biz-tabs">' + tab('overview', 'business', 'Overview') + tab('ideas', 'ideas', 'Ideas') + tab('contacts', 'contacts', 'Contacts') + '</div>';
+}
+function renderBusinessPage() {
+  updateNavBadges();
+  const ideas = state.data.ideas || [];
+  const contacts = state.data.contacts || [];
+  const today = todayStr();
+  const openC = c => !['closed', 'dropped'].includes(c.status);
+  const top = topIdea(ideas);
+  const pv = pipelineValue(contacts);
+  const dueCount = contacts.filter(c => openC(c) && c.followUpDate && c.followUpDate <= today).length;
+  const cold = contacts.filter(c => isGoingCold(c, today));
+  const warm = contacts.filter(c => c.status === 'warm' || c.status === 'closing').length;
+  const activeIdeas = ideas.filter(i => i.status === 'active').length;
+  const exploringIdeas = ideas.filter(i => i.status === 'exploring').length;
+  const moneyOn = isPillarOn('money');
+  const money = getMoneyPeriod() || { label: '', income: 0, spent: 0, net: 0, rate: 0 };
+
+  // One smart headline — the single most useful next move
+  let insight;
+  if (!ideas.length && !contacts.length) insight = '🚀 Add your first idea or contact to start building your business pipeline.';
+  else if (cold.length) insight = '❄️ ' + cold.length + ' lead' + (cold.length === 1 ? '' : 's') + ' going cold — reach out before they forget you.';
+  else if (dueCount) insight = '📆 ' + dueCount + ' follow-up' + (dueCount === 1 ? '' : 's') + ' due — clear them today.';
+  else if (top && top.nextStep) insight = '🎯 Move your strongest idea forward: ' + escapeHtml(top.nextStep);
+  else insight = '✅ Pipeline looks healthy — keep the momentum going.';
+
+  const card = (cls, inner, target) => '<button type="button" class="biz-card' + (cls ? ' ' + cls : '') + '" onclick="navigate(\'' + target + '\')">' + inner + '</button>';
+  const grid =
+    '<div class="biz-grid">' +
+    card('', '<div class="biz-k">Sales pipeline</div><div class="biz-big">$' + pv.open.toLocaleString() + '</div><div class="biz-sub">$' + pv.weighted.toLocaleString() + ' expected · ' + warm + ' warm</div>', 'contacts') +
+    card((cold.length || dueCount) ? 'biz-alert' : '', '<div class="biz-k">Reach out</div><div class="biz-big">' + (dueCount + cold.length) + '</div><div class="biz-sub">' + dueCount + ' due · ' + cold.length + ' going cold</div>', 'contacts') +
+    (moneyOn ? card('', '<div class="biz-k">Money · ' + escapeHtml(money.label || 'this period') + '</div><div class="biz-big">$' + Math.round(money.net).toLocaleString() + '</div><div class="biz-sub">$' + Math.round(money.income).toLocaleString() + ' in · $' + Math.round(money.spent).toLocaleString() + ' out · ' + money.rate + '% saved</div>', 'log') : '') +
+    card('', '<div class="biz-k">Ideas</div><div class="biz-big">' + ideas.length + '</div><div class="biz-sub">' + activeIdeas + ' active · ' + exploringIdeas + ' exploring</div>', 'ideas') +
+    '</div>';
+
+  const spotlight = top
+    ? '<button type="button" class="biz-top" onclick="openIdea(\'' + top.id + '\')">' +
+      '<div class="biz-k">🎯 Your strongest bet</div>' +
+      '<div class="biz-top-title">' + escapeHtml(top.title) + ' <span>' + ideaScore(top.scores) + '</span></div>' +
+      (top.nextStep ? '<div class="biz-sub">Next: ' + escapeHtml(top.nextStep) + '</div>' : '<div class="biz-sub biz-muted">Set its next step in the idea →</div>') +
+      '</button>'
+    : '';
+
+  const reachList = contacts.filter(c => openC(c) && ((c.followUpDate && c.followUpDate <= today) || isGoingCold(c, today)))
+    .sort((a, b) => (+b.dealValue || 0) - (+a.dealValue || 0)).slice(0, 5);
+  const reach = reachList.length
+    ? '<div class="biz-k" style="margin-top:20px">Who to contact next</div>' +
+      '<div class="biz-reach">' + reachList.map(c => '<button type="button" class="biz-reach-row" onclick="navigate(\'contacts\')">' +
+        '<span class="brr-name">' + escapeHtml(c.name) + '</span>' +
+        '<span class="brr-meta">' + ((+c.dealValue) ? '$' + (+c.dealValue).toLocaleString() + ' · ' : '') + (isGoingCold(c, today) ? '❄️ going cold' : 'follow-up due') + '</span></button>').join('') + '</div>'
+    : '';
+
+  document.getElementById('main').innerHTML =
+    '<div class="page-header"><h2 class="page-title">Business</h2>' +
+    '<p class="page-sub">Your ideas, pipeline and money — in one place.</p></div>' +
+    businessTabs('overview') +
+    '<div class="biz-insight">' + insight + '</div>' +
+    grid + spotlight + reach;
+}
+
 // ── Contacts CRM intelligence (all pure/testable) ──
 // A deal's chance of closing by pipeline stage — powers the weighted pipeline.
 const CONTACT_STAGE_PROB = { new: 0.1, contacted: 0.25, warm: 0.5, closing: 0.8, closed: 1, dropped: 0 };
@@ -6606,6 +6674,7 @@ function renderContactsPage() {
   document.getElementById('main').innerHTML =
     '<div class="page-header"><h2 class="page-title">Contacts</h2>' +
     '<p class="page-sub">Your network is your pipeline. Nurture it — never let a warm lead go cold.</p></div>' +
+    businessTabs('contacts') +
     statsBar + searchBar + addForm +
     (all.length === 0
       ? '<div class="empty-state small"><p>No contacts yet. Add your first one above — start with someone you met this week.</p></div>'

@@ -21,7 +21,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon.svg?v=2">
   <link rel="icon" href="icon.svg?v=2" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=118">
+  <link rel="stylesheet" href="style.css?v=119">
   <script src="vendor/chart.umd.min.js"></script>
   <script src="vendor/marked.min.js"></script>
 </head>
@@ -47,11 +47,8 @@
       <a href="#" class="nav-item" data-page="checklist">
         <span class="nav-icon"></span><span>Checklist</span>
       </a>
-      <a href="#" class="nav-item" data-page="contacts">
-        <span class="nav-icon"></span><span>Contacts</span><span class="nav-badge" id="contacts-badge" style="display:none"></span>
-      </a>
-      <a href="#" class="nav-item" data-page="ideas">
-        <span class="nav-icon"></span><span>Business Ideas</span>
+      <a href="#" class="nav-item" data-page="business">
+        <span class="nav-icon"></span><span>Business</span><span class="nav-badge" id="business-badge" style="display:none"></span>
       </a>
       <a href="#" class="nav-item" data-page="reading">
         <span class="nav-icon"></span><span>Reading</span>
@@ -106,7 +103,7 @@
     </button>
   </nav>
 
-  <script src="app.js?v=148"></script>
+  <script src="app.js?v=149"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
