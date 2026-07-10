@@ -883,6 +883,18 @@ body {
 .fu-overdue  { background: rgba(239,68,68,0.12); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
 .fu-today    { background: rgba(245,158,11,0.12); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
 .fu-upcoming { background: rgba(59,130,246,0.08); color: var(--network-color); border: 1px solid rgba(59,130,246,0.25); }
+.fu-cold     { background: rgba(56,189,248,0.12); color: #0284C7; border: 1px solid rgba(56,189,248,0.35); }
+/* Smarter contacts: search, deal value, last-touch, quick actions */
+.contact-search { width: 100%; box-sizing: border-box; margin-bottom: 16px; padding: 11px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-2); color: var(--text); font-family: inherit; font-size: 15px; }
+.contact-search:focus { outline: none; border-color: var(--accent); }
+.contact-deal { font-size: 13px; font-weight: 700; color: var(--money-color); margin-bottom: 4px; }
+.contact-deal span { font-weight: 600; color: var(--text-muted); }
+.contact-last { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+.contact-last.is-cold { color: #0284C7; font-weight: 600; }
+.contact-link { color: var(--network-color); text-decoration: none; }
+.contact-link:hover { text-decoration: underline; }
+.contact-card.contact-cold { border-left: 3px solid #38BDF8; }
+.btn-touch { border-color: var(--gym-color) !important; color: var(--gym-color) !important; font-weight: 700; }
 
 /* ─── Floating Action Button ──────────────────── */
 .fab-btn {

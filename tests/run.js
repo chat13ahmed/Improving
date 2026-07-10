@@ -61,7 +61,7 @@ function loadApp(fieldValues) {
     ' loggingStreak, bestStreak, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
-    ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress,' +
+    ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
     ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
@@ -318,6 +318,28 @@ ok('ideaTaskProgress: empty → 0/0', (() => { const p = A.ideaTaskProgress([]);
 ok('ideaTaskProgress: counts done + pct', (() => { const p = A.ideaTaskProgress([{ done: true }, { done: false }, { done: true }, { done: false }]); return p.done === 2 && p.total === 4 && p.pct === 50; })());
 ok('ideaTaskProgress: all done → 100', A.ideaTaskProgress([{ done: true }, { done: true }]).pct === 100);
 ok('ideaTaskProgress: handles junk', A.ideaTaskProgress(null).total === 0 && A.ideaTaskProgress(undefined).pct === 0);
+// Contacts CRM intelligence
+eq('stageProbability: warm = 50%', A.stageProbability('warm'), 0.5);
+eq('stageProbability: closing = 80%', A.stageProbability('closing'), 0.8);
+eq('stageProbability: dropped = 0', A.stageProbability('dropped'), 0);
+eq('stageProbability: unknown → default 10%', A.stageProbability('xyz'), 0.1);
+const _cts = [
+  { status: 'warm', dealValue: 1000 },     // open 1000, weighted 500
+  { status: 'closing', dealValue: 2000 },  // open 2000, weighted 1600
+  { status: 'closed', dealValue: 5000 },   // won 5000
+  { status: 'dropped', dealValue: 9000 },  // ignored
+  { status: 'new' }                         // no deal
+];
+const _pv = A.pipelineValue(_cts);
+eq('pipelineValue: open sums live deals', _pv.open, 3000);
+eq('pipelineValue: weighted by stage', _pv.weighted, 2100);
+eq('pipelineValue: won counts closed', _pv.won, 5000);
+ok('pipelineValue: handles junk', A.pipelineValue(null).open === 0);
+eq('daysBetween: 10 days', A.daysBetween('2026-06-01', '2026-06-11'), 10);
+ok('isGoingCold: open + no follow-up + old touch → cold', A.isGoingCold({ status: 'warm', lastContact: '2026-06-01' }, '2026-06-20') === true);
+ok('isGoingCold: recent touch → not cold', A.isGoingCold({ status: 'warm', lastContact: '2026-06-18' }, '2026-06-20') === false);
+ok('isGoingCold: has a follow-up planned → not cold', A.isGoingCold({ status: 'warm', lastContact: '2026-06-01', followUpDate: '2026-06-25' }, '2026-06-20') === false);
+ok('isGoingCold: closed → never cold', A.isGoingCold({ status: 'closed', lastContact: '2026-06-01' }, '2026-06-20') === false);
 
 // Goal status (pure)
 const _wg = { kind: 'weight', start: 180, target: 170, deadline: '2026-07-10', createdAt: '2026-06-10' };

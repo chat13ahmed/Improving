@@ -6443,57 +6443,111 @@ async function analyzeIdeas() {
 // ─────────────────────────────────────────────────────────────
 // CONTACTS  (mini-CRM for networking → commission)
 // ─────────────────────────────────────────────────────────────
+// ── Contacts CRM intelligence (all pure/testable) ──
+// A deal's chance of closing by pipeline stage — powers the weighted pipeline.
+const CONTACT_STAGE_PROB = { new: 0.1, contacted: 0.25, warm: 0.5, closing: 0.8, closed: 1, dropped: 0 };
+function stageProbability(status) { const p = CONTACT_STAGE_PROB[status]; return p == null ? 0.1 : p; }
+// Open pipeline (sum of live deals), expected (weighted by stage), and won.
+function pipelineValue(contacts) {
+  let open = 0, weighted = 0, won = 0;
+  for (const c of (Array.isArray(contacts) ? contacts : [])) {
+    const v = Math.max(0, +(c && c.dealValue) || 0);
+    if (!v) continue;
+    if (c.status === 'closed') won += v;
+    else if (c.status !== 'dropped') { open += v; weighted += v * stageProbability(c.status); }
+  }
+  return { open: Math.round(open), weighted: Math.round(weighted), won: Math.round(won) };
+}
+function daysBetween(a, b) { const t1 = Date.parse(a + 'T00:00:00Z'), t2 = Date.parse(b + 'T00:00:00Z'); return (isNaN(t1) || isNaN(t2)) ? 0 : Math.round((t2 - t1) / 86400000); }
+function contactLastTouch(c) { return (c && (c.lastContact || c.addedDate)) || ''; }
+// A live contact with no follow-up scheduled that you haven't talked to in a while.
+function isGoingCold(c, today, coldDays) {
+  coldDays = coldDays || 14;
+  if (!c || ['closed', 'dropped'].includes(c.status)) return false;
+  if (c.followUpDate) return false;                 // already has a follow-up planned
+  const last = contactLastTouch(c);
+  return !!last && daysBetween(last, today) >= coldDays;
+}
+async function logTouch(id) {
+  const c = state.data.contacts.find(x => x.id === id); if (!c) return;
+  c.lastContact = todayStr();
+  await saveData();
+  showToast('Logged — nice. Keep it warm.', 'success');
+  renderContactsPage();
+}
+function onContactSearch(val) {
+  state._contactSearch = val;
+  renderContactsPage();
+  const el = document.getElementById('contact-search');
+  if (el) { el.focus(); const v = el.value; el.value = ''; el.value = v; }   // keep focus, caret at end
+}
 function renderContactsPage() {
   updateNavBadges();
-  // Starred contacts always float to the top
-  const { contacts } = state.data;
-  contacts.sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0));
+  const all = state.data.contacts || [];
   const today = todayStr();
-  const overdue = contacts.filter(c => c.followUpDate && c.followUpDate < today  && !['closed','dropped'].includes(c.status));
-  const dueToday= contacts.filter(c => c.followUpDate && c.followUpDate === today && !['closed','dropped'].includes(c.status));
-  const upcoming= contacts.filter(c => c.followUpDate && c.followUpDate > today  && !['closed','dropped'].includes(c.status));
-  const rest     = contacts.filter(c => !c.followUpDate                            && !['closed','dropped'].includes(c.status));
-  const closed   = contacts.filter(c => ['closed','dropped'].includes(c.status));
+  const q = (state._contactSearch || '').trim().toLowerCase();
+  let contacts = all.slice().sort((a, b) => (b.starred ? 1 : 0) - (a.starred ? 1 : 0));
+  if (q) contacts = contacts.filter(c => [c.name, c.role, c.met, c.notes, c.phone, c.social, c.category, c.status].some(f => String(f || '').toLowerCase().includes(q)));
+  const openC = c => !['closed', 'dropped'].includes(c.status);
+  const overdue = contacts.filter(c => openC(c) && c.followUpDate && c.followUpDate < today);
+  const dueToday= contacts.filter(c => openC(c) && c.followUpDate && c.followUpDate === today);
+  const upcoming= contacts.filter(c => openC(c) && c.followUpDate && c.followUpDate > today);
+  const cold     = contacts.filter(c => isGoingCold(c, today));
+  const rest     = contacts.filter(c => openC(c) && !c.followUpDate && !isGoingCold(c, today));
+  const closed   = contacts.filter(c => ['closed', 'dropped'].includes(c.status));
 
   const statusColors = { new: 'var(--text-muted)', contacted: 'var(--network-color)', warm: 'var(--warning)', closing: 'var(--accent)', closed: 'var(--success)', dropped: 'var(--danger)' };
   const catColors = { prospect: 'var(--money-color)', client: 'var(--success)', referral: 'var(--gym-color)', friend: 'var(--network-color)', partner: 'var(--accent)' };
 
   function contactCard(c) {
-    const isOverdue = c.followUpDate && c.followUpDate < today && !['closed','dropped'].includes(c.status);
-    const isToday   = c.followUpDate && c.followUpDate === today && !['closed','dropped'].includes(c.status);
+    const open = openC(c);
+    const isOverdue = open && c.followUpDate && c.followUpDate < today;
+    const isToday   = open && c.followUpDate && c.followUpDate === today;
+    const cold = isGoingCold(c, today);
     const followUpBadge = isOverdue
       ? '<span class="fu-badge fu-overdue">Follow-up overdue</span>'
       : isToday
         ? '<span class="fu-badge fu-today">Follow up today</span>'
         : c.followUpDate
-          ? '<span class="fu-badge fu-upcoming">' + fmtDate(c.followUpDate) + '</span>'
-          : '';
-    const statusStyle = 'background:' + (statusColors[c.status] || 'var(--text-muted)') + '22;color:' + (statusColors[c.status] || 'var(--text-muted)') + ';border:1px solid ' + (statusColors[c.status] || 'var(--text-muted)') + '44';
-    const catStyle = 'background:' + (catColors[c.category] || 'var(--text-muted)') + '22;color:' + (catColors[c.category] || 'var(--text-muted)');
-
-    return '<div class="contact-card' + (isOverdue ? ' contact-overdue' : isToday ? ' contact-today' : '') + (c.starred ? ' contact-starred' : '') + '">' +
+          ? '<span class="fu-badge fu-upcoming">Follow up ' + fmtDate(c.followUpDate) + '</span>'
+          : cold ? '<span class="fu-badge fu-cold">❄️ Going cold</span>' : '';
+    const sColor = statusColors[c.status] || 'var(--text-muted)', cColor = catColors[c.category] || 'var(--text-muted)';
+    const statusStyle = 'background:' + sColor + '22;color:' + sColor + ';border:1px solid ' + sColor + '44';
+    const catStyle = 'background:' + cColor + '22;color:' + cColor;
+    const deal = Math.max(0, +c.dealValue || 0);
+    const dealLine = deal ? '<div class="contact-deal">💰 $' + deal.toLocaleString() + (open ? ' <span>· ' + Math.round(stageProbability(c.status) * 100) + '% likely</span>' : '') + '</div>' : '';
+    const last = contactLastTouch(c), d = last ? daysBetween(last, today) : null;
+    const lastLine = (open && d != null) ? '<div class="contact-last' + (cold ? ' is-cold' : '') + '">Last talked ' + (d <= 0 ? 'today' : d === 1 ? 'yesterday' : d + ' days ago') + '</div>' : '';
+    const tel = String(c.phone || '').replace(/[^\d+]/g, '');
+    const phoneLink = c.phone ? '<a href="tel:' + escapeAttr(tel) + '" class="contact-link">📞 ' + escapeHtml(c.phone) + '</a>' : '';
+    const s = String(c.social || '').trim();
+    const socialUrl = s.startsWith('http') ? s : s.startsWith('@') ? ('https://instagram.com/' + s.slice(1)) : '';
+    const socialLink = s ? (socialUrl ? '<a href="' + escapeAttr(socialUrl) + '" target="_blank" rel="noopener" class="contact-link">' + escapeHtml(s) + '</a>' : '<span class="contact-link">' + escapeHtml(s) + '</span>') : '';
+    return '<div class="contact-card' + (isOverdue ? ' contact-overdue' : isToday ? ' contact-today' : cold ? ' contact-cold' : '') + (c.starred ? ' contact-starred' : '') + '">' +
       '<div class="contact-top">' +
       '<div class="contact-name">' +
-      '<button class="star-btn' + (c.starred ? ' starred' : '') + '" onclick="toggleStar(\'' + c.id + '\')" title="' + (c.starred ? 'Unpin contact' : 'Pin contact') + '">' + (c.starred ? '' : '☆') + '</button>' +
-      c.name + '</div>' +
+      '<button class="star-btn' + (c.starred ? ' starred' : '') + '" onclick="toggleStar(\'' + c.id + '\')" title="' + (c.starred ? 'Unpin contact' : 'Pin contact') + '">' + (c.starred ? '★' : '☆') + '</button>' +
+      escapeHtml(c.name) + '</div>' +
       '<div class="contact-badges">' +
-      '<span class="contact-badge" style="' + catStyle + '">' + (c.category || 'contact') + '</span>' +
-      '<span class="contact-badge" style="' + statusStyle + '">' + (c.status || 'new') + '</span>' +
+      '<span class="contact-badge" style="' + catStyle + '">' + escapeHtml(c.category || 'contact') + '</span>' +
+      '<span class="contact-badge" style="' + statusStyle + '">' + escapeHtml(c.status || 'new') + '</span>' +
       '</div>' +
       '</div>' +
-      (c.role ? '<div class="contact-role">' + c.role + '</div>' : '') +
-      (c.met  ? '<div class="contact-met">' + c.met + '</div>' : '') +
-      (c.phone || c.social ? '<div class="contact-info">' + (c.phone ? '' + c.phone + '  ' : '') + (c.social ? '' + c.social : '') + '</div>' : '') +
-      (c.notes ? '<div class="contact-notes">' + c.notes + '</div>' : '') +
+      (c.role ? '<div class="contact-role">' + escapeHtml(c.role) + '</div>' : '') +
+      (c.met  ? '<div class="contact-met">' + escapeHtml(c.met) + '</div>' : '') +
+      ((phoneLink || socialLink) ? '<div class="contact-info">' + phoneLink + (phoneLink && socialLink ? ' · ' : '') + socialLink + '</div>' : '') +
+      dealLine + lastLine +
+      (c.notes ? '<div class="contact-notes">' + escapeHtml(c.notes) + '</div>' : '') +
       followUpBadge +
       '<div class="contact-actions">' +
+      (open ? '<button class="btn-sm btn-touch" onclick="logTouch(\'' + c.id + '\')">✓ Reached out</button>' : '') +
       (c.status !== 'closed' ? '<select class="contact-status-select" onchange="updateContactStatus(\'' + c.id + '\',this.value)">' +
-        ['new','contacted','warm','closing','closed','dropped'].map(s =>
-          '<option value="' + s + '"' + (c.status === s ? ' selected' : '') + '>' + s.charAt(0).toUpperCase() + s.slice(1) + '</option>'
+        ['new','contacted','warm','closing','closed','dropped'].map(st =>
+          '<option value="' + st + '"' + (c.status === st ? ' selected' : '') + '>' + st.charAt(0).toUpperCase() + st.slice(1) + '</option>'
         ).join('') + '</select>' : '') +
       '<button class="btn-sm" onclick="showSetFollowUp(\'' + c.id + '\')">Follow-up</button>' +
       '<button class="btn-sm" onclick="editContact(\'' + c.id + '\')">Edit</button>' +
-      '<button class="btn-sm btn-sm-danger" onclick="deleteContact(\'' + c.id + '\')"></button>' +
+      '<button class="btn-sm btn-sm-danger" onclick="deleteContact(\'' + c.id + '\')">Delete</button>' +
       '</div></div>';
   }
 
@@ -6501,14 +6555,20 @@ function renderContactsPage() {
     '<div class="contacts-section-title' + (cls ? ' ' + cls : '') + '">' + title + ' <span>(' + list.length + ')</span></div>' +
     '<div class="contacts-grid">' + list.map(contactCard).join('') + '</div>';
 
-  // Stats bar
-  const statsBar = contacts.length > 0
+  // Stats bar — now money-aware: open pipeline + expected (stage-weighted) value
+  const pv = pipelineValue(all);
+  const dueCount = all.filter(c => openC(c) && c.followUpDate && c.followUpDate <= today).length;
+  const statsBar = all.length > 0
     ? '<div class="contacts-stats">' +
-      '<div class="cs-item"><span>Total</span><strong>' + contacts.length + '</strong></div>' +
-      '<div class="cs-item"><span>Follow-ups due</span><strong style="color:' + (overdue.length + dueToday.length > 0 ? 'var(--danger)' : 'var(--success)') + '">' + (overdue.length + dueToday.length) + '</strong></div>' +
-      '<div class="cs-item"><span>Warm leads</span><strong>' + contacts.filter(c=>c.status==='warm'||c.status==='closing').length + '</strong></div>' +
-      '<div class="cs-item"><span>Clients</span><strong>' + contacts.filter(c=>c.status==='closed').length + '</strong></div>' +
+      '<div class="cs-item"><span>Contacts</span><strong>' + all.length + '</strong></div>' +
+      '<div class="cs-item"><span>Due now</span><strong style="color:' + (dueCount > 0 ? 'var(--danger)' : 'var(--success)') + '">' + dueCount + '</strong></div>' +
+      '<div class="cs-item" title="Total value of all live deals"><span>Pipeline</span><strong>$' + pv.open.toLocaleString() + '</strong></div>' +
+      '<div class="cs-item" title="Deal values weighted by how likely each stage is to close"><span>Expected</span><strong style="color:var(--accent)">$' + pv.weighted.toLocaleString() + '</strong></div>' +
+      (pv.won ? '<div class="cs-item"><span>Won</span><strong style="color:var(--success)">$' + pv.won.toLocaleString() + '</strong></div>' : '') +
       '</div>'
+    : '';
+  const searchBar = all.length > 0
+    ? '<input type="search" id="contact-search" class="contact-search" placeholder="Search name, role, status…" value="' + escapeAttr(state._contactSearch || '') + '" oninput="onContactSearch(this.value)">'
     : '';
 
   // Add contact form
@@ -6545,15 +6605,18 @@ function renderContactsPage() {
 
   document.getElementById('main').innerHTML =
     '<div class="page-header"><h2 class="page-title">Contacts</h2>' +
-    '<p class="page-sub">Every person you meet is a potential commission. Track them here.</p></div>' +
-    statsBar + addForm +
-    (contacts.length === 0
-      ? '<div class="empty-state small"><p>No contacts yet. Add your first one above — start with someone you met at the gym this week.</p></div>'
-      : section('Overdue Follow-ups', overdue, 'cst-danger') +
-        section('Follow Up Today', dueToday, 'cst-today') +
-        section('Upcoming Follow-ups', upcoming, '') +
-        section('Other Contacts', rest, '') +
-        section('Closed / Dropped', closed, 'cst-muted'));
+    '<p class="page-sub">Your network is your pipeline. Nurture it — never let a warm lead go cold.</p></div>' +
+    statsBar + searchBar + addForm +
+    (all.length === 0
+      ? '<div class="empty-state small"><p>No contacts yet. Add your first one above — start with someone you met this week.</p></div>'
+      : (contacts.length === 0
+          ? '<div class="empty-state small"><p>No contacts match “' + escapeHtml(q) + '”.</p></div>'
+          : section('⏰ Overdue follow-ups', overdue, 'cst-danger') +
+            section('📆 Follow up today', dueToday, 'cst-today') +
+            section('❄️ Going cold — reach out', cold, 'cst-danger') +
+            section('Upcoming follow-ups', upcoming, '') +
+            section('Other contacts', rest, '') +
+            section('Closed / dropped', closed, 'cst-muted')));
 }
 
 function toggleAddContact() {
@@ -6588,10 +6651,12 @@ async function updateContactStatus(id, status) {
   const c = state.data.contacts.find(x => x.id === id);
   if (!c) return;
   c.status = status;
+  if (['contacted', 'warm', 'closing', 'closed'].includes(status)) c.lastContact = todayStr();   // moving a deal forward is a touch
   await saveData();
   updateNavBadges();
   if (status === 'closed') showToast('Marked as client! Great work!', 'success');
   else showToast('Status updated.', 'success');
+  renderContactsPage();
 }
 
 function showSetFollowUp(id) {
