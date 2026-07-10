@@ -719,13 +719,21 @@ function renderAuthScreen(mode) {
   const screen = document.createElement('div');
   screen.id = 'auth-screen';
   screen.innerHTML =
-    '<div class="auth-card">' +
-    '<div class="auth-brand"><span class="brand-icon"></span><div>' +
-    '<div class="auth-title">Onward</div><div class="auth-sub">Life Progress</div></div></div>' +
-    '<div class="auth-hook">' +
-    '<div class="auth-hook-title">Build habits. Track your life. Get better.</div>' +
-    '<div class="auth-hook-sub">One simple place for your fitness, money, reading and habits — 30 seconds a day, with an AI coach that keeps you accountable and shows how it all connects.</div>' +
-    '</div>' +
+    '<div class="auth-card auth-card--hero">' +
+    '<div class="auth-hero">' +
+    '<div class="auth-hero-sun"></div>' +
+    '<svg class="auth-hero-mtn" viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden="true">' +
+    '<polygon points="0,120 70,58 130,96 200,40 270,92 340,54 400,88 400,120" fill="#34C48E" opacity="0.5"></polygon>' +
+    '<polygon points="0,120 60,84 140,107 220,72 300,105 370,82 400,99 400,120" fill="#0F8A63"></polygon>' +
+    '<line x1="200" y1="42" x2="200" y2="23" stroke="#0B3D2E" stroke-width="3"></line>' +
+    '<polygon points="200,23 227,30 200,37" fill="#F97316"></polygon>' +
+    '</svg>' +
+    '<div class="auth-hero-top"><span class="auth-logo-mark">▲</span><span class="auth-logo-word">Onward</span></div>' +
+    '<div class="auth-hero-copy">' +
+    '<h1 class="auth-headline">Build the life<br>you want.</h1>' +
+    '<p class="auth-tagline">Fitness, money, reading &amp; habits — tracked in 30 seconds a day, with an AI coach.</p>' +
+    '</div></div>' +
+    '<div class="auth-body">' +
     '<div class="auth-tabs">' +
     '<button class="auth-tab' + (!isSignup ? ' active' : '') + '" onclick="renderAuthScreen(\'login\')">Log In</button>' +
     '<button class="auth-tab' + (isSignup ? ' active' : '') + '" onclick="renderAuthScreen(\'signup\')">Sign Up</button>' +
@@ -763,7 +771,7 @@ function renderAuthScreen(mode) {
     '<button type="button" class="btn-link" onclick="startDemo()">See a live demo</button>' +
     '<a class="btn-link" href="about.html">What is Onward? →</a></div>' +
     '</div>' +
-    '</div>';
+    '</div></div>';
   document.body.appendChild(screen);
   setTimeout(() => document.getElementById('auth-username')?.focus(), 50);
 }
