@@ -7795,7 +7795,7 @@ function readingBody() {
       '</div></div>'
     : '';
 
-  return statsBar + bookCard + historyCard + finishedCard;
+  return statsBar + bookCard + renderTakeawaysCard() + historyCard + finishedCard;
 }
 
 // ---- Knowledge hub (Reading + Vocabulary) ----------------------------------
@@ -7844,6 +7844,7 @@ function renderKnowledgeOverview() {
   const shortTitle = bookTitle.length > 26 ? escapeHtml(bookTitle.slice(0, 25)) + '…' : escapeHtml(bookTitle);
 
   return '<div class="biz-insight">' + insight + '</div>' +
+    renderReviewCard() +
     '<div class="biz-grid">' +
     card('<div class="biz-k">Pages this week</div><div class="biz-big">' + readPages.toLocaleString() +
       '</div><div class="biz-sub">' + (streak > 1 ? streak + '-day streak 🔥' : 'read a little daily') + '</div>',
@@ -7876,6 +7877,98 @@ function renderKnowledgePage() {
   if (tab === 'reading') ensureBookCovers(); // resolve any missing covers, then re-render
 }
 function renderReadingPage() { state._knowledgeTab = 'reading'; renderKnowledgePage(); }
+
+// ---- Key takeaways: capture a lesson, then resurface it later --------------
+// Priority for resurfacing: never-revisited first, then least-recently revisited.
+function sortTakeawaysByPriority(list) {
+  const arr = Array.isArray(list) ? list.slice() : [];
+  return arr.sort((a, b) => {
+    const sa = a.seenAt || '', sb = b.seenAt || '';
+    if (sa === sb) return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1;
+    if (!sa) return -1;   // a never revisited → surfaces first
+    if (!sb) return 1;
+    return sa < sb ? -1 : 1;
+  });
+}
+function renderReviewCard() {
+  const list = sortTakeawaysByPriority(state.data.takeaways || []);
+  if (!list.length) return '';
+  const idx = (((state._reviewIdx || 0) % list.length) + list.length) % list.length;
+  const t = list[idx];
+  return '<div class="km-review">' +
+    '<div class="km-review-label">💡 A lesson worth revisiting</div>' +
+    '<div class="km-quote">“' + escapeHtml(t.text) + '”</div>' +
+    (t.book ? '<div class="km-book">— ' + escapeHtml(t.book) + '</div>' : '') +
+    '<div class="km-actions">' +
+    '<button type="button" class="btn-sm" onclick="markTakeawayReviewed(\'' + t.id + '\')">Still using this ✓</button>' +
+    (list.length > 1 ? '<button type="button" class="km-another" onclick="reviewNextTakeaway()">Show another</button>' : '') +
+    '</div></div>';
+}
+function reviewNextTakeaway() {
+  const n = (state.data.takeaways || []).length;
+  if (!n) return;
+  state._reviewIdx = ((state._reviewIdx || 0) + 1) % n;
+  renderKnowledgePage();
+}
+async function markTakeawayReviewed(id) {
+  const t = (state.data.takeaways || []).find(x => x.id === id);
+  if (!t) return;
+  t.seenAt = todayStr();
+  await saveData();
+  showToast('Love it — keep living it. 💪', 'success');
+  const n = (state.data.takeaways || []).length;
+  state._reviewIdx = ((state._reviewIdx || 0) + 1) % Math.max(1, n); // move on to another
+  renderKnowledgePage();
+}
+function renderTakeawaysCard() {
+  const list   = state.data.takeaways || [];
+  const active = (state.data.books || []).find(b => b.status === 'reading');
+  const form =
+    '<div class="tk-form">' +
+    '<input type="text" id="tk-input" class="vocab-input" placeholder="A lesson worth remembering…" maxlength="240" autocomplete="off" onkeydown="if(event.key===\'Enter\'){addTakeaway()}">' +
+    '<button class="btn btn-primary" onclick="addTakeaway()">Save</button>' +
+    '</div>' +
+    (active ? '<div class="tk-attach">Saving to <b>' + escapeHtml(active.title) + '</b></div>' : '');
+  const items = list.length
+    ? '<div class="tk-list">' + [...list].reverse().map(t =>
+        '<div class="tk-item">' +
+        '<div class="tk-text">“' + escapeHtml(t.text) + '”</div>' +
+        '<div class="tk-meta">' +
+        (t.book
+          ? '<span class="tk-book">' + escapeHtml(t.book) + '</span>'
+          : '<span class="tk-book tk-book-none">General</span>') +
+        (t.seenAt ? '<span class="tk-seen">revisited ' + fmtDate(t.seenAt) + '</span>' : '') +
+        '<button class="tk-x" title="Remove" onclick="deleteTakeaway(\'' + t.id + '\')">✕</button>' +
+        '</div></div>').join('') + '</div>'
+    : '<div class="my-meals-empty">No lessons saved yet — capture one idea worth keeping from your book.</div>';
+  return '<div class="card tk-card">' +
+    '<h3 class="card-title">Key takeaways</h3>' +
+    '<p class="card-sub">Distill the ideas worth remembering. We\'ll bring one back to you now and then so it actually sticks.' +
+    (list.length ? ' · <b>' + list.length + '</b> saved' : '') + '</p>' +
+    form + items +
+    '</div>';
+}
+async function addTakeaway() {
+  const el = document.getElementById('tk-input');
+  const text = ((el && el.value) || '').trim();
+  if (!text) { showToast('Write the lesson first.', 'error'); return; }
+  const active = (state.data.books || []).find(b => b.status === 'reading');
+  if (!state.data.takeaways) state.data.takeaways = [];
+  state.data.takeaways.push({
+    id: uid(), text,
+    book: (active && active.title) || '', bookId: (active && active.id) || '',
+    createdAt: todayStr(), seenAt: ''
+  });
+  await saveData();
+  showToast('Saved — we\'ll resurface it later.', 'success');
+  renderKnowledgePage();
+}
+async function deleteTakeaway(id) {
+  if (!confirm('Remove this lesson?')) return;
+  state.data.takeaways = (state.data.takeaways || []).filter(x => x.id !== id);
+  await saveData();
+  renderKnowledgePage();
+}
 
 // Curated list of popular growth/business/self-development books with page counts,
 // so people pick instead of typing title + author + pages. Custom entries still work.

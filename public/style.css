@@ -929,6 +929,28 @@ body {
 .hl-w-label { flex: 1; font-size: 14px; font-weight: 700; color: var(--text); }
 .hl-w-meta { font-size: 12px; color: var(--text-muted); flex: none; }
 
+/* Knowledge hub — key takeaways + the resurfacing "review" card */
+.km-review { background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.30); border-left: 4px solid var(--accent); border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; }
+.km-review-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--accent); margin-bottom: 6px; }
+.km-quote { font-size: 16px; font-weight: 600; color: var(--text); line-height: 1.5; }
+.km-book { font-size: 13px; color: var(--text-muted); margin-top: 5px; font-style: italic; }
+.km-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.km-another { border: none; background: transparent; color: var(--text-muted); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; padding: 6px 4px; }
+.km-another:hover { color: var(--text); }
+.tk-card .card-sub { margin-bottom: 12px; }
+.tk-form { display: flex; gap: 8px; margin-bottom: 8px; }
+.tk-form .vocab-input { flex: 1; }
+.tk-attach { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+.tk-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.tk-item { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.tk-text { font-size: 14px; color: var(--text); line-height: 1.45; }
+.tk-meta { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
+.tk-book { font-size: 11px; font-weight: 700; color: var(--read-color); background: rgba(6,182,212,.10); border-radius: 999px; padding: 2px 9px; }
+.tk-book-none { color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); }
+.tk-seen { font-size: 11px; color: var(--text-muted); }
+.tk-x { margin-left: auto; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 13px; padding: 2px 4px; }
+.tk-x:hover { color: #EF4444; }
+
 /* ─── Floating Action Button ──────────────────── */
 .fab-btn {
   position: fixed; bottom: 28px; right: 28px;

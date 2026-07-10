@@ -62,7 +62,7 @@ function loadApp(fieldValues) {
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
-    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel });';
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -217,6 +217,24 @@ ok('yearRange needs a few weeks (null on tiny history)', A.yearRange(_yd.slice(0
 const _vs = A.vocabStats([{ word: 'a', sentence: 'I used a.' }, { word: 'b', sentence: '' }, { word: 'c' }]);
 ok('vocabStats counts total + practiced + needSentence', _vs.total === 3 && _vs.practiced === 1 && _vs.needSentence === 2);
 ok('vocabStats handles empty/null safely', A.vocabStats(null).total === 0 && A.vocabStats([]).practiced === 0);
+// Key takeaways — resurfacing order: never-revisited first, then least-recently revisited
+eq('sortTakeawaysByPriority: never-seen surfaces before revisited',
+  A.sortTakeawaysByPriority([
+    { id: 'x', createdAt: '2026-01-01', seenAt: '2026-07-01' },
+    { id: 'y', createdAt: '2026-02-01', seenAt: '' }
+  ]).map(t => t.id), ['y', 'x']);
+eq('sortTakeawaysByPriority: among revisited, oldest seenAt first',
+  A.sortTakeawaysByPriority([
+    { id: 'a', createdAt: '2026-01-01', seenAt: '2026-07-05' },
+    { id: 'b', createdAt: '2026-01-02', seenAt: '2026-06-01' }
+  ]).map(t => t.id), ['b', 'a']);
+eq('sortTakeawaysByPriority: two never-seen keep created order (oldest first)',
+  A.sortTakeawaysByPriority([
+    { id: 'new', createdAt: '2026-03-01', seenAt: '' },
+    { id: 'old', createdAt: '2026-01-01', seenAt: '' }
+  ]).map(t => t.id), ['old', 'new']);
+ok('sortTakeawaysByPriority handles empty/null safely',
+  A.sortTakeawaysByPriority(null).length === 0 && A.sortTakeawaysByPriority([]).length === 0);
 // weeklyGoalsReached — dashboard's "% of goals reached" hero number
 ok('weeklyGoalsReached averages active goals', A.weeklyGoalsReached({ gymDays: 4, readPages: 100 }, { gymDaysPerWeek: 4, weeklyReadGoal: 200 }, 0, { gym: true, reading: true }) === 75);
 ok('weeklyGoalsReached caps each goal at 100', A.weeklyGoalsReached({ gymDays: 10 }, { gymDaysPerWeek: 5 }, 0, { gym: true }) === 100);
