@@ -2130,11 +2130,12 @@ body.wo-fullscreen .bottom-nav { display: none !important; }   /* workout is an 
 .lw-dot.lw-neg { background: #ef4444; }
 
 /* Living mountain sky — animated dashboard hero */
-.mtn-hero { position: relative; height: 138px; border-radius: var(--radius); overflow: hidden; margin-bottom: 18px; box-shadow: var(--shadow); }
+.mtn-hero { position: relative; height: 152px; border-radius: var(--radius); overflow: hidden; margin-bottom: 18px; box-shadow: var(--shadow-md); }
 .mtn-hero-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.mtn-hero-text { position: absolute; left: 18px; bottom: 14px; z-index: 2; }
-.mtn-greet { font-size: 21px; font-weight: 800; color: #fff; text-shadow: 0 1px 5px rgba(15,23,42,0.4); line-height: 1.2; }
-.mtn-sub { font-size: 13px; color: rgba(255,255,255,0.95); text-shadow: 0 1px 4px rgba(15,23,42,0.4); margin-top: 3px; }
+.mtn-hero::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(to top, rgba(8,20,42,0.55), transparent 48%); }
+.mtn-hero-text { position: absolute; left: 20px; right: 20px; bottom: 16px; z-index: 2; }
+.mtn-greet { font-size: 24px; font-weight: 800; color: #fff; text-shadow: 0 1px 8px rgba(8,20,42,0.5); line-height: 1.15; letter-spacing: -0.3px; }
+.mtn-sub { font-size: 13.5px; color: rgba(255,255,255,0.96); text-shadow: 0 1px 6px rgba(8,20,42,0.5); margin-top: 4px; }
 .mtn-stars circle { animation: mtn-twinkle 3s ease-in-out infinite; }
 @keyframes mtn-twinkle { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
 .mtn-celestial { animation: mtn-glow 4.5s ease-in-out infinite; }
