@@ -246,7 +246,7 @@ body {
 }
 @media (prefers-reduced-motion: reduce) { .main::before, #auth-screen::before { animation: none !important; } }
 .page-header { margin-bottom: 28px; }
-.page-title  { font-size: 26px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
+.page-title  { font-size: 30px; font-weight: 800; color: var(--text); letter-spacing: -0.03em; line-height: 1.15; }
 .page-sub    { color: var(--text-muted); margin-top: 4px; font-size: 14px; }
 
 /* ─── Cards ───────────────────────────────────── */
@@ -970,7 +970,7 @@ body {
 .biz-insight { background: var(--tint-1); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 16px; line-height: 1.5; }
 .biz-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 14px; }
 .biz-card { text-align: left; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; cursor: pointer; box-shadow: var(--shadow); transition: border-color .15s, transform .15s; font-family: inherit; }
-.biz-card:hover { border-color: var(--border-bright); transform: translateY(-1px); }
+.biz-card:hover { border-color: var(--border-bright); transform: translateY(-2px); box-shadow: var(--shadow-md); }
 .biz-card.biz-alert { border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.04); }
 .biz-k { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); }
 .biz-big { font-size: 26px; font-weight: 800; color: var(--text); letter-spacing: -.5px; margin: 3px 0 2px; }
@@ -1536,7 +1536,7 @@ body {
   /* Top scrolling nav + footer are replaced by the bottom tab bar on phones */
   .sidebar-nav, .sidebar-footer { display: none; }
   .main { margin-left: 0; padding: 18px 14px 96px; max-width: 100%; min-width: 0; overflow-x: hidden; }
-  .page-title { font-size: 22px; }
+  .page-title { font-size: 25px; }
   /* Anything that could be wider than the phone scrolls inside its own card */
   .card { max-width: 100%; }
   /* Reading stat cards: 4-across is too tight on a phone, so values like "22 pages"
