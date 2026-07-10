@@ -630,6 +630,7 @@ function showSummitCelebration() {
 // Entry point — gate the app behind a login session
 async function init() {
   applyTheme();      // resolve Auto/Light/Dark and wire the OS-change listener
+  paintNavIcons();   // fill the sidebar's line icons
   buildScene3d();   // animated 3D backdrop, behind every screen
   state.token = localStorage.getItem('be_token');
   let session = { authed: false };
@@ -1003,6 +1004,32 @@ function applyNavVisibility() {
 // ─────────────────────────────────────────────────────────────
 // NAVIGATION
 // ─────────────────────────────────────────────────────────────
+// Cohesive line-icon set for the sidebar + mobile "More" sheet (stroke = currentColor,
+// so they inherit the theme and the active-item colour automatically).
+const NAV_ICONS = {
+  dashboard: '<path d="M3 11l9-8 9 8"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/>',
+  stats:     '<path d="M3 20h18"/><path d="M6 20v-6"/><path d="M12 20V6"/><path d="M18 20v-9"/>',
+  log:       '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 9v6M9 12h6"/>',
+  checklist: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l2.6 2.6L16 9"/>',
+  health:    '<path d="M20.8 8.6a5 5 0 0 0-8.8-2.6A5 5 0 0 0 3.2 8.6C3.2 14 12 20 12 20s8.8-6 8.8-11.4z"/>',
+  business:  '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/>',
+  knowledge: '<path d="M12 6.4C10.5 5.4 8 5 4 5v13c4 0 6.5.4 8 1.6"/><path d="M12 6.4C13.5 5.4 16 5 20 5v13c-4 0-6.5.4-8 1.6z"/>',
+  community: '<circle cx="9" cy="8" r="3.2"/><path d="M3.6 20a5.6 5.6 0 0 1 10.8 0"/><path d="M16.5 5.3a3.2 3.2 0 0 1 0 6"/><path d="M18.6 20a5.6 5.6 0 0 0-2.4-4.4"/>',
+  coach:     '<path d="M21 11.5a8.5 8.5 0 0 1-12.2 7.6L3 21l1.9-5.8A8.5 8.5 0 1 1 21 11.5z"/>',
+  history:   '<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>',
+  settings:  '<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.5M12 19v2.5M4.4 7l2.1 1.2M17.5 15.8l2.1 1.2M4.4 17l2.1-1.2M17.5 8.2l2.1-1.2"/>'
+};
+function navIconSVG(page) {
+  const p = NAV_ICONS[page];
+  return p ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>' : '';
+}
+function paintNavIcons() {
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(a => {
+    const ic = a.querySelector('.nav-icon');
+    if (ic && !ic.firstChild) ic.innerHTML = navIconSVG(a.dataset.page);
+  });
+}
+
 function navigate(page) {
   state.page = page;
   if (page !== 'workout') document.body.classList.remove('wo-fullscreen');   // restore the bottom nav when leaving the workout
@@ -1054,7 +1081,7 @@ function openMoreSheet() {
     '<div class="more-sheet-grip"></div>' +
     '<div class="more-sheet-title">Go to</div>' +
     '<div class="more-grid">' +
-    items.map(i => '<button type="button" class="more-item' + (i.page === state.page ? ' active' : '') + '" data-page="' + i.page + '">' + escapeHtml(i.label) + '</button>').join('') +
+    items.map(i => '<button type="button" class="more-item' + (i.page === state.page ? ' active' : '') + '" data-page="' + i.page + '"><span class="more-ico">' + navIconSVG(i.page) + '</span>' + escapeHtml(i.label) + '</button>').join('') +
     '</div>' +
     (state.user ? '<button type="button" class="more-logout" onclick="logout()">Log out</button>' : '') +
     '</div>';

@@ -152,6 +152,9 @@ body {
 .brand-sub { font-size: 10px; color: var(--text-muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 1.5px; }
 
 .sidebar-nav { flex: 1; padding: 16px 12px; display: flex; flex-direction: column; gap: 3px; }
+/* Line icons (currentColor → theme + active state aware) */
+.nav-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 20px; }
+.nav-icon svg { width: 18px; height: 18px; display: block; }
 .nav-item {
   display: flex;
   align-items: center;
@@ -1610,7 +1613,9 @@ body.wo-fullscreen .bottom-nav { display: none !important; }   /* workout is an 
 .more-sheet-grip { width: 40px; height: 4px; border-radius: 2px; background: var(--border-bright); margin: 4px auto 12px; }
 .more-sheet-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted); margin-bottom: 10px; }
 .more-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.more-item { padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
+.more-item { display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
+.more-ico { display: inline-flex; flex: none; }
+.more-ico svg { width: 18px; height: 18px; display: block; }
 .more-item.active { border-color: var(--primary); color: var(--primary); background: rgba(59,130,246,0.08); }
 .more-logout { width: 100%; margin-top: 12px; padding: 13px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: none; color: var(--danger); font-size: 14px; font-weight: 700; cursor: pointer; }
 
