@@ -629,6 +629,7 @@ function showSummitCelebration() {
 // ─────────────────────────────────────────────────────────────
 // Entry point — gate the app behind a login session
 async function init() {
+  applyTheme();      // resolve Auto/Light/Dark and wire the OS-change listener
   buildScene3d();   // animated 3D backdrop, behind every screen
   state.token = localStorage.getItem('be_token');
   let session = { authed: false };
@@ -9433,7 +9434,14 @@ function renderChecklistPage() {
 // Appearance — toggle the animated 3D parallax background (per device)
 function renderAppearanceCard() {
   const on = bg3dEnabled();
+  const pref = themePref();
+  const seg = (v, label) => '<button type="button" class="theme-seg-btn' + (pref === v ? ' on' : '') + '" onclick="setTheme(\'' + v + '\')">' + label + '</button>';
   return '<div class="card">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px">' +
+    '<h3 class="card-title" style="margin-bottom:0">Theme</h3>' +
+    '<div class="theme-seg">' + seg('system', 'Auto') + seg('light', 'Light') + seg('dark', 'Dark') + '</div></div>' +
+    '<p class="card-sub" style="margin-bottom:0">Auto follows your phone’s light/dark setting. Choose Light or Dark to lock it. Set per device.</p>' +
+    '<div style="height:1px;background:var(--border);margin:16px 0"></div>' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
     '<h3 class="card-title" style="margin-bottom:0">3D background</h3>' +
     '<label class="pc-toggle"><input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="setBg3d(this.checked)"><span class="pc-slider"></span></label></div>' +
@@ -9758,6 +9766,34 @@ function scene3dParallax(scene) {
 function setBg3d(on) {
   try { localStorage.setItem('be_bg3d', on ? 'on' : 'off'); } catch {}
   if (on) buildScene3d(); else document.getElementById('scene3d')?.remove();
+}
+
+// ── Theme (Auto / Light / Dark) — per device, resolved to a data-theme on <html> ──
+function themePref() { try { return localStorage.getItem('onward_theme') || 'system'; } catch { return 'system'; } }
+function effectiveTheme(pref) {
+  pref = pref || themePref();
+  if (pref === 'system') return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  return pref;
+}
+function applyTheme() {
+  const root = document.documentElement;
+  if (!root || !root.setAttribute) return;
+  const eff = effectiveTheme();
+  root.setAttribute('data-theme', eff);
+  const m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute('content', eff === 'dark' ? '#0B1120' : '#F4F6FB');
+  // Follow the OS when on Auto — wire the listener once
+  if (!window.__themeWired && window.matchMedia) {
+    window.__themeWired = true;
+    try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (themePref() === 'system') applyTheme(); }); } catch {}
+  }
+}
+function setTheme(pref) {
+  try { localStorage.setItem('onward_theme', pref); } catch {}
+  applyTheme();
+  if (bg3dEnabled() && typeof buildScene3d === 'function') { document.getElementById('scene3d')?.remove(); buildScene3d(); } // recolour the 3D scene
+  if (state && state.page === 'settings') renderSettingsPage();
+  showToast('Theme set to ' + (pref === 'system' ? 'Auto' : pref[0].toUpperCase() + pref.slice(1)), 'success');
 }
 
 init();

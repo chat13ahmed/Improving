@@ -2,6 +2,8 @@
 
 /* Never let the page pan sideways on a phone — content stays within the screen */
 html, body { overflow-x: hidden; max-width: 100%; }
+/* Themed base behind everything (the 3D scene / transparent surfaces sit on top) */
+html { background: var(--bg); }
 
 :root {
   /* ── Core Light Theme ── */
@@ -65,6 +67,10 @@ html, body { overflow-x: hidden; max-width: 100%; }
   --water-border:  rgba(56,189,248,0.35);
   --water-glow:    rgba(56,189,248,0.18);
 
+  /* Frosted app chrome (header / tab bar) — flips in dark mode */
+  --chrome-bg:     rgba(255,255,255,0.80);
+  --chrome-border: rgba(228,233,240,0.9);
+
   --shadow:    0 1px 3px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.04);
   --shadow-lg: 0 12px 40px rgba(2,6,23,0.14);
   --radius:    14px;
@@ -72,6 +78,43 @@ html, body { overflow-x: hidden; max-width: 100%; }
   --sidebar-width: 240px;
   --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
+
+/* ─── Dark theme ───────────────────────────────────
+   JS resolves the effective theme (Auto → the OS setting) and sets
+   data-theme="dark|light" on <html>, so only this one block is needed. */
+:root[data-theme="dark"] {
+  --bg:            #0B1120;
+  --bg-2:          #131B2E;
+  --sidebar-bg:    #0F1728;
+  --card:          #161F33;
+  --card-2:        #1E293B;
+  --text:          #E6EDF7;
+  --text-muted:    #93A2BC;
+  --border:        #26324A;
+  --border-bright: #3A4966;
+  --surface:       #1B2438;
+  --field-bg:      #131B2E;
+  --overlay:       rgba(2,6,23,0.66);
+  --tint-1:        rgba(255,255,255,0.03);
+  --tint-2:        rgba(255,255,255,0.05);
+  --tint-3:        rgba(255,255,255,0.07);
+  --tint-4:        rgba(255,255,255,0.10);
+  --chrome-bg:     rgba(15,23,42,0.72);
+  --chrome-border: rgba(255,255,255,0.08);
+  --shadow:        0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-lg:     0 16px 44px rgba(0,0,0,0.62);
+  --accent-light:  rgba(245,158,11,0.12);
+}
+/* A few spots reference light-only literals — brighten them for dark */
+:root[data-theme="dark"] .nav-item.active { color: #A9C4FF; background: rgba(59,130,246,0.18); }
+:root[data-theme="dark"] .btn-primary { box-shadow: 0 0 22px rgba(59,130,246,0.45); }
+:root[data-theme="dark"] .loading-screen p { color: var(--text-muted); }
+
+/* Theme picker (Settings › Appearance) */
+.theme-seg { display: inline-flex; gap: 3px; background: var(--surface); border-radius: 10px; padding: 3px; }
+.theme-seg-btn { border: none; background: transparent; color: var(--text-muted); font-family: inherit; font-weight: 700; font-size: 12px; padding: 6px 13px; border-radius: 7px; cursor: pointer; transition: all .15s; }
+.theme-seg-btn.on { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+.theme-seg-btn:active { transform: scale(0.95); }
 
 body {
   font-family: var(--font);
@@ -1612,17 +1655,17 @@ body.wo-fullscreen .bottom-nav { display: none !important; }   /* workout is an 
      container while the real scroll is on <html>, which breaks position:sticky.) */
   .sidebar {
     position: fixed; top: 0; left: 0; right: 0; height: 54px; z-index: 150;
-    background: rgba(255,255,255,0.80);
+    background: var(--chrome-bg);
     -webkit-backdrop-filter: saturate(180%) blur(16px);
     backdrop-filter: saturate(180%) blur(16px);
-    border-bottom: 1px solid rgba(228,233,240,0.9);
+    border-bottom: 1px solid var(--chrome-border);
   }
   .sidebar-brand { height: 54px; padding: 0 16px; border-bottom: none; background: none; }
   .main { padding-top: 66px; }   /* clear the fixed 54px header */
 
   /* Matching frosted bottom tab bar */
   .bottom-nav {
-    background: rgba(255,255,255,0.82);
+    background: var(--chrome-bg);
     -webkit-backdrop-filter: saturate(180%) blur(18px);
     backdrop-filter: saturate(180%) blur(18px);
   }
@@ -2563,6 +2606,11 @@ body { background: transparent; }
   transform: translate3d(calc(var(--mx) * 14px), calc(var(--my) *  9px - var(--sc) * 16px), 0); }
 .s3-near { height: 34vh; fill: #84ccaf; opacity: .74;
   transform: translate3d(calc(var(--mx) * 22px), calc(var(--my) * 13px - var(--sc) * 26px), 0); }
+/* Night palette for the backdrop so it reads as dusk mountains, not a bright day scene */
+:root[data-theme="dark"] .s3-sky { background: radial-gradient(130% 90% at 50% -5%, #17273f 0%, #0f1a2e 45%, var(--bg) 100%); }
+:root[data-theme="dark"] .s3-far  { fill: #1b3150; opacity: .5; }
+:root[data-theme="dark"] .s3-mid  { fill: #1a3a48; opacity: .55; }
+:root[data-theme="dark"] .s3-near { fill: #1d4a44; opacity: .62; }
 .s3-particles {
   position: absolute; inset: 0; will-change: transform;
   transform: translate3d(calc(var(--mx) * 18px), calc(var(--my) * 13px), 0);

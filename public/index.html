@@ -6,6 +6,7 @@
   <title>Onward — Build habits. Track your life. Get better.</title>
   <meta name="description" content="Onward is one simple app to build habits and track your whole life — fitness, money, reading, nutrition — in 30 seconds a day, with an AI coach that keeps you accountable and shows how it all connects.">
   <meta name="theme-color" content="#F4F6FB">
+  <script>/* Apply saved theme before first paint to avoid a flash */(function(){try{var p=localStorage.getItem('onward_theme')||'system';var eff=p==='system'?((window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light'):p;document.documentElement.setAttribute('data-theme',eff);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',eff==='dark'?'#0B1120':'#F4F6FB');}catch(e){}})();</script>
   <meta property="og:title" content="Onward — Build habits. Track your life. Get better.">
   <meta property="og:description" content="Track your fitness, money, reading and habits in one place, with an AI coach. 30 seconds a day.">
   <meta property="og:type" content="website">
@@ -21,7 +22,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon.svg?v=2">
   <link rel="icon" href="icon.svg?v=2" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=124">
+  <link rel="stylesheet" href="style.css?v=126">
   <script src="vendor/chart.umd.min.js"></script>
   <script src="vendor/marked.min.js"></script>
 </head>
@@ -106,7 +107,7 @@
     </button>
   </nav>
 
-  <script src="app.js?v=156"></script>
+  <script src="app.js?v=157"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
