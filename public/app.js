@@ -998,6 +998,8 @@ function renderUserChip() {
 function applyNavVisibility() {
   const knowledgeNav = document.querySelector('.nav-item[data-page="knowledge"]');
   if (knowledgeNav) knowledgeNav.style.display = isPillarOn('reading') ? '' : 'none';
+  const adminNav = document.querySelector('.nav-item[data-page="admin"]');   // owner-only console
+  if (adminNav) adminNav.style.display = state.isOwner ? '' : 'none';
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1016,7 +1018,8 @@ const NAV_ICONS = {
   community: '<circle cx="9" cy="8" r="3.2"/><path d="M3.6 20a5.6 5.6 0 0 1 10.8 0"/><path d="M16.5 5.3a3.2 3.2 0 0 1 0 6"/><path d="M18.6 20a5.6 5.6 0 0 0-2.4-4.4"/>',
   coach:     '<path d="M21 11.5a8.5 8.5 0 0 1-12.2 7.6L3 21l1.9-5.8A8.5 8.5 0 1 1 21 11.5z"/>',
   history:   '<circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/>',
-  settings:  '<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.5M12 19v2.5M4.4 7l2.1 1.2M17.5 15.8l2.1 1.2M4.4 17l2.1-1.2M17.5 8.2l2.1-1.2"/>'
+  settings:  '<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.5M12 19v2.5M4.4 7l2.1 1.2M17.5 15.8l2.1 1.2M4.4 17l2.1-1.2M17.5 8.2l2.1-1.2"/>',
+  admin:     '<path d="M12 3l7 3v5c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4.5"/>'
 };
 function navIconSVG(page) {
   const p = NAV_ICONS[page];
@@ -1030,6 +1033,7 @@ function paintNavIcons() {
 }
 
 function navigate(page) {
+  if (page === 'admin' && !state.isOwner) page = 'dashboard';   // owner-only console (the server also enforces this)
   state.page = page;
   if (page !== 'workout') document.body.classList.remove('wo-fullscreen');   // restore the bottom nav when leaving the workout
   state._openIdea = null;   // leaving to any page closes an open idea workspace
@@ -1046,7 +1050,7 @@ function navigate(page) {
   if (['business', 'ideas', 'contacts'].includes(page)) document.querySelector('.nav-item[data-page="business"]')?.classList.add('active');
   // Reading lives under the Knowledge hub, so keep that nav item lit on its tab
   if (['knowledge', 'reading'].includes(page)) document.querySelector('.nav-item[data-page="knowledge"]')?.classList.add('active');
-  const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, workout: renderWorkout, business: renderBusinessPage, health: renderHealthPage, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, knowledge: renderKnowledgePage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage };
+  const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, workout: renderWorkout, business: renderBusinessPage, health: renderHealthPage, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, knowledge: renderKnowledgePage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage, admin: renderAdminPage };
   injectFAB();
   (pages[page] || renderDashboard)();
   // Subtle fade-up so section changes feel like a native screen transition
@@ -9488,10 +9492,6 @@ function renderSettingsPage() {
     '<div class="page-header"><h2 class="page-title">Settings</h2>' +
     '<p class="page-sub">Customize your pillars, goals, profile, and app preferences</p></div>' +
 
-    // Owner-only tools (invisible to everyone else)
-    renderAdminStatsCard() +
-    renderOwnerCard() +
-
     // Customize pillars (first — it's the headline feature)
     pillarCustomizerCard() +
 
@@ -9582,8 +9582,6 @@ function renderSettingsPage() {
     '</div>' +
     '<button class="btn btn-outline" onclick="navigate(\'checklist\')">Open Checklist & Reminders →</button>' +
     '</div>';
-
-  if (state.isOwner) { loadBroadcastReach(); loadAdminStats(); }
 }
 
 // Owner-only card: type a message → push it to everyone's phone. Returns '' for normal users.
@@ -9616,41 +9614,99 @@ async function grantPro() {
 }
 
 // Owner-only live analytics — so you can SEE if people actually use it
-function renderAdminStatsCard() {
-  if (!state.isOwner) return '';
-  return '<div class="card" style="border:1px solid rgba(45,212,191,0.3)">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
-    '<h3 class="card-title" style="margin-bottom:0">Your app — live numbers</h3>' +
-    '<button class="btn btn-outline btn-sm" onclick="loadAdminStats()">↻ Refresh</button></div>' +
-    '<p class="card-sub">Owner only — how many people use Onward, how often, and what it earns.</p>' +
-    '<div id="admin-stats" class="admin-grid"><div class="di-loading"><div class="spinner"></div><span>Loading…</span></div></div>' +
-    '<div id="admin-recent"></div>' +
-    '<p class="card-sub" style="margin-top:12px;font-size:12px">Revenue is estimated from Pro members × your price — your exact figure lives in your Stripe dashboard.</p></div>';
+// ── Owner-only Admin console: a professional dashboard of the whole app ──
+function renderAdminPage() {
+  if (!state.isOwner) { navigate('dashboard'); return; }   // defence in depth (server also 403s)
+  document.getElementById('main').innerHTML =
+    '<div class="page-header"><h2 class="page-title">Admin</h2>' +
+    '<p class="page-sub">Your command center — everything happening across Onward, in one place.</p></div>' +
+    '<div class="adm-toolbar"><span class="adm-owner-badge">🔒 Owner only</span>' +
+    '<button class="btn btn-outline btn-sm" onclick="loadAdminConsole()">↻ Refresh</button></div>' +
+    '<div id="adm-body"><div class="di-loading"><div class="spinner"></div><span>Loading your numbers…</span></div></div>';
+  loadAdminConsole();
 }
-async function loadAdminStats() {
-  const grid = document.getElementById('admin-stats');
-  const recent = document.getElementById('admin-recent');
-  if (grid) grid.innerHTML = '<div class="di-loading"><div class="spinner"></div><span>Loading…</span></div>';
+async function loadAdminConsole() {
+  const body = document.getElementById('adm-body');
+  if (body) body.innerHTML = '<div class="di-loading"><div class="spinner"></div><span>Loading your numbers…</span></div>';
   try {
     const j = await fetch('/api/admin/stats', { headers: authHeaders() }).then(r => r.json());
-    if (!grid) return;
-    const tile = (n, label, hint) => '<div class="admin-tile"><div class="admin-n">' + n + '</div><div class="admin-l">' + label + '</div>' + (hint ? '<div class="admin-h">' + hint + '</div>' : '') + '</div>';
-    grid.innerHTML =
-      tile(j.totalUsers, 'People using Onward', j.new7 ? '+' + j.new7 + ' this week' : '') +
-      tile((j.avgDaysWeek != null ? j.avgDaysWeek : '—'), 'Avg days / week', 'among weekly users') +
-      tile('$' + (j.estRevenue || 0), 'Est. revenue / mo', (j.proUsers || 0) + ' Pro member' + (j.proUsers === 1 ? '' : 's')) +
-      tile(j.loggedToday, 'Logged today', j.totalUsers ? Math.round(j.loggedToday / j.totalUsers * 100) + '% of users' : '') +
-      tile(j.active7, 'Active this week') +
-      tile(j.pushDevices, 'Push devices');
-    if (recent) {
-      const rowsHtml = (j.recent || []).map(r => '<tr><td>' + escapeHtml(r.username) + '</td><td style="text-align:center">' + r.days + '</td><td style="text-align:right;color:var(--text-muted)">' + (r.last ? fmtDateShort(r.last) : '—') + '</td></tr>').join('');
-      recent.innerHTML = (j.recent && j.recent.length)
-        ? '<table class="admin-table"><thead><tr><th>User</th><th style="text-align:center">Days</th><th style="text-align:right">Last active</th></tr></thead><tbody>' + rowsHtml + '</tbody></table>'
-        : '<p class="card-sub" style="margin-top:10px">No signups yet — share your link to get your first users.</p>';
-    }
+    if (!j || j.error) throw new Error(j && j.error);
+    renderAdminConsole(j);
   } catch {
-    if (grid) grid.innerHTML = '<p class="card-sub">Couldn\'t load stats — try Refresh.</p>';
+    if (body) body.innerHTML = '<div class="card"><p class="card-sub">Couldn\'t load your numbers — check your connection and hit Refresh.</p></div>';
   }
+}
+function admSection(title, sub, inner) {
+  return '<div class="card adm-card"><div class="adm-card-head"><h3 class="card-title" style="margin-bottom:0">' + title + '</h3>' +
+    (sub ? '<span class="adm-card-sub">' + sub + '</span>' : '') + '</div>' + inner + '</div>';
+}
+function admMini(label, val, hint) {
+  return '<div class="adm-mini-item"><div class="adm-mini-n">' + val + '</div><div class="adm-mini-l">' + label + '</div>' +
+    (hint ? '<div class="adm-mini-h">' + hint + '</div>' : '') + '</div>';
+}
+function renderAdminConsole(j) {
+  const body = document.getElementById('adm-body');
+  if (!body) return;
+  const total = j.totalUsers || 0;
+  const pct = (n) => total ? Math.round((n / total) * 100) : 0;
+
+  const kpi = (n, label, hint, tone) => '<div class="adm-kpi ' + (tone || '') + '"><div class="adm-kpi-n">' + n + '</div>' +
+    '<div class="adm-kpi-l">' + label + '</div>' + (hint ? '<div class="adm-kpi-h">' + hint + '</div>' : '') + '</div>';
+  const kpis = '<div class="adm-kpis">' +
+    kpi(total, 'Total users', j.new7 ? '▲ ' + j.new7 + ' this week' : 'no new signups yet', 'blue') +
+    kpi(j.active7 || 0, 'Active this week', pct(j.active7) + '% of users', 'green') +
+    kpi(j.loggedToday || 0, 'Logged today', pct(j.loggedToday) + '% of users', 'amber') +
+    kpi('$' + (j.estRevenue || 0), 'Est. revenue / mo', (j.proUsers || 0) + ' Pro', 'violet') +
+    '</div>';
+
+  const maxS = Math.max(1, ...(j.signups || []).map(s => s.count));
+  const spark = '<div class="adm-spark">' + (j.signups || []).map(s =>
+    '<div class="adm-spark-col" title="' + s.date + ': ' + s.count + ' signup' + (s.count === 1 ? '' : 's') + '">' +
+    '<div class="adm-spark-bar' + (s.count ? '' : ' empty') + '" style="height:' + (s.count ? Math.max(8, Math.round(s.count / maxS * 100)) : 4) + '%"></div></div>').join('') + '</div>';
+  const growth = admSection('Growth', 'New signups · last 14 days',
+    spark + '<div class="adm-mini">' + admMini('Today', j.newToday || 0) + admMini('7 days', j.new7 || 0) +
+    admMini('30 days', j.new30 || 0) + admMini('All time', total) + '</div>');
+
+  const eng = admSection('Engagement', 'How sticky the habit is',
+    '<div class="adm-mini">' +
+    admMini('Daily active', j.loggedToday || 0) + admMini('Weekly active', j.active7 || 0) + admMini('Monthly active', j.active30 || 0) +
+    admMini('Stickiness', (j.stickiness || 0) + '%', 'DAU / MAU') +
+    admMini('Avg days / wk', j.avgDaysWeek != null ? j.avgDaysWeek : '—', 'weekly users') +
+    admMini('7-day retention', j.retention7 != null ? j.retention7 + '%' : '—', 'new cohort') +
+    '</div>');
+
+  const barRow = (label, n, color) => { const p = pct(n); return '<div class="adm-bar-row"><span class="adm-bar-label">' + label +
+    '</span><span class="adm-bar-track"><span class="adm-bar-fill" style="width:' + p + '%;background:' + color + '"></span></span>' +
+    '<span class="adm-bar-val">' + n + ' · ' + p + '%</span></div>'; };
+  const P = j.pillars || {}, F = j.features || {};
+  const adoption = admSection('Feature adoption', 'What people actually turn on and use',
+    '<div class="adm-sub-label">Pillars enabled</div>' +
+    barRow('Gym', P.gym || 0, 'var(--gym-color)') + barRow('Nutrition', P.food || 0, 'var(--food-color)') +
+    barRow('Networking', P.networking || 0, 'var(--network-color)') + barRow('Money', P.money || 0, 'var(--money-color)') +
+    barRow('Reading', P.reading || 0, 'var(--read-color)') +
+    '<div class="adm-sub-label" style="margin-top:16px">Modules used</div>' +
+    barRow('Books', F.books || 0, 'var(--read-color)') + barRow('Business ideas', F.ideas || 0, 'var(--primary)') +
+    barRow('Contacts', F.contacts || 0, 'var(--network-color)') + barRow('Vocabulary', F.vocab || 0, 'var(--read-color)') +
+    barRow('Key takeaways', F.takeaways || 0, 'var(--accent)'));
+
+  const money = admSection('Revenue & reach', 'Estimated from Pro members × your price',
+    '<div class="adm-mini">' +
+    admMini('Pro members', j.proUsers || 0) + admMini('Est. / month', '$' + (j.estRevenue || 0)) + admMini('Price', j.priceLabel || '—') +
+    admMini('Push devices', j.pushDevices || 0) + admMini('Reachable', j.pushUsers || 0, 'people') + admMini('Total logs', j.totalDays || 0) +
+    '</div><p class="adm-note">Your exact revenue lives in your Stripe dashboard.</p>');
+
+  const rows = (j.recent || []).map(r =>
+    '<tr><td>' + escapeHtml(r.username) + (r.pro ? ' <span class="adm-pro">PRO</span>' : '') + '</td>' +
+    '<td style="text-align:center">' + r.days + '</td>' +
+    '<td style="text-align:right;color:var(--text-muted)">' + (r.joined ? fmtDateShort(r.joined) : '—') + '</td>' +
+    '<td style="text-align:right;color:var(--text-muted)">' + (r.last ? fmtDateShort(r.last) : '—') + '</td></tr>').join('');
+  const usersTable = admSection('Users', total ? 'Most recently active first' : '',
+    total ? '<div style="overflow-x:auto"><table class="admin-table"><thead><tr><th>User</th><th style="text-align:center">Days</th>' +
+      '<th style="text-align:right">Joined</th><th style="text-align:right">Last active</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+      : '<p class="card-sub">No signups yet — share your link to get your first users.</p>');
+
+  body.innerHTML = kpis + growth + eng + adoption + money + usersTable + renderOwnerCard();
+  loadBroadcastReach();
 }
 
 async function loadBroadcastReach() {

@@ -1413,6 +1413,39 @@ body {
 .admin-table td { padding:8px; border-bottom:1px solid var(--tint-2); }
 @media(max-width:600px){ .admin-grid { grid-template-columns:repeat(2,1fr); } }
 
+/* ─── Admin console ─────────────────────────────── */
+.adm-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; }
+.adm-owner-badge { font-size: 12px; font-weight: 700; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; }
+.adm-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.adm-kpi { border-radius: var(--radius); padding: 16px 18px; border: 1px solid var(--border); background: var(--card); box-shadow: var(--shadow); border-left: 4px solid var(--border-bright); }
+.adm-kpi.blue { border-left-color: var(--primary); }
+.adm-kpi.green { border-left-color: var(--success); }
+.adm-kpi.amber { border-left-color: var(--accent); }
+.adm-kpi.violet { border-left-color: var(--money-color); }
+.adm-kpi-n { font-size: 30px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.adm-kpi-l { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 6px; }
+.adm-kpi-h { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.adm-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.adm-card-sub { font-size: 12.5px; color: var(--text-muted); }
+.adm-mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.adm-mini-item { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.adm-mini-n { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.adm-mini-l { font-size: 12px; color: var(--text-muted); margin-top: 3px; font-weight: 600; }
+.adm-mini-h { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.adm-sub-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); margin-bottom: 10px; }
+.adm-bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.adm-bar-label { width: 110px; flex: none; font-size: 13px; font-weight: 600; color: var(--text); }
+.adm-bar-track { flex: 1; height: 8px; border-radius: 5px; background: var(--surface); overflow: hidden; }
+.adm-bar-fill { display: block; height: 100%; border-radius: 5px; transition: width .4s ease; }
+.adm-bar-val { width: 84px; flex: none; text-align: right; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.adm-spark { display: flex; align-items: flex-end; gap: 4px; height: 90px; padding: 8px 0 4px; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+.adm-spark-col { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.adm-spark-bar { width: 100%; border-radius: 4px 4px 2px 2px; background: linear-gradient(180deg, #60A5FA, var(--primary)); min-height: 3px; }
+.adm-spark-bar.empty { background: var(--border); }
+.adm-note { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+.adm-pro { font-size: 10px; font-weight: 800; color: var(--money-color); background: var(--money-bg); border: 1px solid var(--money-border); border-radius: 999px; padding: 1px 7px; letter-spacing: 0.5px; vertical-align: middle; }
+@media (max-width: 640px) { .adm-kpis { grid-template-columns: repeat(2, 1fr); } .adm-mini { grid-template-columns: repeat(2, 1fr); } .adm-bar-label { width: 90px; } .adm-bar-val { width: 66px; } }
+
 .net-hint { margin-top:10px; font-size:15px; font-weight:600; text-align:center; padding:8px; background:var(--tint-1); border-radius:10px; }
 .net-hint:empty { display:none; }
 .period-set { display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--tint-2); border:1px solid var(--border); border-radius:10px; padding:11px 14px; font-size:15px; margin-bottom:6px; }

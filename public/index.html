@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
-  <link rel="stylesheet" href="style.css?v=132">
+  <link rel="stylesheet" href="style.css?v=133">
   <script src="vendor/chart.umd.min.js"></script>
   <script src="vendor/marked.min.js"></script>
 </head>
@@ -72,6 +72,9 @@
       <a href="#" class="nav-item" data-page="settings">
         <span class="nav-icon"></span><span>Settings</span>
       </a>
+      <a href="#" class="nav-item nav-admin" data-page="admin" style="display:none">
+        <span class="nav-icon"></span><span>Admin</span>
+      </a>
     </nav>
     <div class="sidebar-footer"></div>
   </aside>
@@ -110,7 +113,7 @@
     </button>
   </nav>
 
-  <script src="app.js?v=160"></script>
+  <script src="app.js?v=161"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });

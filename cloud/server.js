@@ -649,7 +649,12 @@ app.get('/api/admin/stats', requireAuth, async (req, res) => {
     const today = new Date().toISOString().split('T')[0];
     const dayWithin = (ds, n) => { if (!ds) return false; const t = Date.parse(ds + 'T00:00:00Z'); return !isNaN(t) && Date.now() - t < n * DAY && Date.now() - t > -DAY; };
     const createdWithin = (c, n) => { if (!c) return false; const t = Date.parse(c); return !isNaN(t) && Date.now() - t < n * DAY; };
+    const dstr = (c) => { if (!c) return ''; const t = new Date(c); return isNaN(t) ? '' : t.toISOString().slice(0, 10); };
     let loggedToday = 0, active7 = 0, active30 = 0, totalDays = 0, weekDaysSum = 0, proUsers = 0;
+    let cohort = 0, retained = 0;                                   // 7-day retention of the 8–30d signup cohort
+    const pillars = { gym: 0, food: 0, networking: 0, money: 0, reading: 0 };
+    const features = { books: 0, ideas: 0, contacts: 0, vocab: 0, takeaways: 0 };
+    const has = (v) => Array.isArray(v) && v.length > 0;
     const rows = users.map(u => {
       const d0 = byId[String(u.id)] || {};
       const prof = d0.profile || {};
@@ -662,20 +667,40 @@ app.get('/api/admin/stats', requireAuth, async (req, res) => {
       if (week > 0) active7++;
       if (dates.some(d => dayWithin(d, 30))) active30++;
       if (prof.pro === true && !isOwner(u.username)) proUsers++;   // paying members (owner excluded)
-      return { username: u.username, days: days.length, last: dates.sort().slice(-1)[0] || null };
+      // Feature adoption, straight from each person's own data blob
+      const P = prof.pillars || {};
+      Object.keys(pillars).forEach(id => { if (!P[id] || P[id].enabled !== false) pillars[id]++; });
+      if (has(d0.books)) features.books++;
+      if (has(d0.ideas)) features.ideas++;
+      if (has(d0.contacts)) features.contacts++;
+      if (has(d0.vocab)) features.vocab++;
+      if (has(d0.takeaways)) features.takeaways++;
+      const ageDays = u.created_at ? (Date.now() - Date.parse(dstr(u.created_at) + 'T00:00:00Z')) / DAY : 0;
+      if (ageDays >= 7 && ageDays <= 30) { cohort++; if (week > 0) retained++; }
+      return { username: u.username, days: days.length, last: dates.sort().slice(-1)[0] || null, pro: prof.pro === true, joined: dstr(u.created_at) || null };
     });
     rows.sort((a, b) => String(b.last || '').localeCompare(String(a.last || '')) || b.days - a.days);
+    const created = users.map(u => dstr(u.created_at));
+    const signups = [];                                            // last 14 days, for the growth chart
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(Date.now() - i * DAY).toISOString().slice(0, 10);
+      signups.push({ date: d, count: created.filter(x => x === d).length });
+    }
     const priceLabel = process.env.PRICE_LABEL || '$7.99/mo';
     const monthlyPrice = parseFloat((priceLabel.match(/[\d.]+/) || ['0'])[0]) || 0;
     res.json({
       totalUsers: users.length, loggedToday, active7, active30, totalDays,
       avgDays: users.length ? +(totalDays / users.length).toFixed(1) : 0,
       avgDaysWeek: active7 ? +(weekDaysSum / active7).toFixed(1) : 0,   // avg days/week among weekly-active users
+      stickiness: active30 ? Math.round(loggedToday / active30 * 100) : 0,  // DAU / MAU
+      retention7: cohort ? Math.round(retained / cohort * 100) : null,
       proUsers, priceLabel, monthlyPrice, estRevenue: +(proUsers * monthlyPrice).toFixed(2),
-      pushDevices: subs.length,
+      pushDevices: subs.length, pushUsers: new Set(subs.map(s => String(s.user_id))).size,
       newToday: users.filter(u => createdWithin(u.created_at, 1)).length,
       new7: users.filter(u => createdWithin(u.created_at, 7)).length,
-      recent: rows.slice(0, 20)
+      new30: users.filter(u => createdWithin(u.created_at, 30)).length,
+      signups, pillars, features,
+      recent: rows.slice(0, 25)
     });
   } catch (e) { res.status(500).json({ error: 'Stats failed' }); }
 });
