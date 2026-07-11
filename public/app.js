@@ -7726,17 +7726,24 @@ function renderVocabCard() {
     '<div class="vocab-form">' +
     '<input type="text" id="vocab-word" class="vocab-input" placeholder="New word" maxlength="60" autocomplete="off">' +
     '<input type="text" id="vocab-meaning" class="vocab-input" placeholder="What it means" maxlength="240" autocomplete="off">' +
+    '<input type="text" id="vocab-context" class="vocab-input" placeholder="The sentence you found it in (optional — context makes it stick)" maxlength="300" autocomplete="off">' +
+    '<div class="vocab-form-row">' +
     '<input type="text" id="vocab-book" class="vocab-input" placeholder="From which book? (optional)" maxlength="80" autocomplete="off">' +
+    '<input type="text" id="vocab-page" class="vocab-input vocab-page" inputmode="numeric" placeholder="Page" maxlength="6" autocomplete="off">' +
+    '</div>' +
     '<button class="btn btn-primary" onclick="addVocabWord()">Add word</button>' +
     '</div>';
   const list = vocab.length
     ? '<div class="vocab-list">' + [...vocab].reverse().map(w => {
       const hasS = w.sentence && w.sentence.trim();
+      const hasCtx = w.context && w.context.trim();
       return '<div class="vocab-item">' +
         '<div class="vocab-top"><span class="vocab-word">' + escapeHtml(w.word) + '</span>' +
         (w.book ? '<span class="vocab-bk">' + escapeHtml(w.book) + '</span>' : '') +
+        (w.page ? '<span class="vocab-pg">p.' + escapeHtml(String(w.page)) + '</span>' : '') +
         '<button class="vocab-x" title="Remove" onclick="deleteVocabWord(\'' + w.id + '\')">✕</button></div>' +
         (w.meaning ? '<div class="vocab-mean">' + escapeHtml(w.meaning) + '</div>' : '') +
+        (hasCtx ? '<div class="vocab-context">“' + escapeHtml(w.context.trim()) + '”</div>' : '') +
         (hasS
           ? '<div class="vocab-sentence">“' + escapeHtml(w.sentence) + '” <span class="vocab-done">✓ used it</span></div>'
           : '<div class="vocab-ask"><div class="vocab-ask-q">Can you use <b>' + escapeHtml(w.word) + '</b> in a sentence?</div>' +
@@ -7744,10 +7751,10 @@ function renderVocabCard() {
             '<button class="btn-sm" onclick="saveVocabSentence(\'' + w.id + '\')">Save</button></div></div>') +
         '</div>';
     }).join('') + '</div>'
-    : '<div class="my-meals-empty">No words yet — add one you picked up from a book.</div>';
+    : '<div class="my-meals-empty">No words yet — add one you picked up from a book, with the sentence you found it in.</div>';
   return '<div class="card vocab-card">' +
     '<h3 class="card-title">Words I\'m learning</h3>' +
-    '<p class="card-sub">Capture new words from your books and their meaning — then put each to work in a sentence.' +
+    '<p class="card-sub">Capture a new word with the sentence you met it in — seeing it in context is what makes it stick — then put it to work in your own sentence.' +
     (s.total ? ' · <b>' + s.total + '</b> word' + (s.total === 1 ? '' : 's') + ' · <b>' + s.practiced + '</b> used in a sentence' : '') + '</p>' +
     form + list +
     '<label class="vocab-remind"><input type="checkbox" onchange="toggleVocabNudge(this)"' + (state.data.profile && state.data.profile.vocabNudge !== false ? ' checked' : '') + '> Surprise me with a word to practice — send me a notification to use one in a sentence</label>' +
@@ -7763,9 +7770,12 @@ async function addVocabWord() {
   const word = (document.getElementById('vocab-word')?.value || '').trim();
   const meaning = (document.getElementById('vocab-meaning')?.value || '').trim();
   const book = (document.getElementById('vocab-book')?.value || '').trim();
+  const context = (document.getElementById('vocab-context')?.value || '').trim();
+  const pageRaw = (document.getElementById('vocab-page')?.value || '').trim();
+  const page = pageRaw ? (parseInt(pageRaw, 10) || '') : '';
   if (!word) { showToast('Type the word first.', 'error'); return; }
   if (!state.data.vocab) state.data.vocab = [];
-  state.data.vocab.push({ id: uid(), word, meaning, book, sentence: '', createdAt: todayStr() });
+  state.data.vocab.push({ id: uid(), word, meaning, book, page, context, sentence: '', createdAt: todayStr() });
   await saveData();
   showToast('Added “' + word + '” — now use it in a sentence!', 'success');
   renderKnowledgePage();

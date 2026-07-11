@@ -2202,6 +2202,12 @@ body.wo-fullscreen .bottom-nav { display: none !important; }   /* workout is an 
 .vocab-x:hover { color: var(--danger); }
 .vocab-mean { font-size: 13.5px; color: var(--text-muted); margin-top: 3px; line-height: 1.5; }
 .vocab-sentence { margin-top: 8px; font-size: 13.5px; color: var(--text); font-style: italic; line-height: 1.5; }
+/* Location layer — page badge + the source sentence the word was found in */
+.vocab-form-row { display: flex; gap: 8px; }
+.vocab-form-row .vocab-input:first-child { flex: 1; min-width: 0; }
+.vocab-page { flex: none; width: 84px; text-align: center; }
+.vocab-pg { font-size: 11px; font-weight: 700; color: var(--read-color); background: rgba(6,182,212,0.10); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.vocab-context { font-size: 13.5px; color: var(--text); line-height: 1.55; margin-top: 8px; padding: 8px 12px; border-left: 3px solid var(--read-color); background: var(--surface); border-radius: 0 8px 8px 0; font-style: italic; }
 .vocab-done { font-style: normal; font-size: 12px; color: var(--success); font-weight: 700; margin-left: 4px; }
 .vocab-ask { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
 .vocab-ask-q { font-size: 13px; color: var(--text); margin-bottom: 7px; }
