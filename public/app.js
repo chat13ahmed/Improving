@@ -22,6 +22,9 @@ let charts = {};
 // ─────────────────────────────────────────────────────────────
 // The user's own Claude key, stored in this browser (bring-your-own-key).
 function aiKey() { try { return localStorage.getItem('onward_ai_key') || ''; } catch { return ''; } }
+function aiProvider() { try { return localStorage.getItem('onward_ai_provider') || 'auto'; } catch { return 'auto'; } }
+function aiModel() { try { return localStorage.getItem('onward_ai_model') || ''; } catch { return ''; } }
+function aiBase() { try { return localStorage.getItem('onward_ai_base') || ''; } catch { return ''; } }
 // A safe preview of the saved key — enough to spot a truncated/partial paste.
 // A real Anthropic key is ~108 chars and starts with "sk-ant-api03-".
 function maskKey(k) { k = String(k || ''); if (!k) return ''; const tail = k.length > 8 ? k.slice(-4) : ''; return k.slice(0, 12) + '…' + tail + ' · ' + k.length + ' chars'; }
@@ -29,7 +32,12 @@ function authHeaders() {
   const h = { 'Content-Type': 'application/json' };
   if (state.token) h.Authorization = 'Bearer ' + state.token;
   const k = aiKey();
-  if (k) h['X-Api-Key'] = k;   // server uses this if no ANTHROPIC_API_KEY env var is set
+  if (k) {
+    h['X-Api-Key'] = k;   // server uses this if no server-side key is set
+    const prov = aiProvider(); if (prov && prov !== 'auto') h['X-Ai-Provider'] = prov;
+    const model = aiModel(); if (model) h['X-Ai-Model'] = model;
+    const base = aiBase(); if (base) h['X-Ai-Base'] = base;
+  }
   return h;
 }
 
@@ -1984,7 +1992,7 @@ async function estimateFoodWithAI() {
     const res = await fetch('/api/estimate-food', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ description }) });
     const j = await res.json();
     if (!res.ok) {
-      showToast(j.error === 'NO_KEY' ? 'Add your Claude API key in Settings to use AI estimates.' : (j.error || 'Estimate failed.'), 'error');
+      showToast(j.error === 'NO_KEY' ? 'Add your AI key in Settings to use AI estimates.' : (j.error || 'Estimate failed.'), 'error');
       return;
     }
     if (!state._foodLog) state._foodLog = [];
@@ -2688,7 +2696,7 @@ function maybeGenerateInsight() {
 
 async function fetchCoachInsight(force) {
   if (state._insightLoading) return;
-  if (!state.hasApiKey) { showToast('Connect Claude in Settings first.', 'error'); return; }
+  if (!state.hasApiKey) { showToast('Connect an AI key in Settings first.', 'error'); return; }
   state._insightLoading = true;
   const setBody = (html) => { const b = document.getElementById('di-body'); if (b) b.innerHTML = html; };
   if (force) setBody('<div class="di-loading"><div class="spinner"></div><span>Thinking…</span></div>');
@@ -2696,7 +2704,7 @@ async function fetchCoachInsight(force) {
     const r = await fetch('/api/insight', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ data: enrichedData() }) });
     const j = await r.json();
     if (!r.ok || !j.insight) {
-      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect Claude in Settings to get daily insights.' : 'Couldn\'t generate — tap ↻ to retry.') + '</div>');
+      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect an AI key in Settings to get daily insights.' : 'Couldn\'t generate — tap ↻ to retry.') + '</div>');
       return;
     }
     state.data.coachInsight = { date: todayStr(), text: j.insight };
@@ -2730,7 +2738,7 @@ function maybeGeneratePlan() {
 }
 async function fetchGamePlan(force) {
   if (state._planLoading) return;
-  if (!state.hasApiKey) { showToast('Connect Claude in Settings first.', 'error'); return; }
+  if (!state.hasApiKey) { showToast('Connect an AI key in Settings first.', 'error'); return; }
   state._planLoading = true;
   const setBody = (html) => { const b = document.getElementById('plan-body'); if (b) b.innerHTML = html; };
   if (force) setBody('<div class="di-loading"><div class="spinner"></div><span>Thinking…</span></div>');
@@ -2738,7 +2746,7 @@ async function fetchGamePlan(force) {
     const r = await fetch('/api/plan', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ data: enrichedData() }) });
     const j = await r.json();
     if (!r.ok || !j.plan) {
-      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect Claude in Settings to get your plan.' : 'Couldn\'t build it — tap ↻ to retry.') + '</div>');
+      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect an AI key in Settings to get your plan.' : 'Couldn\'t build it — tap ↻ to retry.') + '</div>');
       return;
     }
     state.data.gamePlan = { date: todayStr(), text: j.plan };
@@ -2786,7 +2794,7 @@ function maybeGeneratePatterns() {
 }
 async function fetchPatterns(force) {
   if (state._patLoading) return;
-  if (!state.hasApiKey) { showToast('Connect Claude in Settings first.', 'error'); return; }
+  if (!state.hasApiKey) { showToast('Connect an AI key in Settings first.', 'error'); return; }
   state._patLoading = true;
   const setBody = (html) => { const b = document.getElementById('pat-body'); if (b) b.innerHTML = html; };
   if (force) setBody('<div class="di-loading"><div class="spinner"></div><span>Finding a connection…</span></div>');
@@ -2794,7 +2802,7 @@ async function fetchPatterns(force) {
     const r = await fetch('/api/patterns', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ data: enrichedData() }) });
     const j = await r.json();
     if (!r.ok || !j.pattern) {
-      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect Claude in Settings to unlock Patterns.' : 'Couldn\'t find one — tap ↻ to retry.') + '</div>');
+      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect an AI key in Settings to unlock Patterns.' : 'Couldn\'t find one — tap ↻ to retry.') + '</div>');
       return;
     }
     state.data.patternInsight = { date: todayStr(), text: j.pattern };
@@ -2841,7 +2849,7 @@ function renderReviewCard() {
 }
 async function fetchReview() {
   if (state._revLoading) return;
-  if (!state.hasApiKey) { showToast('Connect Claude in Settings first.', 'error'); return; }
+  if (!state.hasApiKey) { showToast('Connect an AI key in Settings first.', 'error'); return; }
   state._revLoading = true;
   const setBody = (html) => { const b = document.getElementById('rev-body'); if (b) b.innerHTML = html; };
   setBody('<div class="di-loading"><div class="spinner"></div><span>Reviewing your whole week…</span></div>');
@@ -2849,7 +2857,7 @@ async function fetchReview() {
     const r = await fetch('/api/review', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ data: enrichedData(), weekLabel: formatWeekRange(getWeekStart(todayStr())) }) });
     const j = await r.json();
     if (!r.ok || !j.review) {
-      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect Claude in Settings to unlock this.' : 'Couldn\'t generate — try again.') + '</div>');
+      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect an AI key in Settings to unlock this.' : 'Couldn\'t generate — try again.') + '</div>');
       return;
     }
     state.data.weeklyReview = { weekStart: getWeekStart(todayStr()), text: j.review };
@@ -6185,7 +6193,7 @@ function renderIdeasPage() {
       ? '<div class="card" style="margin-top:4px">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
         '<div><h3 class="card-title" style="margin-bottom:4px">Analyze My Ideas</h3>' +
-        '<p style="font-size:13px;color:var(--text-muted)">Ask Claude which idea has the best potential for your situation</p></div>' +
+        '<p style="font-size:13px;color:var(--text-muted)">Ask your AI coach which idea has the best potential for your situation</p></div>' +
         '<button class="btn btn-primary" id="btn-ideas-ai" onclick="analyzeIdeas()">Ask Coach</button></div>' +
         '<div class="insight-result hidden" id="result-ideas"></div></div>'
       : '');
@@ -6352,7 +6360,7 @@ function renderIdeaValidate(idea) {
   const aiBlock = state.hasApiKey
     ? '<button type="button" class="btn btn-primary" onclick="openIdeaCoach(\'' + idea.id + '\')" style="margin-top:10px;width:100%">🎯 Interview me — the validation coach</button>' +
       '<div class="iv-ai-hint">A step-by-step stress-test drawn from The Mom Test, Running Lean, Zero to One &amp; more.</div>'
-    : '<div class="iv-ai-hint">Add your Claude API key in Settings and a validation coach will interview and stress-test this idea — Mom Test style.</div>';
+    : '<div class="iv-ai-hint">Add your AI key in Settings and a validation coach will interview and stress-test this idea — Mom Test style.</div>';
   return '<div class="modal-box iv-box">' +
     '<div class="iv-head"><div><h3 class="card-title" style="margin-bottom:2px">Validate: ' + escapeHtml(idea.title) + '</h3>' +
     '<p class="card-sub" style="margin-bottom:0">The Lean Startup way — test the risky guesses before you build.</p></div>' +
@@ -6409,7 +6417,7 @@ async function validateIdeaWithAI(id) {
 // ── Interactive validation-coach interview (multi-turn chat, one idea) ──
 function openIdeaCoach(id) {
   const idea = state.data.ideas.find(i => i.id === id); if (!idea) return;
-  if (!state.hasApiKey) { showToast('Add your Claude API key in Settings to use the validation coach.', 'error'); return; }
+  if (!state.hasApiKey) { showToast('Add your AI key in Settings to use the validation coach.', 'error'); return; }
   closeIdeaValidate();
   const seeded = (Array.isArray(idea.coachChat) && idea.coachChat.length)
     ? idea.coachChat.slice()
@@ -6454,7 +6462,7 @@ async function sendIdeaChat() {
     const res = await fetch('/api/chat', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ messages: c.messages, mode: 'ideacoach', idea: { title: idea.title, description: idea.description, scores: idea.scores, validation: idea.validation } }) });
     const j = await res.json().catch(() => ({}));
     c.busy = false;
-    if (!res.ok) c.messages.push({ role: 'assistant', content: j.error === 'NO_KEY' ? 'Add your Claude API key in Settings to use the coach.' : (j.error || 'Something went wrong — try again.') });
+    if (!res.ok) c.messages.push({ role: 'assistant', content: j.error === 'NO_KEY' ? 'Add your AI key in Settings to use the coach.' : (j.error || 'Something went wrong — try again.') });
     else c.messages.push({ role: 'assistant', content: j.reply || 'Try rephrasing that.' });
   } catch { c.busy = false; c.messages.push({ role: 'assistant', content: 'Could not reach the coach — check your connection.' }); }
   refreshIdeaCoachThread();
@@ -7038,12 +7046,9 @@ function applyHistoryFilter() {
 function renderCoachPage() {
   const keyBanner = !state.hasApiKey
     ? '<div class="api-key-banner"><span class="api-key-icon"></span><div style="flex:1">' +
-      '<h3>Connect Claude AI to unlock your coach</h3>' +
-      '<p>Get your free API key at <strong>console.anthropic.com</strong> → API Keys</p>' +
-      '<div style="display:flex;gap:10px;margin-top:10px;align-items:center">' +
-      '<input type="password" id="api-key-input" placeholder="sk-ant-api03-…" style="flex:1;padding:10px 14px;border:1.5px solid var(--accent);border-radius:8px;font-size:14px;font-family:monospace;background:#fff;outline:none">' +
-      '<button class="btn btn-primary" onclick="saveApiKey()">Save Key</button></div>' +
-      '<p style="margin-top:8px;font-size:12px;color:var(--text-muted)">Stored only on your computer.</p></div></div>'
+      '<h3>Connect an AI model to unlock your coach</h3>' +
+      '<p style="margin-bottom:4px">Bring your own key — works with Claude, OpenAI (GPT), Gemini, or any OpenAI-compatible API.</p>' +
+      apiKeyFields() + '</div></div>'
     : '<div style="background:var(--success-bg);border:1px solid #b8e0cc;border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;font-size:13px;color:var(--success);display:flex;justify-content:space-between;align-items:center;gap:10px">' +
       '<span>AI Coach is ready' + (aiKey() ? ' · <span style="font-family:monospace;color:var(--text-muted)">' + escapeHtml(maskKey(aiKey())) + '</span>' : ' · using the server key') + '</span>' +
       '<button onclick="clearApiKey()" style="background:none;border:none;font-size:12px;color:var(--text-muted);cursor:pointer;flex:none">Change key</button></div>';
@@ -7059,7 +7064,7 @@ function renderCoachPage() {
 
   document.getElementById('main').innerHTML =
     '<div class="page-header"><h2 class="page-title">AI Coach</h2>' +
-    '<p class="page-sub">Powered by Claude — your personal life & income coach</p></div>' +
+    '<p class="page-sub">Your personal life & income coach — powered by the AI you connect</p></div>' +
     keyBanner +
     '<div class="insights-grid">' + cards + '</div>' +
     '<div class="card coach-chat-card">' +
@@ -7090,7 +7095,7 @@ async function sendChat() {
   const inp = document.getElementById('chat-input');
   const text = (inp && inp.value || '').trim();
   if (!text || state._chatBusy) return;
-  if (!state.hasApiKey) { showToast('Add your Claude API key in Settings to chat.', 'error'); return; }
+  if (!state.hasApiKey) { showToast('Add your AI key in Settings to chat.', 'error'); return; }
   state._chat = state._chat || [];
   state._chat.push({ role: 'user', content: text });
   if (inp) inp.value = '';
@@ -7100,7 +7105,7 @@ async function sendChat() {
     const res = await fetch('/api/chat', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ messages: state._chat, data: enrichedData() }) });
     const j = await res.json().catch(() => ({}));
     state._chatBusy = false;
-    if (!res.ok) state._chat.push({ role: 'assistant', content: j.error === 'NO_KEY' ? 'Add your Claude API key in Settings to chat with your coach.' : (j.error || 'Something went wrong — try again.') });
+    if (!res.ok) state._chat.push({ role: 'assistant', content: j.error === 'NO_KEY' ? 'Add your AI key in Settings to chat with your coach.' : (j.error || 'Something went wrong — try again.') });
     else state._chat.push({ role: 'assistant', content: j.reply || 'Hmm — try rephrasing that.' });
   } catch {
     state._chatBusy = false;
@@ -7296,22 +7301,74 @@ async function saveGoals(e) {
 // ─────────────────────────────────────────────────────────────
 // API KEY
 // ─────────────────────────────────────────────────────────────
+// The BYO-key form: provider selector + key (+ base/model for custom providers).
+// Reused by the Coach page and Settings so they stay in sync.
+function apiKeyFields() {
+  const prov = aiProvider();
+  const opt = (v, label) => '<option value="' + v + '"' + (prov === v ? ' selected' : '') + '>' + label + '</option>';
+  return '<div class="ak-form">' +
+    '<label class="ak-label">AI provider</label>' +
+    '<select id="ai-provider" class="ak-input" onchange="onProviderChange()">' +
+    opt('auto', 'Auto-detect from key') + opt('anthropic', 'Anthropic — Claude') + opt('openai', 'OpenAI — GPT') +
+    opt('google', 'Google — Gemini') + opt('other', 'Other (OpenAI-compatible)') + '</select>' +
+    '<div id="ai-advanced" class="ak-advanced"' + (prov === 'other' ? '' : ' style="display:none"') + '>' +
+    '<label class="ak-label">API base URL</label>' +
+    '<input type="text" id="ai-base" class="ak-input" placeholder="https://openrouter.ai/api/v1" value="' + escapeAttr(aiBase()) + '">' +
+    '<label class="ak-label">Model</label>' +
+    '<input type="text" id="ai-model" class="ak-input" placeholder="e.g. meta-llama/llama-3.1-70b-instruct" value="' + escapeAttr(aiModel()) + '">' +
+    '</div>' +
+    '<label class="ak-label">API key</label>' +
+    '<div class="ak-row">' +
+    '<input type="password" id="api-key-input" class="ak-input ak-key" placeholder="' + providerKeyHint(prov) + '" autocomplete="off" spellcheck="false">' +
+    '<button type="button" class="btn btn-primary" onclick="saveApiKey()">Save</button></div>' +
+    '<p class="ak-hint" id="ak-hint">' + providerHint(prov) + '</p>' +
+    '</div>';
+}
+function providerKeyHint(prov) {
+  return { auto: 'Paste your API key…', anthropic: 'sk-ant-api03-…', openai: 'sk-…', google: 'AIza…', other: 'your API key' }[prov] || 'Paste your API key…';
+}
+function providerHint(prov) {
+  const map = {
+    anthropic: 'Get a key at <b>console.anthropic.com</b> → API Keys.',
+    openai: 'Get a key at <b>platform.openai.com</b> → API keys.',
+    google: 'Get a key at <b>aistudio.google.com</b> → Get API key.',
+    other: 'Works with any OpenAI-compatible API — OpenRouter, Groq, Together, a local model… Set the base URL + model above.',
+    auto: 'Works with Claude, OpenAI (GPT) or Gemini — we detect the provider from your key.'
+  };
+  return (map[prov] || map.auto) + ' Stored only on this device.';
+}
+function onProviderChange() {
+  const prov = document.getElementById('ai-provider')?.value || 'auto';
+  const adv = document.getElementById('ai-advanced'); if (adv) adv.style.display = prov === 'other' ? '' : 'none';
+  const hint = document.getElementById('ak-hint'); if (hint) hint.innerHTML = providerHint(prov);
+  const inp = document.getElementById('api-key-input'); if (inp) inp.placeholder = providerKeyHint(prov);
+}
 async function saveApiKey() {
   const k = (document.getElementById('api-key-input')?.value || '').trim();
   if (!k) { showToast('Paste your API key first.', 'error'); return; }
-  if (!k.startsWith('sk-ant-')) { showToast('Key should start with sk-ant-', 'error'); return; }
-  try { localStorage.setItem('onward_ai_key', k); } catch {}
+  const prov = document.getElementById('ai-provider')?.value || 'auto';
+  const base = (document.getElementById('ai-base')?.value || '').trim();
+  const model = (document.getElementById('ai-model')?.value || '').trim();
+  if (prov === 'anthropic' && !k.startsWith('sk-ant-')) { showToast('Anthropic keys start with sk-ant-', 'error'); return; }
+  if (prov === 'google' && !k.startsWith('AIza')) { showToast('Google keys usually start with AIza', 'error'); return; }
+  if (prov === 'other' && !base) { showToast('Add the API base URL for a custom provider.', 'error'); return; }
+  try {
+    localStorage.setItem('onward_ai_key', k);
+    localStorage.setItem('onward_ai_provider', prov);
+    localStorage.setItem('onward_ai_model', model);
+    localStorage.setItem('onward_ai_base', base);
+  } catch {}
   state.hasApiKey = true;
   showToast('AI Coach unlocked!', 'success');
-  renderCoachPage();
+  if (state.page === 'settings') renderSettingsPage(); else renderCoachPage();
 }
 
 async function clearApiKey() {
   if (!confirm('Remove your API key?')) return;
-  try { localStorage.removeItem('onward_ai_key'); } catch {}
+  try { ['onward_ai_key', 'onward_ai_provider', 'onward_ai_model', 'onward_ai_base'].forEach(x => localStorage.removeItem(x)); } catch {}
   state.hasApiKey = false;
   showToast('Key removed.', 'success');
-  renderCoachPage();
+  if (state.page === 'settings') renderSettingsPage(); else renderCoachPage();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -9554,15 +9611,13 @@ function renderSettingsPage() {
 
     // AI Key
     '<div class="card">' +
-    '<h3 class="card-title">AI Coach — Claude API Key</h3>' +
+    '<h3 class="card-title">AI Coach — connect any AI</h3>' +
     (hasKey
       ? '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--success-bg);border:1px solid rgba(16,185,129,0.3);border-radius:var(--radius-sm);margin-bottom:12px">' +
         '<span style="color:var(--success);font-weight:600">API key connected — AI Coach is active</span>' +
         '<button class="btn-link" onclick="clearApiKey()">Remove key</button></div>'
-      : '<p class="card-sub">Get your free key at <strong>console.anthropic.com</strong> → API Keys</p>' +
-        '<div style="display:flex;gap:10px">' +
-        '<input type="password" id="api-key-input" placeholder="sk-ant-api03-…" style="flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:monospace;background:rgba(0,0,0,0.3);color:var(--text);outline:none">' +
-        '<button class="btn btn-primary" onclick="saveApiKey()">Save Key</button></div>') +
+      : '<p class="card-sub">Bring your own key from Claude, OpenAI (GPT), Gemini, or any OpenAI-compatible API.</p>' +
+        apiKeyFields()) +
     '</div>' +
 
     // Security & password

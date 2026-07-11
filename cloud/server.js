@@ -308,13 +308,120 @@ function aiGuard(req, res) {
   return true;
 }
 
+// ── Multi-provider AI ────────────────────────────────────────────────
+// Bring-your-own key for Anthropic (Claude), OpenAI (GPT), Google (Gemini),
+// or ANY OpenAI-compatible endpoint (OpenRouter, Groq, Together, local, …).
+// The provider/model/base come from headers (set by the client) or env; if
+// unset we detect the provider from the key prefix. All calls go over fetch,
+// so no per-provider SDK is needed.
+class AIError extends Error { constructor(status, message) { super(message); this.status = status || 500; } }
+function detectProvider(key) {
+  const k = String(key || '');
+  if (k.startsWith('sk-ant-')) return 'anthropic';
+  if (k.startsWith('AIza')) return 'google';
+  return 'openai';   // sk-…, sk-proj-…, or any OpenAI-compatible key
+}
+function getAIConfig(req) {
+  const key = getApiKey(req);
+  const h = (req && req.headers) || {};
+  let provider = String(h['x-ai-provider'] || process.env.AI_PROVIDER || '').trim().toLowerCase();
+  if (!provider || provider === 'auto') provider = detectProvider(key);
+  if (provider === 'gemini') provider = 'google';
+  if (provider === 'claude') provider = 'anthropic';
+  if (!['anthropic', 'openai', 'google'].includes(provider)) provider = 'openai';   // "other" == OpenAI-compatible
+  const DEF = { anthropic: 'claude-sonnet-4-6', openai: 'gpt-4o-mini', google: 'gemini-1.5-flash' };
+  const model = String(h['x-ai-model'] || process.env.AI_MODEL || '').trim() || DEF[provider];
+  const base = String(h['x-ai-base'] || process.env.AI_BASE_URL || '').trim().replace(/\/+$/, '');
+  return { key, provider, model, base };
+}
+function sysToText(system) { return Array.isArray(system) ? system.map(b => (b && b.text) || '').join('\n\n') : String(system || ''); }
+function msgToText(content) { return Array.isArray(content) ? content.map(b => (b && b.text) || '').join('') : String(content || ''); }
+function openaiMessages(system, messages) {
+  return [{ role: 'system', content: sysToText(system) }].concat((messages || []).map(m => ({ role: m.role, content: msgToText(m.content) })));
+}
+
+// One-shot completion → returns the assistant's text.
+async function aiComplete({ req, system, messages, maxTokens = 1024 }) {
+  const { key, provider, model, base } = getAIConfig(req);
+  if (provider === 'anthropic') {
+    const r = await fetch((base || 'https://api.anthropic.com') + '/v1/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model, max_tokens: maxTokens, system, messages })
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new AIError(r.status, (j.error && j.error.message) || 'AI request failed');
+    return (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+  }
+  if (provider === 'google') {
+    const url = (base || 'https://generativelanguage.googleapis.com') + '/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(key);
+    const contents = (messages || []).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: msgToText(m.content) }] }));
+    const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ system_instruction: { parts: [{ text: sysToText(system) }] }, contents, generationConfig: { maxOutputTokens: maxTokens } }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new AIError(r.status, (j.error && j.error.message) || 'AI request failed');
+    const cand = j.candidates && j.candidates[0];
+    return (((cand && cand.content && cand.content.parts) || []).map(p => p.text || '').join('')).trim();
+  }
+  const r = await fetch((base || 'https://api.openai.com/v1') + '/chat/completions', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key },
+    body: JSON.stringify({ model, max_tokens: maxTokens, messages: openaiMessages(system, messages) })
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new AIError(r.status, (j.error && j.error.message) || 'AI request failed');
+  return ((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '').trim();
+}
+
+// Streaming completion → calls onText(chunk) as tokens arrive. Falls back to a
+// single chunk for providers we don't stream (keeps the UX working everywhere).
+async function aiStream({ req, system, messages, maxTokens = 1024, onText }) {
+  const { key, provider, model, base } = getAIConfig(req);
+  const pump = async (response, extract) => {
+    if (!response.ok) { const j = await response.json().catch(() => ({})); throw new AIError(response.status, (j.error && j.error.message) || 'AI request failed'); }
+    const reader = response.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice(5).trim();
+        if (data === '[DONE]') return;
+        let obj; try { obj = JSON.parse(data); } catch { continue; }
+        const t = extract(obj);
+        if (t) onText(t);
+      }
+    }
+  };
+  if (provider === 'openai') {
+    const r = await fetch((base || 'https://api.openai.com/v1') + '/chat/completions', {
+      method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + key },
+      body: JSON.stringify({ model, max_tokens: maxTokens, stream: true, messages: openaiMessages(system, messages) })
+    });
+    return pump(r, o => o.choices && o.choices[0] && o.choices[0].delta && o.choices[0].delta.content);
+  }
+  if (provider === 'anthropic') {
+    const r = await fetch((base || 'https://api.anthropic.com') + '/v1/messages', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model, max_tokens: maxTokens, stream: true, system, messages })
+    });
+    return pump(r, o => (o.type === 'content_block_delta' && o.delta && o.delta.type === 'text_delta') ? o.delta.text : '');
+  }
+  const text = await aiComplete({ req, system, messages, maxTokens });   // Google & co: one chunk
+  if (text) onText(text);
+}
+
 app.post('/api/analyze', async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
-    const client = new Anthropic({ apiKey: getApiKey(req) });
-    const msg = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 2048, system: [{ type: 'text', text: buildSystemPrompt(req.body.data?.profile || {}), cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: buildUserMessage(req.body.data, req.body.question) }] });
-    res.json({ analysis: msg.content[0].text });
-  } catch (e) { res.status(500).json({ error: e.message || 'Analysis failed' }); }
+    const analysis = await aiComplete({ req, maxTokens: 2048, system: [{ type: 'text', text: buildSystemPrompt(req.body.data?.profile || {}), cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: buildUserMessage(req.body.data, req.body.question) }] });
+    res.json({ analysis });
+  } catch (e) { res.status(e.status || 500).json({ error: e.message || 'Analysis failed' }); }
 });
 
 app.post('/api/analyze-stream', async (req, res) => {
@@ -322,10 +429,7 @@ app.post('/api/analyze-stream', async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream'); res.setHeader('Cache-Control', 'no-cache'); res.setHeader('Connection', 'keep-alive'); res.flushHeaders();
   let aborted = false; req.on('close', () => { aborted = true; });
   try {
-    const client = new Anthropic({ apiKey: getApiKey(req) });
-    const stream = client.messages.stream({ model: 'claude-sonnet-4-6', max_tokens: 2048, system: [{ type: 'text', text: buildSystemPrompt(req.body.data?.profile || {}), cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: buildUserMessage(req.body.data, req.body.question) }] });
-    stream.on('text', t => { if (!aborted) res.write(`data: ${JSON.stringify({ text: t })}\n\n`); });
-    await stream.finalMessage();
+    await aiStream({ req, maxTokens: 2048, system: [{ type: 'text', text: buildSystemPrompt(req.body.data?.profile || {}), cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: buildUserMessage(req.body.data, req.body.question) }], onText: t => { if (!aborted) res.write(`data: ${JSON.stringify({ text: t })}\n\n`); } });
     if (!aborted) { res.write('data: [DONE]\n\n'); res.end(); }
   } catch (e) { if (!aborted) { res.write(`data: ${JSON.stringify({ error: e.message || 'Analysis failed' })}\n\n`); res.end(); } }
 });
@@ -360,7 +464,6 @@ app.post('/api/chat', async (req, res) => {
       .slice(-12)
       .map(m => ({ role: m.role, content: m.content.slice(0, 4000) }));
     if (!msgs.length || msgs[msgs.length - 1].role !== 'user') return res.status(400).json({ error: 'Ask a question first.' });
-    const client = new Anthropic({ apiKey: getApiKey(req) });
     let systemBlocks, maxTokens = 1024;
     if (req.body.mode === 'ideacoach') {
       maxTokens = 1400;
@@ -376,10 +479,9 @@ app.post('/api/chat', async (req, res) => {
         { type: 'text', text: 'The person\'s current tracking data (for context):\n\n```json\n' + JSON.stringify(data, null, 2) + '\n```', cache_control: { type: 'ephemeral' } }
       ];
     }
-    const msg = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: maxTokens, system: systemBlocks, messages: msgs });
-    const reply = (msg.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    const reply = await aiComplete({ req, maxTokens, system: systemBlocks, messages: msgs });
     res.json({ reply: reply || 'Sorry — try rephrasing that.' });
-  } catch (e) { res.status(500).json({ error: e.message || 'Coach is unavailable right now.' }); }
+  } catch (e) { res.status(e.status || 500).json({ error: e.message || 'Coach is unavailable right now.' }); }
 });
 
 app.post('/api/estimate-food', async (req, res) => {
@@ -387,52 +489,46 @@ app.post('/api/estimate-food', async (req, res) => {
   const description = String(req.body.description || '').trim();
   if (!description) return res.status(400).json({ error: 'Describe the food first.' });
   try {
-    const client = new Anthropic({ apiKey: getApiKey(req) });
     const system = `You are a nutrition estimation engine. Given a description of food someone ate (it may include a quantity), respond with ONLY a JSON object — no prose, no markdown fences — of exactly this form:
 {"name": "<short food name>", "grams": <total grams as a number>, "calories": <integer>, "protein": <grams>, "carbs": <grams>, "fat": <grams>}
 Estimate realistic values for the WHOLE described amount. If no quantity is given, assume one typical serving. Output the JSON object only.`;
-    const msg = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 300, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'Food eaten: ' + description }] });
-    const food = parseFoodEstimate(msg.content && msg.content[0] && msg.content[0].text);
+    const text = await aiComplete({ req, maxTokens: 300, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'Food eaten: ' + description }] });
+    const food = parseFoodEstimate(text);
     if (!food) return res.status(502).json({ error: 'Could not estimate that — try describing it differently.' });
     res.json(food);
-  } catch (e) { res.status(500).json({ error: e.message || 'Estimate failed' }); }
+  } catch (e) { res.status(e.status || 500).json({ error: e.message || 'Estimate failed' }); }
 });
 
 app.post('/api/insight', async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
-    const client = new Anthropic({ apiKey: getApiKey(req) });
     const system = `You are this person's personal life coach. Based on their recent tracking data, write ONE short, specific, motivating insight for today — at most 2 sentences (~45 words). Reference their real numbers or patterns when you can. End with a tiny concrete action if it fits. Output only the insight sentence(s), no markdown or preamble.`;
-    const msg = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 160, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'My recent tracking data:\n\n```json\n' + JSON.stringify(req.body.data, null, 2) + '\n```\n\nGive me today\'s insight.' }] });
-    const insight = ((msg.content && msg.content[0] && msg.content[0].text) || '').trim();
+    const insight = (await aiComplete({ req, maxTokens: 160, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'My recent tracking data:\n\n```json\n' + JSON.stringify(req.body.data, null, 2) + '\n```\n\nGive me today\'s insight.' }] })).trim();
     if (!insight) return res.status(502).json({ error: 'No insight generated.' });
     res.json({ insight });
-  } catch (e) { res.status(500).json({ error: e.message || 'Insight failed' }); }
+  } catch (e) { res.status(e.status || 500).json({ error: e.message || 'Insight failed' }); }
 });
 
 // ── Today's Game Plan: concrete next actions (works from day one — fixes cold start) ──
 app.post('/api/plan', async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
-    const client = new Anthropic({ apiKey: getApiKey(req) });
     const system = `You are this person's personal coach and strategist. From their goals and tracking data, give them a short, concrete GAME PLAN for TODAY — the specific next actions that move them toward their goals.
 Rules:
 - Open with ONE short bold line naming today's #1 focus.
 - Then 2–4 SPECIFIC actions they can do TODAY as a markdown bullet list; start each with a verb and tie it to their real goals/targets/numbers when possible.
 - If they're brand new with little or no data, give an encouraging concrete starter plan for today.
 - Practical and specific — never generic filler or motivational fluff. ~90 words total. Output only the focus line + the bullets (markdown).`;
-    const msg = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 320, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'My goals and tracking data:\n\n```json\n' + JSON.stringify(req.body.data, null, 2) + '\n```\n\nWhat is my game plan for today?' }] });
-    const plan = ((msg.content && msg.content[0] && msg.content[0].text) || '').trim();
+    const plan = (await aiComplete({ req, maxTokens: 320, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'My goals and tracking data:\n\n```json\n' + JSON.stringify(req.body.data, null, 2) + '\n```\n\nWhat is my game plan for today?' }] })).trim();
     if (!plan) return res.status(502).json({ error: 'No plan generated.' });
     res.json({ plan });
-  } catch (e) { res.status(500).json({ error: e.message || 'Plan failed' }); }
+  } catch (e) { res.status(e.status || 500).json({ error: e.message || 'Plan failed' }); }
 });
 
 // ── Patterns: ONE cross-domain connection only a whole-life app could see ──
 app.post('/api/patterns', async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
-    const client = new Anthropic({ apiKey: getApiKey(req) });
     const system = `You are this person's personal life coach with a rare advantage: you see EVERY area of their life at once — training, income/money, nutrition, weight, reading, networking, habits, mood notes. Find ONE genuine CROSS-DOMAIN connection in their data that a single-purpose app could never see: a way one area appears to affect another.
 Rules:
 - Connect TWO DIFFERENT areas (e.g. gym↔income, reading↔mood, protein↔weight, water↔workouts, sleep↔focus). Never an observation about a single area alone.
@@ -440,29 +536,26 @@ Rules:
 - Be honest — only claim a pattern the data actually supports. If there isn't enough data yet for a real cross-domain link, say so warmly in one sentence and name what to keep logging to unlock it.
 - 1–2 sentences (~40 words), a little surprising; end with a tiny nudge if it fits.
 - Output ONLY the sentence(s): no markdown, headings, lists, or preamble.`;
-    const msg = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 180, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'My tracking data across all areas:\n\n```json\n' + JSON.stringify(req.body.data, null, 2) + '\n```\n\nFind one real cross-domain pattern.' }] });
-    const pattern = ((msg.content && msg.content[0] && msg.content[0].text) || '').trim();
+    const pattern = (await aiComplete({ req, maxTokens: 180, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'My tracking data across all areas:\n\n```json\n' + JSON.stringify(req.body.data, null, 2) + '\n```\n\nFind one real cross-domain pattern.' }] })).trim();
     if (!pattern) return res.status(502).json({ error: 'No pattern found.' });
     res.json({ pattern });
-  } catch (e) { res.status(500).json({ error: e.message || 'Patterns failed' }); }
+  } catch (e) { res.status(e.status || 500).json({ error: e.message || 'Patterns failed' }); }
 });
 
 // ── Weekly Life Review: the Sunday ritual across every pillar ──
 app.post('/api/review', async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
-    const client = new Anthropic({ apiKey: getApiKey(req) });
     const system = `You are this person's personal chief-of-staff and coach. Write their WEEKLY LIFE REVIEW from their tracking data across every area of life. Make it feel personal and earned — reference their real numbers.
 Use EXACTLY these three short markdown sections and nothing else:
 **Wins this week** — 2–3 bullets of what genuinely went well.
 **The pattern I noticed** — ONE cross-domain connection between two different areas (e.g. training↔income, reading↔focus, protein↔weight). This is the most important part.
 **Focus for next week** — ONE concrete priority phrased as a single action.
 Rules: warm, direct, no fluff or generic filler; use their actual data. If the week is thin on data, keep it short and honest. ~120 words total. Output only the three sections.`;
-    const msg = await client.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 450, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'My tracking data:\n\n```json\n' + JSON.stringify(req.body.data, null, 2) + '\n```\n\nWrite my weekly review' + (req.body.weekLabel ? ' for the week of ' + req.body.weekLabel : '') + '.' }] });
-    const review = ((msg.content && msg.content[0] && msg.content[0].text) || '').trim();
+    const review = (await aiComplete({ req, maxTokens: 450, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'My tracking data:\n\n```json\n' + JSON.stringify(req.body.data, null, 2) + '\n```\n\nWrite my weekly review' + (req.body.weekLabel ? ' for the week of ' + req.body.weekLabel : '') + '.' }] })).trim();
     if (!review) return res.status(502).json({ error: 'No review generated.' });
     res.json({ review });
-  } catch (e) { res.status(500).json({ error: e.message || 'Review failed' }); }
+  } catch (e) { res.status(e.status || 500).json({ error: e.message || 'Review failed' }); }
 });
 
 // ── Web push (reminders that reach the phone even when the app is closed) ──
