@@ -75,6 +75,50 @@ function sqliteImpl() {
         data TEXT DEFAULT '{}', likes TEXT DEFAULT '[]', flags INTEGER DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now'))
       )`);
+      // ── Collective-knowledge social layer (groups, notes, likes, replies, flags, notifications) ──
+      db.exec(`CREATE TABLE IF NOT EXISTS reading_groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+        owner_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        invite_code TEXT UNIQUE, created_at TEXT DEFAULT (datetime('now'))
+      )`);
+      db.exec(`CREATE TABLE IF NOT EXISTS group_members (
+        group_id INTEGER REFERENCES reading_groups(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        role TEXT NOT NULL DEFAULT 'member', notify_enabled INTEGER NOT NULL DEFAULT 1,
+        joined_at TEXT DEFAULT (datetime('now')), PRIMARY KEY (group_id, user_id)
+      )`);
+      db.exec(`CREATE TABLE IF NOT EXISTS notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, author_name TEXT,
+        group_id INTEGER REFERENCES reading_groups(id) ON DELETE CASCADE, book_id INTEGER,
+        page INTEGER, quote TEXT, body TEXT NOT NULL,
+        confusion_count INTEGER NOT NULL DEFAULT 0, needs_clarification INTEGER NOT NULL DEFAULT 0,
+        upvote_count INTEGER NOT NULL DEFAULT 0, created_at TEXT DEFAULT (datetime('now'))
+      )`);
+      db.exec(`CREATE TABLE IF NOT EXISTS note_likes (
+        note_id INTEGER REFERENCES notes(id) ON DELETE CASCADE, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT DEFAULT (datetime('now')), PRIMARY KEY (note_id, user_id)
+      )`);
+      db.exec(`CREATE TABLE IF NOT EXISTS note_replies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        note_id INTEGER REFERENCES notes(id) ON DELETE CASCADE,
+        parent_id INTEGER REFERENCES note_replies(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, author_name TEXT, body TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+      )`);
+      db.exec(`CREATE TABLE IF NOT EXISTS note_confusions (
+        note_id INTEGER REFERENCES notes(id) ON DELETE CASCADE, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT DEFAULT (datetime('now')), PRIMARY KEY (note_id, user_id)
+      )`);
+      db.exec(`CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        type TEXT NOT NULL, title TEXT NOT NULL, body TEXT, link TEXT, group_id INTEGER,
+        read_at TEXT, created_at TEXT DEFAULT (datetime('now'))
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_notes_group ON notes(group_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_replies_note ON note_replies(note_id)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, read_at)');
     },
     async createUser(u) {
       const r = db.prepare('INSERT INTO users(username,email,phone,pw_salt,pw_hash,sec_question,sec_salt,sec_hash) VALUES(?,?,?,?,?,?,?,?)')
@@ -158,6 +202,77 @@ function sqliteImpl() {
       const r = force ? db.prepare('DELETE FROM community_posts WHERE id=?').run(id)
                       : db.prepare('DELETE FROM community_posts WHERE id=? AND user_id=?').run(id, userId);
       return r.changes > 0;
+    },
+    // ── Groups + collective notes (social layer) ──
+    async createGroup(g) {
+      db.exec('BEGIN');
+      try {
+        const r = db.prepare('INSERT INTO reading_groups(name,owner_id,invite_code) VALUES(?,?,?)').run(g.name, g.owner_id, g.invite_code || null);
+        const id = Number(r.lastInsertRowid);
+        db.prepare("INSERT OR IGNORE INTO group_members(group_id,user_id,role) VALUES(?,?, 'owner')").run(id, g.owner_id);
+        db.exec('COMMIT');
+        return id;
+      } catch (e) { db.exec('ROLLBACK'); throw e; }
+    },
+    async addGroupMember(groupId, userId, role) { db.prepare('INSERT OR IGNORE INTO group_members(group_id,user_id,role) VALUES(?,?,?)').run(groupId, userId, role || 'member'); },
+    async getMembership(groupId, userId) { return db.prepare('SELECT group_id,user_id,role,notify_enabled FROM group_members WHERE group_id=? AND user_id=?').get(groupId, userId) || null; },
+    async groupMembers(groupId) { return db.prepare('SELECT user_id, role, notify_enabled FROM group_members WHERE group_id=?').all(groupId); },
+    async setNotifyEnabled(groupId, userId, enabled) { db.prepare('UPDATE group_members SET notify_enabled=? WHERE group_id=? AND user_id=?').run(enabled ? 1 : 0, groupId, userId); },
+    async createNote(n) {
+      const r = db.prepare('INSERT INTO notes(user_id,author_name,group_id,book_id,page,quote,body) VALUES(?,?,?,?,?,?,?)')
+        .run(n.user_id, n.author_name || null, n.group_id || null, n.book_id || null, n.page ?? null, n.quote || null, n.body);
+      return Number(r.lastInsertRowid);
+    },
+    async getNote(id) { return db.prepare('SELECT * FROM notes WHERE id=?').get(id) || null; },
+    async listGroupNotes(groupId) {
+      return db.prepare(`SELECT id,user_id,author_name,book_id,page,quote,body,upvote_count,confusion_count,needs_clarification,created_at
+        FROM notes WHERE group_id=? ORDER BY id DESC LIMIT 200`).all(groupId);
+    },
+    async toggleNoteLike(noteId, userId) {
+      db.exec('BEGIN');
+      try {
+        const exists = db.prepare('SELECT 1 FROM note_likes WHERE note_id=? AND user_id=?').get(noteId, userId);
+        if (exists) db.prepare('DELETE FROM note_likes WHERE note_id=? AND user_id=?').run(noteId, userId);
+        else db.prepare('INSERT INTO note_likes(note_id,user_id) VALUES(?,?)').run(noteId, userId);
+        const count = db.prepare('SELECT count(*) AS n FROM note_likes WHERE note_id=?').get(noteId).n;
+        db.prepare('UPDATE notes SET upvote_count=? WHERE id=?').run(count, noteId);
+        db.exec('COMMIT');
+        return { liked: !exists, count };
+      } catch (e) { db.exec('ROLLBACK'); throw e; }
+    },
+    async createReply(r0) {
+      const r = db.prepare('INSERT INTO note_replies(note_id,parent_id,user_id,author_name,body) VALUES(?,?,?,?,?)')
+        .run(r0.note_id, r0.parent_id || null, r0.user_id, r0.author_name || null, r0.body);
+      return Number(r.lastInsertRowid);
+    },
+    async listReplies(noteId) { return db.prepare('SELECT id,note_id,parent_id,user_id,author_name,body,created_at FROM note_replies WHERE note_id=? ORDER BY id ASC').all(noteId); },
+    // Idempotent confusion flag → distinct-user count → trip needs_clarification once at 3.
+    async confuseNote(noteId, userId) {
+      db.exec('BEGIN');
+      try {
+        db.prepare('INSERT OR IGNORE INTO note_confusions(note_id,user_id) VALUES(?,?)').run(noteId, userId);
+        const count = db.prepare('SELECT count(*) AS n FROM note_confusions WHERE note_id=?').get(noteId).n;
+        const cur = db.prepare('SELECT needs_clarification, group_id FROM notes WHERE id=?').get(noteId);
+        if (!cur) { db.exec('ROLLBACK'); return null; }
+        let tripped = false;
+        if (count >= 3 && !cur.needs_clarification) { db.prepare('UPDATE notes SET confusion_count=?, needs_clarification=1 WHERE id=?').run(count, noteId); tripped = true; }
+        else { db.prepare('UPDATE notes SET confusion_count=? WHERE id=?').run(count, noteId); }
+        db.exec('COMMIT');
+        return { count, tripped, groupId: cur.group_id };
+      } catch (e) { db.exec('ROLLBACK'); throw e; }
+    },
+    async createNotifications(rows) {
+      const stmt = db.prepare('INSERT INTO notifications(user_id,type,title,body,link,group_id) VALUES(?,?,?,?,?,?)');
+      for (const n of rows) stmt.run(n.user_id, n.type, n.title, n.body || null, n.link || null, n.group_id || null);
+    },
+    async listNotifications(userId, limit) {
+      return db.prepare(`SELECT id,type,title,body,link,group_id,read_at,created_at FROM notifications
+        WHERE user_id=? ORDER BY (read_at IS NULL) DESC, id DESC LIMIT ?`).all(userId, limit || 30);
+    },
+    async unreadCount(userId) { return db.prepare('SELECT count(*) AS n FROM notifications WHERE user_id=? AND read_at IS NULL').get(userId).n; },
+    async markNotificationsRead(userId, ids) {
+      if (ids && ids.length) db.prepare(`UPDATE notifications SET read_at=datetime('now') WHERE user_id=? AND id IN (${ids.map(() => '?').join(',')})`).run(userId, ...ids);
+      else db.prepare("UPDATE notifications SET read_at=datetime('now') WHERE user_id=? AND read_at IS NULL").run(userId);
     }
   };
 }
@@ -184,6 +299,28 @@ function pgImpl() {
       await q('ALTER TABLE shared_meals ADD COLUMN IF NOT EXISTS photo TEXT');
       await q(`CREATE TABLE IF NOT EXISTS community_posts (id BIGSERIAL PRIMARY KEY, user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
                author_name TEXT, type TEXT NOT NULL, title TEXT, body TEXT, data TEXT DEFAULT '{}', likes TEXT DEFAULT '[]', flags INTEGER DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now())`);
+      // ── Collective-knowledge social layer ──
+      await q(`CREATE TABLE IF NOT EXISTS reading_groups (id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL,
+               owner_id BIGINT REFERENCES users(id) ON DELETE CASCADE, invite_code TEXT UNIQUE, created_at TIMESTAMPTZ DEFAULT now())`);
+      await q(`CREATE TABLE IF NOT EXISTS group_members (group_id BIGINT REFERENCES reading_groups(id) ON DELETE CASCADE,
+               user_id BIGINT REFERENCES users(id) ON DELETE CASCADE, role TEXT NOT NULL DEFAULT 'member',
+               notify_enabled BOOLEAN NOT NULL DEFAULT TRUE, joined_at TIMESTAMPTZ DEFAULT now(), PRIMARY KEY (group_id, user_id))`);
+      await q(`CREATE TABLE IF NOT EXISTS notes (id BIGSERIAL PRIMARY KEY, user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+               author_name TEXT, group_id BIGINT REFERENCES reading_groups(id) ON DELETE CASCADE, book_id BIGINT,
+               page INTEGER, quote TEXT, body TEXT NOT NULL, confusion_count INTEGER NOT NULL DEFAULT 0,
+               needs_clarification BOOLEAN NOT NULL DEFAULT FALSE, upvote_count INTEGER NOT NULL DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now())`);
+      await q(`CREATE TABLE IF NOT EXISTS note_likes (note_id BIGINT REFERENCES notes(id) ON DELETE CASCADE,
+               user_id BIGINT REFERENCES users(id) ON DELETE CASCADE, created_at TIMESTAMPTZ DEFAULT now(), PRIMARY KEY (note_id, user_id))`);
+      await q(`CREATE TABLE IF NOT EXISTS note_replies (id BIGSERIAL PRIMARY KEY, note_id BIGINT REFERENCES notes(id) ON DELETE CASCADE,
+               parent_id BIGINT REFERENCES note_replies(id) ON DELETE CASCADE, user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+               author_name TEXT, body TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now())`);
+      await q(`CREATE TABLE IF NOT EXISTS note_confusions (note_id BIGINT REFERENCES notes(id) ON DELETE CASCADE,
+               user_id BIGINT REFERENCES users(id) ON DELETE CASCADE, created_at TIMESTAMPTZ DEFAULT now(), PRIMARY KEY (note_id, user_id))`);
+      await q(`CREATE TABLE IF NOT EXISTS notifications (id BIGSERIAL PRIMARY KEY, user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+               type TEXT NOT NULL, title TEXT NOT NULL, body TEXT, link TEXT, group_id BIGINT, read_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT now())`);
+      await q('CREATE INDEX IF NOT EXISTS idx_notes_group ON notes(group_id)');
+      await q('CREATE INDEX IF NOT EXISTS idx_replies_note ON note_replies(note_id)');
+      await q('CREATE INDEX IF NOT EXISTS idx_notif_user ON notifications(user_id, read_at)');
     },
     async createUser(u) {
       const r = await q('INSERT INTO users(username,email,phone,pw_salt,pw_hash,sec_question,sec_salt,sec_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
@@ -261,6 +398,80 @@ function pgImpl() {
       const r = force ? await q('DELETE FROM community_posts WHERE id=$1', [id])
                       : await q('DELETE FROM community_posts WHERE id=$1 AND user_id=$2', [id, userId]);
       return r.rowCount > 0;
+    },
+    // ── Groups + collective notes (social layer) ──
+    async createGroup(g) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const r = await client.query('INSERT INTO reading_groups(name,owner_id,invite_code) VALUES($1,$2,$3) RETURNING id', [g.name, g.owner_id, g.invite_code || null]);
+        const id = r.rows[0].id;
+        await client.query("INSERT INTO group_members(group_id,user_id,role) VALUES($1,$2,'owner') ON CONFLICT DO NOTHING", [id, g.owner_id]);
+        await client.query('COMMIT');
+        return id;
+      } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+    },
+    async addGroupMember(groupId, userId, role) { await q("INSERT INTO group_members(group_id,user_id,role) VALUES($1,$2,$3) ON CONFLICT DO NOTHING", [groupId, userId, role || 'member']); },
+    async getMembership(groupId, userId) { const r = await q('SELECT group_id,user_id,role,notify_enabled FROM group_members WHERE group_id=$1 AND user_id=$2', [groupId, userId]); return r.rows[0] || null; },
+    async groupMembers(groupId) { const r = await q('SELECT user_id, role, notify_enabled FROM group_members WHERE group_id=$1', [groupId]); return r.rows; },
+    async setNotifyEnabled(groupId, userId, enabled) { await q('UPDATE group_members SET notify_enabled=$1 WHERE group_id=$2 AND user_id=$3', [!!enabled, groupId, userId]); },
+    async createNote(n) {
+      const r = await q('INSERT INTO notes(user_id,author_name,group_id,book_id,page,quote,body) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+        [n.user_id, n.author_name || null, n.group_id || null, n.book_id || null, n.page ?? null, n.quote || null, n.body]);
+      return r.rows[0].id;
+    },
+    async getNote(id) { const r = await q('SELECT * FROM notes WHERE id=$1', [id]); return r.rows[0] || null; },
+    async listGroupNotes(groupId) {
+      const r = await q(`SELECT id,user_id,author_name,book_id,page,quote,body,upvote_count,confusion_count,needs_clarification,created_at
+        FROM notes WHERE group_id=$1 ORDER BY id DESC LIMIT 200`, [groupId]);
+      return r.rows;
+    },
+    async toggleNoteLike(noteId, userId) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const ex = await client.query('SELECT 1 FROM note_likes WHERE note_id=$1 AND user_id=$2', [noteId, userId]);
+        if (ex.rowCount) await client.query('DELETE FROM note_likes WHERE note_id=$1 AND user_id=$2', [noteId, userId]);
+        else await client.query('INSERT INTO note_likes(note_id,user_id) VALUES($1,$2)', [noteId, userId]);
+        const c = await client.query('SELECT count(*)::int AS n FROM note_likes WHERE note_id=$1', [noteId]);
+        await client.query('UPDATE notes SET upvote_count=$1 WHERE id=$2', [c.rows[0].n, noteId]);
+        await client.query('COMMIT');
+        return { liked: !ex.rowCount, count: c.rows[0].n };
+      } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+    },
+    async createReply(r0) {
+      const r = await q('INSERT INTO note_replies(note_id,parent_id,user_id,author_name,body) VALUES($1,$2,$3,$4,$5) RETURNING id',
+        [r0.note_id, r0.parent_id || null, r0.user_id, r0.author_name || null, r0.body]);
+      return r.rows[0].id;
+    },
+    async listReplies(noteId) { const r = await q('SELECT id,note_id,parent_id,user_id,author_name,body,created_at FROM note_replies WHERE note_id=$1 ORDER BY id ASC', [noteId]); return r.rows; },
+    async confuseNote(noteId, userId) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('INSERT INTO note_confusions(note_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [noteId, userId]);
+        const c = await client.query('SELECT count(*)::int AS n FROM note_confusions WHERE note_id=$1', [noteId]);
+        const cur = await client.query('SELECT needs_clarification, group_id FROM notes WHERE id=$1', [noteId]);
+        if (!cur.rowCount) { await client.query('ROLLBACK'); return null; }
+        const count = c.rows[0].n; let tripped = false;
+        if (count >= 3 && !cur.rows[0].needs_clarification) { await client.query('UPDATE notes SET confusion_count=$1, needs_clarification=TRUE WHERE id=$2', [count, noteId]); tripped = true; }
+        else { await client.query('UPDATE notes SET confusion_count=$1 WHERE id=$2', [count, noteId]); }
+        await client.query('COMMIT');
+        return { count, tripped, groupId: cur.rows[0].group_id };
+      } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
+    },
+    async createNotifications(rows) {
+      for (const n of rows) await q('INSERT INTO notifications(user_id,type,title,body,link,group_id) VALUES($1,$2,$3,$4,$5,$6)', [n.user_id, n.type, n.title, n.body || null, n.link || null, n.group_id || null]);
+    },
+    async listNotifications(userId, limit) {
+      const r = await q(`SELECT id,type,title,body,link,group_id,read_at,created_at FROM notifications
+        WHERE user_id=$1 ORDER BY (read_at IS NULL) DESC, id DESC LIMIT $2`, [userId, limit || 30]);
+      return r.rows;
+    },
+    async unreadCount(userId) { const r = await q('SELECT count(*)::int AS n FROM notifications WHERE user_id=$1 AND read_at IS NULL', [userId]); return r.rows[0].n; },
+    async markNotificationsRead(userId, ids) {
+      if (ids && ids.length) await q('UPDATE notifications SET read_at=now() WHERE user_id=$1 AND id = ANY($2::bigint[])', [userId, ids]);
+      else await q('UPDATE notifications SET read_at=now() WHERE user_id=$1 AND read_at IS NULL', [userId]);
     }
   };
 }
@@ -292,5 +503,22 @@ module.exports = {
   listPosts: (t) => impl.listPosts(t),
   togglePostLike: (i, u) => impl.togglePostLike(i, u),
   flagPost: (i) => impl.flagPost(i),
-  deletePost: (i, u, f) => impl.deletePost(i, u, f)
+  deletePost: (i, u, f) => impl.deletePost(i, u, f),
+  // ── Groups + collective notes (social layer) ──
+  createGroup: (g) => impl.createGroup(g),
+  addGroupMember: (g, u, r) => impl.addGroupMember(g, u, r),
+  getMembership: (g, u) => impl.getMembership(g, u),
+  groupMembers: (g) => impl.groupMembers(g),
+  setNotifyEnabled: (g, u, e) => impl.setNotifyEnabled(g, u, e),
+  createNote: (n) => impl.createNote(n),
+  getNote: (i) => impl.getNote(i),
+  listGroupNotes: (g) => impl.listGroupNotes(g),
+  toggleNoteLike: (i, u) => impl.toggleNoteLike(i, u),
+  createReply: (r) => impl.createReply(r),
+  listReplies: (i) => impl.listReplies(i),
+  confuseNote: (i, u) => impl.confuseNote(i, u),
+  createNotifications: (rows) => impl.createNotifications(rows),
+  listNotifications: (u, l) => impl.listNotifications(u, l),
+  unreadCount: (u) => impl.unreadCount(u),
+  markNotificationsRead: (u, ids) => impl.markNotificationsRead(u, ids)
 };

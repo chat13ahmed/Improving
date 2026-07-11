@@ -725,6 +725,131 @@ app.delete('/api/community/posts/:id', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'failed' }); }
 });
 
+// ── Reading groups + collective notes (upvotes · threaded replies · confusion flags) ──
+// Fan-out: store an in-app notification for every group member who opted in
+// (notify_enabled), then best-effort web push. No sockets — clients poll the badge.
+async function notifyGroup(groupId, notif, exceptUserId) {
+  const members = await DB.groupMembers(groupId);
+  const targets = members.filter(m => String(m.user_id) !== String(exceptUserId) && m.notify_enabled);
+  if (!targets.length) return;
+  await DB.createNotifications(targets.map(m => ({ user_id: m.user_id, group_id: groupId, ...notif })));
+  if (!push.configured()) return;
+  const subsByUser = {};
+  for (const s of await DB.allPushSubs()) (subsByUser[String(s.user_id)] = subsByUser[String(s.user_id)] || []).push(s.sub);
+  for (const m of targets) {
+    for (const sub of (subsByUser[String(m.user_id)] || [])) {
+      try { await push.sendPush(sub, { title: notif.title, body: notif.body || '', url: notif.link || './', tag: notif.type }); } catch (e) {}
+    }
+  }
+}
+// Build a flat reply list into a threaded tree (parent_id → children).
+function nestReplies(rows) {
+  const byId = new Map(rows.map(r => [r.id, { ...r, children: [] }]));
+  const roots = [];
+  for (const r of byId.values()) { const parent = r.parent_id && byId.get(r.parent_id); (parent ? parent.children : roots).push(r); }
+  return roots;
+}
+
+app.post('/api/groups', requireAuth, async (req, res) => {
+  const name = String(req.body.name || '').trim().slice(0, 80);
+  if (!name) return res.status(400).json({ error: 'Group name required.' });
+  try {
+    const invite = crypto.randomBytes(5).toString('hex');
+    const id = await DB.createGroup({ name, owner_id: req.userId, invite_code: invite });   // creator becomes owner + member
+    res.status(201).json({ id, name, invite_code: invite });
+  } catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+app.post('/api/groups/:id/join', requireAuth, async (req, res) => {
+  const groupId = parseInt(req.params.id, 10);
+  if (!groupId) return res.status(400).json({ error: 'bad id' });
+  try { await DB.addGroupMember(groupId, req.userId, 'member'); res.json({ success: true }); }
+  catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+app.post('/api/groups/:id/notify', requireAuth, async (req, res) => {   // toggle notify_enabled
+  const groupId = parseInt(req.params.id, 10);
+  if (!groupId) return res.status(400).json({ error: 'bad id' });
+  try { await DB.setNotifyEnabled(groupId, req.userId, req.body.enabled !== false); res.json({ success: true }); }
+  catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+app.get('/api/groups/:id/notes', requireAuth, async (req, res) => {
+  const groupId = parseInt(req.params.id, 10);
+  if (!groupId) return res.status(400).json({ error: 'bad id' });
+  try {
+    if (!(await DB.getMembership(groupId, req.userId))) return res.status(403).json({ error: 'Not a group member.' });
+    res.json(await DB.listGroupNotes(groupId));
+  } catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+
+app.post('/api/notes', requireAuth, async (req, res) => {
+  const groupId = parseInt(req.body.groupId, 10) || null;
+  const body = String(req.body.body || req.body.text || '').trim();
+  if (!body) return res.status(400).json({ error: 'Note text required.' });
+  try {
+    if (groupId && !(await DB.getMembership(groupId, req.userId))) return res.status(403).json({ error: 'Not a group member.' });
+    const id = await DB.createNote({
+      user_id: req.userId, author_name: req.username, group_id: groupId,
+      book_id: parseInt(req.body.bookId, 10) || null,
+      page: Number.isInteger(req.body.page) ? req.body.page : null,
+      quote: String(req.body.quote || '').trim() || null, body
+    });
+    res.status(201).json({ id });
+  } catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+app.post('/api/notes/:id/like', requireAuth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'bad id' });
+  try {
+    if (!(await DB.getNote(id))) return res.status(404).json({ error: 'not found' });
+    const r = await DB.toggleNoteLike(id, req.userId);
+    res.json({ success: true, liked: r.liked, upvoteCount: r.count });
+  } catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+app.get('/api/notes/:id/replies', requireAuth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'bad id' });
+  try { res.json(nestReplies(await DB.listReplies(id))); }
+  catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+app.post('/api/notes/:id/replies', requireAuth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const body = String(req.body.body || '').trim();
+  if (!id) return res.status(400).json({ error: 'bad id' });
+  if (!body) return res.status(400).json({ error: 'Reply body required.' });
+  try {
+    if (!(await DB.getNote(id))) return res.status(404).json({ error: 'not found' });
+    const replyId = await DB.createReply({ note_id: id, parent_id: parseInt(req.body.parentId, 10) || null, user_id: req.userId, author_name: req.username, body });
+    res.status(201).json({ id: replyId });
+  } catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+// Confusion flag → distinct-user count; at 3, mark needs_clarification and notify the group once.
+app.post('/api/notes/:id/confuse', requireAuth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'bad id' });
+  try {
+    const r = await DB.confuseNote(id, req.userId);
+    if (!r) return res.status(404).json({ error: 'not found' });
+    if (r.tripped && r.groupId) {
+      await notifyGroup(r.groupId, {
+        type: 'needs_clarification', title: 'A note needs clarification',
+        body: 'A note in your group reached 3 confusion flags.', link: './?note=' + id
+      }, req.userId);
+    }
+    res.json({ success: true, confusionCount: r.count, needsClarification: r.count >= 3 });
+  } catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+
+// In-app notifications (badge on page load — polling, no sockets)
+app.get('/api/notifications', requireAuth, async (req, res) => {
+  try { res.json(await DB.listNotifications(req.userId, 30)); } catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+app.get('/api/notifications/count', requireAuth, async (req, res) => {
+  try { res.json({ unread: await DB.unreadCount(req.userId) }); } catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+app.post('/api/notifications/read', requireAuth, async (req, res) => {
+  try { await DB.markNotificationsRead(req.userId, Array.isArray(req.body.ids) ? req.body.ids : null); res.json({ success: true }); }
+  catch (e) { res.status(500).json({ error: 'failed' }); }
+});
+
 // Owner-only: how many devices a broadcast would reach.
 app.get('/api/admin/reach', requireAuth, async (req, res) => {
   if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });
