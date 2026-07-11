@@ -5658,7 +5658,7 @@ function writeStepToDay(day, key, d) {
     if (rated.length) { const sc = rated.reduce((s, mm) => s + (mm.status === 'ate' ? 5 : mm.status === 'light' ? 3 : 1), 0) / rated.length; day.food = day.food || {}; day.food.rating = Math.round(sc); }
   }
   else if (key === 'food') { if (isPillarOn('food')) { day.food = { rating: d.food || 0, notes: (day.food && day.food.notes) || '' }; if (d.cals) day.calories = d.cals; } }
-  else if (key === 'reading') { if (isPillarOn('reading')) { const ab = (state.data.books || []).find(b => b.status === 'reading'); day.reading = { pages: d.readPages || 0, bookId: (ab && ab.id) || (day.reading && day.reading.bookId) || '', bookTitle: (ab && ab.title) || (day.reading && day.reading.bookTitle) || '', summary: (day.reading && day.reading.summary) || '' }; } }
+  else if (key === 'reading') { if (isPillarOn('reading')) { const ab = (state.data.books || []).find(b => b.status === 'reading'); const pr = day.reading || {}; day.reading = { pages: d.readPages || 0, bookId: (ab && ab.id) || pr.bookId || '', bookTitle: (ab && ab.title) || pr.bookTitle || '', summary: pr.summary || '', chapter: pr.chapter || '', page: pr.page || '', quote: pr.quote || '' }; } }
   else if (key === 'networking') { if (isPillarOn('networking')) day.networking = { count: d.net || 0, notes: (day.networking && day.networking.notes) || '' }; }
   else if (key === 'money') { if (isPillarOn('money')) { day.spent = d.spent || 0; day.money = { activities: d.moneyActs || '', income: (day.money && day.money.income) || 0 }; } }
   else if (key === 'water') day.water = d.water || 0;
@@ -5828,6 +5828,9 @@ function renderLogToday(editDay) {
       const ab = (state.data.books || []).find(b => b.status === 'reading');
       const rPages = d.reading?.pages || '';
       const rSummary = d.reading?.summary || '';
+      const rChapter = d.reading?.chapter || '';
+      const rPage = d.reading?.page || '';
+      const rQuote = d.reading?.quote || '';
       return '<div class="today-section read-section">' +
         '<div class="today-section-header read-header">' + pc.icon + ' ' + escapeHtml(pc.label) + '</div>' +
         (ab
@@ -5838,6 +5841,14 @@ function renderLogToday(editDay) {
             '<div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:16px">' +
             '<button type="button" class="btn btn-outline" style="font-size:12px" onclick="showAddBookModal(true)">Change Book</button>' +
             '</div></div>' +
+            '<div class="form-row">' +
+            '<div class="form-group"><label>Chapter <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>' +
+            '<input type="text" id="read-chapter" maxlength="80" placeholder="e.g. Ch. 3 — Compounding" value="' + escapeAttr(rChapter) + '"></div>' +
+            '<div class="form-group"><label>Page <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>' +
+            '<input type="number" id="read-page" min="0" step="1" placeholder="e.g. 42" value="' + rPage + '"></div>' +
+            '</div>' +
+            '<div class="form-group"><label>Highlighted quote <span style="font-weight:400;color:var(--text-muted)">(optional — a line worth keeping)</span></label>' +
+            '<input type="text" id="read-quote" maxlength="300" placeholder="Paste the exact sentence you want to remember…" value="' + escapeAttr(rQuote) + '"></div>' +
             '<div class="form-group"><label>What did you read? <span style="font-weight:400;color:var(--text-muted)">(summary — helps you retain it)</span></label>' +
             '<textarea id="read-summary" rows="3" placeholder="e.g. Learned the difference between assets and liabilities. The author argues that buying your own home is a liability, not an asset…">' + escapeHtml(rSummary) + '</textarea></div>'
           : '<div class="no-book-prompt">' +
@@ -5986,7 +5997,8 @@ function readDayForm(date, prior) {
   // Reading — section is present whenever the reading pillar is on
   if (document.querySelector('.read-section')) {
     const ab = (state.data.books || []).find(b => b.status === 'reading');
-    entry.reading = { pages: parseInt(document.getElementById('read-pages')?.value) || 0, bookId: ab?.id || '', bookTitle: ab?.title || '', summary: document.getElementById('read-summary')?.value?.trim() || '' };
+    entry.reading = { pages: parseInt(document.getElementById('read-pages')?.value) || 0, bookId: ab?.id || '', bookTitle: ab?.title || '', summary: document.getElementById('read-summary')?.value?.trim() || '',
+      chapter: document.getElementById('read-chapter')?.value?.trim() || '', page: parseInt(document.getElementById('read-page')?.value) || '', quote: document.getElementById('read-quote')?.value?.trim() || '' };
   } else {
     entry.reading = prior.reading || { pages: 0, bookId: '', bookTitle: '', summary: '' };
   }
@@ -7870,11 +7882,17 @@ function readingBody() {
           '<span class="rlog-chev">›</span>' +
           '</button>' +
           '<div class="rlog-book-body">' +
-          g.entries.map(d =>
-            '<div class="rlog-entry">' +
-            '<div class="rlog-entry-top"><span class="rlog-date">' + fmtDate(d.date) + '</span><span class="pill pill-read">+' + d.reading.pages + ' pg</span></div>' +
-            ((d.reading.summary || '').trim() ? '<div class="rlog-note">' + escapeHtml(d.reading.summary.trim()) + '</div>' : '') +
-            '</div>'
+          chaptersInBook(g.entries).map(ch =>
+            (ch.chapter ? '<div class="rlog-chapter">' + escapeHtml(ch.chapter) + '</div>' : '') +
+            ch.entries.map(d =>
+              '<div class="rlog-entry">' +
+              '<div class="rlog-entry-top"><span class="rlog-date">' + fmtDate(d.date) + '</span>' +
+              (d.reading.page ? '<span class="rlog-pg">p.' + escapeHtml(String(d.reading.page)) + '</span>' : '') +
+              '<span class="pill pill-read">+' + d.reading.pages + ' pg</span></div>' +
+              ((d.reading.quote || '').trim() ? '<div class="rlog-quote">“' + escapeHtml(d.reading.quote.trim()) + '”</div>' : '') +
+              ((d.reading.summary || '').trim() ? '<div class="rlog-note">' + escapeHtml(d.reading.summary.trim()) + '</div>' : '') +
+              '</div>'
+            ).join('')
           ).join('') +
           '</div>' +
           '</div>';
@@ -8329,6 +8347,18 @@ function groupReadingByBook(days) {
     pages: map[title].reduce((s, d) => s + (d.reading.pages || 0), 0),
     notes: map[title].filter(d => (d.reading.summary || '').trim()).length
   }));
+}
+// Sub-group a book's reading entries by chapter (keeps newest-first order;
+// entries with no chapter fall into one trailing unlabelled group).
+function chaptersInBook(entries) {
+  const order = [], map = {};
+  (entries || []).forEach(d => {
+    const ch = ((d.reading && d.reading.chapter) || '').trim();
+    const key = ch || ' ';
+    if (!map[key]) { map[key] = { chapter: ch, entries: [] }; order.push(key); }
+    map[key].entries.push(d);
+  });
+  return order.map(k => map[k]);
 }
 // Remembers which book note-groups are collapsed, across re-renders.
 const _collapsedBookNotes = new Set();

@@ -2112,6 +2112,13 @@ body.wo-fullscreen .bottom-nav { display: none !important; }   /* workout is an 
 .rlog-entry-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
 .rlog-date { font-weight: 700; font-size: 13px; color: var(--text); }
 .rlog-note { font-size: 13.5px; color: var(--text-muted); line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; }
+/* Location layer for reading notes: chapter sub-groups, page badge, highlighted quote */
+.rlog-entry-top { justify-content: flex-start; }
+.rlog-entry-top .pill { margin-left: auto; }
+.rlog-chapter { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--read-color); margin: 14px 0 2px; }
+.rlog-book-body > .rlog-chapter:first-child { margin-top: 4px; }
+.rlog-pg { font-size: 11px; font-weight: 700; color: var(--read-color); background: rgba(6,182,212,0.10); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.rlog-quote { font-size: 13px; color: var(--text); font-style: italic; line-height: 1.5; margin: 2px 0 6px; padding: 6px 10px; border-left: 3px solid var(--read-color); background: var(--surface); border-radius: 0 6px 6px 0; }
 
 /* Community feed — composer + posts */
 .cf-typetabs, .cf-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
