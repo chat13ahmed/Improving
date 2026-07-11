@@ -2119,6 +2119,15 @@ body.wo-fullscreen .bottom-nav { display: none !important; }   /* workout is an 
 .rlog-book-body > .rlog-chapter:first-child { margin-top: 4px; }
 .rlog-pg { font-size: 11px; font-weight: 700; color: var(--read-color); background: rgba(6,182,212,0.10); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .rlog-quote { font-size: 13px; color: var(--text); font-style: italic; line-height: 1.5; margin: 2px 0 6px; padding: 6px 10px; border-left: 3px solid var(--read-color); background: var(--surface); border-radius: 0 6px 6px 0; }
+/* Per-book chapter list */
+.chap-list { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 12px; }
+.chap-item { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+.chap-num { font-size: 12px; font-weight: 800; color: var(--read-color); background: rgba(6,182,212,0.10); border-radius: 6px; padding: 1px 8px; flex: none; }
+.chap-name { flex: 1; font-size: 14px; color: var(--text); min-width: 0; overflow-wrap: break-word; }
+.chap-x { border: none; background: none; color: var(--text-muted); cursor: pointer; font-size: 13px; flex: none; padding: 2px 4px; }
+.chap-x:hover { color: var(--danger); }
+.chap-add { display: flex; gap: 8px; }
+.chap-add .vocab-input { flex: 1; }
 
 /* Community feed — composer + posts */
 .cf-typetabs, .cf-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }

@@ -5843,7 +5843,8 @@ function renderLogToday(editDay) {
             '</div></div>' +
             '<div class="form-row">' +
             '<div class="form-group"><label>Chapter <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>' +
-            '<input type="text" id="read-chapter" maxlength="80" placeholder="e.g. Ch. 3 — Compounding" value="' + escapeAttr(rChapter) + '"></div>' +
+            '<input type="text" id="read-chapter" list="read-chapter-list" maxlength="80" placeholder="e.g. Ch. 3 — Compounding" value="' + escapeAttr(rChapter) + '">' +
+            '<datalist id="read-chapter-list">' + (ab.chapters || []).map(c => '<option value="' + escapeAttr(c) + '"></option>').join('') + '</datalist></div>' +
             '<div class="form-group"><label>Page <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>' +
             '<input type="number" id="read-page" min="0" step="1" placeholder="e.g. 42" value="' + rPage + '"></div>' +
             '</div>' +
@@ -7882,7 +7883,7 @@ function readingBody() {
           '<span class="rlog-chev">›</span>' +
           '</button>' +
           '<div class="rlog-book-body">' +
-          chaptersInBook(g.entries).map(ch =>
+          chaptersInBook(g.entries, (booksByTitle[g.title] || {}).chapters).map(ch =>
             (ch.chapter ? '<div class="rlog-chapter">' + escapeHtml(ch.chapter) + '</div>' : '') +
             ch.entries.map(d =>
               '<div class="rlog-entry">' +
@@ -7916,7 +7917,44 @@ function readingBody() {
       '</div></div>'
     : '';
 
-  return statsBar + bookCard + renderTakeawaysCard() + historyCard + finishedCard;
+  return statsBar + bookCard + renderChaptersCard() + renderTakeawaysCard() + historyCard + finishedCard;
+}
+// Per-book chapter list — define a book's chapters once, then pick them when logging.
+function renderChaptersCard() {
+  const book = (state.data.books || []).find(b => b.status === 'reading');
+  if (!book) return '';
+  const chapters = book.chapters || [];
+  const list = chapters.length
+    ? '<div class="chap-list">' + chapters.map((c, i) =>
+        '<div class="chap-item"><span class="chap-num">' + (i + 1) + '</span>' +
+        '<span class="chap-name">' + escapeHtml(c) + '</span>' +
+        '<button class="chap-x" title="Remove" onclick="deleteChapter(' + i + ')">✕</button></div>').join('') + '</div>'
+    : '<div class="my-meals-empty">No chapters yet — add them so your notes organize themselves by chapter.</div>';
+  return '<div class="card chap-card">' +
+    '<h3 class="card-title">Chapters — ' + escapeHtml(book.title) + '</h3>' +
+    '<p class="card-sub">List this book\'s chapters once. When you log a reading note you can pick one, and your notes group under it automatically.</p>' +
+    list +
+    '<div class="chap-add"><input type="text" id="chap-input" class="vocab-input" placeholder="Add a chapter — e.g. Ch. 3 — Compounding" maxlength="80" autocomplete="off" onkeydown="if(event.key===\'Enter\'){addChapter()}"><button class="btn btn-primary" onclick="addChapter()">Add</button></div>' +
+    '</div>';
+}
+async function addChapter() {
+  const el = document.getElementById('chap-input');
+  const name = ((el && el.value) || '').trim();
+  if (!name) { showToast('Type a chapter name first.', 'error'); return; }
+  const book = (state.data.books || []).find(b => b.status === 'reading');
+  if (!book) return;
+  if (!book.chapters) book.chapters = [];
+  if (book.chapters.some(c => c.toLowerCase() === name.toLowerCase())) { showToast('That chapter is already listed.', 'error'); return; }
+  book.chapters.push(name);
+  await saveData();
+  renderKnowledgePage();
+}
+async function deleteChapter(i) {
+  const book = (state.data.books || []).find(b => b.status === 'reading');
+  if (!book || !Array.isArray(book.chapters)) return;
+  book.chapters.splice(i, 1);
+  await saveData();
+  renderKnowledgePage();
 }
 
 // ---- Knowledge hub (Reading + Vocabulary) ----------------------------------
@@ -8350,15 +8388,24 @@ function groupReadingByBook(days) {
 }
 // Sub-group a book's reading entries by chapter (keeps newest-first order;
 // entries with no chapter fall into one trailing unlabelled group).
-function chaptersInBook(entries) {
-  const order = [], map = {};
+function chaptersInBook(entries, bookChapters) {
+  const map = {}, seen = [];
   (entries || []).forEach(d => {
     const ch = ((d.reading && d.reading.chapter) || '').trim();
     const key = ch || ' ';
-    if (!map[key]) { map[key] = { chapter: ch, entries: [] }; order.push(key); }
+    if (!map[key]) { map[key] = { chapter: ch, entries: [] }; seen.push(key); }
     map[key].entries.push(d);
   });
-  return order.map(k => map[k]);
+  const used = new Set(), ordered = [];
+  (bookChapters || []).forEach(name => {                 // 1. the book's own chapters, in their order
+    const k = (name || '').trim();
+    if (k && map[k] && !used.has(k)) { used.add(k); ordered.push(map[k]); }
+  });
+  seen.forEach(k => {                                    // 2. any ad-hoc chapters not in the list (recency)
+    if (k !== ' ' && !used.has(k)) { used.add(k); ordered.push(map[k]); }
+  });
+  if (map[' ']) ordered.push(map[' ']);                  // 3. unlabelled entries last
+  return ordered;
 }
 // Remembers which book note-groups are collapsed, across re-renders.
 const _collapsedBookNotes = new Set();
