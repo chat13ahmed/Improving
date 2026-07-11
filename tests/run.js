@@ -62,7 +62,7 @@ function loadApp(fieldValues) {
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
-    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority });';
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -235,6 +235,20 @@ eq('sortTakeawaysByPriority: two never-seen keep created order (oldest first)',
   ]).map(t => t.id), ['old', 'new']);
 ok('sortTakeawaysByPriority handles empty/null safely',
   A.sortTakeawaysByPriority(null).length === 0 && A.sortTakeawaysByPriority([]).length === 0);
+// fuelStatus — the gym × nutrition connector
+eq('fuelStatus: under-eating while training hard → warn',
+  A.fuelStatus({ trainedToday: false, gymDays: 4, proteinTarget: 150, proteinToday: 0, avgProteinWeek: 90 }).tone, 'warn');
+eq('fuelStatus: eating matches training → good',
+  A.fuelStatus({ trainedToday: false, gymDays: 4, proteinTarget: 150, proteinToday: 0, avgProteinWeek: 145 }).tone, 'good');
+ok('fuelStatus: trained today computes the protein gap', (() => {
+  const r = A.fuelStatus({ trainedToday: true, gymDays: 1, proteinTarget: 150, proteinToday: 100, avgProteinWeek: 100 });
+  return r.tone === 'today' && r.gap === 50;
+})());
+eq('fuelStatus: no training/data → neutral',
+  A.fuelStatus({ trainedToday: false, gymDays: 0, proteinTarget: 0, proteinToday: 0, avgProteinWeek: 0 }).tone, 'neutral');
+ok('fuelStatus: no gap when not trained today', A.fuelStatus({ trainedToday: false, gymDays: 1, proteinTarget: 150, proteinToday: 20, avgProteinWeek: 20 }).gap === 0);
+ok('proteinFoodForGap: suggests food for a real gap, nothing for none',
+  /whey|chicken/.test(A.proteinFoodForGap(40)) && A.proteinFoodForGap(0) === '');
 // weeklyGoalsReached — dashboard's "% of goals reached" hero number
 ok('weeklyGoalsReached averages active goals', A.weeklyGoalsReached({ gymDays: 4, readPages: 100 }, { gymDaysPerWeek: 4, weeklyReadGoal: 200 }, 0, { gym: true, reading: true }) === 75);
 ok('weeklyGoalsReached caps each goal at 100', A.weeklyGoalsReached({ gymDays: 10 }, { gymDaysPerWeek: 5 }, 0, { gym: true }) === 100);

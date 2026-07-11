@@ -1717,6 +1717,73 @@ function computeNutrition(n) {
 
 function getNutrition() { return computeNutrition(state.data.profile?.nutrition); }
 
+// ── Gym × Nutrition: does your eating match your training? (pure + testable) ──
+function fuelStatus(ctx) {
+  const c = ctx || {};
+  const target = +c.proteinTarget || 0;
+  const gymDays = +c.gymDays || 0;
+  const avg = Math.round(+c.avgProteinWeek || 0);
+  const eatenToday = Math.round(+c.proteinToday || 0);
+  const gap = c.trainedToday && target ? Math.max(0, target - eatenToday) : 0;
+  let tone, headline, detail;
+  if (target && gymDays >= 3 && avg > 0 && avg < target * 0.8) {
+    tone = 'warn';
+    headline = 'Your eating isn’t matching your training';
+    detail = 'You trained ' + gymDays + '× this week but averaged only ' + avg + 'g protein/day — under your ' + target + 'g target. Muscle is built in the kitchen; close the gap.';
+  } else if (target && gymDays >= 3 && avg >= target * 0.9) {
+    tone = 'good';
+    headline = 'Fuel is matching training 🔒';
+    detail = 'Trained ' + gymDays + '× and averaging ' + avg + 'g protein/day — right on target. This is exactly how muscle gets built.';
+  } else if (c.trainedToday) {
+    tone = 'today';
+    headline = 'You trained today — refuel 💪';
+    detail = gap > 0
+      ? gap + 'g of protein to go (of ' + target + 'g). Recovery runs on it — make your next meal count.'
+      : 'Protein target hit — great recovery fuel in the tank.';
+  } else {
+    tone = 'neutral';
+    headline = 'Training × Nutrition';
+    detail = gymDays > 0
+      ? 'Trained ' + gymDays + '× this week, averaging ' + avg + 'g protein/day. Protein matters most on training weeks.'
+      : 'Log a workout and your meals to see how your fuel matches your training.';
+  }
+  return { tone, headline, detail, gap };
+}
+// Turn a protein gap into real food. (pure + testable)
+function proteinFoodForGap(gap) {
+  const g = Math.round(+gap || 0);
+  if (g <= 0) return '';
+  let food;
+  if (g >= 45) food = 'a chicken breast + a scoop of whey';
+  else if (g >= 30) food = 'a chicken breast (≈35g)';
+  else if (g >= 20) food = 'a scoop of whey + Greek yogurt';
+  else food = 'a scoop of whey (≈25g)';
+  return '≈ ' + food + ' closes the gap';
+}
+function renderFuelCard() {
+  const nut = getNutrition();
+  if (!nut || !isPillarOn('gym')) return '';
+  const td = (state.data.days || []).find(d => d.date === todayStr()) || {};
+  const trainedToday = !!(td.gym && td.gym.done);
+  const proteinToday = (td.eaten && td.eaten.protein) || 0;
+  const gymDays = getWeekStats().gymDays || 0;
+  const weekStart = getWeekStart();
+  const pDays = (state.data.days || []).filter(d => d.date >= weekStart && (d.eaten && d.eaten.protein) > 0);
+  const avgProteinWeek = pDays.length ? pDays.reduce((s, d) => s + (d.eaten.protein || 0), 0) / pDays.length : 0;
+  const target = nut.protein.g;
+  const fs = fuelStatus({ trainedToday, gymDays, proteinTarget: target, proteinToday, avgProteinWeek });
+  const pct = target ? Math.min(100, Math.round(proteinToday / target * 100)) : 0;
+  const food = fs.gap > 0 ? proteinFoodForGap(fs.gap) : '';
+  return '<div class="card fuel-card fuel-' + fs.tone + '">' +
+    '<div class="fuel-badge">🔗 Training × Nutrition</div>' +
+    '<div class="fuel-title">' + fs.headline + '</div>' +
+    '<div class="fuel-detail">' + fs.detail + '</div>' +
+    (target ? '<div class="fuel-bar-top"><span>Protein today</span><span>' + Math.round(proteinToday) + ' / ' + target + 'g</span></div>' +
+      '<div class="fuel-bar"><i style="width:' + pct + '%"></i></div>' : '') +
+    (food ? '<div class="fuel-food">💡 ' + food + '</div>' : '') +
+    '</div>';
+}
+
 // ── Bodyweight tracking (stored in kg; displayed in the user's unit) ──
 function weightUnitPref() { return (state.data.profile && state.data.profile.nutrition && state.data.profile.nutrition.weightUnit) || 'lbs'; }
 function kgToDisplay(kg) { return weightUnitPref() === 'lbs' ? kg / LBS_TO_KG : kg; }
@@ -3924,42 +3991,62 @@ function renderGymPlanHint() {
 // ─────────────────────────────────────────────────────────────
 const EXERCISE_LIBRARY = {
   Chest: ['Barbell Bench Press', 'Incline Barbell Bench Press', 'Decline Bench Press', 'Flat Dumbbell Press', 'Incline Dumbbell Press',
-    'Machine Chest Press', 'Smith Machine Bench Press', 'Push-Up', 'Incline Push-Up', 'Dips',
-    'Chest Fly', 'Pec Deck Machine', 'Cable Crossover', 'Low Cable Fly', 'High Cable Fly',
-    'Landmine Press', 'Dumbbell Pullover', 'Svend Press'],
-  Back: ['Pull-Up', 'Chin-Up', 'Lat Pulldown', 'Wide-Grip Lat Pulldown', 'Straight-Arm Pulldown',
-    'Bent-Over Row', 'Pendlay Row', 'T-Bar Row', 'Seated Cable Row', 'Chest-Supported Row',
-    'Dumbbell Row', 'Meadows Row', 'Inverted Row', 'Deadlift', 'Rack Pull',
-    'Trap Bar Deadlift', 'Back Extension', 'Face Pull'],
-  Legs: ['Back Squat', 'Front Squat', 'Goblet Squat', 'Hack Squat', 'Leg Press',
-    'Bulgarian Split Squat', 'Walking Lunge', 'Reverse Lunge', 'Step-Up', 'Romanian Deadlift',
-    'Sumo Deadlift', 'Leg Extension', 'Leg Curl', 'Seated Leg Curl', 'Hip Thrust',
-    'Glute Bridge', 'Calf Raise', 'Seated Calf Raise', 'Adductor Machine', 'Box Jump'],
-  Shoulders: ['Overhead Press', 'Dumbbell Shoulder Press', 'Machine Shoulder Press', 'Arnold Press', 'Behind-the-Neck Press',
-    'Bradford Press', 'Landmine Shoulder Press', 'Pike Push-Up', 'Lateral Raise', 'Cable Lateral Raise',
-    'Front Raise', 'Cable Front Raise', 'Plate Front Raise', 'Rear Delt Fly', 'Reverse Pec Deck',
-    'Upright Row', 'Shrug'],
+    'Decline Dumbbell Press', 'Machine Chest Press', 'Incline Machine Press', 'Smith Machine Bench Press', 'Floor Press',
+    'Push-Up', 'Incline Push-Up', 'Deficit Push-Up', 'Archer Push-Up', 'Dips',
+    'Ring Dips', 'Chest Fly', 'Pec Deck Machine', 'Cable Crossover', 'Low Cable Fly',
+    'High Cable Fly', 'Single-Arm Cable Press', 'Landmine Press', 'Dumbbell Pullover', 'Svend Press'],
+  Back: ['Pull-Up', 'Chin-Up', 'Neutral-Grip Pull-Up', 'Lat Pulldown', 'Wide-Grip Lat Pulldown',
+    'Neutral-Grip Pulldown', 'Single-Arm Lat Pulldown', 'Straight-Arm Pulldown', 'Cable Pullover', 'Bent-Over Row',
+    'Pendlay Row', 'T-Bar Row', 'Seated Cable Row', 'Chest-Supported Row', 'Machine Row',
+    'Dumbbell Row', 'Kroc Row', 'Seal Row', 'Meadows Row', 'Inverted Row',
+    'Deadlift', 'Rack Pull', 'Deficit Deadlift', 'Snatch-Grip Deadlift', 'Trap Bar Deadlift',
+    'Good Morning', 'Back Extension', 'Face Pull'],
+  Legs: ['Back Squat', 'Front Squat', 'Pause Squat', 'Goblet Squat', 'Hack Squat',
+    'Pendulum Squat', 'Zercher Squat', 'Belt Squat', 'Sissy Squat', 'Leg Press',
+    'Single-Leg Press', 'Bulgarian Split Squat', 'Walking Lunge', 'Reverse Lunge', 'Curtsy Lunge',
+    'Cossack Squat', 'Step-Up', 'Romanian Deadlift', 'Single-Leg RDL', 'Stiff-Leg Deadlift',
+    'Sumo Deadlift', 'Leg Extension', 'Leg Curl', 'Seated Leg Curl', 'Nordic Curl',
+    'Hip Thrust', 'Glute Bridge', 'Calf Raise', 'Standing Calf Raise', 'Seated Calf Raise',
+    'Donkey Calf Raise', 'Adductor Machine', 'Abductor Machine', 'Box Jump'],
+  Shoulders: ['Overhead Press', 'Seated Dumbbell Press', 'Dumbbell Shoulder Press', 'Machine Shoulder Press', 'Arnold Press',
+    'Push Press', 'Z Press', 'Behind-the-Neck Press', 'Landmine Shoulder Press', 'Pike Push-Up',
+    'Handstand Push-Up', 'Lateral Raise', 'Cable Lateral Raise', 'Machine Lateral Raise', 'Leaning Cable Lateral Raise',
+    'Front Raise', 'Cable Front Raise', 'Plate Front Raise', 'Rear Delt Fly', 'Cable Rear Delt Fly',
+    'Reverse Pec Deck', 'Upright Row', 'Barbell Shrug', 'Dumbbell Shrug'],
   Arms: ['Barbell Curl', 'EZ-Bar Curl', 'Dumbbell Curl', 'Incline Dumbbell Curl', 'Hammer Curl',
-    'Preacher Curl', 'Concentration Curl', 'Cable Curl', 'Spider Curl', 'Zottman Curl',
-    'Triceps Pushdown', 'Rope Triceps Pushdown', 'Skull Crusher', 'Overhead Triceps Extension', 'Triceps Kickback',
-    'Close-Grip Bench Press', 'Bench Dip', 'Diamond Push-Up', 'Wrist Curl', 'Reverse Wrist Curl'],
-  Core: ['Plank', 'Side Plank', 'Hollow Hold', 'Crunch', 'Bicycle Crunch',
-    'Cable Crunch', 'Sit-Up', 'Decline Sit-Up', 'Hanging Leg Raise', 'Lying Leg Raise',
-    'Russian Twist', 'Cable Woodchop', 'Pallof Press', 'Ab Wheel Rollout', 'Mountain Climber',
-    'Dead Bug', 'Flutter Kicks', 'V-Up'],
-  Cardio: ['Treadmill Run', 'Sprints', 'Incline Walk', 'Hiking', 'Cycling',
-    'Assault Bike', 'Rowing Machine', 'Stair Climber', 'Elliptical', 'Jump Rope',
-    'Burpees', 'Battle Ropes', 'Kettlebell Swing', 'Sled Push', 'Shadow Boxing',
-    'Swimming', 'HIIT Intervals']
+    'Cross-Body Hammer Curl', 'Preacher Curl', 'Machine Preacher Curl', 'Concentration Curl', 'Cable Curl',
+    'Bayesian Cable Curl', 'Spider Curl', 'Drag Curl', 'Zottman Curl', 'Reverse Curl',
+    '21s', 'Triceps Pushdown', 'Rope Triceps Pushdown', 'Single-Arm Pushdown', 'Skull Crusher',
+    'Overhead Triceps Extension', 'Overhead Cable Extension', 'Triceps Kickback', 'JM Press', 'Close-Grip Bench Press',
+    'Bench Dip', 'Diamond Push-Up', 'Wrist Curl', 'Reverse Wrist Curl', 'Wrist Roller',
+    'Plate Pinch'],
+  Core: ['Plank', 'Side Plank', 'Weighted Plank', 'Copenhagen Plank', 'Hollow Hold',
+    'Hollow Rock', 'Crunch', 'Bicycle Crunch', 'Reverse Crunch', 'Cable Crunch',
+    'Sit-Up', 'Decline Sit-Up', 'Hanging Leg Raise', 'Hanging Knee Raise', 'Toes-to-Bar',
+    'Lying Leg Raise', 'Russian Twist', 'Cable Woodchop', 'Cable Rotation', 'Pallof Press',
+    'Ab Wheel Rollout', 'Dragon Flag', 'L-Sit', 'Mountain Climber', 'Dead Bug',
+    'Bird Dog', 'Flutter Kicks', 'V-Up', 'Windshield Wipers', 'Suitcase Carry'],
+  Cardio: ['Treadmill Run', 'Jog', 'Sprints', 'Incline Walk', 'Incline Sprints',
+    'Hiking', 'Cycling', 'Spin Bike', 'Assault Bike', 'Rowing Machine',
+    'Ski Erg', 'Stair Climber', 'Elliptical', 'Jump Rope', 'Jumping Jacks',
+    'High Knees', 'Burpees', 'Battle Ropes', 'Kettlebell Swing', 'Sled Push',
+    'Farmer’s Carry', 'Bear Crawl', 'Shadow Boxing', 'Swimming', 'HIIT Intervals']
 };
 // Ready-made workouts — each is a list of library exercises. Pick one and just
 // log your sets/reps, instead of building the workout from scratch.
 const WORKOUT_PROGRAMS = {
   'Full Body': ['Back Squat', 'Barbell Bench Press', 'Bent-Over Row', 'Overhead Press', 'Plank'],
+  'Beginner Full Body': ['Goblet Squat', 'Machine Chest Press', 'Lat Pulldown', 'Leg Press', 'Plank'],
+  '5x5 Strength': ['Back Squat', 'Barbell Bench Press', 'Bent-Over Row', 'Overhead Press', 'Deadlift'],
   'Push Day': ['Barbell Bench Press', 'Incline Dumbbell Press', 'Overhead Press', 'Lateral Raise', 'Triceps Pushdown'],
   'Pull Day': ['Pull-Up', 'Bent-Over Row', 'Lat Pulldown', 'Face Pull', 'Barbell Curl'],
   'Leg Day': ['Back Squat', 'Romanian Deadlift', 'Leg Press', 'Leg Curl', 'Calf Raise'],
   'Upper Body': ['Barbell Bench Press', 'Bent-Over Row', 'Overhead Press', 'Lat Pulldown', 'Barbell Curl', 'Triceps Pushdown'],
+  'Chest & Triceps': ['Barbell Bench Press', 'Incline Dumbbell Press', 'Cable Crossover', 'Dips', 'Rope Triceps Pushdown', 'Overhead Triceps Extension'],
+  'Back & Biceps': ['Pull-Up', 'Bent-Over Row', 'Seated Cable Row', 'Face Pull', 'Barbell Curl', 'Hammer Curl'],
+  'Shoulders & Arms': ['Overhead Press', 'Lateral Raise', 'Rear Delt Fly', 'Barbell Curl', 'Triceps Pushdown', 'Hammer Curl'],
+  'Glutes & Hamstrings': ['Hip Thrust', 'Romanian Deadlift', 'Bulgarian Split Squat', 'Seated Leg Curl', 'Glute Bridge', 'Calf Raise'],
+  'Athletic Conditioning': ['Kettlebell Swing', 'Box Jump', 'Battle Ropes', 'Sled Push', 'Burpees', 'Mountain Climber'],
   'Core & Abs': ['Plank', 'Hanging Leg Raise', 'Cable Crunch', 'Russian Twist', 'Ab Wheel Rollout']
 };
 // Which body group a library exercise belongs to (for its card label + muscle map).
@@ -4250,7 +4337,13 @@ function closeWorkout() {
   const tot = workoutTotals(state._workout ? state._workout.exercises : []);
   state._workout = null; state._lib = null; state._mm = null; state._woChoose = false; state._woProgram = false;
   navigate(state._workoutReturn || 'log');
-  if (tot.sets > 0) showToast('Workout saved — ' + tot.sets + ' sets · ' + tot.reps + ' reps 💪', 'success');
+  if (tot.sets > 0) {
+    const nut = getNutrition();
+    const td = (state.data.days || []).find(d => d.date === todayStr()) || {};
+    const gap = nut ? Math.max(0, nut.protein.g - Math.round((td.eaten && td.eaten.protein) || 0)) : 0;
+    const base = 'Workout saved — ' + tot.sets + ' sets · ' + tot.reps + ' reps 💪';
+    showToast(gap > 0 ? base + ' · now refuel: ~' + gap + 'g protein to go' : base, 'success');
+  }
 }
 
 // ── Exercises + sets ──
@@ -6555,6 +6648,7 @@ function renderHealthOverview(nut, gymDays, gymGoal, streak, eatenCal, eatenP, w
     card('<div class="biz-k">Protein today</div><div class="biz-big">' + Math.round(eatenP) + 'g</div><div class="biz-sub">' + (pTarget ? 'of ' + pTarget + 'g target' : 'set a target') + '</div>', "setHealthTab('nutrition')") +
     card('<div class="biz-k">Weight</div><div class="biz-big">' + (wDisp != null ? wDisp + ' <span style="font-size:14px">' + wUnit + '</span>' : '—') + '</div><div class="biz-sub">' + (wDisp != null ? 'latest weigh-in' : 'log your weight') + '</div>', "setHealthTab('nutrition')") +
     '</div>' +
+    renderFuelCard() +
     '<button type="button" class="wo-add" style="margin-top:4px" onclick="openWorkout(\'health\')">🏋️ Track a workout — sets, reps & rest timer</button>';
 }
 function renderHealthTraining(gymDays, gymGoal, streak) {
@@ -6579,7 +6673,7 @@ function renderHealthNutrition(nut, td, eatenCal, eatenP) {
     bar(Math.round(eaten.carbs || 0), nut.carbs.g, 'Carbs', 'g', 'var(--accent)') +
     bar(Math.round(eaten.fat || 0), nut.fat.g, 'Fat', 'g', '#A78BFA') +
     '</div><button type="button" class="wo-add" onclick="navigate(\'log\')">＋ Log today\'s food</button>';
-  return today + renderMealPlan(nut) + renderNutritionWeekCard() + renderWeightTrend();
+  return today + renderFuelCard() + renderMealPlan(nut) + renderNutritionWeekCard() + renderWeightTrend();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -8357,7 +8451,38 @@ const BOOK_DB = [
   { t: 'The Fountainhead', a: 'Ayn Rand', p: 752 },
   { t: 'Dune', a: 'Frank Herbert', p: 688 },
   { t: 'Siddhartha', a: 'Hermann Hesse', p: 152 },
-  { t: 'The Old Man and the Sea', a: 'Ernest Hemingway', p: 127 }
+  { t: 'The Old Man and the Sea', a: 'Ernest Hemingway', p: 127 },
+  // Health, fitness & nutrition
+  { t: 'Outlive', a: 'Peter Attia', p: 496 },
+  { t: 'Bigger Leaner Stronger', a: 'Michael Matthews', p: 496 },
+  { t: 'Thinner Leaner Stronger', a: 'Michael Matthews', p: 456 },
+  { t: 'Starting Strength', a: 'Mark Rippetoe', p: 347 },
+  { t: 'The New Encyclopedia of Modern Bodybuilding', a: 'Arnold Schwarzenegger', p: 800 },
+  { t: 'How Not to Die', a: 'Michael Greger', p: 576 },
+  { t: 'In Defense of Food', a: 'Michael Pollan', p: 256 },
+  { t: "The Omnivore's Dilemma", a: 'Michael Pollan', p: 464 },
+  { t: 'Born to Run', a: 'Christopher McDougall', p: 287 },
+  { t: 'The Comfort Crisis', a: 'Michael Easter', p: 320 },
+  { t: 'Exercised', a: 'Daniel E. Lieberman', p: 464 },
+  { t: 'Spark', a: 'John J. Ratey', p: 304 },
+  { t: 'Glucose Revolution', a: 'Jessie Inchauspé', p: 320 },
+  { t: 'The Obesity Code', a: 'Jason Fung', p: 320 },
+  { t: 'Why We Get Fat', a: 'Gary Taubes', p: 272 },
+  { t: 'Endure', a: 'Alex Hutchinson', p: 336 },
+  { t: 'Peak Performance', a: 'Brad Stulberg', p: 272 },
+  { t: 'The Willpower Instinct', a: 'Kelly McGonigal', p: 272 },
+  { t: 'Dopamine Nation', a: 'Anna Lembke', p: 304 },
+  // A few more money, mind & classics
+  { t: 'The Barefoot Investor', a: 'Scott Pape', p: 296 },
+  { t: "The Bogleheads' Guide to Investing", a: 'Taylor Larimore', p: 336 },
+  { t: 'The Molecule of More', a: 'Daniel Z. Lieberman', p: 240 },
+  { t: 'Chatter', a: 'Ethan Kross', p: 272 },
+  { t: 'The Brain That Changes Itself', a: 'Norman Doidge', p: 448 },
+  { t: 'Thus Spoke Zarathustra', a: 'Friedrich Nietzsche', p: 352 },
+  { t: 'Beyond Good and Evil', a: 'Friedrich Nietzsche', p: 240 },
+  { t: 'The Stranger', a: 'Albert Camus', p: 123 },
+  { t: 'Frankenstein', a: 'Mary Shelley', p: 280 },
+  { t: 'The Count of Monte Cristo', a: 'Alexandre Dumas', p: 1276 }
 ];
 // Group the library by author (sorted) for the "browse by author" picker.
 function booksByAuthor() {
