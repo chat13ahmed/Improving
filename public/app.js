@@ -8018,9 +8018,35 @@ function vocabStats(vocab) {
   const practiced = list.filter(w => w.sentence && w.sentence.trim()).length;
   return { total: list.length, practiced, needSentence: list.length - practiced };
 }
+// ── Spaced repetition (Leitner) for vocabulary — active recall makes it stick. Pure + testable. ──
+const REVIEW_INTERVALS = [1, 2, 4, 9, 16, 30];   // days until next review, by box
+function reviewIntervalDays(box) { return REVIEW_INTERVALS[Math.max(0, Math.min(box | 0, REVIEW_INTERVALS.length - 1))]; }
+function nextReviewBox(box, correct) { box = Number.isInteger(box) ? box : 0; return correct ? Math.min(box + 1, REVIEW_INTERVALS.length - 1) : 0; }
+function vocabDue(vocab, today) { return (Array.isArray(vocab) ? vocab : []).filter(w => !w.review || !w.review.due || w.review.due <= today); }
+function vocabMastered(vocab) { return (Array.isArray(vocab) ? vocab : []).filter(w => w.review && (w.review.box || 0) >= 4).length; }
+// Reading pace: pages/day averaged over the last 14 calendar days (rest days included). Pure.
+function readingPacePerDay(days) {
+  const now = Date.now(); let pages = 0;
+  for (const d of (days || [])) {
+    if (!d.reading || !(d.reading.pages > 0)) continue;
+    const t = Date.parse((d.date || '') + 'T00:00:00');
+    if (!isNaN(t)) { const age = (now - t) / 86400000; if (age >= 0 && age < 14) pages += d.reading.pages; }
+  }
+  return pages / 14;
+}
 function renderVocabCard() {
   const vocab = state.data.vocab || [];
   const s = vocabStats(vocab);
+  const dueCount = vocabDue(vocab, todayStr()).length;
+  const mastered = vocabMastered(vocab);
+  const reviewBanner = vocab.length
+    ? (dueCount > 0
+      ? '<div class="vr-cta"><div class="vr-cta-txt"><div class="vr-cta-n">🎯 ' + dueCount + ' word' + (dueCount === 1 ? '' : 's') + ' due to review</div>' +
+        '<div class="vr-cta-sub">Active recall is what burns them in' + (mastered ? ' · ' + mastered + ' mastered' : '') + '.</div></div>' +
+        '<button type="button" class="btn btn-primary" onclick="startVocabReview()">Review →</button></div>'
+      : '<div class="vr-cta vr-cta-done"><div class="vr-cta-txt"><div class="vr-cta-n">✓ All caught up</div>' +
+        '<div class="vr-cta-sub">' + mastered + ' of ' + vocab.length + ' mastered · next review ' + (nextVocabReviewDate() || 'later') + '</div></div></div>')
+    : '';
   const form =
     '<div class="vocab-form">' +
     '<input type="text" id="vocab-word" class="vocab-input" placeholder="New word" maxlength="60" autocomplete="off">' +
@@ -8055,7 +8081,7 @@ function renderVocabCard() {
     '<h3 class="card-title">Words I\'m learning</h3>' +
     '<p class="card-sub">Capture a new word with the sentence you met it in — seeing it in context is what makes it stick — then put it to work in your own sentence.' +
     (s.total ? ' · <b>' + s.total + '</b> word' + (s.total === 1 ? '' : 's') + ' · <b>' + s.practiced + '</b> used in a sentence' : '') + '</p>' +
-    form + list +
+    reviewBanner + form + list +
     '<label class="vocab-remind"><input type="checkbox" onchange="toggleVocabNudge(this)"' + (state.data.profile && state.data.profile.vocabNudge !== false ? ' checked' : '') + '> Surprise me with a word to practice — send me a notification to use one in a sentence</label>' +
     '</div>';
 }
@@ -8096,6 +8122,76 @@ async function deleteVocabWord(id) {
   await saveData();
   renderKnowledgePage();
 }
+// ── Flashcard review session (active recall + spaced repetition) ──
+function nextVocabReviewDate() {
+  const today = todayStr();
+  const future = (state.data.vocab || []).map(w => w.review && w.review.due).filter(d => d && d > today).sort();
+  return future.length ? fmtDate(future[0]) : null;
+}
+function startVocabReview() {
+  const due = vocabDue(state.data.vocab || [], todayStr());
+  if (!due.length) { showToast('No words due — you’re all caught up! 🎉', 'success'); return; }
+  const queue = due.map(w => w.id).sort(() => Math.random() - 0.5);
+  state._review = { queue, idx: 0, revealed: false, got: 0, missed: 0 };
+  renderVocabReview();
+}
+function currentReviewWord() {
+  const r = state._review; if (!r) return null;
+  return (state.data.vocab || []).find(w => w.id === r.queue[r.idx]);
+}
+function renderVocabReview() {
+  const r = state._review; if (!r) return;
+  document.getElementById('vocab-review')?.remove();
+  if (r.idx >= r.queue.length) return renderVocabReviewDone();
+  const w = currentReviewWord();
+  if (!w) { r.idx++; return renderVocabReview(); }
+  const hint = [w.book ? escapeHtml(w.book) : '', w.page ? 'p.' + escapeHtml(String(w.page)) : ''].filter(Boolean).join(' · ');
+  const body = r.revealed
+    ? '<div class="vr-answer">' +
+      (w.meaning ? '<div class="vr-mean">' + escapeHtml(w.meaning) + '</div>' : '<div class="vr-mean vr-muted">(no meaning saved for this word)</div>') +
+      (w.context && w.context.trim() ? '<div class="vr-ctx">“' + escapeHtml(w.context.trim()) + '”</div>' : '') +
+      '</div><div class="vr-actions">' +
+      '<button type="button" class="btn vr-miss" onclick="gradeVocabReview(false)">😕 Forgot</button>' +
+      '<button type="button" class="btn btn-primary vr-got" onclick="gradeVocabReview(true)">✅ Knew it</button></div>'
+    : '<button type="button" class="btn btn-primary vr-reveal" onclick="revealVocabReview()">Show meaning</button>';
+  const html = '<div class="modal-overlay" id="vocab-review"><div class="modal-box vr-box">' +
+    '<button type="button" class="vr-close" onclick="closeVocabReview()" aria-label="Close">✕</button>' +
+    '<div class="vr-progress">' + (r.idx + 1) + ' / ' + r.queue.length + '</div>' +
+    '<div class="vr-word">' + escapeHtml(w.word) + '</div>' +
+    (hint ? '<div class="vr-hint">' + hint + '</div>' : '') + body +
+    '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+function revealVocabReview() { if (state._review) { state._review.revealed = true; renderVocabReview(); } }
+async function gradeVocabReview(correct) {
+  const r = state._review; if (!r) return;
+  const w = currentReviewWord();
+  if (w) {
+    const box = nextReviewBox((w.review && w.review.box) || 0, correct);
+    const due = new Date(); due.setDate(due.getDate() + reviewIntervalDays(box));
+    w.review = { box, due: due.toISOString().slice(0, 10), seen: ((w.review && w.review.seen) || 0) + 1, last: todayStr() };
+    if (correct) r.got++; else r.missed++;
+    await saveData();
+  }
+  r.idx++; r.revealed = false;
+  renderVocabReview();
+}
+function renderVocabReviewDone() {
+  const r = state._review || { got: 0, missed: 0, queue: [] };
+  document.getElementById('vocab-review')?.remove();
+  const nextDue = nextVocabReviewDate();
+  const html = '<div class="modal-overlay" id="vocab-review"><div class="modal-box vr-box vr-done">' +
+    '<div class="vr-done-icon">🎉</div><div class="vr-word">Review complete</div>' +
+    '<div class="vr-done-sub">Reviewed <b>' + r.queue.length + '</b> word' + (r.queue.length === 1 ? '' : 's') + ' · <b>' + r.got + '</b> knew · <b>' + r.missed + '</b> to revisit.' +
+    (nextDue ? '<br>Next review: <b>' + nextDue + '</b>.' : '') + '</div>' +
+    '<button type="button" class="btn btn-primary" onclick="closeVocabReview()">Done</button></div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+function closeVocabReview() {
+  document.getElementById('vocab-review')?.remove();
+  state._review = null;
+  if (state.page === 'knowledge') renderKnowledgePage();
+}
 function readingBody() {
   const books      = state.data.books || [];
   const activeBook = books.find(b => b.status === 'reading');
@@ -8112,6 +8208,15 @@ function readingBody() {
   const bookPct = (activeBook?.totalPages && activeBook.totalPages > 0)
     ? Math.min(100, Math.round((bookPagesRead / activeBook.totalPages) * 100))
     : null;
+
+  const pace = readingPacePerDay(state.data.days);
+  const pagesLeft = (activeBook && activeBook.totalPages) ? Math.max(0, activeBook.totalPages - bookPagesRead) : 0;
+  let paceLine = '';
+  if (activeBook && pagesLeft > 0 && pace >= 1) {
+    const daysLeft = Math.ceil(pagesLeft / pace);
+    const finish = new Date(); finish.setDate(finish.getDate() + daysLeft);
+    paceLine = '<div class="rbc-pace">📅 At ~' + Math.round(pace) + ' pg/day, <b>' + pagesLeft.toLocaleString() + '</b> to go — finish in ~<b>' + daysLeft + '</b> day' + (daysLeft === 1 ? '' : 's') + ' (' + fmtDate(finish.toISOString().slice(0, 10)) + ')</div>';
+  }
 
   const booksByTitle = {};
   (state.data.books || []).forEach(b => { booksByTitle[b.title] = b; });
@@ -8145,6 +8250,7 @@ function readingBody() {
       (bookPct !== null ? '<span style="font-weight:800;color:var(--read-color);font-size:15px">' + bookPct + '%</span>' : '') +
       '</div>' +
       (bookPct !== null ? '<div class="rbc-bar-track"><div class="rbc-bar-fill" style="width:' + bookPct + '%"></div></div>' : '') +
+      paceLine +
       '</div></div>'
     : '<div class="card reading-start-card">' +
       '<div class="rsc-icon"></div>' +
@@ -8261,6 +8367,7 @@ function renderKnowledgeOverview() {
   const finished = books.filter(b => b.status === 'finished').length;
   const streak   = getReadingStreak();
   const vs       = vocabStats(state.data.vocab || []);
+  const dueCount = vocabDue(state.data.vocab || [], todayStr()).length;
   const readPages = stats.readPages || 0;
 
   let bookPct = null, bookTitle = '', bookPagesRead = 0;
@@ -8275,6 +8382,8 @@ function renderKnowledgeOverview() {
   let insight;
   if (!active && !(state.data.vocab || []).length && !finished)
     insight = '📚 Pick your current book — a few pages a day compounds fast.';
+  else if (dueCount >= 3)
+    insight = '🎯 ' + dueCount + ' words are due for review — a quick recall session locks them in.';
   else if (vs.needSentence > 0)
     insight = '📝 ' + vs.needSentence + ' new word' + (vs.needSentence === 1 ? '' : 's') +
       ' waiting to be used in a sentence — lock them in.';
@@ -8299,7 +8408,7 @@ function renderKnowledgeOverview() {
       '</div><div class="biz-sub">' + (active ? shortTitle + (bookPct == null && bookPagesRead ? ' · pages in' : '') : 'set your book') + '</div>',
       "setKnowledgeTab('reading')") +
     card('<div class="biz-k">Words learning</div><div class="biz-big">' + vs.total +
-      '</div><div class="biz-sub">' + (vs.needSentence > 0 ? vs.needSentence + ' to practice' : (vs.total ? 'all practiced ✓' : 'add from books')) + '</div>',
+      '</div><div class="biz-sub">' + (dueCount > 0 ? dueCount + ' due to review' : (vs.total ? 'all reviewed ✓' : 'add from books')) + '</div>',
       "setKnowledgeTab('vocabulary')") +
     card('<div class="biz-k">Books finished</div><div class="biz-big">' + finished +
       '</div><div class="biz-sub">' + (finished ? 'nice work' : 'finish your first') + '</div>',

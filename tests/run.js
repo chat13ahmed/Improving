@@ -62,7 +62,7 @@ function loadApp(fieldValues) {
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
-    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI });';
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -271,6 +271,27 @@ ok('debtPayoffMonths: real APR pays off in finite months', (() => { const n = A.
 ok('yearsToFI: already there → 0', A.yearsToFI(1000000, 1000000, 0) === 0);
 ok('yearsToFI: no FI number → null', A.yearsToFI(50000, 0, 1000) === null);
 ok('yearsToFI: saving reaches FI in a finite, sensible time', (() => { const y = A.yearsToFI(100000, 1000000, 3000, 0.07); return y > 5 && y < 40; })());
+// Vocabulary spaced repetition (Leitner)
+eq('nextReviewBox: correct promotes the box', A.nextReviewBox(1, true), 2);
+eq('nextReviewBox: wrong resets to box 0', A.nextReviewBox(4, false), 0);
+eq('nextReviewBox: caps at the top box', A.nextReviewBox(5, true), 5);
+eq('nextReviewBox: undefined box starts at 0 then promotes', A.nextReviewBox(undefined, true), 1);
+ok('reviewIntervalDays: higher box = longer interval', A.reviewIntervalDays(0) < A.reviewIntervalDays(3) && A.reviewIntervalDays(0) === 1);
+(() => {
+  const vocab = [
+    { id: 'a', word: 'new' },                                   // never reviewed → due
+    { id: 'b', word: 'soon', review: { box: 1, due: '2020-01-01' } },   // past due
+    { id: 'c', word: 'later', review: { box: 4, due: '2999-01-01' } },  // not due, mastered
+  ];
+  eq('vocabDue: never-reviewed + past-due are due, future is not', A.vocabDue(vocab, '2026-07-11').map(w => w.id), ['a', 'b']);
+  eq('vocabMastered: box >= 4 counts as mastered', A.vocabMastered(vocab), 1);
+})();
+ok('readingPacePerDay: averages recent pages over 14 days', (() => {
+  const iso = (off) => { const d = new Date(); d.setDate(d.getDate() - off); return d.toISOString().slice(0, 10); };
+  const days = [{ date: iso(0), reading: { pages: 14 } }, { date: iso(1), reading: { pages: 14 } }, { date: iso(30), reading: { pages: 999 } }];
+  const p = A.readingPacePerDay(days);   // (14+14)/14 = 2, old day excluded
+  return Math.abs(p - 2) < 0.001;
+})());
 // At-rest encryption round-trip (cloud/crypto.js)
 (() => {
   const ENC = require('../cloud/crypto');
