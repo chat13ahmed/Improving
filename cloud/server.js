@@ -20,7 +20,13 @@ const DB = require('./db');
 const push = require('./push');
 
 const PORT = process.env.PORT || 8080;
-const JWT_SECRET = process.env.JWT_SECRET || crypto.createHash('sha256').update('be-dev-secret-change-me').digest('hex');
+// Never ship a hardcoded/known secret — a public secret means anyone can forge
+// login tokens. Fall back to a RANDOM per-boot secret (sessions reset on restart)
+// and warn, so an un-configured deploy is still safe rather than forgeable.
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  console.warn('⚠️  JWT_SECRET is not set — using a random secret for this boot (sessions reset on restart). Set JWT_SECRET in production.');
+  return crypto.randomBytes(32).toString('hex');
+})();
 const AI_HOURLY_LIMIT = Number(process.env.AI_HOURLY_LIMIT || 60);
 const CLIENT_DIR = process.env.CLIENT_DIR || path.join(__dirname, '..', 'public');
 
@@ -126,9 +132,34 @@ function aiAllowed(key) {
   if (arr.length >= AI_HOURLY_LIMIT) { aiHits.set(key, arr); return false; }
   arr.push(now); aiHits.set(key, arr); return true;
 }
+// ── Per-IP rate limit for auth — blunts password brute-forcing & signup spam ──
+const authHits = new Map();
+function authRateLimited(ip) {
+  const now = Date.now(), win = 900000;   // 15 minutes
+  const arr = (authHits.get(String(ip)) || []).filter(t => now - t < win);
+  arr.push(now); authHits.set(String(ip), arr);
+  return arr.length > 12;
+}
 
 // ── App ──
 const app = express();
+app.set('trust proxy', 1);   // behind Render's proxy — makes req.ip the real client IP (for rate limits)
+// Security headers on every response (defence-in-depth, no dependency needed).
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), interest-cohort=()');
+  res.setHeader('Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline'; " +            // inline theme script + onclick handlers
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com; " +
+    "img-src 'self' data: https:; " +                  // book covers (OpenLibrary), icons
+    "connect-src 'self' https://openlibrary.org https://covers.openlibrary.org; " +
+    "object-src 'none'; base-uri 'self'; frame-ancestors 'self'");
+  next();
+});
 app.use(express.json({ limit: '10mb' }));
 // dotfiles: 'allow' so /.well-known/assetlinks.json (Android app verification) is served
 app.use(express.static(CLIENT_DIR, { dotfiles: 'allow' }));
@@ -152,6 +183,7 @@ function isOwner(name) {
 
 // ── Accounts / auth ──
 app.post('/api/signup', async (req, res) => {
+  if (authRateLimited(req.ip)) return res.status(429).json({ error: 'Too many attempts — please wait a few minutes.' });
   try {
     const username = (req.body.username || '').trim();
     const password = req.body.password || '';
@@ -184,6 +216,7 @@ app.post('/api/signup', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
+  if (authRateLimited(req.ip)) return res.status(429).json({ error: 'Too many attempts — please wait a few minutes.' });
   try {
     const username = (req.body.username || '').trim();
     const password = req.body.password || '';

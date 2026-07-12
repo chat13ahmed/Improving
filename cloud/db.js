@@ -6,6 +6,7 @@
  */
 'use strict';
 const path = require('path');
+const ENC = require('./crypto');   // at-rest encryption of the user data blob
 
 let impl = null;
 // Parse a JSON array column safely (ingredients); always returns an array.
@@ -131,18 +132,18 @@ function sqliteImpl() {
     async findUserById(id) { return db.prepare('SELECT * FROM users WHERE id = ?').get(id) || null; },
     async updatePassword(id, salt, hash) { db.prepare('UPDATE users SET pw_salt=?, pw_hash=? WHERE id=?').run(salt, hash, id); },
     async setSecurity(id, q, salt, hash) { db.prepare('UPDATE users SET sec_question=?, sec_salt=?, sec_hash=? WHERE id=?').run(q, salt, hash, id); },
-    async getData(userId) { const row = db.prepare('SELECT data, version FROM user_data WHERE user_id=?').get(userId); return row ? { data: JSON.parse(row.data), version: row.version } : null; },
+    async getData(userId) { const row = db.prepare('SELECT data, version FROM user_data WHERE user_id=?').get(userId); return row ? { data: ENC.decryptData(JSON.parse(row.data)), version: row.version } : null; },
     async saveData(userId, dataObj, version) {
       db.prepare(`INSERT INTO user_data(user_id,data,version,updated_at) VALUES(?,?,?,datetime('now'))
                   ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, version=excluded.version, updated_at=datetime('now')`)
-        .run(userId, JSON.stringify(dataObj), version);
+        .run(userId, JSON.stringify(ENC.encryptData(dataObj)), version);
     },
     // Server-side metadata write (e.g. cron _lastNudge): update only if the version
     // is unchanged, and do NOT bump it — so it never clobbers a client save or
     // invalidates a client's version. Returns true if it wrote.
     async saveDataMeta(userId, dataObj, expectedVersion) {
       const r = db.prepare(`UPDATE user_data SET data=?, updated_at=datetime('now') WHERE user_id=? AND version=?`)
-        .run(JSON.stringify(dataObj), userId, expectedVersion);
+        .run(JSON.stringify(ENC.encryptData(dataObj)), userId, expectedVersion);
       return r.changes > 0;
     },
     async savePushSub(userId, sub) {
@@ -153,7 +154,7 @@ function sqliteImpl() {
     async deletePushSub(endpoint) { db.prepare('DELETE FROM push_subscriptions WHERE endpoint=?').run(endpoint); },
     async allPushSubs() { return db.prepare('SELECT user_id, sub FROM push_subscriptions').all().map(r => ({ user_id: r.user_id, sub: JSON.parse(r.sub) })); },
     async allUsers() { return db.prepare('SELECT id, username, created_at FROM users').all(); },
-    async allUserData() { return db.prepare('SELECT user_id, data FROM user_data').all().map(r => ({ user_id: r.user_id, data: JSON.parse(r.data) })); },
+    async allUserData() { return db.prepare('SELECT user_id, data FROM user_data').all().map(r => ({ user_id: r.user_id, data: ENC.decryptData(JSON.parse(r.data)) })); },
     // ── Community meals ──
     async createSharedMeal(m) {
       const r = db.prepare('INSERT INTO shared_meals(user_id,author_name,name,kcal,p,c,f,servings,notes,ingredients,photo) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
@@ -333,13 +334,13 @@ function pgImpl() {
     async findUserById(id) { const r = await q('SELECT * FROM users WHERE id=$1', [id]); return r.rows[0] || null; },
     async updatePassword(id, salt, hash) { await q('UPDATE users SET pw_salt=$1, pw_hash=$2 WHERE id=$3', [salt, hash, id]); },
     async setSecurity(id, ques, salt, hash) { await q('UPDATE users SET sec_question=$1, sec_salt=$2, sec_hash=$3 WHERE id=$4', [ques, salt, hash, id]); },
-    async getData(userId) { const r = await q('SELECT data, version FROM user_data WHERE user_id=$1', [userId]); return r.rowCount ? { data: r.rows[0].data, version: r.rows[0].version } : null; },
+    async getData(userId) { const r = await q('SELECT data, version FROM user_data WHERE user_id=$1', [userId]); return r.rowCount ? { data: ENC.decryptData(r.rows[0].data), version: r.rows[0].version } : null; },
     async saveData(userId, dataObj, version) {
       await q(`INSERT INTO user_data(user_id,data,version,updated_at) VALUES($1,$2,$3,now())
-               ON CONFLICT(user_id) DO UPDATE SET data=$2, version=$3, updated_at=now()`, [userId, JSON.stringify(dataObj), version]);
+               ON CONFLICT(user_id) DO UPDATE SET data=$2, version=$3, updated_at=now()`, [userId, JSON.stringify(ENC.encryptData(dataObj)), version]);
     },
     async saveDataMeta(userId, dataObj, expectedVersion) {
-      const r = await q('UPDATE user_data SET data=$1, updated_at=now() WHERE user_id=$2 AND version=$3', [JSON.stringify(dataObj), userId, expectedVersion]);
+      const r = await q('UPDATE user_data SET data=$1, updated_at=now() WHERE user_id=$2 AND version=$3', [JSON.stringify(ENC.encryptData(dataObj)), userId, expectedVersion]);
       return r.rowCount > 0;
     },
     async savePushSub(userId, sub) {
@@ -349,7 +350,7 @@ function pgImpl() {
     async deletePushSub(endpoint) { await q('DELETE FROM push_subscriptions WHERE endpoint=$1', [endpoint]); },
     async allPushSubs() { const r = await q('SELECT user_id, sub FROM push_subscriptions', []); return r.rows.map(x => ({ user_id: x.user_id, sub: x.sub })); },
     async allUsers() { const r = await q('SELECT id, username, created_at FROM users', []); return r.rows; },
-    async allUserData() { const r = await q('SELECT user_id, data FROM user_data', []); return r.rows.map(x => ({ user_id: x.user_id, data: x.data })); },
+    async allUserData() { const r = await q('SELECT user_id, data FROM user_data', []); return r.rows.map(x => ({ user_id: x.user_id, data: ENC.decryptData(x.data) })); },
     // ── Community meals ──
     async createSharedMeal(m) {
       const r = await q('INSERT INTO shared_meals(user_id,author_name,name,kcal,p,c,f,servings,notes,ingredients,photo) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id',

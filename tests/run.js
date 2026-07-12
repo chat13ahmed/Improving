@@ -271,6 +271,22 @@ ok('debtPayoffMonths: real APR pays off in finite months', (() => { const n = A.
 ok('yearsToFI: already there → 0', A.yearsToFI(1000000, 1000000, 0) === 0);
 ok('yearsToFI: no FI number → null', A.yearsToFI(50000, 0, 1000) === null);
 ok('yearsToFI: saving reaches FI in a finite, sensible time', (() => { const y = A.yearsToFI(100000, 1000000, 3000, 0.07); return y > 5 && y < 40; })());
+// At-rest encryption round-trip (cloud/crypto.js)
+(() => {
+  const ENC = require('../cloud/crypto');
+  const saved = process.env.DATA_ENCRYPTION_KEY;
+  const obj = { secret: 'net worth 319000', arr: [1, 2, 3], nested: { a: true } };
+  delete process.env.DATA_ENCRYPTION_KEY;
+  ok('crypto: no key → transparent pass-through', JSON.stringify(ENC.encryptData(obj)) === JSON.stringify(obj) && ENC.enabled() === false);
+  process.env.DATA_ENCRYPTION_KEY = require('crypto').randomBytes(32).toString('base64');
+  const env = ENC.encryptData(obj);
+  ok('crypto: with key → AES-GCM envelope, plaintext not visible', env && env.__enc === 'a256gcm' && !JSON.stringify(env).includes('319000') && ENC.enabled());
+  eq('crypto: envelope decrypts back to the original', ENC.decryptData(env), obj);
+  let rejected = false;
+  try { ENC.decryptData({ ...env, ct: Buffer.from('garbage-ciphertext').toString('base64') }); } catch { rejected = true; }
+  ok('crypto: tampered ciphertext is rejected (GCM auth tag)', rejected);
+  if (saved === undefined) delete process.env.DATA_ENCRYPTION_KEY; else process.env.DATA_ENCRYPTION_KEY = saved;
+})();
 // weeklyGoalsReached — dashboard's "% of goals reached" hero number
 ok('weeklyGoalsReached averages active goals', A.weeklyGoalsReached({ gymDays: 4, readPages: 100 }, { gymDaysPerWeek: 4, weeklyReadGoal: 200 }, 0, { gym: true, reading: true }) === 75);
 ok('weeklyGoalsReached caps each goal at 100', A.weeklyGoalsReached({ gymDays: 10 }, { gymDaysPerWeek: 5 }, 0, { gym: true }) === 100);
