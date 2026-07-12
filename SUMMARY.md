@@ -34,8 +34,9 @@ Installable PWA · works on phone and desktop · light + dark mode.
 
 ### Knowledge hub (Overview · Reading · Vocabulary)
 - **Reading** — a **255-book** curated library (auto cover art), reading streak, a **pace projection** ("finish by …"), per-book **chapters**, and notes grouped **Book → Chapter → note** with page + highlighted quote.
-- **Key Takeaways** — capture lessons; they **resurface** for review over time.
+- **Key Takeaways** — capture lessons; they **resurface** for review over time, plus a **takeaway quiz** (active recall: finish the lesson from memory, graded on the same Leitner schedule).
 - **Vocabulary** — capture a word with its source sentence + page, then **spaced-repetition flashcard review** (Leitner) so words stick permanently.
+- **Year in Knowledge** — a shareable recap card: books finished, pages read, best streak, words learned/mastered, lessons saved.
 
 ### Money
 - Income (weekly/monthly/daily cadence), spending, net, savings goal, money circle.
@@ -118,4 +119,4 @@ Then run a cron (e.g. cron-job.org) hitting the server's push-tick endpoint so t
 
 1. **Go live** — deploy, set the env vars above, smoke-test signup/login/log, and set your admin username.
 2. **First users** — put it in front of 3–5 real people for two weeks; let their behaviour drive the roadmap. Retention is the one metric no amount of polish can answer.
-3. **Optional follow-ups already scoped** — a "Year in Knowledge" recap, a takeaways quiz, training-day calorie adjustment, the collective-knowledge UI (the backend exists), and finance extras (ROI-vs-benchmark, dividends, time-wealth).
+3. **Optional follow-ups already scoped** — training-day calorie adjustment, the collective-knowledge UI (the backend exists), finance extras (ROI-vs-benchmark, dividends, time-wealth), and cross-book concept links (needs a tag system first). *(The "Year in Knowledge" recap and the takeaways quiz shipped.)*
