@@ -1054,11 +1054,11 @@ function navigate(page) {
   const moreBtn = document.getElementById('bnav-more');
   if (moreBtn) moreBtn.classList.toggle('active', !['dashboard', 'log', 'coach'].includes(page));
   document.getElementById('more-sheet')?.remove();
-  // Ideas + Contacts live under the Business hub, so keep that nav item lit on their tabs
-  if (['business', 'ideas', 'contacts'].includes(page)) document.querySelector('.nav-item[data-page="business"]')?.classList.add('active');
+  // Ideas + Contacts + Finances live under the Business hub, so keep that nav item lit on their tabs
+  if (['business', 'ideas', 'contacts', 'finances'].includes(page)) document.querySelector('.nav-item[data-page="business"]')?.classList.add('active');
   // Reading lives under the Knowledge hub, so keep that nav item lit on its tab
   if (['knowledge', 'reading'].includes(page)) document.querySelector('.nav-item[data-page="knowledge"]')?.classList.add('active');
-  const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, workout: renderWorkout, business: renderBusinessPage, health: renderHealthPage, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, knowledge: renderKnowledgePage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage, admin: renderAdminPage };
+  const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, workout: renderWorkout, business: renderBusinessPage, finances: renderFinancesPage, health: renderHealthPage, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, knowledge: renderKnowledgePage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage, admin: renderAdminPage };
   injectFAB();
   (pages[page] || renderDashboard)();
   // Subtle fade-up so section changes feel like a native screen transition
@@ -6681,7 +6681,7 @@ function renderHealthNutrition(nut, td, eatenCal, eatenP) {
 // ─────────────────────────────────────────────────────────────
 function businessTabs(active) {
   const tab = (id, target, label) => '<button type="button" class="biz-tab' + (active === id ? ' on' : '') + '" onclick="navigate(\'' + target + '\')">' + label + '</button>';
-  return '<div class="biz-tabs">' + tab('overview', 'business', 'Overview') + tab('ideas', 'ideas', 'Ideas') + tab('contacts', 'contacts', 'Contacts') + '</div>';
+  return '<div class="biz-tabs">' + tab('overview', 'business', 'Overview') + tab('finances', 'finances', 'Finances') + tab('ideas', 'ideas', 'Ideas') + tab('contacts', 'contacts', 'Contacts') + '</div>';
 }
 function renderBusinessPage() {
   updateNavBadges();
@@ -6739,6 +6739,198 @@ function renderBusinessPage() {
     businessTabs('overview') +
     '<div class="biz-insight">' + insight + '</div>' +
     grid + spotlight + reach;
+}
+
+// ─────────────────────────────────────────────────────────────
+// FINANCES — a personal-CFO dashboard inside the Business hub
+// ─────────────────────────────────────────────────────────────
+function sumObj(o) { return Object.values(o || {}).reduce((s, v) => s + (+v || 0), 0); }
+function getFinance() {
+  const f = state.data.finance || {};
+  return {
+    assets: Object.assign({ cash: 0, investments: 0, property: 0, business: 0, other: 0 }, f.assets),
+    liabilities: Object.assign({ mortgage: 0, loans: 0, credit: 0, other: 0 }, f.liabilities),
+    monthlyIncome: +f.monthlyIncome || 0, monthlyExpenses: +f.monthlyExpenses || 0,
+    monthlySavings: +f.monthlySavings || 0, passiveIncome: +f.passiveIncome || 0,
+    portfolio: Object.assign({ stocks: 0, bonds: 0, realEstate: 0, crypto: 0, cash: 0 }, f.portfolio),
+    business: Object.assign({ revenue: 0, expenses: 0 }, f.business),
+    debts: Array.isArray(f.debts) ? f.debts : [],
+    withdrawalRate: +f.withdrawalRate || 4, currentAge: +f.currentAge || 0,
+    snapshots: Array.isArray(f.snapshots) ? f.snapshots : []
+  };
+}
+function financeHasData(f) { return sumObj(f.assets) > 0 || sumObj(f.liabilities) > 0 || f.monthlyIncome > 0 || f.debts.length > 0; }
+// Core wealth metrics — pure + testable.
+function financeMetrics(f) {
+  const totalAssets = sumObj(f.assets), totalLiab = sumObj(f.liabilities);
+  const netWorth = totalAssets - totalLiab;
+  const savingsRate = f.monthlyIncome > 0 ? Math.round(f.monthlySavings / f.monthlyIncome * 100) : 0;
+  const emergencyMonths = f.monthlyExpenses > 0 ? Math.round(f.assets.cash / f.monthlyExpenses * 10) / 10 : 0;
+  const annualExpenses = f.monthlyExpenses * 12;
+  const fiNumber = f.withdrawalRate > 0 ? Math.round(annualExpenses * (100 / f.withdrawalRate)) : 0;
+  const investable = (f.assets.cash || 0) + (f.assets.investments || 0);
+  const fiProgress = fiNumber > 0 ? Math.min(100, Math.round(investable / fiNumber * 100)) : 0;
+  const passiveRatio = f.monthlyIncome > 0 ? Math.round(f.passiveIncome / f.monthlyIncome * 100) : 0;
+  const activeIncome = Math.max(0, f.monthlyIncome - f.passiveIncome);
+  const bizProfit = (f.business.revenue || 0) - (f.business.expenses || 0);
+  const bizMargin = f.business.revenue > 0 ? Math.round(bizProfit / f.business.revenue * 100) : 0;
+  const debtTotal = f.debts.reduce((s, d) => s + (+d.balance || 0), 0);
+  return { totalAssets, totalLiab, netWorth, savingsRate, emergencyMonths, annualExpenses, fiNumber, investable, fiProgress, passiveRatio, activeIncome, bizProfit, bizMargin, debtTotal };
+}
+// Months to clear a debt at a fixed monthly payment; Infinity if it can't beat interest. (pure)
+function debtPayoffMonths(balance, apr, payment) {
+  balance = +balance || 0; payment = +payment || 0;
+  const r = (+apr || 0) / 100 / 12;
+  if (balance <= 0) return 0;
+  if (r === 0) return payment > 0 ? Math.ceil(balance / payment) : Infinity;
+  if (payment <= balance * r) return Infinity;
+  return Math.ceil(Math.log(payment / (payment - balance * r)) / Math.log(1 + r));
+}
+// Years until invested assets reach the FI number (grows ~7% real + monthly saving). (pure)
+function yearsToFI(investable, fiNumber, monthlySavings, realRate) {
+  investable = +investable || 0; fiNumber = +fiNumber || 0; monthlySavings = +monthlySavings || 0;
+  if (fiNumber <= 0) return null;
+  if (investable >= fiNumber) return 0;
+  const mr = (realRate || 0.07) / 12; let bal = investable, m = 0;
+  while (bal < fiNumber && m < 1200) { bal = bal * (1 + mr) + monthlySavings; m++; }
+  return m >= 1200 ? null : Math.round(m / 12 * 10) / 10;
+}
+
+function renderFinancesPage() {
+  const f = getFinance();
+  const header = '<div class="page-header"><h2 class="page-title">Business</h2>' +
+    '<p class="page-sub">Your ideas, pipeline and money — in one place.</p></div>' + businessTabs('finances');
+  if (!financeHasData(f)) {
+    document.getElementById('main').innerHTML = header +
+      '<div class="card fin-intro"><div class="fin-intro-icon">📊</div>' +
+      '<h3 class="card-title">See your whole financial picture</h3>' +
+      '<p class="card-sub">Net worth, savings rate, your path to financial independence, debt payoff and more — the numbers a CFO watches. Enter a snapshot to begin, then update it monthly to see the trend.</p>' +
+      '<button type="button" class="btn btn-primary" onclick="openFinanceEditor()">Set up my finances →</button></div>';
+    return;
+  }
+  const m = financeMetrics(f);
+  const fm = (n) => { n = Math.round(+n || 0); return (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString(); };
+  const prev = f.snapshots.length >= 2 ? f.snapshots[f.snapshots.length - 2] : null;
+  const change = prev ? m.netWorth - prev.net : null;
+
+  const heroCard = '<div class="card fin-hero">' +
+    '<div class="fin-k">Net Worth</div>' +
+    '<div class="fin-nw' + (m.netWorth < 0 ? ' neg' : '') + '">' + fm(m.netWorth) + '</div>' +
+    '<div class="fin-nw-sub">' + fm(m.totalAssets) + ' assets − ' + fm(m.totalLiab) + ' liabilities' +
+      (change != null ? ' · <span class="' + (change >= 0 ? 'fin-up' : 'fin-down') + '">' + (change >= 0 ? '▲ ' : '▼ ') + fm(Math.abs(change)) + ' since last</span>' : '') + '</div>' +
+    (f.snapshots.length >= 2 ? '<div class="fin-chart-wrap"><canvas id="fin-nw-chart"></canvas></div>' : '') + '</div>';
+
+  const rTone = (v, good, ok) => v >= good ? 'good' : v >= ok ? 'ok' : 'low';
+  const ratioCard = (label, val, sub, tone) => '<div class="fin-ratio fin-' + tone + '"><div class="fin-ratio-n">' + val + '</div><div class="fin-ratio-l">' + label + '</div><div class="fin-ratio-h">' + sub + '</div></div>';
+  const ratios = '<div class="fin-ratios">' +
+    ratioCard('Savings rate', m.savingsRate + '%', m.savingsRate >= 20 ? 'strong (>20%)' : 'aim for 20%+', rTone(m.savingsRate, 20, 10)) +
+    ratioCard('Emergency fund', m.emergencyMonths + ' mo', m.emergencyMonths >= 3 ? 'covered (3–6mo)' : 'aim 3–6mo', rTone(m.emergencyMonths, 3, 1)) +
+    ratioCard('Passive income', m.passiveRatio + '%', 'of income', rTone(m.passiveRatio, 30, 10)) +
+    '</div>';
+
+  const y2fi = yearsToFI(m.investable, m.fiNumber, f.monthlySavings);
+  const fiCard = m.fiNumber ? '<div class="card fin-fi"><div class="fin-sec-h">🏁 Financial Independence</div>' +
+    '<div class="fin-fi-row"><span>FI number (' + f.withdrawalRate + '% rule)</span><strong>' + fm(m.fiNumber) + '</strong></div>' +
+    '<div class="fin-bar"><i style="width:' + m.fiProgress + '%"></i></div>' +
+    '<div class="fin-fi-sub"><b>' + m.fiProgress + '%</b> there — ' + fm(m.investable) + ' invested of ' + fm(m.fiNumber) +
+      (y2fi === 0 ? ' · you’re financially independent 🎉' : (y2fi != null ? ' · ~<b>' + y2fi + ' yrs</b> at your current saving' : '')) + '</div></div>' : '';
+
+  const pf = f.portfolio, pfT = sumObj(pf);
+  const allocItems = [['Stocks', pf.stocks, '#3B82F6'], ['Bonds', pf.bonds, '#10B981'], ['Real estate', pf.realEstate, '#F59E0B'], ['Crypto', pf.crypto, '#A78BFA'], ['Cash', pf.cash, '#06B6D4']].filter(x => x[1] > 0);
+  const allocCard = pfT > 0 ? '<div class="card"><div class="fin-sec-h">📊 Portfolio allocation</div>' +
+    '<div class="fin-chart-wrap fin-donut"><canvas id="fin-alloc-chart"></canvas></div>' +
+    '<div class="fin-legend">' + allocItems.map(x => '<span class="fin-leg"><i style="background:' + x[2] + '"></i>' + x[0] + ' ' + Math.round(x[1] / pfT * 100) + '%</span>').join('') + '</div></div>' : '';
+
+  const incomeCard = f.monthlyIncome > 0 ? '<div class="card"><div class="fin-sec-h">💸 Income — active vs passive</div>' +
+    '<div class="fin-split-bar"><i class="fin-active" style="width:' + (100 - m.passiveRatio) + '%"></i><i class="fin-passive" style="width:' + m.passiveRatio + '%"></i></div>' +
+    '<div class="fin-split-legend"><span>Active ' + fm(m.activeIncome) + '/mo</span><span>Passive ' + fm(f.passiveIncome) + '/mo</span></div>' +
+    '<p class="card-sub" style="margin:8px 0 0">Grow the passive side — income while you sleep.</p></div>' : '';
+
+  const plCard = f.business.revenue > 0 ? '<div class="card"><div class="fin-sec-h">🏢 Business P&L (monthly)</div><div class="fin-pl">' +
+    '<div><span>Revenue</span><strong>' + fm(f.business.revenue) + '</strong></div><div><span>Expenses</span><strong>' + fm(f.business.expenses) + '</strong></div>' +
+    '<div><span>Net profit</span><strong class="' + (m.bizProfit >= 0 ? 'fin-up' : 'fin-down') + '">' + fm(m.bizProfit) + '</strong></div><div><span>Margin</span><strong>' + m.bizMargin + '%</strong></div></div></div>' : '';
+
+  const debts = f.debts.filter(d => +d.balance > 0).sort((a, b) => (+b.apr || 0) - (+a.apr || 0));
+  const debtsCard = debts.length ? '<div class="card"><div class="fin-sec-h">🔥 Debt payoff — avalanche (highest APR first)</div>' +
+    debts.map(d => { const mo = debtPayoffMonths(d.balance, d.apr, d.payment); const lab = mo === Infinity ? 'payment too low to clear it' : 'debt-free in ~' + (mo < 24 ? mo + ' mo' : (Math.round(mo / 12 * 10) / 10) + ' yrs');
+      return '<div class="fin-debt"><div class="fin-debt-top"><span class="fin-debt-name">' + escapeHtml(d.name || 'Debt') + '</span><span class="fin-debt-apr">' + (+d.apr || 0) + '% APR</span></div>' +
+        '<div class="fin-debt-meta">' + fm(d.balance) + ' left · ' + fm(d.payment) + '/mo · <b>' + lab + '</b></div></div>'; }).join('') +
+    '<p class="card-sub" style="margin:8px 0 0">Total debt ' + fm(m.debtTotal) + '. Clearing a 20% APR card is a guaranteed 20% return.</p></div>' : '';
+
+  document.getElementById('main').innerHTML = header + heroCard + ratios + fiCard + allocCard + incomeCard + plCard + debtsCard +
+    '<button type="button" class="btn btn-outline" style="width:100%;margin-top:4px" onclick="openFinanceEditor()">✏️ Update my finances</button>';
+  initFinanceCharts(f);
+}
+function initFinanceCharts(f) {
+  if (typeof Chart === 'undefined') return;
+  const nwEl = document.getElementById('fin-nw-chart');
+  if (nwEl && f.snapshots.length >= 2) {
+    charts.finNW = new Chart(nwEl, { type: 'line',
+      data: { labels: f.snapshots.map(s => fmtDateShort(s.date)), datasets: [{ data: f.snapshots.map(s => s.net), borderColor: '#3B82F6', backgroundColor: 'rgba(59,130,246,0.12)', fill: true, tension: 0.35, pointRadius: 2 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => '$' + Math.round(v / 1000) + 'k' } } } } });
+  }
+  const alEl = document.getElementById('fin-alloc-chart');
+  const pf = f.portfolio, items = [['Stocks', pf.stocks, '#3B82F6'], ['Bonds', pf.bonds, '#10B981'], ['Real estate', pf.realEstate, '#F59E0B'], ['Crypto', pf.crypto, '#A78BFA'], ['Cash', pf.cash, '#06B6D4']].filter(x => x[1] > 0);
+  if (alEl && items.length) {
+    charts.finAlloc = new Chart(alEl, { type: 'doughnut',
+      data: { labels: items.map(x => x[0]), datasets: [{ data: items.map(x => x[1]), backgroundColor: items.map(x => x[2]), borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { display: false } } } });
+  }
+}
+function finDebtRowHtml(d) {
+  d = d || {};
+  return '<div class="fin-debt-row">' +
+    '<input type="text" class="fd-name" placeholder="Name" value="' + escapeAttr(d.name || '') + '">' +
+    '<input type="number" class="fd-bal" inputmode="decimal" step="any" placeholder="Balance" value="' + (d.balance || '') + '">' +
+    '<input type="number" class="fd-apr" inputmode="decimal" step="any" placeholder="APR%" value="' + (d.apr || '') + '">' +
+    '<input type="number" class="fd-pay" inputmode="decimal" step="any" placeholder="$/mo" value="' + (d.payment || '') + '">' +
+    '<button type="button" class="fin-debt-x" onclick="this.closest(\'.fin-debt-row\').remove()">✕</button></div>';
+}
+function finAddDebtRow() { document.getElementById('fin-debts')?.insertAdjacentHTML('beforeend', finDebtRowHtml({})); }
+function closeFinanceEditor() { document.getElementById('fin-modal')?.remove(); }
+function openFinanceEditor() {
+  const f = getFinance();
+  const field = (label, id, val, ph) => '<div class="fin-f"><label>' + label + '</label><input type="number" id="' + id + '" inputmode="decimal" step="any" min="0" placeholder="' + (ph || '0') + '" value="' + (val || '') + '"></div>';
+  const grp = (title, inner) => '<div class="fin-group-h">' + title + '</div><div class="fin-grid">' + inner + '</div>';
+  const html = '<div class="modal-overlay" id="fin-modal"><div class="modal-box fin-editor">' +
+    '<h3 class="card-title" style="text-align:left;margin-bottom:4px">Your financial snapshot</h3>' +
+    '<p class="card-sub" style="text-align:left">Enter what you know — leave the rest blank. Update it monthly to build your trend.</p>' +
+    grp('Assets', field('Cash & savings', 'fe-cash', f.assets.cash) + field('Investments', 'fe-inv', f.assets.investments) + field('Property', 'fe-prop', f.assets.property) + field('Business value', 'fe-abiz', f.assets.business) + field('Other', 'fe-aother', f.assets.other)) +
+    grp('Liabilities (what you owe)', field('Mortgage', 'fe-mort', f.liabilities.mortgage) + field('Loans', 'fe-loans', f.liabilities.loans) + field('Credit cards', 'fe-credit', f.liabilities.credit) + field('Other', 'fe-lother', f.liabilities.other)) +
+    grp('Monthly cash flow', field('Income (post-tax)', 'fe-income', f.monthlyIncome) + field('Expenses', 'fe-exp', f.monthlyExpenses) + field('Saved / invested', 'fe-save', f.monthlySavings) + field('Passive income', 'fe-passive', f.passiveIncome)) +
+    grp('Portfolio allocation', field('Stocks', 'fe-pstocks', f.portfolio.stocks) + field('Bonds', 'fe-pbonds', f.portfolio.bonds) + field('Real estate', 'fe-preal', f.portfolio.realEstate) + field('Crypto', 'fe-pcrypto', f.portfolio.crypto) + field('Cash', 'fe-pcash', f.portfolio.cash)) +
+    grp('Business (monthly)', field('Revenue', 'fe-rev', f.business.revenue) + field('Operating expenses', 'fe-opex', f.business.expenses)) +
+    '<div class="fin-group-h">Debts to pay off</div><div id="fin-debts">' + (f.debts.map(finDebtRowHtml).join('') || finDebtRowHtml({})) + '</div>' +
+    '<button type="button" class="btn-sm" style="margin-top:6px" onclick="finAddDebtRow()">+ Add a debt</button>' +
+    grp('Assumptions', field('Safe withdrawal rate %', 'fe-wr', f.withdrawalRate, '4') + field('Your age', 'fe-age', f.currentAge, '')) +
+    '<div class="fin-editor-actions"><button type="button" class="btn btn-outline" onclick="closeFinanceEditor()">Cancel</button><button type="button" class="btn btn-primary" onclick="saveFinance()">Save snapshot</button></div>' +
+    '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('fin-modal').addEventListener('click', e => { if (e.target.id === 'fin-modal') closeFinanceEditor(); });
+}
+async function saveFinance() {
+  const v = id => parseFloat(document.getElementById(id)?.value) || 0;
+  const debts = [...document.querySelectorAll('#fin-debts .fin-debt-row')].map(r => ({
+    id: uid(), name: (r.querySelector('.fd-name')?.value || '').trim(),
+    balance: parseFloat(r.querySelector('.fd-bal')?.value) || 0, apr: parseFloat(r.querySelector('.fd-apr')?.value) || 0, payment: parseFloat(r.querySelector('.fd-pay')?.value) || 0
+  })).filter(d => d.balance > 0);
+  const fin = {
+    assets: { cash: v('fe-cash'), investments: v('fe-inv'), property: v('fe-prop'), business: v('fe-abiz'), other: v('fe-aother') },
+    liabilities: { mortgage: v('fe-mort'), loans: v('fe-loans'), credit: v('fe-credit'), other: v('fe-lother') },
+    monthlyIncome: v('fe-income'), monthlyExpenses: v('fe-exp'), monthlySavings: v('fe-save'), passiveIncome: v('fe-passive'),
+    portfolio: { stocks: v('fe-pstocks'), bonds: v('fe-pbonds'), realEstate: v('fe-preal'), crypto: v('fe-pcrypto'), cash: v('fe-pcash') },
+    business: { revenue: v('fe-rev'), expenses: v('fe-opex') },
+    debts, withdrawalRate: v('fe-wr') || 4, currentAge: v('fe-age'),
+    snapshots: (state.data.finance && state.data.finance.snapshots) || []
+  };
+  const net = sumObj(fin.assets) - sumObj(fin.liabilities);
+  const today = todayStr();
+  fin.snapshots = fin.snapshots.filter(s => s.date !== today).concat([{ date: today, net }]).sort((a, b) => a.date < b.date ? -1 : 1).slice(-24);
+  state.data.finance = fin;
+  await saveData();
+  closeFinanceEditor();
+  showToast('Financial snapshot saved.', 'success');
+  navigate('finances');
 }
 
 // ── Contacts CRM intelligence (all pure/testable) ──

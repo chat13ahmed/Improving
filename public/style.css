@@ -996,6 +996,57 @@ body {
 .biz-reach-row:hover { border-color: var(--accent); }
 .brr-name { font-size: 14px; font-weight: 700; color: var(--text); }
 .brr-meta { font-size: 12px; color: var(--text-muted); flex: none; }
+/* ─── Finances (personal-CFO dashboard) ─────────── */
+.fin-intro { text-align: center; }
+.fin-intro-icon { font-size: 34px; margin-bottom: 6px; }
+.fin-sec-h { font-size: 13px; font-weight: 800; color: var(--text); margin-bottom: 12px; }
+.fin-k { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); }
+.fin-hero { text-align: center; }
+.fin-nw { font-size: 40px; font-weight: 800; letter-spacing: -1px; color: var(--text); line-height: 1.05; margin: 4px 0; font-variant-numeric: tabular-nums; }
+.fin-nw.neg { color: var(--danger); }
+.fin-nw-sub { font-size: 13px; color: var(--text-muted); }
+.fin-up { color: var(--success); font-weight: 700; } .fin-down { color: var(--danger); font-weight: 700; }
+.fin-chart-wrap { height: 150px; margin-top: 14px; position: relative; }
+.fin-chart-wrap.fin-donut { height: 190px; }
+.fin-ratios { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+.fin-ratio { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--border-bright); border-radius: var(--radius); padding: 14px 14px; box-shadow: var(--shadow); }
+.fin-ratio.fin-good { border-left-color: var(--success); } .fin-ratio.fin-ok { border-left-color: var(--accent); } .fin-ratio.fin-low { border-left-color: var(--danger); }
+.fin-ratio-n { font-size: 24px; font-weight: 800; color: var(--text); letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+.fin-ratio-l { font-size: 12px; font-weight: 700; color: var(--text-muted); margin-top: 2px; }
+.fin-ratio-h { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+.fin-fi-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; color: var(--text-muted); margin-bottom: 8px; }
+.fin-fi-row strong { font-size: 18px; color: var(--text); font-variant-numeric: tabular-nums; }
+.fin-bar { height: 12px; border-radius: 6px; background: var(--surface); overflow: hidden; }
+.fin-bar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #60A5FA, var(--primary)); transition: width .4s; }
+.fin-fi-sub { font-size: 13px; color: var(--text-muted); margin-top: 8px; line-height: 1.5; }
+.fin-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; justify-content: center; margin-top: 12px; }
+.fin-leg { font-size: 12px; color: var(--text); display: inline-flex; align-items: center; gap: 6px; }
+.fin-leg i { width: 10px; height: 10px; border-radius: 3px; }
+.fin-split-bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--surface); }
+.fin-split-bar .fin-active { background: var(--primary); } .fin-split-bar .fin-passive { background: var(--success); }
+.fin-split-legend { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+.fin-pl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fin-pl > div { background: var(--surface); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; }
+.fin-pl span { font-size: 12px; color: var(--text-muted); } .fin-pl strong { font-size: 18px; color: var(--text); font-variant-numeric: tabular-nums; }
+.fin-debt { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.fin-debt-top { display: flex; justify-content: space-between; align-items: center; }
+.fin-debt-name { font-weight: 700; color: var(--text); font-size: 14px; }
+.fin-debt-apr { font-size: 11px; font-weight: 800; color: var(--danger); background: var(--danger-bg); border-radius: 999px; padding: 2px 8px; }
+.fin-debt-meta { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; }
+/* Finance editor modal */
+.fin-editor { text-align: left; width: 480px; max-width: 94vw; }
+.fin-group-h { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); margin: 16px 0 8px; }
+.fin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fin-f { display: flex; flex-direction: column; }
+.fin-f label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.fin-f input { width: 100%; padding: 9px 11px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--field-bg); color: var(--text); font-size: 14px; outline: none; }
+.fin-f input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(59,130,246,0.14); }
+.fin-debt-row { display: grid; grid-template-columns: 1fr 84px 66px 66px 28px; gap: 6px; margin-bottom: 6px; }
+.fin-debt-row input { padding: 8px 8px; border: 1.5px solid var(--border); border-radius: 8px; background: var(--field-bg); color: var(--text); font-size: 13px; outline: none; min-width: 0; }
+.fin-debt-x { border: none; background: none; color: var(--text-muted); cursor: pointer; font-size: 13px; }
+.fin-debt-x:hover { color: var(--danger); }
+.fin-editor-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+@media (max-width: 640px) { .fin-ratios { grid-template-columns: 1fr; } }
 /* Health hub — today's macros + recent workouts */
 .hl-today { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
 .hl-macro-top { display: flex; justify-content: space-between; font-size: 13px; color: var(--text); margin-bottom: 4px; }

@@ -62,7 +62,7 @@ function loadApp(fieldValues) {
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
-    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap });';
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -249,6 +249,28 @@ eq('fuelStatus: no training/data → neutral',
 ok('fuelStatus: no gap when not trained today', A.fuelStatus({ trainedToday: false, gymDays: 1, proteinTarget: 150, proteinToday: 20, avgProteinWeek: 20 }).gap === 0);
 ok('proteinFoodForGap: suggests food for a real gap, nothing for none',
   /whey|chicken/.test(A.proteinFoodForGap(40)) && A.proteinFoodForGap(0) === '');
+// financeMetrics — the personal-CFO numbers
+(() => {
+  const f = { assets: { cash: 30000, investments: 120000, property: 0, business: 0, other: 0 },
+    liabilities: { mortgage: 0, loans: 0, credit: 5000, other: 0 },
+    monthlyIncome: 8000, monthlyExpenses: 4000, monthlySavings: 2000, passiveIncome: 800,
+    business: { revenue: 10000, expenses: 6000 }, withdrawalRate: 4, debts: [{ balance: 5000 }] };
+  const m = A.financeMetrics(f);
+  eq('financeMetrics: net worth = assets − liabilities', m.netWorth, 145000);
+  eq('financeMetrics: savings rate %', m.savingsRate, 25);
+  eq('financeMetrics: emergency months from cash/expenses', m.emergencyMonths, 7.5);
+  eq('financeMetrics: FI number = annual expenses × 25 (4% rule)', m.fiNumber, 1200000);
+  eq('financeMetrics: FI progress % (investable / FI)', m.fiProgress, 13);
+  eq('financeMetrics: passive income ratio %', m.passiveRatio, 10);
+  eq('financeMetrics: business margin %', m.bizMargin, 40);
+})();
+ok('debtPayoffMonths: zero balance → 0', A.debtPayoffMonths(0, 20, 100) === 0);
+ok('debtPayoffMonths: payment below interest → Infinity', A.debtPayoffMonths(10000, 24, 50) === Infinity);
+ok('debtPayoffMonths: 0% APR → ceil(balance/payment)', A.debtPayoffMonths(1000, 0, 100) === 10);
+ok('debtPayoffMonths: real APR pays off in finite months', (() => { const n = A.debtPayoffMonths(1000, 20, 100); return n > 10 && n < 14; })());
+ok('yearsToFI: already there → 0', A.yearsToFI(1000000, 1000000, 0) === 0);
+ok('yearsToFI: no FI number → null', A.yearsToFI(50000, 0, 1000) === null);
+ok('yearsToFI: saving reaches FI in a finite, sensible time', (() => { const y = A.yearsToFI(100000, 1000000, 3000, 0.07); return y > 5 && y < 40; })());
 // weeklyGoalsReached — dashboard's "% of goals reached" hero number
 ok('weeklyGoalsReached averages active goals', A.weeklyGoalsReached({ gymDays: 4, readPages: 100 }, { gymDaysPerWeek: 4, weeklyReadGoal: 200 }, 0, { gym: true, reading: true }) === 75);
 ok('weeklyGoalsReached caps each goal at 100', A.weeklyGoalsReached({ gymDays: 10 }, { gymDaysPerWeek: 5 }, 0, { gym: true }) === 100);
