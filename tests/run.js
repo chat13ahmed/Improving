@@ -62,7 +62,7 @@ function loadApp(fieldValues) {
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
-    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay });';
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -292,6 +292,38 @@ ok('readingPacePerDay: averages recent pages over 14 days', (() => {
   const p = A.readingPacePerDay(days);   // (14+14)/14 = 2, old day excluded
   return Math.abs(p - 2) < 0.001;
 })());
+// knowledgeYearStats — the "Year in Knowledge" recap numbers
+(() => {
+  const data = {
+    days: [
+      { date: '2026-03-01', reading: { pages: 20 } },
+      { date: '2026-03-02', reading: { pages: 10 } },
+      { date: '2026-03-03', reading: { pages: 5 } },
+      { date: '2026-03-10', reading: { pages: 15 } },
+      { date: '2025-12-31', reading: { pages: 999 } },          // previous year — excluded
+      { date: '2026-04-01' }                                    // no reading — ignored
+    ],
+    books: [
+      { status: 'finished', finishedDate: '2026-02-10' },
+      { status: 'finished', finishedDate: '2025-11-01' },       // previous year — excluded
+      { status: 'reading' }
+    ],
+    vocab: [
+      { word: 'a', createdAt: '2026-01-05' },
+      { word: 'b', createdAt: '2025-06-01', review: { box: 5 } } // old word, but mastered counts all-time
+    ],
+    takeaways: [{ createdAt: '2026-05-01' }, { createdAt: '2025-05-01' }]
+  };
+  const s = A.knowledgeYearStats(data, 2026);
+  eq('yearStats: pages sum only within the year', s.pages, 50);
+  eq('yearStats: days read within the year', s.daysRead, 4);
+  eq('yearStats: books finished within the year', s.booksFinished, 1);
+  eq('yearStats: words added within the year', s.wordsAdded, 1);
+  eq('yearStats: mastered counts all-time (box ≥ 4)', s.wordsMastered, 1);
+  eq('yearStats: takeaways within the year', s.takeaways, 1);
+  eq('yearStats: best streak = longest consecutive run', s.bestStreak, 3);
+  ok('yearStats: empty data is safe', A.knowledgeYearStats({}, 2026).pages === 0 && A.knowledgeYearStats(null, 2026).bestStreak === 0);
+})();
 // At-rest encryption round-trip (cloud/crypto.js)
 (() => {
   const ENC = require('../cloud/crypto');

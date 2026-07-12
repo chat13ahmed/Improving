@@ -8034,6 +8034,26 @@ function readingPacePerDay(days) {
   }
   return pages / 14;
 }
+// "Year in Knowledge" — the year's reading + learning story in numbers. Pure + testable.
+function knowledgeYearStats(data, year) {
+  const d = data || {};
+  const yr = String(year || new Date().getFullYear());
+  const inYear = (ds) => typeof ds === 'string' && ds.startsWith(yr + '-');
+  const readDays = (Array.isArray(d.days) ? d.days : []).filter(x => x && inYear(x.date) && x.reading && x.reading.pages > 0);
+  const pages = readDays.reduce((s, x) => s + (x.reading.pages || 0), 0);
+  const booksFinished = (d.books || []).filter(b => b && b.status === 'finished' && inYear(b.finishedDate || '')).length;
+  const wordsAdded = (d.vocab || []).filter(w => w && inYear(w.createdAt || '')).length;
+  const takeaways = (d.takeaways || []).filter(t => t && inYear(t.createdAt || '')).length;
+  // longest consecutive-day reading run within the year
+  const dates = [...new Set(readDays.map(x => x.date))].sort();
+  let best = 0, run = 0, prev = null;
+  for (const ds of dates) {
+    const t = Date.parse(ds + 'T00:00:00Z');
+    run = (prev != null && t - prev === 86400000) ? run + 1 : 1;
+    prev = t; if (run > best) best = run;
+  }
+  return { year: yr, pages, daysRead: readDays.length, booksFinished, wordsAdded, wordsMastered: vocabMastered(d.vocab || []), takeaways, bestStreak: best };
+}
 function renderVocabCard() {
   const vocab = state.data.vocab || [];
   const s = vocabStats(vocab);
@@ -8413,7 +8433,8 @@ function renderKnowledgeOverview() {
     card('<div class="biz-k">Books finished</div><div class="biz-big">' + finished +
       '</div><div class="biz-sub">' + (finished ? 'nice work' : 'finish your first') + '</div>',
       "setKnowledgeTab('reading')") +
-    '</div>';
+    '</div>' +
+    renderYearInKnowledge();
 }
 
 function renderKnowledgePage() {
@@ -8477,6 +8498,12 @@ async function markTakeawayReviewed(id) {
 function renderTakeawaysCard() {
   const list   = state.data.takeaways || [];
   const active = (state.data.books || []).find(b => b.status === 'reading');
+  const dueQ = vocabDue(list, todayStr()).length;
+  const quizBanner = list.length && dueQ > 0
+    ? '<div class="vr-cta"><div class="vr-cta-txt"><div class="vr-cta-n">💡 ' + dueQ + ' lesson' + (dueQ === 1 ? '' : 's') + ' due for recall</div>' +
+      '<div class="vr-cta-sub">Try to finish each lesson from memory — that\'s what makes it yours.</div></div>' +
+      '<button type="button" class="btn btn-primary" onclick="startTakeawayQuiz()">Quiz me →</button></div>'
+    : '';
   const form =
     '<div class="tk-form">' +
     '<input type="text" id="tk-input" class="vocab-input" placeholder="A lesson worth remembering…" maxlength="240" autocomplete="off" onkeydown="if(event.key===\'Enter\'){addTakeaway()}">' +
@@ -8499,7 +8526,7 @@ function renderTakeawaysCard() {
     '<h3 class="card-title">Key takeaways</h3>' +
     '<p class="card-sub">Distill the ideas worth remembering. We\'ll bring one back to you now and then so it actually sticks.' +
     (list.length ? ' · <b>' + list.length + '</b> saved' : '') + '</p>' +
-    form + items +
+    quizBanner + form + items +
     '</div>';
 }
 async function addTakeaway() {
@@ -8522,6 +8549,100 @@ async function deleteTakeaway(id) {
   state.data.takeaways = (state.data.takeaways || []).filter(x => x.id !== id);
   await saveData();
   renderKnowledgePage();
+}
+// ── Takeaway quiz — active recall for your saved lessons (same Leitner engine
+// and .vr-* flashcard styles as the vocabulary review) ──
+function startTakeawayQuiz() {
+  const due = vocabDue(state.data.takeaways || [], todayStr());   // generic: anything with {review:{due}}
+  if (!due.length) { showToast('No lessons due — all fresh in mind! 🎉', 'success'); return; }
+  state._tkQuiz = { queue: due.map(t => t.id).sort(() => Math.random() - 0.5), idx: 0, revealed: false, got: 0, missed: 0 };
+  renderTakeawayQuiz();
+}
+function currentQuizTakeaway() {
+  const r = state._tkQuiz; if (!r) return null;
+  return (state.data.takeaways || []).find(t => t.id === r.queue[r.idx]);
+}
+function renderTakeawayQuiz() {
+  const r = state._tkQuiz; if (!r) return;
+  document.getElementById('tk-quiz')?.remove();
+  if (r.idx >= r.queue.length) return renderTakeawayQuizDone();
+  const t = currentQuizTakeaway();
+  if (!t) { r.idx++; return renderTakeawayQuiz(); }
+  const opening = (t.text || '').trim();
+  const cue = opening.length > 30 ? escapeHtml(opening.slice(0, 28)) + '…' : escapeHtml(opening.slice(0, Math.ceil(opening.length / 2))) + '…';
+  const body = r.revealed
+    ? '<div class="vr-answer"><div class="vr-ctx">“' + escapeHtml(t.text) + '”</div></div>' +
+      '<div class="vr-actions">' +
+      '<button type="button" class="btn vr-miss" onclick="gradeTakeawayQuiz(false)">😕 Faded</button>' +
+      '<button type="button" class="btn btn-primary vr-got" onclick="gradeTakeawayQuiz(true)">✅ Still with me</button></div>'
+    : '<button type="button" class="btn btn-primary vr-reveal" onclick="revealTakeawayQuiz()">Show the lesson</button>';
+  const html = '<div class="modal-overlay" id="tk-quiz"><div class="modal-box vr-box">' +
+    '<button type="button" class="vr-close" onclick="closeTakeawayQuiz()" aria-label="Close">✕</button>' +
+    '<div class="vr-progress">Lesson ' + (r.idx + 1) + ' / ' + r.queue.length + '</div>' +
+    '<div class="vr-word" style="font-size:20px">Can you finish this lesson' + (t.book ? ' from <span style="color:var(--read-color)">' + escapeHtml(t.book) + '</span>' : '') + '?</div>' +
+    '<div class="vr-hint">“' + cue + '”</div>' + body +
+    '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+function revealTakeawayQuiz() { if (state._tkQuiz) { state._tkQuiz.revealed = true; renderTakeawayQuiz(); } }
+async function gradeTakeawayQuiz(correct) {
+  const r = state._tkQuiz; if (!r) return;
+  const t = currentQuizTakeaway();
+  if (t) {
+    const box = nextReviewBox((t.review && t.review.box) || 0, correct);
+    const due = new Date(); due.setDate(due.getDate() + reviewIntervalDays(box));
+    t.review = { box, due: due.toISOString().slice(0, 10), seen: ((t.review && t.review.seen) || 0) + 1, last: todayStr() };
+    t.seenAt = todayStr();   // keep the Overview's resurfacing card in sync
+    if (correct) r.got++; else r.missed++;
+    await saveData();
+  }
+  r.idx++; r.revealed = false;
+  renderTakeawayQuiz();
+}
+function renderTakeawayQuizDone() {
+  const r = state._tkQuiz || { got: 0, missed: 0, queue: [] };
+  document.getElementById('tk-quiz')?.remove();
+  const html = '<div class="modal-overlay" id="tk-quiz"><div class="modal-box vr-box vr-done">' +
+    '<div class="vr-done-icon">💡</div><div class="vr-word">Lessons refreshed</div>' +
+    '<div class="vr-done-sub">Recalled <b>' + r.queue.length + '</b> lesson' + (r.queue.length === 1 ? '' : 's') + ' · <b>' + r.got + '</b> still with you · <b>' + r.missed + '</b> to revisit sooner.</div>' +
+    '<button type="button" class="btn btn-primary" onclick="closeTakeawayQuiz()">Done</button></div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+function closeTakeawayQuiz() {
+  document.getElementById('tk-quiz')?.remove();
+  state._tkQuiz = null;
+  if (state.page === 'knowledge') renderKnowledgePage();
+}
+
+// ── Year in Knowledge — a shareable recap of the year's reading + learning ──
+function renderYearInKnowledge() {
+  const s = knowledgeYearStats(state.data, new Date().getFullYear());
+  if (!s.pages && !s.booksFinished && !s.wordsAdded && !s.takeaways) return '';
+  const item = (n, l) => '<div class="ky-item"><div class="ky-n">' + n + '</div><div class="ky-l">' + l + '</div></div>';
+  return '<div class="card ky-card">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px">' +
+    '<h3 class="card-title" style="margin-bottom:0">📖 Your ' + s.year + ' in Knowledge</h3>' +
+    '<button type="button" class="btn-sm" onclick="shareYearInKnowledge()">Share</button></div>' +
+    '<div class="ky-grid">' +
+    item(s.booksFinished, 'book' + (s.booksFinished === 1 ? '' : 's') + ' finished') +
+    item(s.pages.toLocaleString(), 'pages read') +
+    item(s.bestStreak, 'best streak') +
+    item(s.wordsAdded, 'words learned') +
+    item(s.wordsMastered, 'mastered') +
+    item(s.takeaways, 'lessons saved') +
+    '</div></div>';
+}
+async function shareYearInKnowledge() {
+  const s = knowledgeYearStats(state.data, new Date().getFullYear());
+  const bits = [];
+  if (s.booksFinished) bits.push(s.booksFinished + ' book' + (s.booksFinished === 1 ? '' : 's') + ' finished');
+  if (s.pages) bits.push(s.pages.toLocaleString() + ' pages read');
+  if (s.bestStreak > 1) bits.push(s.bestStreak + '-day best streak');
+  if (s.wordsAdded) bits.push(s.wordsAdded + ' new words');
+  if (s.takeaways) bits.push(s.takeaways + ' lessons saved');
+  const text = '📖 My ' + s.year + ' in Knowledge — ' + bits.join(' · ') + '. Tracked with Onward.';
+  try { if (navigator.share) { await navigator.share({ title: 'Onward', text }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(text); showToast('Copied — paste it anywhere.', 'success'); } catch { showToast('Share not available here.', 'error'); }
 }
 
 // Curated list of popular growth/business/self-development books with page counts,
