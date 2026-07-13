@@ -19,7 +19,7 @@ Installable PWA · works on phone and desktop · light + dark mode.
 ### Daily core
 - **Dashboard** — a greeting "summit" hero, *Today's One Move* (the single best next action), weekly progress score, per-pillar cards, and a quick-jump grid.
 - **Log Today** — a 30-second guided flow (one question at a time) *and* a full form.
-- **Statistics** — on-brand, theme-aware charts (weight trend, income, gym, money flow).
+- **Stats live inside each hub** — the separate Statistics page is retired; every overview (Health / Business / Knowledge) opens with **animated stat rings** (pillar-coloured progress rings, count-up numbers, week-over-week arrows, a glow pulse at 100%), and the charts moved to their natural tabs (gym chart → Health·Training, 12-week money chart → Finances, money circle → Business).
 - **Checklist & reminders** — recurring tasks and web-push reminders.
 
 ### Health hub (Training · Nutrition · Body)
