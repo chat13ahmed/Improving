@@ -644,7 +644,25 @@ ok('money circle rolls savings forward', _circ.carryover === 600 && _circ.income
 ok('money circle spent fraction', Math.abs(_circ.spentFrac - (500 / 2600)) < 0.001);
 // demo preview data shape
 const _demo = A.buildDemoData();
-ok('buildDemoData shape (21 days, profile, income, book)', _demo.days.length === 21 && !!_demo.profile && Object.keys(_demo.incomes).length >= 1 && _demo.books.length === 1 && _demo.days.every(d => !!d.date));
+ok('buildDemoData shape (21 days, profile, income, books)', _demo.days.length === 21 && !!_demo.profile && Object.keys(_demo.incomes).length >= 1 && _demo.books.length === 2 && _demo.days.every(d => !!d.date));
+// The live demo must leave NO section blank — every hub has content.
+ok('demo: current book has chapters + totalPages; one finished book', (() => {
+  const cur = _demo.books.find(b => b.status === 'reading'), fin = _demo.books.find(b => b.status === 'finished');
+  return cur && cur.totalPages > 0 && Array.isArray(cur.chapters) && cur.chapters.length >= 3 && fin && !!fin.finishedDate;
+})());
+ok('demo: reading notes carry chapter/page/quote', _demo.days.some(d => d.reading && d.reading.pages > 0 && d.reading.chapter && d.reading.page > 0 && d.reading.quote));
+ok('demo: workouts have real exercises + sets', _demo.days.some(d => d.gym && d.gym.done && Array.isArray(d.gym.exercises) && d.gym.exercises[0].sets.length > 0));
+ok('demo: eaten macros present daily', _demo.days.every(d => d.eaten && d.eaten.protein > 0));
+ok('demo: vocab seeded with context + a word due for review', _demo.vocab.length >= 3 && _demo.vocab.some(w => w.context) && A.vocabDue(_demo.vocab, _demo.days[20].date).length >= 1);
+ok('demo: takeaways seeded and due for the quiz', _demo.takeaways.length >= 2 && A.vocabDue(_demo.takeaways, _demo.days[20].date).length >= 1);
+ok('demo: finance snapshot complete (metrics compute)', (() => {
+  const m = A.financeMetrics(_demo.finance); return m.netWorth === 49600 && m.savingsRate > 0 && _demo.finance.snapshots.length >= 2 && _demo.finance.debts.length >= 1;
+})());
+ok('demo: contacts form a pipeline with value + follow-ups', (() => {
+  const pv = A.pipelineValue(_demo.contacts); return pv.open > 0 && pv.won > 0 && _demo.contacts.some(c => c.followUpDate);
+})());
+ok('demo: a scored idea with tasks + validation', _demo.ideas.some(i => i.scores && A.ideaScore(i.scores) > 0 && (i.tasks || []).length && i.validation && i.validation.customer));
+ok('demo: checklist + reminders seeded', _demo.checklist.length >= 2 && _demo.reminders.length >= 1);
 
 // subscription gate (free trial → paywall)
 A.state.isOwner = false; A.state.paymentsLive = true;

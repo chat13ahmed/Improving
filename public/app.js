@@ -7674,35 +7674,127 @@ async function clearApiKey() {
 // DEMO PREVIEW  (show someone the app full of sample data — never saved)
 // ─────────────────────────────────────────────────────────────
 function buildDemoData() {
-  const days = [], today = new Date();
+  // A demo where EVERY section has life in it — no blank tabs for a curious visitor.
+  const today = new Date();
+  const iso = (off) => { const d = new Date(today); d.setDate(d.getDate() - off); return d.toISOString().split('T')[0]; };
+  const CH = ['Ch. 1 — The Rich Don’t Work for Money', 'Ch. 2 — Why Teach Financial Literacy', 'Ch. 3 — Mind Your Own Business', 'Ch. 4 — The History of Taxes'];
+  // The reading journey through the current book — chapters, pages, quotes, notes (209 of 336)
+  const READS = {
+    13: { pages: 24, chapter: CH[0], page: 24, quote: 'The poor and the middle class work for money. The rich have money work for them.', summary: 'The mindset shift: stop trading hours for money — build things that pay you.' },
+    12: { pages: 18, chapter: CH[0], page: 42, summary: 'Fear and greed drive most money decisions. Watch mine this week.' },
+    10: { pages: 22, chapter: CH[1], page: 64, quote: 'An asset puts money in your pocket; a liability takes it out.', summary: 'The single rule: buy assets first.' },
+    8:  { pages: 30, chapter: CH[1], page: 94, summary: 'My car is a liability, not an asset. Ouch — but true.' },
+    6:  { pages: 26, chapter: CH[2], page: 120, quote: 'The rich focus on their asset columns while everyone else focuses on their income statements.', summary: 'Mind your own business = grow the asset column on the side.' },
+    4:  { pages: 21, chapter: CH[2], page: 141 },
+    2:  { pages: 28, chapter: CH[3], page: 169, summary: 'Corporations pay expenses first, then taxes. Employees are taxed first.' },
+    1:  { pages: 20, chapter: CH[3], page: 189, quote: 'Every dollar in my asset column was a great employee, working hard to make more employees.', summary: 'Make every dollar an employee.' },
+    0:  { pages: 20, chapter: CH[3], page: 209, summary: 'Finished the tax chapter — key: earn, spend, then be taxed (via a business).' }
+  };
+  // Rotating workouts with real sets, so Training, totals and the muscle map are alive
+  const WORKOUTS = [
+    { muscleGroup: 'chest', exercises: [
+      { name: 'Barbell Bench Press', muscle: 'Chest', sets: [{ reps: 8, weight: 135, secs: 0 }, { reps: 8, weight: 155, secs: 0 }, { reps: 6, weight: 165, secs: 0 }] },
+      { name: 'Overhead Press', muscle: 'Shoulders', sets: [{ reps: 10, weight: 75, secs: 0 }, { reps: 8, weight: 85, secs: 0 }] },
+      { name: 'Triceps Pushdown', muscle: 'Arms', sets: [{ reps: 12, weight: 50, secs: 0 }, { reps: 12, weight: 55, secs: 0 }] }] },
+    { muscleGroup: 'back', exercises: [
+      { name: 'Pull-Up', muscle: 'Back', sets: [{ reps: 8, weight: 0, secs: 0 }, { reps: 7, weight: 0, secs: 0 }, { reps: 6, weight: 0, secs: 0 }] },
+      { name: 'Bent-Over Row', muscle: 'Back', sets: [{ reps: 10, weight: 115, secs: 0 }, { reps: 8, weight: 125, secs: 0 }] },
+      { name: 'Barbell Curl', muscle: 'Arms', sets: [{ reps: 12, weight: 45, secs: 0 }, { reps: 10, weight: 50, secs: 0 }] }] },
+    { muscleGroup: 'legs', exercises: [
+      { name: 'Back Squat', muscle: 'Legs', sets: [{ reps: 8, weight: 185, secs: 0 }, { reps: 8, weight: 205, secs: 0 }, { reps: 6, weight: 225, secs: 0 }] },
+      { name: 'Romanian Deadlift', muscle: 'Legs', sets: [{ reps: 10, weight: 155, secs: 0 }, { reps: 10, weight: 165, secs: 0 }] },
+      { name: 'Plank', muscle: 'Core', sets: [{ reps: 0, weight: 0, secs: 60 }, { reps: 0, weight: 0, secs: 75 }] }] }
+  ];
+  const days = [];
   for (let i = 20; i >= 0; i--) {
     const d = new Date(today); d.setDate(d.getDate() - i);
     const date = d.toISOString().split('T')[0];
     const weekend = d.getDay() === 0 || d.getDay() === 6;
+    const rest = d.getDay() === 0 || i === 3 || i === 9 || i === 16;   // Sundays + a few rest days ≈ 5 sessions/week
+    const wo = rest ? null : WORKOUTS[i % 3];
+    const read = READS[i];
+    const calories = 2500 + ((i * 137) % 400);
     days.push({
       id: uid(), date,
-      gym: { done: Math.random() > 0.28, muscleGroup: ['Push', 'Pull', 'Legs', 'Full body'][i % 4], duration: 45 + Math.round(Math.random() * 30), notes: '' },
-      food: { rating: 3 + Math.round(Math.random() * 2), notes: '' },
-      networking: { count: weekend ? 0 : Math.round(Math.random() * 3), notes: '' },
-      money: { activities: weekend ? '' : 'Followed up with leads', income: 0 },
-      spent: Math.round(15 + Math.random() * (weekend ? 120 : 70)),
-      reading: { pages: Math.random() > 0.4 ? 10 + Math.round(Math.random() * 30) : 0, bookId: 'demo', bookTitle: 'Rich Dad Poor Dad', summary: '' },
-      water: Math.round((0.25 + Math.random() * 0.75) * 4) / 4,
-      calories: 2000 + Math.floor(Math.random() * 800), notes: ''
+      gym: wo
+        ? { done: true, muscleGroup: wo.muscleGroup, duration: 0, notes: '', exercises: wo.exercises }
+        : { done: false, muscleGroup: '', duration: 0, notes: '' },
+      food: { rating: 3 + (i % 3), notes: '' },
+      eaten: { protein: 135 + ((i * 7) % 50), carbs: Math.round(calories * 0.45 / 4), fat: Math.round(calories * 0.25 / 9) },
+      networking: { count: weekend ? 0 : (i % 4 === 0 ? 3 : 1 + (i % 2)), notes: '' },
+      money: { activities: weekend ? '' : ['Followed up with leads', 'Sent two proposals', 'Posted in local groups', 'Invoiced Jordan'][i % 4], income: 0 },
+      spent: weekend ? 60 + ((i * 23) % 80) : 20 + ((i * 17) % 60),
+      reading: read
+        ? { pages: read.pages, bookId: 'demo', bookTitle: 'Rich Dad Poor Dad', chapter: read.chapter, page: read.page, quote: read.quote || '', summary: read.summary || '' }
+        : { pages: 0, bookId: 'demo', bookTitle: 'Rich Dad Poor Dad', summary: '' },
+      water: 0.5 + ((i % 3) * 0.25),
+      calories,
+      notes: i === 1 ? 'Great call with Jordan — send the contract tomorrow.' : (i === 7 ? 'Slept 8h. Best training day in weeks.' : '')
     });
   }
   const incomes = {};
   incomes[today.toISOString().slice(0, 7)] = 4200;
   const pm = new Date(today); pm.setMonth(pm.getMonth() - 1);
   incomes[pm.toISOString().slice(0, 7)] = 3900;
-  const weights = []; for (let i = 21; i >= 0; i -= 3) { const d = new Date(today); d.setDate(d.getDate() - i); weights.push({ date: d.toISOString().split('T')[0], kg: 80 - (21 - i) * 0.04 }); }
+  const weights = []; for (let i = 21; i >= 0; i -= 3) { weights.push({ date: iso(i), kg: 80 - (21 - i) * 0.04 }); }
   return {
     profile: { name: 'Alex', firstName: 'Alex', pillars: defaultPillars(), gymDaysPerWeek: 5, weeklyNetworkGoal: 3, weeklyReadGoal: 100, savingsGoal: 800, incomeCadence: 'monthly',
+      plannedWorkout: { program: 'Push Day' },
       nutrition: { age: 28, sex: 'male', heightCm: 180, weightKg: 80, heightUnit: 'ft', weightUnit: 'lbs', activity: 'active', goal: 'gain', strategy: 'muscle', mealsPerDay: 4 } },
     days, weeks: [], incomes, weights,
-    books: [{ id: 'demo', title: 'Rich Dad Poor Dad', author: 'Robert Kiyosaki', status: 'reading' }],
-    contacts: [{ id: uid(), name: 'Jordan Lee', status: 'lead', starred: true, notes: 'Met at the gym' }],
-    ideas: [{ id: uid(), title: 'Weekend car-detailing side hustle', status: 'active', notes: '' }]
+    books: [
+      { id: 'demo', title: 'Rich Dad Poor Dad', author: 'Robert Kiyosaki', status: 'reading', totalPages: 336, startDate: iso(14), chapters: CH.slice() },
+      { id: 'demo2', title: 'Atomic Habits', author: 'James Clear', status: 'finished', totalPages: 320, finishedDate: iso(32) }
+    ],
+    vocab: [
+      { id: 'w1', word: 'Ephemeral', meaning: 'Lasting a very short time', book: 'Atomic Habits', page: 142,
+        context: 'Motivation is ephemeral — systems are what endure.', sentence: 'The hype was ephemeral; the habit remained.', createdAt: iso(12),
+        review: { box: 4, due: iso(-18), seen: 5, last: iso(2) } },
+      { id: 'w2', word: 'Liability', meaning: 'Something that takes money out of your pocket', book: 'Rich Dad Poor Dad', page: 61,
+        context: 'An asset puts money in your pocket; a liability takes it out.', sentence: '', createdAt: iso(6),
+        review: { box: 1, due: iso(0), seen: 1, last: iso(2) } },
+      { id: 'w3', word: 'Frugality', meaning: 'Being intentional and sparing with money', book: 'Rich Dad Poor Dad', page: 88,
+        context: 'Frugality bought his first assets — not a bigger salary.', sentence: '', createdAt: iso(1) }
+    ],
+    takeaways: [
+      { id: 'tk1', text: 'You do not rise to the level of your goals — you fall to the level of your systems.', book: 'Atomic Habits', bookId: 'demo2', createdAt: iso(18), seenAt: iso(6), review: { box: 1, due: iso(0), seen: 1, last: iso(6) } },
+      { id: 'tk2', text: 'An asset puts money in your pocket; a liability takes it out.', book: 'Rich Dad Poor Dad', bookId: 'demo', createdAt: iso(8), seenAt: '' },
+      { id: 'tk3', text: 'The rich buy assets first and luxuries last — the poor do the reverse.', book: 'Rich Dad Poor Dad', bookId: 'demo', createdAt: iso(3), seenAt: '' }
+    ],
+    finance: {
+      assets: { cash: 12500, investments: 38000, property: 0, business: 8000, other: 2500 },
+      liabilities: { mortgage: 0, loans: 9000, credit: 2400, other: 0 },
+      monthlyIncome: 4200, monthlyExpenses: 2600, monthlySavings: 1100, passiveIncome: 350,
+      portfolio: { stocks: 24000, bonds: 4000, realEstate: 0, crypto: 6000, cash: 4000 },
+      business: { revenue: 1800, expenses: 700 },
+      debts: [
+        { id: 'd1', name: 'Credit card', balance: 2400, apr: 22, payment: 250 },
+        { id: 'd2', name: 'Car loan', balance: 9000, apr: 6, payment: 320 }
+      ],
+      withdrawalRate: 4, currentAge: 28,
+      snapshots: [{ date: iso(62), net: 41300 }, { date: iso(31), net: 45150 }, { date: iso(0), net: 49600 }]
+    },
+    contacts: [
+      { id: uid(), name: 'Jordan Lee', role: 'Gym owner', status: 'closing', dealValue: 2500, followUpDate: iso(0), lastContact: iso(2), addedDate: iso(15), starred: true, notes: 'Wants the premium package — send the contract.' },
+      { id: uid(), name: 'Sam Rivera', role: 'Restaurant owner', status: 'warm', dealValue: 1200, followUpDate: iso(-2), lastContact: iso(4), addedDate: iso(11), notes: 'Asked for a proposal after tasting night.' },
+      { id: uid(), name: 'Priya Shah', role: 'Marketing consultant', status: 'contacted', dealValue: 800, lastContact: iso(9), addedDate: iso(9), notes: 'Met at the networking mixer — follow up!' },
+      { id: uid(), name: 'Marcus Webb', role: 'Property manager', status: 'closed', dealValue: 950, lastContact: iso(6), addedDate: iso(20), notes: 'Won — monthly detailing for his lot.' }
+    ],
+    ideas: [
+      { id: uid(), title: 'Weekend car-detailing side hustle', status: 'active',
+        scores: { income: 3, speed: 5, ease: 4, passion: 3 }, nextStep: 'Book 3 paid test washes this weekend',
+        notes: 'Low startup cost — supplies ≈ $120.',
+        pros: ['Cash from week one', 'Zero rent — fully mobile'], cons: ['Weather-dependent', 'Caps out at my own hours'],
+        tasks: [{ id: 'dt1', text: 'Buy supplies', done: true }, { id: 'dt2', text: 'Post in 3 local groups', done: true }, { id: 'dt3', text: 'First 3 paid washes', done: false }],
+        validation: { customer: 'Busy professionals with nice cars', valueHyp: 'They’ll pay $60–90 to skip the wash queue', experiment: 'Presell 5 washes in local groups', metric: '3 of 5 book within a week' } },
+      { id: uid(), title: 'Meal-prep delivery for gym members', status: 'exploring', notes: 'Partner with the gym café? Validate demand first.' }
+    ],
+    checklist: [{ id: 'c1', text: 'Train — even 20 minutes counts' }, { id: 'c2', text: 'Read 10 pages' }, { id: 'c3', text: 'One outreach message' }],
+    checkDone: (() => { const o = {}; o[iso(0)] = ['c1']; return o; })(),
+    reminders: [
+      { id: 'r1', label: 'Morning workout', time: '07:00', enabled: true, _lastFired: '' },
+      { id: 'r2', label: 'Evening reading', time: '21:30', enabled: true, _lastFired: '' }
+    ]
   };
 }
 async function startDemo() {
@@ -8025,11 +8117,13 @@ function nextReviewBox(box, correct) { box = Number.isInteger(box) ? box : 0; re
 function vocabDue(vocab, today) { return (Array.isArray(vocab) ? vocab : []).filter(w => !w.review || !w.review.due || w.review.due <= today); }
 function vocabMastered(vocab) { return (Array.isArray(vocab) ? vocab : []).filter(w => w.review && (w.review.box || 0) >= 4).length; }
 // Reading pace: pages/day averaged over the last 14 calendar days (rest days included). Pure.
+// Dates are aged in UTC ('Z') because todayStr()/stored dates are UTC date strings —
+// local parsing made today's pages vanish from the pace in western-timezone evenings.
 function readingPacePerDay(days) {
   const now = Date.now(); let pages = 0;
   for (const d of (days || [])) {
     if (!d.reading || !(d.reading.pages > 0)) continue;
-    const t = Date.parse((d.date || '') + 'T00:00:00');
+    const t = Date.parse((d.date || '') + 'T00:00:00Z');
     if (!isNaN(t)) { const age = (now - t) / 86400000; if (age >= 0 && age < 14) pages += d.reading.pages; }
   }
   return pages / 14;
