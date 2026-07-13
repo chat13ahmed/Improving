@@ -465,21 +465,57 @@ function renderAchievementsSection() {
 function animateCounters() {
   document.querySelectorAll('.anim-count').forEach(el => {
     const target = parseFloat(el.dataset.val || '0');
-    if (!target) return;
     const isDecimal = el.dataset.decimal === '1';
     const prefix = el.dataset.prefix || '';
     const suffix = el.dataset.suffix || '';
+    const final = prefix + (isDecimal ? target.toFixed(1) : Math.round(target)) + suffix;
+    if (!target) { el.textContent = final; return; }
     const start = performance.now();
     const dur = 900;
+    let done = false;
     function tick(now) {
       const p = Math.min((now - start) / dur, 1);
       const eased = 1 - Math.pow(1 - p, 3);
       const v = eased * target;
       el.textContent = prefix + (isDecimal ? v.toFixed(1) : Math.round(v)) + suffix;
-      if (p < 1) requestAnimationFrame(tick);
+      if (p < 1) requestAnimationFrame(tick); else done = true;
     }
     requestAnimationFrame(tick);
+    // rAF is throttled/paused in background or low-power tabs — never leave a "0" on screen
+    setTimeout(() => { if (!done) { done = true; el.textContent = final; } }, dur + 350);
   });
+}
+
+// ── Animated stat rings — each hub overview's numbers, designed to motivate ──
+// A ring fills to the goal % in the pillar's colour with a count-up number;
+// hitting 100% earns a celebratory glow. pct: null renders a plain count tile.
+function statRingCard(o) {
+  const pct = o.pct == null ? null : Math.max(0, Math.min(100, Math.round(o.pct)));
+  const R = 26, C = 2 * Math.PI * R;
+  const viz = pct == null
+    ? '<span class="sr-icon">' + (o.icon || '✦') + '</span>'
+    : '<svg class="sr-ring" viewBox="0 0 64 64" aria-hidden="true">' +
+      '<circle class="sr-track" cx="32" cy="32" r="' + R + '"/>' +
+      '<circle class="sr-fill" cx="32" cy="32" r="' + R + '" style="stroke-dasharray:' + C.toFixed(1) + ';stroke-dashoffset:' + C.toFixed(1) + '" data-off="' + (C * (1 - pct / 100)).toFixed(1) + '"/></svg>' +
+      '<span class="sr-pct anim-count" data-val="' + pct + '" data-suffix="%">0%</span>';
+  return '<button type="button" class="sr-card' + (pct != null && pct >= 100 ? ' sr-hit' : '') + '" style="--sr:' + o.color + '"' +
+    (o.onclick ? ' onclick="' + o.onclick + '"' : '') + '>' +
+    '<span class="sr-viz">' + viz + '</span>' +
+    '<span class="sr-body">' +
+    '<span class="sr-value"><span class="anim-count" data-val="' + o.value + '"' +
+    (o.decimal ? ' data-decimal="1"' : '') + (o.prefix ? ' data-prefix="' + o.prefix + '"' : '') + '>0</span>' +
+    (o.suffix ? '<i>' + o.suffix + '</i>' : '') + '</span>' +
+    '<span class="sr-label">' + o.label + '</span>' +
+    (o.sub ? '<span class="sr-sub">' + o.sub + '</span>' : '') +
+    '</span></button>';
+}
+// After render: let the rings sweep to their target and the numbers count up.
+// Timer-driven (not rAF) so throttled/background tabs still reach the true values.
+function wireStatRings() {
+  setTimeout(() => {
+    document.querySelectorAll('.sr-fill').forEach(el => { el.style.strokeDashoffset = el.dataset.off; });
+  }, 60);
+  setTimeout(animateCounters, 80);
 }
 
 // Make cards tilt in 3D toward the cursor (with a light-following sheen).
@@ -1042,6 +1078,7 @@ function paintNavIcons() {
 
 function navigate(page) {
   if (page === 'admin' && !state.isOwner) page = 'dashboard';   // owner-only console (the server also enforces this)
+  if (page === 'stats') page = 'dashboard';   // the stats page retired — its numbers live in each hub's overview now
   state.page = page;
   if (page !== 'workout') document.body.classList.remove('wo-fullscreen');   // restore the bottom nav when leaving the workout
   state._openIdea = null;   // leaving to any page closes an open idea workspace
@@ -1058,7 +1095,7 @@ function navigate(page) {
   if (['business', 'ideas', 'contacts', 'finances'].includes(page)) document.querySelector('.nav-item[data-page="business"]')?.classList.add('active');
   // Reading lives under the Knowledge hub, so keep that nav item lit on its tab
   if (['knowledge', 'reading'].includes(page)) document.querySelector('.nav-item[data-page="knowledge"]')?.classList.add('active');
-  const pages = { dashboard: renderDashboard, stats: renderStatsPage, log: renderLogEntry, workout: renderWorkout, business: renderBusinessPage, finances: renderFinancesPage, health: renderHealthPage, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, knowledge: renderKnowledgePage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage, admin: renderAdminPage };
+  const pages = { dashboard: renderDashboard, log: renderLogEntry, workout: renderWorkout, business: renderBusinessPage, finances: renderFinancesPage, health: renderHealthPage, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, knowledge: renderKnowledgePage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage, admin: renderAdminPage };
   injectFAB();
   (pages[page] || renderDashboard)();
   // Subtle fade-up so section changes feel like a native screen transition
@@ -5168,28 +5205,15 @@ function renderDashboard() {
     '</div>' +
     '</div>';
 
-  // Charts & recent (if data)
-  const anySpend = (state.data.days || []).some(d => (d.spent || 0) > 0);
-  const showIncomeChart = isPillarOn('money') && (hasWeeks || anySpend);
-  const showGymChart    = hasDays  && isPillarOn('gym');
-  let chartsHtml = '';
-  if (hasDays || hasWeeks) {
-    const incomeTitle = 'Money (last 12 weeks)';
-    const gymTitle    = escapeHtml(pillar('gym').label) + ' Days per Week';
-    const chartCards =
-      (showIncomeChart ? '<div class="card"><h3 class="card-title">' + incomeTitle + '</h3><div class="chart-wrap"><canvas id="incomeChart"></canvas></div></div>' : '') +
-      (showGymChart    ? '<div class="card"><h3 class="card-title">' + gymTitle + '</h3><div class="chart-wrap"><canvas id="gymChart"></canvas></div></div>' : '');
-    chartsHtml =
-      (chartCards ? '<div class="charts-row">' + chartCards + '</div>' : '') +
-      '<div class="card"><h3 class="card-title">Recent Days</h3>' + renderRecentDaysTable(sortedDays.slice(0, 7)) + '</div>';
-  } else {
-    chartsHtml = '<div class="empty-state"><div class="empty-icon empty-mtn">' + obMountainSvg() + '</div>' +
-      '<h3>Your mountain is waiting</h3>' +
-      '<p>Log your first day to take the first step up — even 30 seconds counts. Every day you log moves your climber higher.</p>' +
-      '<div class="empty-actions">' +
-      '<button class="btn btn-primary" onclick="navigate(\'log\')">Log my first day</button>' +
-      '</div></div>';
-  }
+  // The stats & charts now live inside each hub's overview (Health / Business /
+  // Knowledge) — the dashboard keeps the whole-life view + the empty state.
+  const chartsHtml = (hasDays || hasWeeks) ? '' :
+    '<div class="empty-state"><div class="empty-icon empty-mtn">' + obMountainSvg() + '</div>' +
+    '<h3>Your mountain is waiting</h3>' +
+    '<p>Log your first day to take the first step up — even 30 seconds counts. Every day you log moves your climber higher.</p>' +
+    '<div class="empty-actions">' +
+    '<button class="btn btn-primary" onclick="navigate(\'log\')">Log my first day</button>' +
+    '</div></div>';
 
   const achievementsHtml = hasDays ? renderAchievementsSection() : '';
 
@@ -5207,14 +5231,13 @@ function renderDashboard() {
     '<div><h2 class="page-title">Dashboard</h2>' +
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-    (hasDays ? '<button class="btn btn-outline btn-sm" onclick="navigate(\'stats\')">All stats</button>' : '') +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="openWeekRecap()">Week recap</button>' : '') +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">Share</button>' : '') +
     '</div></div>' +
     gHero +
     sec('Your goals', gGoals) +
     gLight +
-    (hasDays ? '<button class="btn btn-primary dash-stats-cta" onclick="navigate(\'stats\')">See all your stats →</button>' : chartsHtml);
+    (hasDays ? focusHtml + achievementsHtml : chartsHtml);
 
   setTimeout(animateCounters, 120);
   // Summit celebration once when momentum hits 100% (resets if it drops)
@@ -5298,7 +5321,7 @@ function renderWhyEditorCard() {
 function renderWhyCard() {
   const m = getMission();
   if (!m) return '';
-  return '<div class="card why-mini" onclick="navigate(\'stats\')"><span class="why-mini-label">YOUR WHY</span>' +
+  return '<div class="card why-mini" onclick="showMissionEditor()"><span class="why-mini-label">YOUR WHY</span>' +
     '<span class="why-mini-text">' + escapeHtml(m) + '</span></div>';
 }
 function showMissionEditor() {
@@ -5413,82 +5436,10 @@ function showDayComplete(day) {
   setTimeout(() => { if (el.parentNode) el.remove(); }, 5200);
 }
 
-// ── Statistics — all the numbers, insights, charts and trends in one place,
-// so the dashboard can stay light and goal-focused. ──
-function renderStatsPage() {
-  const { days, weeks, profile } = state.data;
-  updateNavBadges();
-  const hasDays = days.length > 0, hasWeeks = weeks.length > 0;
-  const header = '<div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
-    '<div><h2 class="page-title">Statistics</h2><p class="page-sub">Your numbers, insights, and trends</p></div>' +
-    '<button class="btn btn-outline btn-sm" onclick="navigate(\'dashboard\')">← Dashboard</button></div>';
-  if (!hasDays) {
-    document.getElementById('main').innerHTML = header +
-      '<div class="empty-state"><div class="empty-icon empty-mtn">' + obMountainSvg() + '</div><h3>No stats yet</h3>' +
-      '<p>Log a few days and your charts, insights, and trends will appear here.</p>' +
-      '<div class="empty-actions"><button class="btn btn-primary" onclick="navigate(\'log\')">Log my first day</button></div></div>';
-    return;
-  }
-  const stats = getWeekStats(), lastStats = getLastWeekStats();
-  const sortedDays = [...days].sort((a, b) => new Date(b.date) - new Date(a.date));
-  const sortedWeeks = [...weeks].sort((a, b) => new Date(b.weekStart) - new Date(a.weekStart));
-  const cardCtx = { stats, lastStats, profile, avgIncome: getWeeklyAvg(weeks, 4), gymStreak: getGymStreak(), readStreak: getReadingStreak() };
-  const pillarsHtml = '<div class="pillar-grid">' + PILLAR_IDS.map(id => pillarCardHtml(id, cardCtx)).join('') + '</div>';
-  const anySpend = days.some(d => (d.spent || 0) > 0);
-  const showIncomeChart = isPillarOn('money') && (hasWeeks || anySpend);
-  const showGymChart = isPillarOn('gym');
-  const chartCards =
-    (showIncomeChart ? '<div class="card"><h3 class="card-title">Money (last 12 weeks)</h3><div class="chart-wrap"><canvas id="incomeChart"></canvas></div></div>' : '') +
-    (showGymChart ? '<div class="card"><h3 class="card-title">' + escapeHtml(pillar('gym').label) + ' Days per Week</h3><div class="chart-wrap"><canvas id="gymChart"></canvas></div></div>' : '');
-  const chartsHtml = (chartCards ? '<div class="charts-row">' + chartCards + '</div>' : '');
-  const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
-  // Simplified: just the numbers, the trends and the history — the deeper "wow"
-  // cards (life web, why/identity, projections, AI coach, body morph) live on the
-  // Dashboard and Coach pages, so the stats page stays scannable.
-  document.getElementById('main').innerHTML = header +
-    sec('This week', pillarsHtml + renderHydrationStrip(stats) + renderFocusCard(stats, lastStats)) +
-    sec('Health & money', renderNutritionWeekCard() + renderWeightTrend() + renderMoneyCircleCard()) +
-    sec('Trends & history', chartsHtml + renderAchievementsSection());
-  setTimeout(animateCounters, 120);
-  setTimeout(() => wireCardTilt('.pillar-card'), 60);
-  if (showIncomeChart) initIncomeChart(sortedWeeks);
-  if (showGymChart) initGymChart(days);
-  if ((state.data.weights || []).length >= 2) initWeightChart();
-}
-
 function renderStars(rating) {
   if (!rating) return '—';
   const full = Math.round(rating);
   return '★'.repeat(full) + '☆'.repeat(5 - full);
-}
-
-function renderRecentDaysTable(days) {
-  if (!days.length) return '<p class="muted">No days logged yet.</p>';
-  const rows = days.map(d => {
-    const gymCell = d.gym?.done
-      ? '<span style="color:var(--gym-color);font-weight:700">✓ ' + (d.gym.muscleGroup || 'Workout') + '</span>'
-      : '<span style="color:var(--text-muted)">Rest</span>';
-    const foodCell = d.food?.rating
-      ? '<span style="color:var(--food-color)">' + '★'.repeat(d.food.rating) + '</span>'
-      : '—';
-    const netCell = d.networking?.count > 0
-      ? '<span style="color:var(--network-color);font-weight:700">+' + d.networking.count + '</span>'
-      : '—';
-    const moneyCell = d.money?.activities
-      ? '<span style="font-size:12px;color:var(--text-muted)">' + d.money.activities.slice(0, 40) + (d.money.activities.length > 40 ? '…' : '') + '</span>'
-      : '—';
-    return '<tr>' +
-      '<td data-label="Date"><strong>' + fmtDate(d.date) + '</strong></td>' +
-      '<td data-label="' + escapeHtml(pillar('gym').label) + '">' + gymCell + '</td>' +
-      '<td data-label="' + escapeHtml(pillar('food').label) + '">' + foodCell + '</td>' +
-      '<td data-label="' + escapeHtml(pillar('networking').label) + '">' + netCell + '</td>' +
-      '<td data-label="' + escapeHtml(pillar('money').label) + '">' + moneyCell + '</td>' +
-      '<td class="action-cell">' +
-      '<button class="btn-sm" onclick="editDay(\'' + d.id + '\')"></button>' +
-      '<button class="btn-sm btn-sm-danger" onclick="deleteDay(\'' + d.id + '\')"></button>' +
-      '</td></tr>';
-  }).join('');
-  return '<table class="table"><thead><tr><th>Date</th><th>' + pillar('gym').icon + ' ' + escapeHtml(pillar('gym').label) + '</th><th>' + pillar('food').icon + ' ' + escapeHtml(pillar('food').label) + '</th><th>' + pillar('networking').icon + ' ' + escapeHtml(pillar('networking').label) + '</th><th>' + pillar('money').icon + ' ' + escapeHtml(pillar('money').label) + '</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
 function initIncomeChart() {
@@ -6630,6 +6581,8 @@ function renderHealthPage() {
     '<p class="page-sub">Training, nutrition and your body — in one place.</p></div>' +
     healthTabs(tab) + body;
   if (tab === 'nutrition' && (state.data.weights || []).length >= 2) initWeightChart();
+  if (tab === 'training' && document.getElementById('gymChart')) initGymChart(state.data.days);
+  wireStatRings();
 }
 function renderHealthOverview(nut, gymDays, gymGoal, streak, eatenCal, eatenP, wDisp, wUnit) {
   const gymLeft = Math.max(0, gymGoal - gymDays);
@@ -6640,13 +6593,24 @@ function renderHealthOverview(nut, gymDays, gymGoal, streak, eatenCal, eatenP, w
   else if (pTarget && pLeft >= 20) insight = '🍗 ' + pLeft + 'g of protein to go today — make your next meal count.';
   else if (gymDays >= gymGoal) insight = '💪 Weekly training goal smashed — recover well and keep eating for your goal.';
   else insight = 'Log your training and food to see how your week is shaping up.';
-  const card = (inner, onclick) => '<button type="button" class="biz-card" onclick="' + onclick + '">' + inner + '</button>';
+  const lastStats = getLastWeekStats();
+  // Weight delta vs the previous weigh-in (a falling number on a gain goal still shows honestly)
+  const ws = (state.data.weights || []).slice().sort((a, b) => a.date < b.date ? -1 : 1);
+  let wDelta = '';
+  if (ws.length >= 2) {
+    const diff = Math.round((kgToDisplay(ws[ws.length - 1].kg) - kgToDisplay(ws[ws.length - 2].kg)) * 10) / 10;
+    wDelta = diff === 0 ? 'holding steady' : (diff > 0 ? '▲ +' : '▼ ') + Math.abs(diff) + ' ' + wUnit + ' since last';
+  }
   return '<div class="biz-insight">' + insight + '</div>' +
-    '<div class="biz-grid">' +
-    card('<div class="biz-k">Training this week</div><div class="biz-big">' + gymDays + ' / ' + gymGoal + '</div><div class="biz-sub">' + (streak > 1 ? streak + '-day streak 🔥' : 'days trained') + '</div>', "setHealthTab('training')") +
-    card('<div class="biz-k">Calories today</div><div class="biz-big">' + eatenCal.toLocaleString() + '</div><div class="biz-sub">' + (nut ? 'of ' + nut.calories.toLocaleString() + ' target' : 'set up nutrition') + '</div>', "setHealthTab('nutrition')") +
-    card('<div class="biz-k">Protein today</div><div class="biz-big">' + Math.round(eatenP) + 'g</div><div class="biz-sub">' + (pTarget ? 'of ' + pTarget + 'g target' : 'set a target') + '</div>', "setHealthTab('nutrition')") +
-    card('<div class="biz-k">Weight</div><div class="biz-big">' + (wDisp != null ? wDisp + ' <span style="font-size:14px">' + wUnit + '</span>' : '—') + '</div><div class="biz-sub">' + (wDisp != null ? 'latest weigh-in' : 'log your weight') + '</div>', "setHealthTab('nutrition')") +
+    '<div class="sr-grid">' +
+    statRingCard({ label: 'Training this week', value: gymDays, suffix: '/' + gymGoal, pct: gymGoal ? gymDays / gymGoal * 100 : null,
+      color: 'var(--gym-color)', sub: (streak > 1 ? streak + '-day streak 🔥 ' : '') + wowArrow(gymDays, lastStats.gymDays), onclick: "setHealthTab('training')" }) +
+    statRingCard({ label: 'Calories today', value: eatenCal, pct: nut ? eatenCal / nut.calories * 100 : null,
+      color: 'var(--food-color)', icon: '🍽️', sub: nut ? 'of ' + nut.calories.toLocaleString() + ' target' : 'set up nutrition', onclick: "setHealthTab('nutrition')" }) +
+    statRingCard({ label: 'Protein today', value: Math.round(eatenP), suffix: 'g', pct: pTarget ? eatenP / pTarget * 100 : null,
+      color: 'var(--success)', icon: '🍗', sub: pTarget ? (pLeft > 0 ? pLeft + 'g to go' : 'target hit — recovery fuel ✓') : 'set a target', onclick: "setHealthTab('nutrition')" }) +
+    statRingCard({ label: 'Weight', value: (wDisp != null ? wDisp : 0), decimal: (wDisp != null && wDisp % 1 !== 0) ? 1 : 0, suffix: ' ' + wUnit, pct: null,
+      color: 'var(--money-color)', icon: '⚖️', sub: wDelta || (wDisp != null ? 'latest weigh-in' : 'log your weight'), onclick: "setHealthTab('nutrition')" }) +
     '</div>' +
     renderFuelCard() +
     '<button type="button" class="wo-add" style="margin-top:4px" onclick="openWorkout(\'health\')">🏋️ Track a workout — sets, reps & rest timer</button>';
@@ -6659,9 +6623,13 @@ function renderHealthTraining(gymDays, gymGoal, streak) {
     const meta = tot.sets ? tot.sets + ' sets · ' + tot.reps + ' reps' : (tot.secs ? formatClock(tot.secs) + ' logged' : 'done ✓');
     return '<div class="hl-workout"><span class="hl-w-date">' + fmtDate(d.date) + '</span><span class="hl-w-label">' + escapeHtml(label) + '</span><span class="hl-w-meta">' + meta + '</span></div>';
   }).join('') : '<div class="pc-empty" style="margin-top:8px">No workouts logged yet — track your first above.</div>';
+  const anyGym = (state.data.days || []).some(d => d.gym && d.gym.done);
+  const gymChart = anyGym
+    ? '<div class="card" style="margin-top:14px"><h3 class="card-title">' + escapeHtml(pillar('gym').label) + ' Days per Week</h3><div class="chart-wrap"><canvas id="gymChart"></canvas></div></div>'
+    : '';
   return '<div class="biz-insight">' + gymDays + ' / ' + gymGoal + ' workouts this week' + (streak > 1 ? ' · ' + streak + '-day streak 🔥' : '') + '</div>' +
     '<button type="button" class="wo-add" onclick="openWorkout(\'health\')">🏋️ Track a workout</button>' +
-    renderGymPlanCard() + recent;
+    renderGymPlanCard() + recent + gymChart;
 }
 function renderHealthNutrition(nut, td, eatenCal, eatenP) {
   if (!nut) return '<div class="empty-state small"><p>Set up your calorie & protein targets to track nutrition.</p><div class="empty-actions"><button class="btn btn-primary" onclick="navigate(\'settings\')">Set up nutrition →</button></div></div>';
@@ -6673,7 +6641,7 @@ function renderHealthNutrition(nut, td, eatenCal, eatenP) {
     bar(Math.round(eaten.carbs || 0), nut.carbs.g, 'Carbs', 'g', 'var(--accent)') +
     bar(Math.round(eaten.fat || 0), nut.fat.g, 'Fat', 'g', '#A78BFA') +
     '</div><button type="button" class="wo-add" onclick="navigate(\'log\')">＋ Log today\'s food</button>';
-  return today + renderFuelCard() + renderMealPlan(nut) + renderNutritionWeekCard() + renderWeightTrend();
+  return today + renderHydrationStrip(getWeekStats()) + renderFuelCard() + renderMealPlan(nut) + renderNutritionWeekCard() + renderWeightTrend();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -6733,12 +6701,23 @@ function renderBusinessPage() {
         '<span class="brr-meta">' + ((+c.dealValue) ? '$' + (+c.dealValue).toLocaleString() + ' · ' : '') + (isGoingCold(c, today) ? '❄️ going cold' : 'follow-up due') + '</span></button>').join('') + '</div>'
     : '';
 
+  // This week's hustle numbers — animated rings in the pillar colours
+  const stats = getWeekStats(), lastStats = getLastWeekStats();
+  const netGoal = (state.data.profile && +state.data.profile.weeklyNetworkGoal) || 0;
+  const rings = '<div class="sr-grid sr-grid-2">' +
+    statRingCard({ label: escapeHtml(pillar('networking').label) + ' this week', value: stats.networkCount, pct: netGoal ? stats.networkCount / netGoal * 100 : null,
+      color: 'var(--network-color)', icon: '🤝', sub: (netGoal ? 'goal ' + netGoal + ' ' : '') + wowArrow(stats.networkCount, lastStats.networkCount), onclick: "navigate('contacts')" }) +
+    (moneyOn ? statRingCard({ label: 'Saved this ' + escapeHtml(money.label || 'period'), value: Math.max(0, money.rate || 0), suffix: '%', pct: Math.max(0, money.rate || 0),
+      color: 'var(--money-color)', icon: '💰', sub: '$' + Math.round(money.income).toLocaleString() + ' in · $' + Math.round(money.spent).toLocaleString() + ' out', onclick: "navigate('finances')" }) : '') +
+    '</div>';
   document.getElementById('main').innerHTML =
     '<div class="page-header"><h2 class="page-title">Business</h2>' +
     '<p class="page-sub">Your ideas, pipeline and money — in one place.</p></div>' +
     businessTabs('overview') +
     '<div class="biz-insight">' + insight + '</div>' +
-    grid + spotlight + reach;
+    rings + grid + spotlight + reach +
+    (moneyOn ? renderMoneyCircleCard() : '');
+  wireStatRings();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -6857,9 +6836,14 @@ function renderFinancesPage() {
         '<div class="fin-debt-meta">' + fm(d.balance) + ' left · ' + fm(d.payment) + '/mo · <b>' + lab + '</b></div></div>'; }).join('') +
     '<p class="card-sub" style="margin:8px 0 0">Total debt ' + fm(m.debtTotal) + '. Clearing a 20% APR card is a guaranteed 20% return.</p></div>' : '';
 
-  document.getElementById('main').innerHTML = header + heroCard + ratios + fiCard + allocCard + incomeCard + plCard + debtsCard +
+  const showCashflow = isPillarOn('money') && ((state.data.weeks || []).length > 0 || (state.data.days || []).some(d => (d.spent || 0) > 0));
+  const cashflowCard = showCashflow
+    ? '<div class="card"><div class="fin-sec-h">📈 Money — last 12 weeks</div><div class="chart-wrap"><canvas id="incomeChart"></canvas></div></div>'
+    : '';
+  document.getElementById('main').innerHTML = header + heroCard + ratios + fiCard + allocCard + incomeCard + plCard + debtsCard + cashflowCard +
     '<button type="button" class="btn btn-outline" style="width:100%;margin-top:4px" onclick="openFinanceEditor()">✏️ Update my finances</button>';
   initFinanceCharts(f);
+  if (showCashflow) initIncomeChart();
 }
 function initFinanceCharts(f) {
   if (typeof Chart === 'undefined') return;
@@ -8507,26 +8491,25 @@ function renderKnowledgeOverview() {
     insight = '🔥 ' + readPages.toLocaleString() + ' pages this week' +
       (streak > 1 ? ' · ' + streak + '-day streak' : '') + ' — keep the momentum going.';
 
-  const card = (inner, onclick) =>
-    '<button type="button" class="biz-card" onclick="' + onclick + '">' + inner + '</button>';
   const shortTitle = bookTitle.length > 26 ? escapeHtml(bookTitle.slice(0, 25)) + '…' : escapeHtml(bookTitle);
+  const readGoal = (state.data.profile && +state.data.profile.weeklyReadGoal) || 0;
+  const lastStats = getLastWeekStats();
 
   return '<div class="biz-insight">' + insight + '</div>' +
     renderReviewCard() +
-    '<div class="biz-grid">' +
-    card('<div class="biz-k">Pages this week</div><div class="biz-big">' + readPages.toLocaleString() +
-      '</div><div class="biz-sub">' + (streak > 1 ? streak + '-day streak 🔥' : 'read a little daily') + '</div>',
-      "setKnowledgeTab('reading')") +
-    card('<div class="biz-k">Current book</div><div class="biz-big">' +
-      (bookPct != null ? bookPct + '%' : (active ? (bookPagesRead ? bookPagesRead.toLocaleString() : '—') : '—')) +
-      '</div><div class="biz-sub">' + (active ? shortTitle + (bookPct == null && bookPagesRead ? ' · pages in' : '') : 'set your book') + '</div>',
-      "setKnowledgeTab('reading')") +
-    card('<div class="biz-k">Words learning</div><div class="biz-big">' + vs.total +
-      '</div><div class="biz-sub">' + (dueCount > 0 ? dueCount + ' due to review' : (vs.total ? 'all reviewed ✓' : 'add from books')) + '</div>',
-      "setKnowledgeTab('vocabulary')") +
-    card('<div class="biz-k">Books finished</div><div class="biz-big">' + finished +
-      '</div><div class="biz-sub">' + (finished ? 'nice work' : 'finish your first') + '</div>',
-      "setKnowledgeTab('reading')") +
+    '<div class="sr-grid">' +
+    statRingCard({ label: 'Pages this week', value: readPages, pct: readGoal ? readPages / readGoal * 100 : null,
+      color: 'var(--read-color)', icon: '📖',
+      sub: (streak > 1 ? streak + '-day streak 🔥 ' : (readGoal ? 'goal ' + readGoal + ' pg ' : 'read a little daily ')) + wowArrow(readPages, lastStats.readPages),
+      onclick: "setKnowledgeTab('reading')" }) +
+    statRingCard({ label: 'Current book', value: (bookPct != null ? bookPct : bookPagesRead), suffix: (bookPct != null ? '%' : (bookPagesRead ? ' pg' : '')),
+      pct: bookPct, color: 'var(--read-color)', icon: '📚',
+      sub: active ? shortTitle : 'set your book', onclick: "setKnowledgeTab('reading')" }) +
+    statRingCard({ label: 'Words learning', value: vs.total, pct: null, color: 'var(--network-color)', icon: '🔤',
+      sub: (dueCount > 0 ? '🎯 ' + dueCount + ' due to review' : (vs.total ? 'all reviewed ✓' : 'add from books')),
+      onclick: "setKnowledgeTab('vocabulary')" }) +
+    statRingCard({ label: 'Books finished', value: finished, pct: null, color: 'var(--accent)', icon: '🏆',
+      sub: (finished ? 'nice work' : 'finish your first'), onclick: "setKnowledgeTab('reading')" }) +
     '</div>' +
     renderYearInKnowledge();
 }
@@ -8544,6 +8527,7 @@ function renderKnowledgePage() {
     '</div>' +
     knowledgeTabs(tab) + body;
   if (tab === 'reading') ensureBookCovers(); // resolve any missing covers, then re-render
+  wireStatRings();
 }
 function renderReadingPage() { state._knowledgeTab = 'reading'; renderKnowledgePage(); }
 

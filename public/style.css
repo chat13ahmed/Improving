@@ -1047,6 +1047,42 @@ body {
 .fin-debt-x:hover { color: var(--danger); }
 .fin-editor-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 @media (max-width: 640px) { .fin-ratios { grid-template-columns: 1fr; } }
+/* ─── Animated stat rings — hub overview numbers that motivate ─── */
+.sr-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 14px; }
+.sr-card {
+  display: flex; align-items: center; gap: 14px; text-align: left;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px 16px; cursor: pointer; box-shadow: var(--shadow); font-family: inherit;
+  transition: border-color .15s, transform .15s, box-shadow .2s;
+  animation: srIn .5s cubic-bezier(.2,.7,.2,1) backwards;
+}
+.sr-card:hover { border-color: var(--sr); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.sr-card:active { transform: scale(0.97); }
+.sr-grid .sr-card:nth-child(1) { animation-delay: .04s; }
+.sr-grid .sr-card:nth-child(2) { animation-delay: .12s; }
+.sr-grid .sr-card:nth-child(3) { animation-delay: .20s; }
+.sr-grid .sr-card:nth-child(4) { animation-delay: .28s; }
+@keyframes srIn { from { opacity: 0; transform: translateY(14px); } }
+.sr-viz { position: relative; width: 56px; height: 56px; flex: none; display: flex; align-items: center; justify-content: center; }
+.sr-ring { width: 56px; height: 56px; transform: rotate(-90deg); }
+.sr-track { fill: none; stroke: var(--surface); stroke-width: 7; }
+.sr-fill { fill: none; stroke: var(--sr); stroke-width: 7; stroke-linecap: round;
+  transition: stroke-dashoffset 1.1s cubic-bezier(.25,.8,.3,1); }
+.sr-pct { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: var(--sr); font-variant-numeric: tabular-nums; }
+.sr-icon { font-size: 26px; line-height: 1; filter: saturate(1.1); }
+.sr-body { min-width: 0; flex: 1; }
+.sr-value { display: block; font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.sr-value i { font-style: normal; font-size: 13px; font-weight: 700; color: var(--text-muted); margin-left: 2px; }
+.sr-label { display: block; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-top: 3px; }
+.sr-sub { display: block; font-size: 12px; color: var(--text-muted); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Goal hit — a warm celebratory pulse that makes 100% feel earned */
+.sr-card.sr-hit { border-color: var(--sr); background: color-mix(in srgb, var(--sr) 6%, var(--card)); }
+.sr-card.sr-hit .sr-viz { animation: srPulse 2.2s ease-in-out infinite; }
+@keyframes srPulse { 0%, 100% { filter: drop-shadow(0 0 0 transparent); } 50% { filter: drop-shadow(0 0 8px var(--sr)); } }
+@media (prefers-reduced-motion: reduce) { .sr-card, .sr-fill { animation: none !important; transition: none !important; } .sr-card.sr-hit .sr-viz { animation: none; } }
+@media (max-width: 380px) { .sr-grid { grid-template-columns: 1fr; } }
+
 /* Health hub — today's macros + recent workouts */
 .hl-today { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
 .hl-macro-top { display: flex; justify-content: space-between; font-size: 13px; color: var(--text); margin-bottom: 4px; }
