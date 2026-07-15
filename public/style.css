@@ -1047,6 +1047,25 @@ body {
 .fin-debt-x:hover { color: var(--danger); }
 .fin-editor-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 @media (max-width: 640px) { .fin-ratios { grid-template-columns: 1fr; } }
+/* Money Mentor — The Psychology of Money, applied to your numbers
+   (.mentor-* namespace — .mm-* belongs to the workout muscle-map modal) */
+.mentor-card { border-left: 4px solid var(--accent); background: linear-gradient(150deg, rgba(245,158,11,0.07), rgba(167,139,250,0.05) 60%, transparent); }
+.mentor-eyebrow { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: var(--accent); }
+.mentor-eyebrow i { text-transform: none; letter-spacing: 0; font-weight: 700; }
+.mentor-principle { font-size: 21px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; margin-top: 8px; line-height: 1.2; }
+.mentor-chapter { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.mentor-why { font-size: 14px; color: var(--text); line-height: 1.65; margin-top: 12px; }
+.mentor-why b { color: var(--accent); }
+.mentor-move { display: flex; flex-direction: column; gap: 3px; margin-top: 14px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.mentor-move-k { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+.mentor-move-t { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.5; }
+.mentor-proj { margin-top: 12px; }
+.mentor-proj-l { font-size: 12px; color: var(--text-muted); }
+.mentor-chips { display: flex; gap: 8px; margin-top: 7px; flex-wrap: wrap; }
+.mentor-chip { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 14px; border-radius: 10px; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); font-size: 15px; font-weight: 800; color: var(--success); font-variant-numeric: tabular-nums; }
+.mentor-chip b { font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.mentor-next { margin-top: 14px; border: none; background: none; color: var(--text-muted); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; padding: 4px 0; }
+.mentor-next:hover { color: var(--text); }
 /* ─── Animated stat rings — hub overview numbers that motivate ─── */
 .sr-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 14px; }
 .sr-card {

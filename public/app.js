@@ -6788,6 +6788,109 @@ function yearsToFI(investable, fiNumber, monthlySavings, realRate) {
   return m >= 1200 ? null : Math.round(m / 12 * 10) / 10;
 }
 
+// ── Money Mentor — The Psychology of Money, applied to YOUR numbers ─────────
+// Not a quote widget: a rules engine that reads the real snapshot and serves
+// the ONE principle this person needs right now, ranked the way a good mentor
+// would triage — survival first, compounding always. (pure + testable)
+function compoundProjection(monthly, annualRate, years) {
+  monthly = +monthly || 0; const r = (+annualRate || 0) / 12, n = (+years || 0) * 12;
+  if (monthly <= 0 || n <= 0) return 0;
+  if (r === 0) return Math.round(monthly * n);
+  return Math.round(monthly * (Math.pow(1 + r, n) - 1) / r);
+}
+function moneyMentorLessons(m, f, ctx) {
+  const c = ctx || {}, out = [];
+  const fmt = (n) => '$' + Math.round(+n || 0).toLocaleString();
+  if (!c.hasData) {
+    out.push({ id: 'start', principle: 'No One Is Crazy', chapter: 'Ch. 1',
+      why: 'Everyone plays the money game with a different hand — what looks reckless in someone else’s spending made sense from inside their life. The book’s starting point: judge less, see clearly, begin where you are.' +
+        (c.periodRate > 0 ? ' You’re already keeping ' + c.periodRate + '% of what comes in — that instinct is the whole foundation.' : ''),
+      move: 'Enter your financial snapshot (3 minutes). A mentor can only coach what it can see.' });
+    return out;
+  }
+  const debts = (f.debts || []).filter(d => (+d.balance) > 0 && (+d.apr) >= 10).sort((a, b) => (+b.apr) - (+a.apr));
+  if (debts.length) {
+    const d = debts[0], mo = debtPayoffMonths(d.balance, d.apr, d.payment);
+    out.push({ id: 'debt', principle: 'Compounding Works Both Ways', chapter: 'Ch. 4 — Confounding Compounding',
+      why: 'Compounding is the book’s miracle — but your ' + escapeHtml(d.name || 'debt') + ' runs it in reverse at <b>' + (+d.apr) + '%</b>, faster than any market reliably runs it forward. Killing it is a guaranteed ' + (+d.apr) + '% return; nobody is offered that deal twice.',
+      move: mo === Infinity
+        ? 'Raise the payment on ' + escapeHtml(d.name || 'this debt') + ' — at ' + fmt(d.payment) + '/mo it never dies. Make it your only money goal until it does.'
+        : 'Attack ' + escapeHtml(d.name || 'this debt') + ' first — at ' + fmt(d.payment) + '/mo it’s gone in ~' + mo + ' months. Then that same payment becomes your wealth machine:',
+      projMonthly: mo === Infinity ? 0 : (+d.payment || 0) });
+  }
+  const efSevere = f.monthlyExpenses > 0 && m.emergencyMonths < 1;
+  if (efSevere) {
+    out.push({ id: 'efund', principle: 'Room for Error', chapter: 'Ch. 13',
+      why: 'The book’s survival rule: the world breaks plans without asking permission. With <b>' + m.emergencyMonths + ' months</b> of cushion, one surprise forces you to sell your future at the worst possible moment.',
+      move: 'Automate a transfer on payday — any amount. The cushion comes first; everything clever comes after.' });
+  }
+  if (f.monthlyIncome > 0 && m.savingsRate < 10) {
+    out.push({ id: 'rate', principle: 'Wealth Is What You Don’t See', chapter: 'Ch. 9',
+      why: 'Wealth is the car not bought, the upgrade skipped — it’s invisible by definition. Your savings rate is <b>' + m.savingsRate + '%</b>, and it’s the one number the book argues matters more than your income or your returns, because it’s the only one fully in your hands.',
+      move: 'Delete ONE invisible expense this week and redirect it to an automatic transfer on payday. The goal isn’t sacrifice — it’s ownership.' , projMonthly: Math.max(0, f.monthlySavings) });
+  }
+  if (!efSevere && f.monthlyExpenses > 0 && m.emergencyMonths >= 1 && m.emergencyMonths < 3) {
+    out.push({ id: 'efund', principle: 'Room for Error', chapter: 'Ch. 13',
+      why: 'You have <b>' + m.emergencyMonths + ' months</b> of armor — real progress. The book’s floor is 3–6: enough that a surprise is an inconvenience, never a catastrophe that makes you sell at the bottom.',
+      move: 'Keep the payday auto-transfer running until the cushion reads 3 months. Boring is the strategy.' });
+  }
+  if (f.monthlyIncome > 0 && m.savingsRate >= 10 && m.savingsRate < 20) {
+    out.push({ id: 'rate', principle: 'Wealth Is What You Don’t See', chapter: 'Ch. 9',
+      why: 'A <b>' + m.savingsRate + '%</b> savings rate puts you ahead of most people — and the book’s quiet point is that the next few percent come from ego, not spreadsheets: spending is often a performance for an audience that isn’t watching.',
+      move: 'Nudge the auto-transfer up by 2–3% of income. You won’t feel it monthly; you’ll absolutely feel it in a decade:', projMonthly: Math.max(0, f.monthlySavings) });
+  }
+  if (f.monthlyExpenses > 0 && (f.assets.cash || 0) > 6 * f.monthlyExpenses && (f.assets.investments || 0) < (f.assets.cash || 0)) {
+    out.push({ id: 'idle', principle: 'Shut Up and Wait', chapter: 'Ch. 4',
+      why: 'Beyond your ~6-month cushion, ' + fmt((f.assets.cash || 0) - 6 * f.monthlyExpenses) + ' is sitting still — and the book’s deepest lesson is that <i>time invested</i>, not timing or genius, is what built almost every fortune. Idle money quietly ages.',
+      move: 'Set a fixed monthly auto-invest of the surplus into something boring and diversified. Automatic beats brilliant.', projMonthly: Math.max(0, f.monthlySavings) });
+  }
+  if (c.ideaTitle && m.savingsRate >= 15 && m.emergencyMonths >= 3) {
+    const venture = Math.max(25, Math.round((f.monthlyIncome * 0.05) / 25) * 25);
+    out.push({ id: 'venture', principle: 'Tails Drive Everything', chapter: 'Ch. 6',
+      why: 'Most bets fail; the few that hit pay for everything — that’s how the book says returns really arrive. Your idea “' + escapeHtml(c.ideaTitle) + '” deserves a real bet, but a <i>survivable</i> one: never the farm, never on credit.',
+      move: 'Give it a fixed venture budget you can afford to lose 100% of — about ' + fmt(venture) + '/mo (5% of income). Survivability is what lets you stay at the table until a tail hits.' });
+  }
+  if (!debts.length && m.savingsRate >= 20 && m.emergencyMonths >= 3) {
+    out.push({ id: 'enough', principle: 'The Hardest Skill: Enough', chapter: 'Ch. 3 + Ch. 5',
+      why: 'You’re doing what most people never manage: <b>' + m.savingsRate + '%</b> saved, <b>' + m.emergencyMonths + ' months</b> of armor, no expensive debt. The book’s warning for people exactly like you: the goalpost moves. Getting wealthy took courage — staying wealthy takes humility and a defined “enough.”',
+      move: 'Write your Enough number down — yours computes to ' + fmt(m.fiNumber) + '. When the goalpost twitches, read it out loud.' });
+  }
+  if (m.fiNumber > 0 && f.monthlySavings > 0) {
+    const y0 = yearsToFI(m.investable, m.fiNumber, f.monthlySavings);
+    const y1 = yearsToFI(m.investable, m.fiNumber, f.monthlySavings + 200);
+    const delta = (y0 != null && y1 != null) ? Math.round((y0 - y1) * 10) / 10 : null;
+    out.push({ id: 'freedom', principle: 'Freedom Is the Dividend', chapter: 'Ch. 7',
+      why: 'The highest return money pays isn’t a number — it’s waking up and owning your time. Every dollar you keep is a small piece of your future bought back. You’re <b>' + m.fiProgress + '%</b> of the way to never needing permission again.',
+      move: (delta && delta > 0 ? 'An extra $200/mo brings your freedom date ~' + delta + ' years closer. Decide tonight, automate tomorrow:' : 'Keep the automation running — the compounding is doing the heavy lifting:'),
+      projMonthly: f.monthlySavings });
+  }
+  return out;
+}
+function renderMoneyMentorCard() {
+  const f = getFinance(), m = financeMetrics(f);
+  const period = getMoneyPeriod() || {};
+  const top = topIdea(state.data.ideas || []);
+  const lessons = moneyMentorLessons(m, f, { hasData: financeHasData(f), periodRate: period.rate || 0, ideaTitle: (top && top.title) || '' });
+  if (!lessons.length) return '';
+  const i = ((state._mentorIdx || 0) % lessons.length + lessons.length) % lessons.length;
+  const L = lessons[i];
+  const chips = (L.projMonthly > 0)
+    ? '<div class="mentor-proj"><span class="mentor-proj-l">$' + Math.round(L.projMonthly).toLocaleString() + '/mo at a 7% average becomes</span><div class="mentor-chips">' +
+      [10, 20, 30].map(y => '<span class="mentor-chip"><b>' + y + 'y</b>$' + compoundProjection(L.projMonthly, 0.07, y).toLocaleString() + '</span>').join('') +
+      '</div></div>'
+    : '';
+  return '<div class="card mentor-card">' +
+    '<div class="mentor-eyebrow">🧭 Money Mentor · <i>The Psychology of Money</i></div>' +
+    '<div class="mentor-principle">' + L.principle + '</div>' +
+    '<div class="mentor-chapter">' + L.chapter + ' · Morgan Housel</div>' +
+    '<div class="mentor-why">' + L.why + '</div>' +
+    '<div class="mentor-move"><span class="mentor-move-k">📌 This week’s move</span><span class="mentor-move-t">' + L.move + '</span></div>' +
+    chips +
+    (lessons.length > 1 ? '<button type="button" class="mentor-next" onclick="nextMoneyLesson()">Next lesson · ' + (i + 1) + '/' + lessons.length + ' →</button>' : '') +
+    '</div>';
+}
+function nextMoneyLesson() { state._mentorIdx = (state._mentorIdx || 0) + 1; renderFinancesPage(); }
+
 function renderFinancesPage() {
   const f = getFinance();
   const header = '<div class="page-header"><h2 class="page-title">Business</h2>' +
@@ -6797,7 +6900,8 @@ function renderFinancesPage() {
       '<div class="card fin-intro"><div class="fin-intro-icon">📊</div>' +
       '<h3 class="card-title">See your whole financial picture</h3>' +
       '<p class="card-sub">Net worth, savings rate, your path to financial independence, debt payoff and more — the numbers a CFO watches. Enter a snapshot to begin, then update it monthly to see the trend.</p>' +
-      '<button type="button" class="btn btn-primary" onclick="openFinanceEditor()">Set up my finances →</button></div>';
+      '<button type="button" class="btn btn-primary" onclick="openFinanceEditor()">Set up my finances →</button></div>' +
+      renderMoneyMentorCard();   // "No One Is Crazy" — the mentor meets them before the numbers do
     return;
   }
   const m = financeMetrics(f);
@@ -6853,7 +6957,7 @@ function renderFinancesPage() {
   const cashflowCard = showCashflow
     ? '<div class="card"><div class="fin-sec-h">📈 Money — last 12 weeks</div><div class="chart-wrap"><canvas id="incomeChart"></canvas></div></div>'
     : '';
-  document.getElementById('main').innerHTML = header + heroCard + ratios + fiCard + allocCard + incomeCard + plCard + debtsCard + cashflowCard +
+  document.getElementById('main').innerHTML = header + heroCard + ratios + renderMoneyMentorCard() + fiCard + allocCard + incomeCard + plCard + debtsCard + cashflowCard +
     '<button type="button" class="btn btn-outline" style="width:100%;margin-top:4px" onclick="openFinanceEditor()">✏️ Update my finances</button>';
   initFinanceCharts(f);
   if (showCashflow) initIncomeChart();

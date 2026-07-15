@@ -62,7 +62,7 @@ function loadApp(fieldValues) {
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
-    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats });';
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats, moneyMentorLessons, compoundProjection });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -292,6 +292,28 @@ ok('readingPacePerDay: averages recent pages over 14 days', (() => {
   const p = A.readingPacePerDay(days);   // (14+14)/14 = 2, old day excluded
   return Math.abs(p - 2) < 0.001;
 })());
+// Money Mentor — Psychology-of-Money lessons ranked by what to fix first
+(() => {
+  const F = (over) => Object.assign({
+    assets: { cash: 12000, investments: 30000, property: 0, business: 0, other: 0 },
+    liabilities: { mortgage: 0, loans: 0, credit: 0, other: 0 },
+    monthlyIncome: 4000, monthlyExpenses: 2500, monthlySavings: 1000, passiveIncome: 0,
+    business: { revenue: 0, expenses: 0 }, debts: [], withdrawalRate: 4
+  }, over);
+  const lessons = (f, ctx) => A.moneyMentorLessons(A.financeMetrics(f), f, Object.assign({ hasData: true }, ctx));
+  eq('mentor: no data → the "start" lesson only', A.moneyMentorLessons({}, { debts: [] }, { hasData: false }).map(l => l.id), ['start']);
+  ok('mentor: expensive debt is always lesson #1', lessons(F({ debts: [{ name: 'Visa', balance: 3000, apr: 22, payment: 200 }] }))[0].id === 'debt');
+  ok('mentor: no cushion → Room for Error leads (no expensive debt)', lessons(F({ assets: { cash: 500, investments: 0, property: 0, business: 0, other: 0 } }))[0].id === 'efund');
+  ok('mentor: low savings rate → Wealth Is What You Don’t See', lessons(F({ monthlySavings: 200 })).some(l => l.id === 'rate'));
+  ok('mentor: strong finances → Enough appears', lessons(F({ monthlySavings: 1200 })).some(l => l.id === 'enough'));
+  ok('mentor: an idea + solid base → a survivable venture budget', lessons(F({}), { ideaTitle: 'Car detailing' }).some(l => l.id === 'venture'));
+  ok('mentor: freedom lesson closes the list when FI is computable', (() => { const L = lessons(F({})); return L.length && L[L.length - 1].id === 'freedom'; })());
+  ok('mentor: every lesson is complete (principle/chapter/why/move)', lessons(F({ debts: [{ name: 'V', balance: 3000, apr: 22, payment: 200 }] }), { ideaTitle: 'X' }).every(l => l.principle && l.chapter && l.why && l.move));
+})();
+ok('compoundProjection: zero monthly → 0', A.compoundProjection(0, 0.07, 10) === 0);
+ok('compoundProjection: 0% rate → simple sum', A.compoundProjection(100, 0, 10) === 12000);
+ok('compoundProjection: $100/mo at 7% for 10y ≈ $17.3k', (() => { const v = A.compoundProjection(100, 0.07, 10); return v > 16800 && v < 17800; })());
+ok('compoundProjection: more years compounds superlinearly', A.compoundProjection(100, 0.07, 30) > 3 * A.compoundProjection(100, 0.07, 10));
 // knowledgeYearStats — the "Year in Knowledge" recap numbers
 (() => {
   const data = {
