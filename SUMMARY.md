@@ -29,6 +29,7 @@ Installable PWA · works on phone and desktop · light + dark mode.
 
 ### Business hub (Overview · Finances · Ideas · Contacts)
 - **Finances (personal-CFO dashboard)** — Net Worth + trend chart, Savings Rate, Emergency Fund, **Financial Independence** number & progress, portfolio-allocation donut, active-vs-passive income, business **P&L** (revenue/profit/margin), and **debt payoff** in avalanche order with computed debt-free dates. One editor captures a monthly snapshot.
+- **Money Mentor** — a rules engine on *The Psychology of Money* (Housel): reads the real snapshot and serves the one principle the person needs now (expensive debt → compounding-in-reverse; no cushion → room for error; low rate → wealth is what you don't see; idle cash; a survivable venture budget for their idea; "Enough"; freedom/FI), each with the diagnosis in their numbers, a weekly move, and 10/20/30-year compounding chips. Lessons cycle.
 - **Ideas** — idea scoring, a Lean-Startup validation module, and an AI validation coach.
 - **Contacts** — a lightweight CRM with a weighted sales pipeline and "going cold" detection.
 
