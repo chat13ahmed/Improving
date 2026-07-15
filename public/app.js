@@ -4031,7 +4031,8 @@ const EXERCISE_LIBRARY = {
     'Decline Dumbbell Press', 'Machine Chest Press', 'Incline Machine Press', 'Smith Machine Bench Press', 'Floor Press',
     'Push-Up', 'Incline Push-Up', 'Deficit Push-Up', 'Archer Push-Up', 'Dips',
     'Ring Dips', 'Chest Fly', 'Pec Deck Machine', 'Cable Crossover', 'Low Cable Fly',
-    'High Cable Fly', 'Single-Arm Cable Press', 'Landmine Press', 'Dumbbell Pullover', 'Svend Press'],
+    'High Cable Fly', 'Single-Arm Cable Press', 'Landmine Press', 'Dumbbell Pullover', 'Svend Press',
+    'Decline Push-Up', 'Plyo Push-Up', 'Weighted Push-Up', 'Wide-Grip Push-Up', 'Machine Fly'],
   Back: ['Pull-Up', 'Chin-Up', 'Neutral-Grip Pull-Up', 'Lat Pulldown', 'Wide-Grip Lat Pulldown',
     'Neutral-Grip Pulldown', 'Single-Arm Lat Pulldown', 'Straight-Arm Pulldown', 'Cable Pullover', 'Bent-Over Row',
     'Pendlay Row', 'T-Bar Row', 'Seated Cable Row', 'Chest-Supported Row', 'Machine Row',
@@ -4067,7 +4068,13 @@ const EXERCISE_LIBRARY = {
     'Hiking', 'Cycling', 'Spin Bike', 'Assault Bike', 'Rowing Machine',
     'Ski Erg', 'Stair Climber', 'Elliptical', 'Jump Rope', 'Jumping Jacks',
     'High Knees', 'Burpees', 'Battle Ropes', 'Kettlebell Swing', 'Sled Push',
-    'Farmer’s Carry', 'Bear Crawl', 'Shadow Boxing', 'Swimming', 'HIIT Intervals']
+    'Farmer’s Carry', 'Bear Crawl', 'Shadow Boxing', 'Swimming', 'HIIT Intervals',
+    // HIIT-style intervals — short, brutal, big burn
+    'Bike Sprints', 'Rowing Intervals', 'Hill Sprints', 'Stair Sprints', 'Squat Jumps',
+    'Tuck Jumps', 'Skater Jumps', 'Med Ball Slams', 'Wall Balls', 'Thrusters',
+    'Double Unders', 'Sprawls',
+    // Steady-state — the fat-burning base you can do daily
+    'Zone 2 Run', 'Power Walk', 'Rucking']
 };
 // Ready-made workouts — each is a list of library exercises. Pick one and just
 // log your sets/reps, instead of building the workout from scratch.
@@ -4084,7 +4091,13 @@ const WORKOUT_PROGRAMS = {
   'Shoulders & Arms': ['Overhead Press', 'Lateral Raise', 'Rear Delt Fly', 'Barbell Curl', 'Triceps Pushdown', 'Hammer Curl'],
   'Glutes & Hamstrings': ['Hip Thrust', 'Romanian Deadlift', 'Bulgarian Split Squat', 'Seated Leg Curl', 'Glute Bridge', 'Calf Raise'],
   'Athletic Conditioning': ['Kettlebell Swing', 'Box Jump', 'Battle Ropes', 'Sled Push', 'Burpees', 'Mountain Climber'],
-  'Core & Abs': ['Plank', 'Hanging Leg Raise', 'Cable Crunch', 'Russian Twist', 'Ab Wheel Rollout']
+  'Core & Abs': ['Plank', 'Hanging Leg Raise', 'Cable Crunch', 'Russian Twist', 'Ab Wheel Rollout'],
+  // Goal-based: pick by what you're after — burn fat, build engine, build muscle
+  'HIIT Cardio (Fat Burn)': ['Bike Sprints', 'Burpees', 'Battle Ropes', 'Jump Rope', 'Med Ball Slams'],
+  'Steady Cardio (Endurance)': ['Zone 2 Run', 'Incline Walk', 'Cycling', 'Rowing Machine'],
+  'Fat Burn — Full Body': ['Kettlebell Swing', 'Goblet Squat', 'Push-Up', 'Inverted Row', 'Thrusters', 'Jump Rope'],
+  'Fat Burn — Chest Focus': ['Push-Up', 'Incline Dumbbell Press', 'Cable Crossover', 'Plyo Push-Up', 'Burpees', 'Mountain Climber'],
+  'Muscle Builder — Chest': ['Barbell Bench Press', 'Incline Dumbbell Press', 'Machine Fly', 'Dips', 'Cable Crossover']
 };
 // Which body group a library exercise belongs to (for its card label + muscle map).
 function exerciseGroup(name) {
