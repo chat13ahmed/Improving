@@ -2657,6 +2657,60 @@ function getLastWeekStats() {
   return { gymDays, avgFood, networkCount, weekIncome, readPages };
 }
 
+// ── Getting started — one clear path through the scattered setup. Each step
+// checks itself off against REAL data and deep-links straight to the fix, so a
+// new user always knows the next tap. Auto-disappears when complete. (pure)
+function setupProgress(d, ctx) {
+  d = d || {}; const c = ctx || {}; const prof = d.profile || {};
+  const pillarOn = (id) => { const p = prof.pillars && prof.pillars[id]; return !p || p.enabled !== false; };
+  const fin = d.finance || {};
+  const steps = [
+    { id: 'log', icon: '✍️', label: 'Log your first day', hint: '30 seconds — this starts everything',
+      done: (d.days || []).length > 0, action: "navigate('log')" },
+    { id: 'goals', icon: '🎯', label: 'Set your weekly goals', hint: 'so the app knows what winning means',
+      done: !!(prof.weeklyReadGoal > 0 || prof.weeklyIncomeGoal > 0 || prof.savingsGoal > 0 || prof.weeklyNetworkGoal > 3),
+      action: 'renderGoalSettings()' },
+    pillarOn('food') ? { id: 'nutrition', icon: '🍗', label: 'Set calorie & protein targets', hint: 'unlocks macros + the Fuel card',
+      done: !!computeNutrition(prof.nutrition), action: "navigate('settings')" } : null,
+    pillarOn('reading') ? { id: 'book', icon: '📖', label: 'Pick your current book', hint: 'start your reading streak',
+      done: (d.books || []).some(b => b && b.status === 'reading'), action: 'showAddBookModal(false)' } : null,
+    c.notif !== 'unsupported' ? { id: 'notif', icon: '🔔', label: 'Turn on reminders', hint: 'the gentle nudge that keeps streaks alive',
+      done: c.notif === 'granted', action: 'setupEnableNotifs()' } : null,
+    pillarOn('money') ? { id: 'finance', icon: '📊', label: 'Enter your money snapshot', hint: 'net worth, savings rate & your mentor',
+      done: !!(Object.values(fin.assets || {}).some(v => +v > 0) || +fin.monthlyIncome > 0 || (fin.debts || []).length), action: "navigate('finances')" } : null
+  ].filter(Boolean);
+  const done = steps.filter(s => s.done).length;
+  return { steps, done, total: steps.length, pct: steps.length ? Math.round(done / steps.length * 100) : 100 };
+}
+function renderSetupCard() {
+  if (state._previewMode) return '';                                  // demo homes stay clean
+  const prof = state.data.profile = state.data.profile || {};
+  if (prof.setupHidden) return '';
+  const notif = ('Notification' in window && window.isSecureContext !== false) ? Notification.permission : 'unsupported';
+  const s = setupProgress(state.data, { notif });
+  if (!s.total || s.done >= s.total) return '';                       // complete → gone for good
+  const rows = s.steps.map(st =>
+    '<button type="button" class="su-row' + (st.done ? ' su-done' : '') + '"' + (st.done ? ' disabled' : ' onclick="' + st.action + '"') + '>' +
+    '<span class="su-check">' + (st.done ? '✓' : '') + '</span>' +
+    '<span class="su-ico">' + st.icon + '</span>' +
+    '<span class="su-txt"><span class="su-label">' + st.label + '</span>' + (st.done ? '' : '<span class="su-hint">' + st.hint + '</span>') + '</span>' +
+    (st.done ? '' : '<span class="su-go">›</span>') + '</button>').join('');
+  return '<div class="card su-card">' +
+    '<div class="su-head"><div><h3 class="card-title" style="margin-bottom:2px">Get set up</h3>' +
+    '<span class="su-sub">' + s.done + ' of ' + s.total + ' done — each step makes Onward smarter about you</span></div>' +
+    '<button type="button" class="btn-link" onclick="hideSetupCard()">Hide</button></div>' +
+    '<div class="su-bar"><i style="width:' + Math.max(4, s.pct) + '%"></i></div>' + rows + '</div>';
+}
+async function hideSetupCard() {
+  state.data.profile.setupHidden = true;
+  await saveData();
+  showToast('Hidden — finish setup anytime from Settings.', 'success');
+  renderDashboard();
+}
+function setupEnableNotifs() {
+  enableNotifications().then(() => { if (state.page === 'dashboard') renderDashboard(); });
+}
+
 function wowArrow(now, then) {
   now = +now || 0; then = +then || 0;   // NaN-proof: a missing week must never render "▼ -100%"
   if (!then && !now) return '';
@@ -5237,7 +5291,7 @@ function renderDashboard() {
   // Group the cards into scannable sections — a label only shows if its group has content
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
   // Light, goal-focused home — all the analytics live on the Statistics page.
-  const gHero  = renderNeverMissTwice() + renderWhyCard() + renderNextStep() + renderWeekStrip() + renderPillarNav();
+  const gHero  = renderNeverMissTwice() + renderWhyCard() + renderNextStep() + renderSetupCard() + renderWeekStrip() + renderPillarNav();
   const gGoals = renderGoalCard() + scoreHtml;
   const gLight = renderNextWorkoutCard() + renderChecklistCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
   document.getElementById('main').innerHTML =

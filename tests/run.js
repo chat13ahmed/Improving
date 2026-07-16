@@ -62,7 +62,7 @@ function loadApp(fieldValues) {
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
-    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats, moneyMentorLessons, compoundProjection, snapshotAgeDays, wowArrow, getLastWeekStats });';
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats, moneyMentorLessons, compoundProjection, snapshotAgeDays, wowArrow, getLastWeekStats, setupProgress });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -292,6 +292,23 @@ ok('readingPacePerDay: averages recent pages over 14 days', (() => {
   const p = A.readingPacePerDay(days);   // (14+14)/14 = 2, old day excluded
   return Math.abs(p - 2) < 0.001;
 })());
+// setupProgress — the Getting Started card checks itself off against real data
+(() => {
+  const empty = A.setupProgress({}, { notif: 'default' });
+  ok('setup: fresh account → nothing done, steps present', empty.done === 0 && empty.total >= 5 && empty.steps.every(s => s.label && s.action));
+  ok('setup: first log flips its step', A.setupProgress({ days: [{ date: '2026-07-16' }] }, { notif: 'default' }).steps.find(s => s.id === 'log').done);
+  ok('setup: a real goal flips the goals step', A.setupProgress({ profile: { weeklyReadGoal: 100 } }, { notif: 'default' }).steps.find(s => s.id === 'goals').done);
+  ok('setup: reading pillar off → no book step', !A.setupProgress({ profile: { pillars: { reading: { enabled: false } } } }, { notif: 'default' }).steps.some(s => s.id === 'book'));
+  ok('setup: unsupported notifications → step hidden', !A.setupProgress({}, { notif: 'unsupported' }).steps.some(s => s.id === 'notif'));
+  ok('setup: granted notifications → step done', A.setupProgress({}, { notif: 'granted' }).steps.find(s => s.id === 'notif').done);
+  ok('setup: finance snapshot flips the money step', A.setupProgress({ finance: { assets: { cash: 100 } } }, { notif: 'default' }).steps.find(s => s.id === 'finance').done);
+  const full = A.setupProgress({
+    days: [{ date: '2026-07-16' }], books: [{ status: 'reading' }],
+    profile: { weeklyReadGoal: 100, nutrition: { age: 28, heightCm: 180, weightKg: 80, sex: 'male' } },
+    finance: { monthlyIncome: 4000 }
+  }, { notif: 'granted' });
+  ok('setup: everything configured → 100% complete', full.done === full.total && full.pct === 100);
+})();
 // wowArrow — week-over-week arrows must be NaN-proof (a missing week once rendered "▼ -100%")
 ok('wowArrow: undefined last week → treated as 0 → up arrow', /wow-up/.test(A.wowArrow(27, undefined)) && /\+100%/.test(A.wowArrow(27, undefined)));
 ok('wowArrow: both zero → empty', A.wowArrow(0, 0) === '');
