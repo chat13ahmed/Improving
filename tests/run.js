@@ -62,7 +62,7 @@ function loadApp(fieldValues) {
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
-    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats, moneyMentorLessons, compoundProjection });';
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats, moneyMentorLessons, compoundProjection, snapshotAgeDays });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -309,6 +309,21 @@ ok('readingPacePerDay: averages recent pages over 14 days', (() => {
   ok('mentor: an idea + solid base → a survivable venture budget', lessons(F({}), { ideaTitle: 'Car detailing' }).some(l => l.id === 'venture'));
   ok('mentor: freedom lesson closes the list when FI is computable', (() => { const L = lessons(F({})); return L.length && L[L.length - 1].id === 'freedom'; })());
   ok('mentor: every lesson is complete (principle/chapter/why/move)', lessons(F({ debts: [{ name: 'V', balance: 3000, apr: 22, payment: 200 }] }), { ideaTitle: 'X' }).every(l => l.principle && l.chapter && l.why && l.move));
+})();
+// Snapshot freshness — the mentor must not coach on stale numbers
+eq('snapshotAgeDays: no snapshots → null', A.snapshotAgeDays([], '2026-07-13'), null);
+eq('snapshotAgeDays: same day → 0', A.snapshotAgeDays([{ date: '2026-07-13', net: 1 }], '2026-07-13'), 0);
+eq('snapshotAgeDays: 40 days old', A.snapshotAgeDays([{ date: '2026-06-03', net: 1 }], '2026-07-13'), 40);
+(() => {
+  const f = { assets: { cash: 12000, investments: 30000, property: 0, business: 0, other: 0 },
+    liabilities: { mortgage: 0, loans: 0, credit: 0, other: 0 },
+    monthlyIncome: 4000, monthlyExpenses: 2500, monthlySavings: 1000, passiveIncome: 0,
+    business: { revenue: 0, expenses: 0 }, debts: [{ name: 'Visa', balance: 3000, apr: 22, payment: 200 }], withdrawalRate: 4 };
+  const m = A.financeMetrics(f);
+  const stale = A.moneyMentorLessons(m, f, { hasData: true, ageDays: 60 });
+  ok('mentor: stale numbers lead — even ahead of expensive debt', stale[0].id === 'stale' && stale[1].id === 'debt');
+  ok('mentor: stale lesson carries an update CTA', !!stale[0].cta && /snapshot/i.test(stale[0].ctaLabel || stale[0].move));
+  ok('mentor: fresh numbers → no stale lesson', !A.moneyMentorLessons(m, f, { hasData: true, ageDays: 5 }).some(l => l.id === 'stale'));
 })();
 ok('compoundProjection: zero monthly → 0', A.compoundProjection(0, 0.07, 10) === 0);
 ok('compoundProjection: 0% rate → simple sum', A.compoundProjection(100, 0, 10) === 12000);

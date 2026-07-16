@@ -6798,6 +6798,16 @@ function compoundProjection(monthly, annualRate, years) {
   if (r === 0) return Math.round(monthly * n);
   return Math.round(monthly * (Math.pow(1 + r, n) - 1) / r);
 }
+// Days since the last snapshot — a mentor coaching on old numbers is just
+// guessing with confidence, so freshness is part of the diagnosis. (pure)
+function snapshotAgeDays(snapshots, today) {
+  const list = Array.isArray(snapshots) ? snapshots : [];
+  if (!list.length) return null;
+  const last = list[list.length - 1].date;
+  const a = Date.parse(String(last) + 'T00:00:00Z'), b = Date.parse(String(today) + 'T00:00:00Z');
+  if (isNaN(a) || isNaN(b)) return null;
+  return Math.max(0, Math.floor((b - a) / 86400000));
+}
 function moneyMentorLessons(m, f, ctx) {
   const c = ctx || {}, out = [];
   const fmt = (n) => '$' + Math.round(+n || 0).toLocaleString();
@@ -6807,6 +6817,13 @@ function moneyMentorLessons(m, f, ctx) {
         (c.periodRate > 0 ? ' You’re already keeping ' + c.periodRate + '% of what comes in — that instinct is the whole foundation.' : ''),
       move: 'Enter your financial snapshot (3 minutes). A mentor can only coach what it can see.' });
     return out;
+  }
+  // Freshness gate: coaching on last season's numbers is confident guessing.
+  if (c.ageDays != null && c.ageDays > 35) {
+    out.push({ id: 'stale', principle: 'Old Numbers, New World', chapter: 'Ch. 12 — Surprise!',
+      why: 'My picture of your money is <b>' + c.ageDays + ' days old</b>. The book’s recurring warning: the world changes faster than plans do — and every lesson below is only as honest as the numbers behind it.',
+      move: 'Update your snapshot — two minutes — and I’ll tell you what actually changed.',
+      cta: 'openFinanceEditor()', ctaLabel: 'Update my snapshot →' });
   }
   const debts = (f.debts || []).filter(d => (+d.balance) > 0 && (+d.apr) >= 10).sort((a, b) => (+b.apr) - (+a.apr));
   if (debts.length) {
@@ -6870,7 +6887,7 @@ function renderMoneyMentorCard() {
   const f = getFinance(), m = financeMetrics(f);
   const period = getMoneyPeriod() || {};
   const top = topIdea(state.data.ideas || []);
-  const lessons = moneyMentorLessons(m, f, { hasData: financeHasData(f), periodRate: period.rate || 0, ideaTitle: (top && top.title) || '' });
+  const lessons = moneyMentorLessons(m, f, { hasData: financeHasData(f), periodRate: period.rate || 0, ideaTitle: (top && top.title) || '', ageDays: snapshotAgeDays(f.snapshots, todayStr()) });
   if (!lessons.length) return '';
   const i = ((state._mentorIdx || 0) % lessons.length + lessons.length) % lessons.length;
   const L = lessons[i];
@@ -6885,6 +6902,7 @@ function renderMoneyMentorCard() {
     '<div class="mentor-chapter">' + L.chapter + ' · Morgan Housel</div>' +
     '<div class="mentor-why">' + L.why + '</div>' +
     '<div class="mentor-move"><span class="mentor-move-k">📌 This week’s move</span><span class="mentor-move-t">' + L.move + '</span></div>' +
+    (L.cta ? '<button type="button" class="btn btn-primary" style="margin-top:12px" onclick="' + L.cta + '">' + L.ctaLabel + '</button>' : '') +
     chips +
     (lessons.length > 1 ? '<button type="button" class="mentor-next" onclick="nextMoneyLesson()">Next lesson · ' + (i + 1) + '/' + lessons.length + ' →</button>' : '') +
     '</div>';
@@ -6909,11 +6927,17 @@ function renderFinancesPage() {
   const prev = f.snapshots.length >= 2 ? f.snapshots[f.snapshots.length - 2] : null;
   const change = prev ? m.netWorth - prev.net : null;
 
+  const age = snapshotAgeDays(f.snapshots, todayStr());
+  const asOf = f.snapshots.length
+    ? '<button type="button" class="fin-asof' + (age > 35 ? ' stale' : '') + '" onclick="openFinanceEditor()">' +
+      (age > 35 ? '⚠️ numbers from ' : 'as of ') + fmtDate(f.snapshots[f.snapshots.length - 1].date) + (age > 35 ? ' — update me' : '') + '</button>'
+    : '';
   const heroCard = '<div class="card fin-hero">' +
     '<div class="fin-k">Net Worth</div>' +
     '<div class="fin-nw' + (m.netWorth < 0 ? ' neg' : '') + '">' + fm(m.netWorth) + '</div>' +
     '<div class="fin-nw-sub">' + fm(m.totalAssets) + ' assets − ' + fm(m.totalLiab) + ' liabilities' +
       (change != null ? ' · <span class="' + (change >= 0 ? 'fin-up' : 'fin-down') + '">' + (change >= 0 ? '▲ ' : '▼ ') + fm(Math.abs(change)) + ' since last</span>' : '') + '</div>' +
+    asOf +
     (f.snapshots.length >= 2 ? '<div class="fin-chart-wrap"><canvas id="fin-nw-chart"></canvas></div>' : '') + '</div>';
 
   const rTone = (v, good, ok) => v >= good ? 'good' : v >= ok ? 'ok' : 'low';
@@ -7026,11 +7050,15 @@ async function saveFinance() {
   };
   const net = sumObj(fin.assets) - sumObj(fin.liabilities);
   const today = todayStr();
+  // The mentor reacts to the CHANGE — grab the previous snapshot before it's replaced
+  const prevSnap = fin.snapshots.filter(s => s.date !== today).slice(-1)[0] || null;
   fin.snapshots = fin.snapshots.filter(s => s.date !== today).concat([{ date: today, net }]).sort((a, b) => a.date < b.date ? -1 : 1).slice(-24);
   state.data.finance = fin;
+  state._mentorIdx = 0;   // fresh numbers → start from the mentor's top lesson again
   await saveData();
   closeFinanceEditor();
-  showToast('Financial snapshot saved.', 'success');
+  const delta = prevSnap ? Math.round(net - prevSnap.net) : null;
+  showToast(delta ? 'Snapshot saved — net worth ' + (delta > 0 ? '▲ up $' : '▼ down $') + Math.abs(delta).toLocaleString() + ' since ' + fmtDate(prevSnap.date) + '.' : 'Financial snapshot saved.', 'success');
   navigate('finances');
 }
 
