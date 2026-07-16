@@ -62,7 +62,7 @@ function loadApp(fieldValues) {
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
-    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats, moneyMentorLessons, compoundProjection, snapshotAgeDays });';
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats, moneyMentorLessons, compoundProjection, snapshotAgeDays, wowArrow, getLastWeekStats });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -292,6 +292,13 @@ ok('readingPacePerDay: averages recent pages over 14 days', (() => {
   const p = A.readingPacePerDay(days);   // (14+14)/14 = 2, old day excluded
   return Math.abs(p - 2) < 0.001;
 })());
+// wowArrow — week-over-week arrows must be NaN-proof (a missing week once rendered "▼ -100%")
+ok('wowArrow: undefined last week → treated as 0 → up arrow', /wow-up/.test(A.wowArrow(27, undefined)) && /\+100%/.test(A.wowArrow(27, undefined)));
+ok('wowArrow: both zero → empty', A.wowArrow(0, 0) === '');
+ok('wowArrow: 3 vs 2 → +50%', /\+50%/.test(A.wowArrow(3, 2)));
+ok('wowArrow: 1 vs 2 → -50%', /wow-down/.test(A.wowArrow(1, 2)) && /-50%/.test(A.wowArrow(1, 2)));
+ok('wowArrow: NaN now → coerced to 0 → down arrow, never NaN text', !/NaN/.test(A.wowArrow(NaN, 5)) && /wow-down/.test(A.wowArrow(NaN, 5)));
+ok('getLastWeekStats: includes readPages (Knowledge ring compares against it)', typeof A.getLastWeekStats().readPages === 'number');
 // Money Mentor — Psychology-of-Money lessons ranked by what to fix first
 (() => {
   const F = (over) => Object.assign({

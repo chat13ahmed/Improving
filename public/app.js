@@ -2653,10 +2653,12 @@ function getLastWeekStats() {
   const avgFood = fr.length ? fr.reduce((a,b)=>a+b,0)/fr.length : 0;
   const networkCount = ld.reduce((s,x)=>s+(x.networking?.count||0),0);
   const weekIncome = state.data.weeks.find(w => w.weekStart === lastWeekStart)?.income || 0;
-  return { gymDays, avgFood, networkCount, weekIncome };
+  const readPages = ld.reduce((s,x)=>s+(x.reading?.pages||0),0);
+  return { gymDays, avgFood, networkCount, weekIncome, readPages };
 }
 
 function wowArrow(now, then) {
+  now = +now || 0; then = +then || 0;   // NaN-proof: a missing week must never render "▼ -100%"
   if (!then && !now) return '';
   const diff = now - then;
   if (Math.abs(diff) < 0.01) return '';
