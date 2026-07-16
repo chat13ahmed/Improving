@@ -1103,7 +1103,19 @@ body {
 .sr-card.sr-hit .sr-viz { animation: srPulse 2.2s ease-in-out infinite; }
 @keyframes srPulse { 0%, 100% { filter: drop-shadow(0 0 0 transparent); } 50% { filter: drop-shadow(0 0 8px var(--sr)); } }
 @media (prefers-reduced-motion: reduce) { .sr-card, .sr-fill { animation: none !important; transition: none !important; } .sr-card.sr-hit .sr-viz { animation: none; } }
-@media (max-width: 380px) { .sr-grid { grid-template-columns: 1fr; } }
+/* Small phones keep the 2-up dashboard feel — compact cards instead of a
+   one-per-row collapse that buried the stats below the fold. */
+@media (max-width: 380px) {
+  .sr-grid { gap: 9px; }
+  .sr-card { padding: 11px 12px; gap: 10px; }
+  .sr-viz, .sr-ring { width: 48px; height: 48px; }
+  .sr-pct { font-size: 10.5px; }
+  .sr-icon { font-size: 22px; }
+  .sr-value { font-size: 19px; }
+  .sr-value i { font-size: 12px; }
+  .sr-label { font-size: 9.5px; letter-spacing: 0.4px; }
+  .sr-sub { font-size: 11px; }
+}
 
 /* Health hub — today's macros + recent workouts */
 .hl-today { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
@@ -1163,7 +1175,8 @@ body {
 .fab-btn:hover { transform: scale(1.12); box-shadow: 0 0 32px rgba(59,130,246,0.55), 0 6px 20px rgba(15,23,42,0.22); }
 
 /* ─── Quick Log Modal ─────────────────────────── */
-.quick-log-box { max-width: 480px; text-align: left; }
+/* min() so the wider desktop box can never hang off a phone screen */
+.quick-log-box { max-width: min(480px, calc(100vw - 28px)); text-align: left; }
 .ql-streak { text-align: center; font-size: 15px; font-weight: 700; color: var(--accent); margin-bottom: 16px; }
 .ql-smart { font-size: 12.5px; color: var(--money-color); background: rgba(167,139,250,0.08); border: 1px solid rgba(167,139,250,0.25); border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 14px; line-height: 1.45; }
 .ql-section { margin-bottom: 16px; }
