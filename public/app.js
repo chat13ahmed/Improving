@@ -459,6 +459,40 @@ function renderAchievementsSection() {
     '</div></div>';
 }
 
+// Compact dashboard version — progress + the next few to unlock, with the full
+// wall one tap away. Keeps the home screen from turning into a 19-tile trophy case.
+function renderAchievementsSummary() {
+  const all = computeAchievements();
+  const earned = all.filter(a => a.earned);
+  const locked = all.filter(a => !a.earned);
+  const pct = all.length ? Math.round((earned.length / all.length) * 100) : 0;
+  const next = locked.slice(0, 3);
+  const chips = next.map(a =>
+    '<div class="achs-chip"><span class="achs-ic">🔒</span>' +
+    '<div class="achs-meta"><div class="achs-nm">' + escapeHtml(a.title) + '</div>' +
+    '<div class="achs-sub">' + escapeHtml(a.desc) + '</div></div></div>').join('');
+  return '<div class="card achs-card">' +
+    '<div class="achs-head">' +
+    '<h3 class="card-title" style="margin-bottom:0">' + earned.length + ' of ' + all.length + ' achievements</h3>' +
+    '<span class="achs-count"><b>' + pct + '%</b> complete · <button type="button" class="btn-link" onclick="openAchievementsModal()">View all</button></span>' +
+    '</div>' +
+    '<div class="achs-bar"><i style="width:' + pct + '%"></i></div>' +
+    (next.length ? '<div class="achs-next">Next to unlock</div><div class="achs-chips">' + chips + '</div>' : '') +
+    '</div>';
+}
+function openAchievementsModal() {
+  if (document.getElementById('ach-overlay')) return;
+  const o = document.createElement('div');
+  o.id = 'ach-overlay'; o.className = 'modal-overlay';
+  o.innerHTML = '<div class="modal-box ach-modal">' +
+    '<div class="ach-modal-head"><h3 class="card-title" style="margin-bottom:0">Achievements</h3>' +
+    '<button type="button" class="btn-icon" onclick="closeAchievementsModal()" aria-label="Close">✕</button></div>' +
+    renderAchievementsSection() + '</div>';
+  o.addEventListener('click', e => { if (e.target === o) closeAchievementsModal(); });
+  document.body.appendChild(o);
+}
+function closeAchievementsModal() { const o = document.getElementById('ach-overlay'); if (o) o.remove(); }
+
 // ─────────────────────────────────────────────────────────────
 // COUNTER ANIMATIONS
 // ─────────────────────────────────────────────────────────────
@@ -5158,9 +5192,34 @@ function renderMountainHero() {
     cloud(40, 1, 44, night ? 0.22 : 0.85) + cloud(70, 0.7, 64, night ? 0.15 : 0.6) +
     mountains +
     '</svg>';
+  // Today's status + this week's dots now ride on the hero — the "am I climbing?"
+  // answer lives at the top instead of in three separate stacked cards below.
+  const today = todayStr();
+  const loggedSet = new Set((state.data.days || []).map(d => d.date));
+  const chip = loggedSet.has(today)
+    ? '<span class="mtn-chip mtn-chip-ok"><span class="mtn-chip-dot"></span>On track today</span>'
+    : '<button type="button" class="mtn-chip mtn-chip-todo" onclick="navigate(\'log\')"><span class="mtn-chip-dot"></span>Log today</button>';
+  const wkBase = new Date(getWeekStart(today) + 'T00:00:00');
+  const wkLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  let wkDots = '', wkCount = 0;
+  for (let i = 0; i < 7; i++) {
+    const dt = new Date(wkBase); dt.setDate(wkBase.getDate() + i);
+    const ds = dt.toISOString().split('T')[0];
+    const done = loggedSet.has(ds);
+    if (done && ds <= today) wkCount++;
+    const cls = 'mtn-wk' + (done ? ' mtn-wk-done' : '') + (ds === today ? ' mtn-wk-today' : '') + (ds > today ? ' mtn-wk-future' : '');
+    wkDots += '<div class="mtn-wk-day"><span class="' + cls + '"></span><span class="mtn-wk-l">' + wkLabels[i] + '</span></div>';
+  }
+  const rail = '<div class="mtn-rail"><span class="mtn-rail-lbl">This week</span>' +
+    '<div class="mtn-rail-days">' + wkDots + '</div>' +
+    '<span class="mtn-rail-count">' + wkCount + ' / 7</span></div>';
   return '<div class="mtn-hero">' + svg +
+    '<div class="mtn-hero-inner">' +
+    '<div class="mtn-hero-top">' +
     '<div class="mtn-hero-text"><div class="mtn-greet">' + greet + (name ? ', ' + escapeHtml(name) : '') + '</div>' +
-    '<div class="mtn-sub">' + escapeHtml(sub) + '</div></div></div>';
+    '<div class="mtn-sub">' + escapeHtml(sub) + '</div></div>' +
+    chip + '</div>' +
+    rail + '</div></div>';
 }
 // How much of this week's goals you've reached — average % across active weekly
 // goals (gym days, networking, reading pages, savings). Pure + testable.
@@ -5284,16 +5343,19 @@ function renderDashboard() {
     '<button class="btn btn-primary" onclick="navigate(\'log\')">Log my first day</button>' +
     '</div></div>';
 
-  const achievementsHtml = hasDays ? renderAchievementsSection() : '';
+  const achievementsHtml = hasDays ? renderAchievementsSummary() : '';
 
   const focusHtml = renderFocusCard(stats, lastStats);
 
   // Group the cards into scannable sections — a label only shows if its group has content
   const sec = (label, html) => html && html.trim() ? '<div class="dash-section">' + label + '</div>' + html : '';
-  // Light, goal-focused home — all the analytics live on the Statistics page.
-  const gHero  = renderNeverMissTwice() + renderWhyCard() + renderNextStep() + renderSetupCard() + renderWeekStrip() + renderPillarNav();
-  const gGoals = renderGoalCard() + scoreHtml;
-  const gLight = renderNextWorkoutCard() + renderChecklistCard() + renderTrialBanner() + renderStreakCard() + renderReminderBanner() + renderQuoteCard();
+  // Redesigned hierarchy: hero (with today's status + week rail) → the weekly score
+  // → pillar quick-log → a 2-column grid of secondary cards → achievements summary.
+  const gBanners = renderNeverMissTwice() + renderReminderBanner() + renderTrialBanner();
+  const gContext = renderWhyCard() + renderSetupCard() + renderNextStep();
+  const gGoals   = renderGoalCard() + scoreHtml;
+  const gridCards = renderNextWorkoutCard() + renderChecklistCard() + renderStreakCard() + focusHtml;
+  const gGrid    = gridCards.trim() ? '<div class="dash-grid">' + gridCards + '</div>' : '';
   document.getElementById('main').innerHTML =
     renderMountainHero() +
     '<div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
@@ -5303,10 +5365,11 @@ function renderDashboard() {
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="openWeekRecap()">Week recap</button>' : '') +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">Share</button>' : '') +
     '</div></div>' +
-    gHero +
+    gBanners +
+    gContext +
     sec('Your goals', gGoals) +
-    gLight +
-    (hasDays ? focusHtml + achievementsHtml : chartsHtml);
+    renderPillarNav() +
+    (hasDays ? sec('Today &amp; this week', gGrid) + renderQuoteCard() + achievementsHtml : chartsHtml);
 
   setTimeout(animateCounters, 120);
   // Summit celebration once when momentum hits 100% (resets if it drops)
