@@ -2653,12 +2653,15 @@ function renderCommunityPage() {
   if (!state._composerType) state._composerType = 'thought';
   if (state._feedFilter == null) state._feedFilter = '';
   const filters = [['', 'All'], ['thought', 'Thoughts'], ['program', 'Programs'], ['meal', 'Meals']];
+  // Desktop: composer rides a sticky left rail beside the feed; mobile stacks.
   document.getElementById('main').innerHTML =
     '<div class="page-header">' +
     '<h2 class="page-title">Community</h2>' +
     '<p class="page-sub">Share thoughts, training programs, and meals — and see what others post</p>' +
     '</div>' +
-    '<div class="card">' +
+    '<div class="comm-layout">' +
+    '<div class="comm-rail">' +
+    '<div class="card comm-composer">' +
     '<h3 class="card-title">Share something</h3>' +
     '<div class="cf-typetabs">' +
     ['thought', 'program', 'meal'].map(t => '<button type="button" class="cf-type' + (t === state._composerType ? ' active' : '') + '" data-t="' + t + '" onclick="setComposerType(\'' + t + '\')">' + POST_TYPE_LABELS[t] + '</button>').join('') +
@@ -2666,10 +2669,13 @@ function renderCommunityPage() {
     '<div id="cf-fields">' + composerFields(state._composerType) + '</div>' +
     '<button class="btn btn-primary" style="margin-top:12px" onclick="submitCommunityPost()">Post</button>' +
     '</div>' +
+    '</div>' +
+    '<div class="comm-feed">' +
     '<div class="cf-filters">' +
     filters.map(([v, l]) => '<button type="button" class="cf-filter' + (v === state._feedFilter ? ' active' : '') + '" data-f="' + v + '" onclick="setCommunityFilter(\'' + v + '\')">' + l + '</button>').join('') +
     '</div>' +
-    '<div id="feed-list"><div class="my-meals-empty">Loading…</div></div>';
+    '<div id="feed-list"><div class="my-meals-empty">Loading…</div></div>' +
+    '</div></div>';
   loadCommunityFeed();
 }
 
@@ -6734,6 +6740,7 @@ function renderHealthOverview(nut, gymDays, gymGoal, streak, eatenCal, eatenP, w
     wDelta = diff === 0 ? 'holding steady' : (diff > 0 ? '▲ +' : '▼ ') + Math.abs(diff) + ' ' + wUnit + ' since last';
   }
   return '<div class="biz-insight">' + insight + '</div>' +
+    '<div class="dash-section">Today &amp; this week</div>' +
     '<div class="sr-grid">' +
     statRingCard({ label: 'Training this week', value: gymDays, suffix: '/' + gymGoal, pct: gymGoal ? gymDays / gymGoal * 100 : null,
       color: 'var(--gym-color)', sub: (streak > 1 ? streak + '-day streak 🔥 ' : '') + wowArrow(gymDays, lastStats.gymDays), onclick: "setHealthTab('training')" }) +
@@ -6773,7 +6780,10 @@ function renderHealthNutrition(nut, td, eatenCal, eatenP) {
     bar(Math.round(eaten.carbs || 0), nut.carbs.g, 'Carbs', 'g', 'var(--accent)') +
     bar(Math.round(eaten.fat || 0), nut.fat.g, 'Fat', 'g', '#A78BFA') +
     '</div><button type="button" class="wo-add" onclick="navigate(\'log\')">＋ Log today\'s food</button>';
-  return today + renderHydrationStrip(getWeekStats()) + renderFuelCard() + renderMealPlan(nut) + renderNutritionWeekCard() + renderWeightTrend();
+  // The two trend charts are peers — side by side on desktop
+  const trendA = renderNutritionWeekCard(), trendB = renderWeightTrend();
+  const trends = (trendA && trendB) ? '<div class="dash-grid">' + trendA + trendB + '</div>' : trendA + trendB;
+  return today + renderHydrationStrip(getWeekStats()) + renderFuelCard() + renderMealPlan(nut) + trends;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -6827,11 +6837,15 @@ function renderBusinessPage() {
   const reachList = contacts.filter(c => openC(c) && ((c.followUpDate && c.followUpDate <= today) || isGoingCold(c, today)))
     .sort((a, b) => (+b.dealValue || 0) - (+a.dealValue || 0)).slice(0, 5);
   const reach = reachList.length
-    ? '<div class="biz-k" style="margin-top:20px">Who to contact next</div>' +
+    ? '<div class="card" style="margin-bottom:0"><div class="biz-k">Who to contact next</div>' +
       '<div class="biz-reach">' + reachList.map(c => '<button type="button" class="biz-reach-row" onclick="navigate(\'contacts\')">' +
         '<span class="brr-name">' + escapeHtml(c.name) + '</span>' +
-        '<span class="brr-meta">' + ((+c.dealValue) ? '$' + (+c.dealValue).toLocaleString() + ' · ' : '') + (isGoingCold(c, today) ? '❄️ going cold' : 'follow-up due') + '</span></button>').join('') + '</div>'
+        '<span class="brr-meta">' + ((+c.dealValue) ? '$' + (+c.dealValue).toLocaleString() + ' · ' : '') + (isGoingCold(c, today) ? '❄️ going cold' : 'follow-up due') + '</span></button>').join('') + '</div></div>'
     : '';
+  // Spotlight + reach-outs are peers — grid them when both exist
+  const focusRow = (spotlight && reach)
+    ? '<div class="dash-section">Where to focus</div><div class="dash-grid">' + spotlight + reach + '</div>'
+    : (spotlight || reach ? '<div class="dash-section">Where to focus</div>' + spotlight + reach : '');
 
   // This week's hustle numbers — animated rings in the pillar colours
   const stats = getWeekStats(), lastStats = getLastWeekStats();
@@ -6847,7 +6861,9 @@ function renderBusinessPage() {
     '<p class="page-sub">Your ideas, pipeline and money — in one place.</p></div>' +
     businessTabs('overview') +
     '<div class="biz-insight">' + insight + '</div>' +
-    rings + grid + spotlight + reach +
+    '<div class="dash-section">This week</div>' + rings +
+    '<div class="dash-section">Pipeline</div>' + grid +
+    focusRow +
     (moneyOn ? renderMoneyCircleCard() : '');
   wireStatRings();
 }
@@ -7509,10 +7525,10 @@ function renderHistoryPage() {
 
   const summaryHtml = days.length > 0
     ? '<div class="history-summary">' +
-      '<div class="hs-item"><span>Days Logged</span><strong>' + days.length + '</strong></div>' +
-      '<div class="hs-item"><span>Gym Workouts</span><strong>' + gymTotal + ' days </strong></div>' +
-      '<div class="hs-item"><span>Avg Food Rating</span><strong>' + (foodAvg > 0 ? foodAvg.toFixed(1) + '/5 ' : '—') + '</strong></div>' +
-      '<div class="hs-item"><span>Total Connections</span><strong>' + netTotal + ' </strong></div>' +
+      '<div class="hs-item"><span>Days Logged</span><strong style="color:var(--primary)">' + days.length + '</strong></div>' +
+      '<div class="hs-item"><span>Gym Workouts</span><strong style="color:var(--gym-color)">' + gymTotal + ' days</strong></div>' +
+      '<div class="hs-item"><span>Avg Food Rating</span><strong style="color:var(--food-color)">' + (foodAvg > 0 ? foodAvg.toFixed(1) + '/5' : '—') + '</strong></div>' +
+      '<div class="hs-item"><span>Total Connections</span><strong style="color:var(--network-color)">' + netTotal + '</strong></div>' +
       '</div>'
     : '';
 
@@ -7526,6 +7542,7 @@ function renderHistoryPage() {
     '<div class="page-header"><h2 class="page-title">History</h2>' +
     '<p class="page-sub">All your logged days</p></div>' +
     summaryHtml +
+    '<div class="dash-section">All entries</div>' +
     '<div class="view-toggle-row">' +
     '<button class="view-btn' + (view==='list'?' view-active':'') + '" onclick="switchHistoryView(\'list\')">List</button>' +
     '<button class="view-btn' + (view==='calendar'?' view-active':'') + '" onclick="switchHistoryView(\'calendar\')">Calendar</button>' +
@@ -7600,6 +7617,7 @@ function renderCoachPage() {
       '<span>AI Coach is ready' + (aiKey() ? ' · <span style="font-family:monospace;color:var(--text-muted)">' + escapeHtml(maskKey(aiKey())) + '</span>' : ' · using the server key') + '</span>' +
       '<button onclick="clearApiKey()" style="background:none;border:none;font-size:12px;color:var(--text-muted);cursor:pointer;flex:none">Change key</button></div>';
 
+  // The chat IS the coach — it leads the page. Deep analyses follow as a grid.
   const cards = ANALYSES.map(a =>
     '<div class="insight-card card">' +
     '<div class="insight-card-header"><span class="insight-icon">' + a.icon + '</span><div>' +
@@ -7609,19 +7627,33 @@ function renderCoachPage() {
     '</div>'
   ).join('');
 
+  // Tappable conversation starters — fill the input and send
+  const starters = ['Am I on track this week?', 'What should I eat tonight to hit my macros?', 'Plan my next 3 days']
+    .map(s => '<button type="button" class="coach-starter"' + (!state.hasApiKey ? ' disabled' : '') +
+      ' onclick="askStarter(this.textContent)">' + s + '</button>').join('');
+
   document.getElementById('main').innerHTML =
     '<div class="page-header"><h2 class="page-title">AI Coach</h2>' +
     '<p class="page-sub">Your personal life & income coach — powered by the AI you connect</p></div>' +
     keyBanner +
-    '<div class="insights-grid">' + cards + '</div>' +
-    '<div class="card coach-chat-card">' +
-    '<h3 class="card-title">Chat with your coach</h3>' +
-    '<p class="card-sub">It knows all your data and your goal. Ask anything — "what should I eat tonight to hit my macros?", "am I on track for my goal?", "why is my income inconsistent?"</p>' +
+    '<div class="card coach-chat-card coach-hero">' +
+    '<h3 class="card-title" style="margin-bottom:4px">Chat with your coach</h3>' +
+    '<p class="card-sub">It knows all your data and your goal — ask anything.</p>' +
     '<div id="coach-thread" class="coach-thread">' + renderChatThread() + '</div>' +
+    '<div class="coach-starters">' + starters + '</div>' +
     '<div class="coach-input-row">' +
     '<textarea id="chat-input" rows="1" placeholder="Message your coach…"' + (!state.hasApiKey ? ' disabled' : '') + ' onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>' +
     '<button class="btn btn-primary" onclick="sendChat()"' + (!state.hasApiKey ? ' disabled' : '') + '>Send</button>' +
-    '</div></div>';
+    '</div></div>' +
+    '<div class="dash-section">Deep dives</div>' +
+    '<div class="insights-grid">' + cards + '</div>';
+}
+// A starter chip fills the chat box and sends it straight to the coach
+function askStarter(text) {
+  const inp = document.getElementById('chat-input');
+  if (!inp) return;
+  inp.value = (text || '').trim();
+  sendChat();
 }
 
 // ── Conversational coach (chat thread, in-memory) ──
@@ -8773,6 +8805,7 @@ function renderKnowledgeOverview() {
 
   return '<div class="biz-insight">' + insight + '</div>' +
     renderReviewCard() +
+    '<div class="dash-section">This week</div>' +
     '<div class="sr-grid">' +
     statRingCard({ label: 'Pages this week', value: readPages, pct: readGoal ? readPages / readGoal * 100 : null,
       color: 'var(--read-color)', icon: '📖',
@@ -10632,9 +10665,11 @@ function renderChecklistPage() {
     ? '<span class="rem-notif-on">On</span> <button type="button" class="btn-link" onclick="sendTestPush()">Send test</button>'
     : '<button type="button" class="btn btn-outline" onclick="enableNotifications()">Enable notifications</button>';
 
+  // Checklist and Reminders are peers — side by side on desktop, stacked on mobile.
   document.getElementById('main').innerHTML =
     '<div class="page-header"><h2 class="page-title">Checklist & Reminders</h2>' +
     '<p class="page-sub">Your daily must-dos and nudges to stay on track</p></div>' +
+    '<div class="dash-grid">' +
     '<div class="card">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
     '<h3 class="card-title" style="margin-bottom:0">Today\'s Checklist</h3>' +
@@ -10658,6 +10693,8 @@ function renderChecklistPage() {
     '<div class="rem-note">Defaults to <strong>today</strong> — tap the date to pick any day ahead. Or check <strong>Repeat every day</strong> for a daily reminder.</div>' +
     '<div class="rem-note">Reminders nudge you while the app is open. On a phone, add it to your home screen and allow notifications for the best results.</div>' +
     '</div>' +
+    '</div>' +
+    '<div class="dash-section">Nudges</div>' +
     renderNudgeCard();
 }
 
@@ -10695,10 +10732,9 @@ function renderSettingsPage() {
     // Customize pillars (first — it's the headline feature)
     pillarCustomizerCard() +
 
-    // Appearance — animated 3D background toggle
-    renderAppearanceCard() +
-
-    // Goals — labels follow your pillar names; only enabled pillars shown
+    // Goals & nutrition, side by side on desktop
+    '<div class="dash-section">Goals &amp; nutrition</div>' +
+    '<div class="dash-grid">' +
     '<div class="card">' +
     '<h3 class="card-title">Weekly Goals</h3>' +
     '<form id="goals-form" onsubmit="saveGoals(event)">' +
@@ -10737,8 +10773,11 @@ function renderSettingsPage() {
 
     // Nutrition & calorie targets
     renderNutritionSettingsCard() +
+    '</div>' +
 
-    // Profile
+    // Coach: work profile + the AI key that powers it
+    '<div class="dash-section">AI Coach</div>' +
+    '<div class="dash-grid">' +
     '<div class="card">' +
     '<h3 class="card-title">Work Profile</h3>' +
     '<p class="card-sub">This is what the AI coach uses to give you personalized advice.</p>' +
@@ -10762,12 +10801,12 @@ function renderSettingsPage() {
       : '<p class="card-sub">Bring your own key from Claude, OpenAI (GPT), Gemini, or any OpenAI-compatible API.</p>' +
         apiKeyFields()) +
     '</div>' +
+    '</div>' +
 
-    // Security & password
-    renderSecurityCard() +
-
-    // Backup & data
-    renderBackupCard() +
+    // App preferences + account & data
+    '<div class="dash-section">App &amp; account</div>' +
+    '<div class="dash-grid">' +
+    renderAppearanceCard() +
 
     // Notifications info
     '<div class="card">' +
@@ -10779,6 +10818,13 @@ function renderSettingsPage() {
     '<br><strong style="color:var(--text)">On iPhone:</strong> add the app to your Home Screen first (Share → Add to Home Screen), then allow notifications.' +
     '</div>' +
     '<button class="btn btn-outline" onclick="navigate(\'checklist\')">Open Checklist & Reminders →</button>' +
+    '</div>' +
+
+    // Security & password
+    renderSecurityCard() +
+
+    // Backup & data
+    renderBackupCard() +
     '</div>';
 }
 
