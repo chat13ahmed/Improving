@@ -62,7 +62,7 @@ function loadApp(fieldValues) {
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
-    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats, moneyMentorLessons, compoundProjection, snapshotAgeDays, wowArrow, getLastWeekStats, setupProgress });';
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats, moneyMentorLessons, compoundProjection, snapshotAgeDays, wowArrow, getLastWeekStats, setupProgress, applyFinishRitual });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -292,6 +292,19 @@ ok('readingPacePerDay: averages recent pages over 14 days', (() => {
   const p = A.readingPacePerDay(days);   // (14+14)/14 = 2, old day excluded
   return Math.abs(p - 2) < 0.001;
 })());
+// applyFinishRitual — the finish-a-book ritual's pure core
+(() => {
+  const mk = () => ({ books: [{ id: 'b1', title: 'Atomic Habits', status: 'reading', questions: [{ id: 'q1', text: 'Why?', answered: false }, { id: 'q2', text: 'How?', answered: false }] }], takeaways: [] });
+  const d1 = mk();
+  const r1 = A.applyFinishRitual(d1, 'b1', { teach: 'Tiny habits compound.', action: 'Never miss twice.', verdict: 'yes', answered: [true, false], date: '2026-07-16', tid: 't1' });
+  ok('ritual: finishes the book with date/teach/verdict', r1.book.status === 'finished' && r1.book.finishedDate === '2026-07-16' && r1.book.teachBack === 'Tiny habits compound.' && r1.book.verdict === 'yes');
+  ok('ritual: the action becomes a Key Takeaway tied to the book', d1.takeaways.length === 1 && d1.takeaways[0].text === 'Never miss twice.' && d1.takeaways[0].book === 'Atomic Habits' && d1.takeaways[0].seenAt === '');
+  ok('ritual: question answered flags recorded', r1.book.questions[0].answered === true && r1.book.questions[1].answered === false);
+  const d2 = mk();
+  A.applyFinishRitual(d2, 'b1', { date: '2026-07-16' });
+  ok('ritual: skipping everything still finishes cleanly, no takeaway', d2.books[0].status === 'finished' && d2.takeaways.length === 0 && !d2.books[0].teachBack);
+  ok('ritual: unknown book → null, nothing breaks', A.applyFinishRitual(mk(), 'nope', {}) === null);
+})();
 // setupProgress — the Getting Started card checks itself off against real data
 (() => {
   const empty = A.setupProgress({}, { notif: 'default' });

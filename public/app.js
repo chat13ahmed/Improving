@@ -7928,8 +7928,14 @@ function buildDemoData() {
       nutrition: { age: 28, sex: 'male', heightCm: 180, weightKg: 80, heightUnit: 'ft', weightUnit: 'lbs', activity: 'active', goal: 'gain', strategy: 'muscle', mealsPerDay: 4 } },
     days, weeks: [], incomes, weights,
     books: [
-      { id: 'demo', title: 'Rich Dad Poor Dad', author: 'Robert Kiyosaki', status: 'reading', totalPages: 336, startDate: iso(14), chapters: CH.slice() },
-      { id: 'demo2', title: 'Atomic Habits', author: 'James Clear', status: 'finished', totalPages: 320, finishedDate: iso(32) }
+      { id: 'demo', title: 'Rich Dad Poor Dad', author: 'Robert Kiyosaki', status: 'reading', totalPages: 336, startDate: iso(14), chapters: CH.slice(),
+        questions: [
+          { id: 'q1', text: 'What do the rich actually do differently with money?', answered: true },
+          { id: 'q2', text: 'How do I start buying assets on a normal income?', answered: false }
+        ] },
+      { id: 'demo2', title: 'Atomic Habits', author: 'James Clear', status: 'finished', totalPages: 320, finishedDate: iso(32), verdict: 'yes',
+        teachBack: 'You don’t change your life with big decisions — you change it with tiny habits that compound. Make good habits obvious and easy, bad ones invisible and hard, and vote for the person you want to become every single day.',
+        questions: [{ id: 'q3', text: 'Why do my habits never stick past week two?', answered: true }] }
     ],
     vocab: [
       { id: 'w1', word: 'Ephemeral', meaning: 'Lasting a very short time', book: 'Atomic Habits', page: 142,
@@ -8516,6 +8522,12 @@ function readingBody() {
     const finish = new Date(); finish.setDate(finish.getDate() + daysLeft);
     paceLine = '<div class="rbc-pace">📅 At ~' + Math.round(pace) + ' pg/day, <b>' + pagesLeft.toLocaleString() + '</b> to go — finish in ~<b>' + daysLeft + '</b> day' + (daysLeft === 1 ? '' : 's') + ' (' + fmtDate(finish.toISOString().slice(0, 10)) + ')</div>';
   }
+  // The questions this book was opened to answer — tap one when the book delivers
+  const bookQs = ((activeBook && activeBook.questions) || []).filter(q => q && q.text);
+  const questionsLine = bookQs.length
+    ? '<div class="rbc-qs"><span class="rbc-qs-k">🧭 Hunting for</span>' +
+      bookQs.map((q, i) => '<button type="button" class="rbc-q' + (q.answered ? ' on' : '') + '" onclick="toggleBookQuestion(' + i + ')" title="Tap when the book answers it">' + (q.answered ? '✓ ' : '') + escapeHtml(q.text) + '</button>').join('') + '</div>'
+    : '';
 
   const booksByTitle = {};
   (state.data.books || []).forEach(b => { booksByTitle[b.title] = b; });
@@ -8549,7 +8561,7 @@ function readingBody() {
       (bookPct !== null ? '<span style="font-weight:800;color:var(--read-color);font-size:15px">' + bookPct + '%</span>' : '') +
       '</div>' +
       (bookPct !== null ? '<div class="rbc-bar-track"><div class="rbc-bar-fill" style="width:' + bookPct + '%"></div></div>' : '') +
-      paceLine +
+      paceLine + questionsLine +
       '</div></div>'
     : '<div class="card reading-start-card">' +
       '<div class="rsc-icon"></div>' +
@@ -8597,13 +8609,13 @@ function readingBody() {
       '<h3 class="card-title">Books Finished (' + finished.length + ')</h3>' +
       '<div class="finished-books-grid">' +
       finished.map(b =>
-        '<div class="finished-book">' +
+        '<button type="button" class="finished-book" onclick="openBookMemory(\'' + b.id + '\')">' +
         bookCoverHtml(b, 'bc-sm') +
         '<div><div class="fb-title">' + escapeHtml(b.title) + '</div>' +
         (b.author ? '<div class="fb-date" style="color:var(--text-muted);font-size:12px">' + escapeHtml(b.author) + '</div>' : '') +
-        (b.totalPages ? '<div class="fb-date">' + b.totalPages + ' pages</div>' : '') +
         (b.finishedDate ? '<div class="fb-date">' + fmtDate(b.finishedDate) + '</div>' : '') +
-        '</div></div>'
+        (b.teachBack ? '<div class="fb-date fb-memory">📝 in your words ›</div>' : '') +
+        '</div></button>'
       ).join('') +
       '</div></div>'
     : '';
@@ -9444,24 +9456,136 @@ async function saveBook() {
   if (!state.data.books) state.data.books = [];
   // Pause any existing reading book
   state.data.books.forEach(b => { if (b.status === 'reading') b.status = 'paused'; });
-  state.data.books.push({ id: uid(), title, author, totalPages, startDate: todayStr(), status: 'reading', finishedDate: null });
+  const nb = { id: uid(), title, author, totalPages, startDate: todayStr(), status: 'reading', finishedDate: null };
+  state.data.books.push(nb);
   backfillBookData(); // if they typed a known title, fill author/pages from the library
   await saveData();
   document.getElementById('add-book-modal')?.remove();
-  showToast('Now reading: ' + title, 'success');
-  renderReadingPage();
+  openBookQuestions(nb.id);   // read with purpose — ask what they're hunting for
 }
 
-async function finishBook(id) {
+// ── Finish-a-Book Ritual ─────────────────────────────────────────────────────
+// The Feynman moment: you don't understand a book until you can explain it
+// simply, and you haven't LEARNED it until it changes what you do. Both answers
+// feed the systems that already exist — the action becomes a Key Takeaway
+// (resurfacing + quiz), the explanation becomes the book's permanent memory.
+// Core logic is pure + testable; the modal is a thin skin over it.
+function applyFinishRitual(d, bookId, r) {
+  const book = ((d && d.books) || []).find(b => b && b.id === bookId);
+  if (!book) return null;
+  r = r || {};
+  book.status = 'finished';
+  book.finishedDate = r.date || book.finishedDate || '';
+  if ((r.teach || '').trim()) book.teachBack = r.teach.trim();
+  if (r.verdict) book.verdict = r.verdict;                    // 'yes' | 'meh' | 'no'
+  if (Array.isArray(r.answered)) (book.questions || []).forEach((q, i) => { if (q) q.answered = !!r.answered[i]; });
+  let takeaway = null;
+  if ((r.action || '').trim()) {
+    takeaway = { id: r.tid || 'tk' + Math.random().toString(36).slice(2, 8), text: r.action.trim(), book: book.title, bookId: book.id, createdAt: r.date || '', seenAt: '' };
+    (d.takeaways = d.takeaways || []).push(takeaway);
+  }
+  return { book, takeaway };
+}
+function finishBook(id) { openFinishRitual(id); }
+function openFinishRitual(id) {
   const book = (state.data.books || []).find(b => b.id === id);
   if (!book) return;
-  if (!confirm('Mark "' + book.title + '" as finished? \n\n+50 XP bonus!')) return;
-  book.status = 'finished';
-  book.finishedDate = todayStr();
+  document.getElementById('finish-ritual')?.remove();
+  const qs = (book.questions || []).filter(q => q && q.text);
+  const qHtml = qs.length
+    ? '<div class="fr-sec"><div class="fr-k">🧭 You started this book hunting for…</div>' +
+      qs.map((q, i) => '<label class="fr-q"><input type="checkbox" id="fr-q-' + i + '"' + (q.answered ? ' checked' : '') + '><span>' + escapeHtml(q.text) + '</span><em>answered?</em></label>').join('') + '</div>'
+    : '';
+  const html = '<div class="modal-overlay" id="finish-ritual"><div class="modal-box fr-box">' +
+    '<div class="modal-badge">🏁 Finishing “' + escapeHtml(book.title) + '”</div>' +
+    '<p class="fr-lead">Two minutes now makes this book yours forever.</p>' +
+    '<div class="fr-sec"><div class="fr-k">🎓 Teach it — the Feynman test</div>' +
+    '<textarea id="fr-teach" rows="3" maxlength="600" placeholder="Explain the book’s core idea in your own words, as if to a smart 12-year-old…"></textarea></div>' +
+    '<div class="fr-sec"><div class="fr-k">⚡ Act on it</div>' +
+    '<input type="text" id="fr-action" maxlength="240" placeholder="One thing you’ll do differently because of this book…">' +
+    '<div class="fr-hint">Saved as a Key Takeaway — it’ll resurface until it sticks.</div></div>' +
+    qHtml +
+    '<div class="fr-sec"><div class="fr-k">Would you tell a friend to read it?</div>' +
+    '<div class="fr-verdict">' +
+    '<button type="button" class="fr-v" data-v="yes" onclick="frPickVerdict(this)">👍<span>Absolutely</span></button>' +
+    '<button type="button" class="fr-v" data-v="meh" onclick="frPickVerdict(this)">🤷<span>Maybe</span></button>' +
+    '<button type="button" class="fr-v" data-v="no" onclick="frPickVerdict(this)">👎<span>Skip it</span></button></div></div>' +
+    '<button type="button" class="btn btn-primary fr-done" onclick="completeFinishRitual(\'' + book.id + '\')">Finish book — +50 XP 🎉</button>' +
+    '<button type="button" class="btn-link fr-skip" onclick="completeFinishRitual(\'' + book.id + '\')">Just mark it finished</button>' +
+    '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('finish-ritual').addEventListener('click', e => { if (e.target.id === 'finish-ritual') e.target.remove(); });
+  setTimeout(() => document.getElementById('fr-teach')?.focus(), 60);
+}
+function frPickVerdict(el) { document.querySelectorAll('.fr-v').forEach(b => b.classList.remove('on')); el.classList.add('on'); }
+async function completeFinishRitual(id) {
+  const book = (state.data.books || []).find(b => b.id === id);
+  const teach = document.getElementById('fr-teach')?.value || '';
+  const action = document.getElementById('fr-action')?.value || '';
+  const verdict = document.querySelector('.fr-v.on')?.dataset.v || '';
+  const answered = ((book && book.questions) || []).map((q, i) => !!document.getElementById('fr-q-' + i)?.checked);
+  applyFinishRitual(state.data, id, { teach, action, verdict, answered, date: todayStr(), tid: uid() });
   await saveData();
-  showToast('Finished: ' + book.title + '! +50 XP!', 'success');
+  document.getElementById('finish-ritual')?.remove();
+  showToast(action.trim() ? 'Finished — and the lesson is locked in. +50 XP 🎉' : 'Finished: ' + (book ? book.title : 'book') + '! +50 XP 🎉', 'success');
   showStreakCelebration(0); // re-use celebration UI
   showAddBookModal(false);
+}
+// Pre-reading priming: readers who hunt find more. Asked once, right after a
+// book is set; the questions live on the book card and close the loop at finish.
+function openBookQuestions(bookId) {
+  document.getElementById('book-questions')?.remove();
+  const book = (state.data.books || []).find(b => b.id === bookId);
+  if (!book) { renderReadingPage(); return; }
+  const ph = ['e.g. How do I actually build a habit that lasts?', 'Question 2 (optional)', 'Question 3 (optional)'];
+  const html = '<div class="modal-overlay" id="book-questions"><div class="modal-box fr-box">' +
+    '<div class="modal-badge">🧭 Read with purpose</div>' +
+    '<p class="fr-lead">What do you want <b>' + escapeHtml(book.title) + '</b> to answer? Up to three questions — you’ll check them off as the book delivers.</p>' +
+    [0, 1, 2].map(i => '<input type="text" class="bq-input" id="bq-' + i + '" maxlength="160" placeholder="' + ph[i] + '">').join('') +
+    '<button type="button" class="btn btn-primary fr-done" onclick="saveBookQuestions(\'' + book.id + '\')">Start reading →</button>' +
+    '<button type="button" class="btn-link fr-skip" onclick="document.getElementById(\'book-questions\').remove(); renderReadingPage();">Skip</button>' +
+    '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  setTimeout(() => document.getElementById('bq-0')?.focus(), 60);
+}
+async function saveBookQuestions(bookId) {
+  const book = (state.data.books || []).find(b => b.id === bookId);
+  if (book) {
+    const qs = [0, 1, 2].map(i => (document.getElementById('bq-' + i)?.value || '').trim()).filter(Boolean)
+      .map(text => ({ id: uid(), text, answered: false }));
+    if (qs.length) book.questions = qs;
+    await saveData();
+    showToast(qs.length ? 'Questions set — go hunt the answers. 🧭' : 'Now reading: ' + book.title, 'success');
+  }
+  document.getElementById('book-questions')?.remove();
+  renderReadingPage();
+}
+async function toggleBookQuestion(i) {
+  const b = (state.data.books || []).find(x => x.status === 'reading');
+  if (!b || !b.questions || !b.questions[i]) return;
+  b.questions[i].answered = !b.questions[i].answered;
+  await saveData();
+  showToast(b.questions[i].answered ? 'Answered ✓ — that’s why you’re reading.' : 'Back on the hunt.', 'success');
+  renderKnowledgePage();
+}
+// A finished book's permanent memory — your own explanation, verdict and the
+// questions you hunted. Rereading your own words years later is the payoff.
+function openBookMemory(id) {
+  const b = (state.data.books || []).find(x => x.id === id);
+  if (!b) return;
+  document.getElementById('book-memory')?.remove();
+  const v = { yes: '👍 Would recommend', meh: '🤷 Mixed feelings', no: '👎 Wouldn’t recommend' }[b.verdict] || '';
+  const qs = (b.questions || []).filter(q => q && q.text);
+  const html = '<div class="modal-overlay" id="book-memory"><div class="modal-box fr-box">' +
+    '<div class="modal-badge">📖 ' + escapeHtml(b.title) + '</div>' +
+    '<p class="fr-lead">' + (b.finishedDate ? 'Finished ' + fmtDate(b.finishedDate) : 'Finished') + (v ? ' · ' + v : '') + '</p>' +
+    (b.teachBack ? '<div class="fr-sec"><div class="fr-k">🎓 In your own words</div><div class="bm-teach">“' + escapeHtml(b.teachBack) + '”</div></div>' : '') +
+    (qs.length ? '<div class="fr-sec"><div class="fr-k">🧭 What you went hunting for</div>' + qs.map(q => '<div class="bm-q">' + (q.answered ? '✅' : '⬜') + ' ' + escapeHtml(q.text) + '</div>').join('') + '</div>' : '') +
+    (!b.teachBack && !qs.length ? '<p class="fr-lead" style="margin-top:4px">No notes captured for this one — the ritual runs when you finish your next book.</p>' : '') +
+    '<button type="button" class="btn btn-primary fr-done" onclick="document.getElementById(\'book-memory\').remove()">Close</button>' +
+    '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('book-memory').addEventListener('click', e => { if (e.target.id === 'book-memory') e.target.remove(); });
 }
 
 // ─────────────────────────────────────────────────────────────

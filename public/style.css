@@ -2549,6 +2549,35 @@ body.wo-fullscreen .bottom-nav { display: none !important; }   /* workout is an 
 .ns-sub { font-size: 13.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
 .ns-cta { margin-top: 12px; }
 
+/* Finish-a-Book Ritual + reading questions + book memory */
+.fr-box { text-align: left; width: 440px; max-width: min(480px, calc(100vw - 28px)); }
+.fr-lead { font-size: 13.5px; color: var(--text-muted); line-height: 1.55; margin: 4px 0 14px; }
+.fr-sec { margin-bottom: 14px; }
+.fr-k { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 7px; }
+.fr-box textarea, .fr-box input[type="text"], .bq-input { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--field-bg); color: var(--text); font-size: 14px; font-family: inherit; outline: none; resize: vertical; }
+.fr-box textarea:focus, .fr-box input[type="text"]:focus, .bq-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(59,130,246,0.14); }
+.bq-input { margin-bottom: 8px; }
+.fr-hint { font-size: 11.5px; color: var(--text-muted); margin-top: 6px; }
+.fr-q { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); margin-bottom: 6px; cursor: pointer; }
+.fr-q span { flex: 1; font-size: 13.5px; color: var(--text); line-height: 1.4; }
+.fr-q em { font-style: normal; font-size: 10.5px; color: var(--text-muted); flex: none; }
+.fr-verdict { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.fr-v { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 6px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--surface); font-size: 20px; cursor: pointer; font-family: inherit; transition: border-color .15s; }
+.fr-v span { font-size: 11px; font-weight: 700; color: var(--text-muted); }
+.fr-v.on { border-color: var(--primary); background: rgba(59,130,246,0.08); }
+.fr-v.on span { color: var(--primary); }
+.fr-done { width: 100%; margin-top: 4px; }
+.fr-skip { display: block; margin: 10px auto 0; }
+.rbc-qs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.rbc-qs-k { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); flex: none; }
+.rbc-q { max-width: 100%; text-align: left; font-size: 12px; font-weight: 600; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; cursor: pointer; font-family: inherit; line-height: 1.35; transition: border-color .15s; }
+.rbc-q:hover { border-color: var(--read-color); }
+.rbc-q.on { color: var(--success); border-color: rgba(16,185,129,0.4); background: rgba(16,185,129,0.08); text-decoration: line-through; }
+.bm-teach { font-size: 14px; color: var(--text); line-height: 1.65; font-style: italic; padding: 10px 14px; border-left: 3px solid var(--read-color); background: var(--surface); border-radius: 0 10px 10px 0; }
+.bm-q { font-size: 13.5px; color: var(--text); line-height: 1.5; margin-bottom: 5px; }
+.finished-book { font-family: inherit; text-align: left; cursor: pointer; }   /* now a button — card look comes from its main rule */
+.fb-memory { color: var(--read-color) !important; font-weight: 700; }
+
 /* Getting started — the one clear setup path for new users */
 .su-card { border-left: 4px solid var(--primary); }
 .su-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
