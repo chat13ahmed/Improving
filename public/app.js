@@ -9230,7 +9230,7 @@ function chaptersInBook(entries, bookChapters) {
   const map = {}, seen = [];
   (entries || []).forEach(d => {
     const ch = ((d.reading && d.reading.chapter) || '').trim();
-    const key = ch || ' ';
+    const key = ch || ' ';
     if (!map[key]) { map[key] = { chapter: ch, entries: [] }; seen.push(key); }
     map[key].entries.push(d);
   });
