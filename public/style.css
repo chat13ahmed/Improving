@@ -2965,40 +2965,89 @@ html { background: var(--bg); }
 body { background: transparent; }
 .main { background: transparent; }
 
+/* Typed registration makes the pointer vars resolve reliably inside calc()
+   transforms and lets the browser interpolate them smoothly. */
+@property --mx { syntax: '<number>'; inherits: true; initial-value: 0; }
+@property --my { syntax: '<number>'; inherits: true; initial-value: 0; }
+@property --sc { syntax: '<number>'; inherits: true; initial-value: 0; }
 #scene3d {
   position: fixed; inset: 0; z-index: -1;
   pointer-events: none; overflow: hidden;
-  perspective: 900px; perspective-origin: 50% 35%;
+  perspective: 1000px; perspective-origin: 50% 32%;
   --mx: 0; --my: 0; --sc: 0;          /* set by JS: pointer/tilt (-1..1) + scroll (0..1) */
+  --s3-glow: rgba(255, 208, 130, .5); /* the sun (day) — swapped to moonlight in dark */
 }
 .s3-sky {
   position: absolute; inset: 0;
-  background: radial-gradient(130% 90% at 50% -5%, #e3f0ff 0%, #ecf3fc 42%, var(--bg) 100%);
+  background:
+    radial-gradient(90% 60% at 66% 2%, rgba(255,243,219,.5) 0%, transparent 46%),  /* warm dawn wash */
+    radial-gradient(140% 100% at 50% -8%, #d9e9ff 0%, #e8f1fd 44%, var(--bg) 100%);
 }
+/* Sun / moon — a soft breathing light source that parallaxes with the scene */
+.s3-glow {
+  position: absolute; left: 62%; top: 3%;
+  width: 42vh; height: 42vh; max-width: 400px; max-height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, var(--s3-glow) 0%, transparent 66%);
+  transform: translate3d(calc(var(--mx) * -16px), calc(var(--my) * -10px - var(--sc) * 14px), 0);
+  transition: transform .5s ease-out;
+  animation: s3glow 11s ease-in-out infinite; will-change: opacity;
+}
+@keyframes s3glow { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
+/* Drifting mist bands */
+.s3-clouds {
+  position: absolute; inset: 0;
+  transform: translate3d(calc(var(--mx) * 10px), calc(var(--my) * 6px), 0);
+  transition: transform .45s ease-out;
+}
+.s3-cloud {
+  position: absolute; left: -25%; width: 150%; border-radius: 50%;
+  background: radial-gradient(60% 100% at 50% 50%, rgba(255,255,255,.5), transparent 72%);
+  filter: blur(10px); will-change: transform;
+}
+.s3-cloud-1 { top: 21%; height: 13vh; animation: s3drift  46s ease-in-out infinite; }
+.s3-cloud-2 { top: 35%; height: 10vh; opacity: .78; animation: s3drift  61s ease-in-out infinite reverse; }
+.s3-cloud-3 { top: 12%; height: 8vh;  opacity: .6;  animation: s3drift2 77s ease-in-out infinite; }
+@keyframes s3drift  { 0%, 100% { transform: translateX(-6%); } 50% { transform: translateX(6%); } }
+@keyframes s3drift2 { 0%, 100% { transform: translateX(5%);  } 50% { transform: translateX(-5%); } }
+
 .s3-stage {
   position: absolute; inset: 0;
   transform-style: preserve-3d; will-change: transform;
-  transform: rotateX(calc(var(--my) * -1.6deg)) rotateY(calc(var(--mx) * 2.1deg));
+  transform: rotateX(calc(var(--my) * -1.4deg)) rotateY(calc(var(--mx) * 1.9deg));
   transition: transform .35s ease-out;
 }
 .s3-mtn {
   position: absolute; left: -2%; width: 104%; bottom: 0; display: block;
   transition: transform .35s ease-out; will-change: transform;
 }
-.s3-mtn polygon { fill: inherit; }
-/* Light enough that dark text stays readable where they pass behind it,
-   but with real colour + differential parallax so the depth reads clearly. */
-.s3-far  { height: 52vh; fill: #cfe6f5; opacity: .6;
-  transform: translate3d(calc(var(--mx) *  8px), calc(var(--my) *  6px - var(--sc) *  9px), 0); }
-.s3-mid  { height: 44vh; fill: #aedccd; opacity: .66;
+/* Differential parallax + opacity give depth; the gradients (below) give haze. */
+.s3-far  { height: 54vh; opacity: .6;
+  transform: translate3d(calc(var(--mx) *  7px), calc(var(--my) *  5px - var(--sc) *  8px), 0); }
+.s3-mid  { height: 45vh; opacity: .8;
   transform: translate3d(calc(var(--mx) * 14px), calc(var(--my) *  9px - var(--sc) * 16px), 0); }
-.s3-near { height: 34vh; fill: #84ccaf; opacity: .74;
+.s3-near { height: 35vh; opacity: .92;
   transform: translate3d(calc(var(--mx) * 22px), calc(var(--my) * 13px - var(--sc) * 26px), 0); }
-/* Night palette for the backdrop so it reads as dusk mountains, not a bright day scene */
-:root[data-theme="dark"] .s3-sky { background: radial-gradient(130% 90% at 50% -5%, #17273f 0%, #0f1a2e 45%, var(--bg) 100%); }
-:root[data-theme="dark"] .s3-far  { fill: #1b3150; opacity: .5; }
-:root[data-theme="dark"] .s3-mid  { fill: #1a3a48; opacity: .55; }
-:root[data-theme="dark"] .s3-near { fill: #1d4a44; opacity: .62; }
+/* Range gradients — light: airy dawn; distance desaturates toward the sky.
+   Styled on the <stop> elements so a theme flip needs no rebuild. */
+.s3gf-a { stop-color: #d6e7fb; } .s3gf-b { stop-color: #c0daf4; }
+.s3gm-a { stop-color: #cdeee1; } .s3gm-b { stop-color: #a2d5bf; }
+.s3gn-a { stop-color: #8ed2b4; } .s3gn-b { stop-color: #4c9e7e; }
+.s3-snow { fill: #ffffff; opacity: .9; }
+/* Night: dusk mountains, moonlight, cooler fainter mist */
+:root[data-theme="dark"] #scene3d { --s3-glow: rgba(150, 182, 255, .3); }
+:root[data-theme="dark"] .s3-sky {
+  background:
+    radial-gradient(90% 60% at 66% 2%, rgba(120,150,220,.16) 0%, transparent 48%),
+    radial-gradient(140% 100% at 50% -8%, #16273f 0%, #101d31 46%, var(--bg) 100%);
+}
+:root[data-theme="dark"] .s3-cloud { background: radial-gradient(60% 100% at 50% 50%, rgba(150,180,220,.26), transparent 72%); }
+:root[data-theme="dark"] .s3-cloud-1 { opacity: .5; }
+:root[data-theme="dark"] .s3gf-a { stop-color: #223a56; } :root[data-theme="dark"] .s3gf-b { stop-color: #182b44; }
+:root[data-theme="dark"] .s3gm-a { stop-color: #1e4150; } :root[data-theme="dark"] .s3gm-b { stop-color: #15303e; }
+:root[data-theme="dark"] .s3gn-a { stop-color: #205049; } :root[data-theme="dark"] .s3gn-b { stop-color: #133a36; }
+:root[data-theme="dark"] .s3-snow { fill: #cdd8ee; opacity: .82; }
+
 .s3-particles {
   position: absolute; inset: 0; will-change: transform;
   transform: translate3d(calc(var(--mx) * 18px), calc(var(--my) * 13px), 0);
@@ -3006,22 +3055,28 @@ body { background: transparent; }
 }
 .p3 {
   position: absolute; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #9fe6cd, #41b794);
-  box-shadow: 0 0 9px 1px rgba(110, 210, 180, .35);
+  background: radial-gradient(circle at 35% 30%, #fff3d2, #f2c069);
+  box-shadow: 0 0 10px 1px rgba(245, 190, 110, .38);
   animation-name: p3float; animation-timing-function: ease-in-out;
   animation-iteration-count: infinite; will-change: transform, opacity;
 }
-/* Drift up while gently twinkling around the particle's own brightness (--o) */
-@keyframes p3float {
-  0%   { transform: translateY(7px);   opacity: calc(var(--o, .4) * .55); }
-  50%  { transform: translateY(-24px); opacity: var(--o, .4); }
-  100% { transform: translateY(7px);   opacity: calc(var(--o, .4) * .55); }
+:root[data-theme="dark"] .p3 {
+  background: radial-gradient(circle at 35% 30%, #eaf2ff, #92b6ea);
+  box-shadow: 0 0 10px 1px rgba(150, 190, 255, .45);
 }
-/* Reduced motion: keep the depth, drop all movement */
-.s3-still .s3-stage, .s3-still .s3-mtn, .s3-still .s3-particles { transform: none !important; }
+/* Rise + gentle diagonal sway (--sx) + scale twinkle around brightness (--o) */
+@keyframes p3float {
+  0%   { transform: translate3d(calc(var(--sx, 8px) * -0.5), 9px, 0)  scale(.9);  opacity: calc(var(--o, .4) * .45); }
+  50%  { transform: translate3d(calc(var(--sx, 8px) *  0.5), -26px, 0) scale(1.08); opacity: var(--o, .4); }
+  100% { transform: translate3d(calc(var(--sx, 8px) * -0.5), 9px, 0)  scale(.9);  opacity: calc(var(--o, .4) * .45); }
+}
+/* Reduced motion: keep the depth + atmosphere, drop all movement */
+.s3-still .s3-stage, .s3-still .s3-mtn, .s3-still .s3-particles,
+.s3-still .s3-glow, .s3-still .s3-clouds { transform: none !important; }
+.s3-still .s3-glow { animation: none !important; }
 @media (prefers-reduced-motion: reduce) {
-  .p3 { animation: none !important; }
-  .s3-stage, .s3-mtn, .s3-particles { transition: none !important; }
+  .p3, .s3-glow, .s3-cloud { animation: none !important; }
+  .s3-stage, .s3-mtn, .s3-particles, .s3-glow, .s3-clouds { transition: none !important; }
 }
 
 /* ─── "Eat now" meal hint (guided log + quick log) ─── */

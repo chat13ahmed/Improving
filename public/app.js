@@ -11026,27 +11026,44 @@ function buildScene3d() {
   if (document.getElementById('scene3d')) return;                  // built once — persists across pages
   const reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
-  const mtn = (cls, pts) => '<svg class="s3-mtn ' + cls + '" viewBox="0 0 1200 400" preserveAspectRatio="none" aria-hidden="true"><polygon points="' + pts + '"/></svg>';
-  // Three overlapping ranges — back is paler & flatter, front darker & taller
-  const far  = mtn('s3-far',  '0,400 0,250 150,180 320,240 480,150 650,225 820,140 1000,215 1200,165 1200,400');
-  const mid  = mtn('s3-mid',  '0,400 0,300 180,215 360,285 540,195 720,275 900,185 1080,265 1200,215 1200,400');
-  const near = mtn('s3-near', '0,400 0,340 220,265 430,335 620,255 820,325 1010,255 1200,305 1200,400');
+  // Each range is a vertical gradient (atmospheric perspective — themed via the
+  // stop classes in CSS) so distance reads as haze, not just scale. `extra` lets
+  // the near range carry snow caps.
+  const mtn = (cls, gid, pts, extra) =>
+    '<svg class="s3-mtn ' + cls + '" viewBox="0 0 1200 400" preserveAspectRatio="none" aria-hidden="true">' +
+    '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop class="' + gid + '-a" offset="0"/><stop class="' + gid + '-b" offset="1"/></linearGradient></defs>' +
+    '<polygon points="' + pts + '" fill="url(#' + gid + ')"/>' + (extra || '') + '</svg>';
+  // Three overlapping ranges — back is paler & flatter, front richer & taller
+  const far  = mtn('s3-far',  's3gf', '0,400 0,250 150,180 320,240 480,150 650,225 820,140 1000,215 1200,165 1200,400');
+  const mid  = mtn('s3-mid',  's3gm', '0,400 0,300 180,215 360,285 540,195 720,275 900,185 1080,265 1200,215 1200,400');
+  // Snow caps sit on the near range's three peaks (jagged bottom edge for realism)
+  const nearPts = '0,400 0,340 220,265 430,335 620,255 820,325 1010,255 1200,305 1200,400';
+  const snow = [[220, 265], [620, 255], [1010, 255]].map(([x, y]) =>
+    '<polygon class="s3-snow" points="' + x + ',' + y + ' ' + (x + 27) + ',' + (y + 33) + ' ' + (x + 10) + ',' + (y + 27) +
+    ' ' + x + ',' + (y + 37) + ' ' + (x - 10) + ',' + (y + 27) + ' ' + (x - 27) + ',' + (y + 33) + '"/>').join('');
+  const near = mtn('s3-near', 's3gn', nearPts, snow);
 
-  // Floating particles — size + blur + opacity fake depth-of-field (bokeh).
-  // --o is the particle's base brightness; the float keyframe twinkles around it.
+  // Slow-drifting mist bands — ambient life even when the pointer is still
+  const clouds = reduce ? '' :
+    '<div class="s3-cloud s3-cloud-1"></div><div class="s3-cloud s3-cloud-2"></div><div class="s3-cloud s3-cloud-3"></div>';
+
+  // Atmospheric particles — warm motes by day, cool sparks by night. Depth drives
+  // size, blur (near = soft bokeh) and brightness; --sx is a per-mote sway.
   let dots = '';
-  const N = reduce ? 0 : 32;
+  const N = reduce ? 0 : 38;
   for (let i = 0; i < N; i++) {
-    const depth = Math.random();                       // 0 = far/small/blurred, 1 = near
-    const size = (3.5 + depth * 11).toFixed(1);
-    const left = (Math.random() * 100).toFixed(2);
-    const top  = (Math.random() * 96).toFixed(2);
-    const dur  = (13 + Math.random() * 18).toFixed(1);
-    const delay = (-Math.random() * 35).toFixed(1);
-    const blur = ((1 - depth) * 2.6).toFixed(2);
-    const op   = (0.16 + depth * 0.40).toFixed(2);     // brighter, esp. the near bokeh
+    const depth = Math.random();                       // 0 = far/small/sharp, 1 = near/big/soft
+    const size  = (3 + depth * 13).toFixed(1);
+    const left  = (Math.random() * 100).toFixed(2);
+    const top   = (Math.random() * 94).toFixed(2);
+    const dur   = (14 + Math.random() * 20).toFixed(1);
+    const delay = (-Math.random() * 40).toFixed(1);
+    const blur  = (0.3 + (1 - depth) * 1.8 + (depth > 0.78 ? (depth - 0.78) * 12 : 0)).toFixed(2);
+    const op    = (0.14 + depth * 0.4).toFixed(2);
+    const sway  = (5 + Math.random() * 18).toFixed(1);
     dots += '<span class="p3" style="left:' + left + '%;top:' + top + '%;width:' + size + 'px;height:' + size +
-      'px;filter:blur(' + blur + 'px);--o:' + op + ';opacity:' + op +
+      'px;filter:blur(' + blur + 'px);--o:' + op + ';--sx:' + sway + 'px;opacity:' + op +
       ';animation-duration:' + dur + 's;animation-delay:' + delay + 's"></span>';
   }
 
@@ -11054,7 +11071,10 @@ function buildScene3d() {
   scene.id = 'scene3d';
   scene.setAttribute('aria-hidden', 'true');
   if (reduce) scene.classList.add('s3-still');
-  scene.innerHTML = '<div class="s3-sky"></div>' +
+  scene.innerHTML =
+    '<div class="s3-sky"></div>' +
+    '<div class="s3-glow"></div>' +
+    '<div class="s3-clouds">' + clouds + '</div>' +
     '<div class="s3-stage">' + far + mid + near +
     '<div class="s3-particles">' + dots + '</div></div>';
   document.body.appendChild(scene);                    // z-index:-1 keeps it behind regardless of DOM order
