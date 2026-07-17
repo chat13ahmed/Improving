@@ -37,6 +37,7 @@ Installable PWA · works on phone and desktop · light + dark mode.
 ### Knowledge hub (Overview · Reading · Vocabulary)
 - **Reading** — a **255-book** curated library (auto cover art), reading streak, a **pace projection** ("finish by …"), per-book **chapters**, and notes grouped **Book → Chapter → note** with page + highlighted quote.
 - **Key Takeaways** — capture lessons; they **resurface** for review over time, plus a **takeaway quiz** (active recall: finish the lesson from memory, graded on the same Leitner schedule).
+- **Finish-a-Book Ritual** — start a book with up to 3 questions to hunt (checked off on the book card as it delivers); finishing opens a 2-minute debrief: teach it back in your own words (Feynman), one behaviour change (auto-becomes a Key Takeaway), question closure, and a 👍/🤷/👎 verdict. Finished books are tappable memories showing your own explanation.
 - **Vocabulary** — capture a word with its source sentence + page, then **spaced-repetition flashcard review** (Leitner) so words stick permanently.
 - **Year in Knowledge** — a shareable recap card: books finished, pages read, best streak, words learned/mastered, lessons saved.
 
