@@ -10182,10 +10182,40 @@ function downloadFile(filename, content, mime) {
   setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
 }
 
-function exportData() {
-  const payload = { app: 'business-escalate', version: 1, exportedAt: new Date().toISOString(), data: state.data };
-  downloadFile('business-escalate-backup-' + todayStr() + '.json', JSON.stringify(payload, null, 2), 'application/json');
-  showToast('Backup downloaded ', 'success');
+function daysAgo(dateStr) {
+  const a = Date.parse(String(dateStr) + 'T00:00:00Z'), b = Date.parse(todayStr() + 'T00:00:00Z');
+  return isNaN(a) ? 9999 : Math.max(0, Math.floor((b - a) / 86400000));
+}
+function exportData(opts) {
+  opts = opts || {};
+  const payload = { app: 'onward', schema: 2, version: 2, exportedAt: new Date().toISOString(), data: state.data };
+  downloadFile(opts.name || ('onward-backup-' + todayStr() + '.json'), JSON.stringify(payload, null, 2), 'application/json');
+  if (!opts.silent) {
+    state.data.profile = state.data.profile || {};
+    state.data.profile.lastBackupAt = todayStr();
+    saveData();
+    if (state.page === 'settings') renderSettingsPage();
+    showToast('Backup downloaded — keep it somewhere safe.', 'success');
+  }
+}
+// Pure: inspect a parsed backup file (wrapped {app,data} or a raw data object)
+// and report whether it's a real Onward backup + a summary of what's inside.
+// This is what makes an import transparent instead of "incorrect imported data".
+function backupSummary(obj) {
+  if (!obj || typeof obj !== 'object') return { ok: false, error: 'That file isn’t readable.' };
+  const wrapped = obj.data && typeof obj.data === 'object' && ('days' in obj.data || 'profile' in obj.data);
+  const data = wrapped ? obj.data : obj;
+  const app = wrapped ? String(obj.app || '') : '';
+  if (!data || typeof data !== 'object' || !('days' in data) || !('profile' in data)) {
+    return { ok: false, error: 'This file isn’t an Onward backup.' };
+  }
+  const n = (k) => Array.isArray(data[k]) ? data[k].length : 0;
+  return {
+    ok: true,
+    knownApp: !app || /onward|business-escalate/i.test(app),
+    exportedAt: (wrapped && obj.exportedAt) ? String(obj.exportedAt).slice(0, 10) : '',
+    counts: { days: n('days'), books: n('books'), vocab: n('vocab'), takeaways: n('takeaways'), contacts: n('contacts'), ideas: n('ideas'), weights: n('weights') }
+  };
 }
 
 function exportDaysCSV() {
@@ -10208,11 +10238,16 @@ async function importData(input) {
   if (!file) return;
   try {
     const parsed = JSON.parse(await file.text());
+    const sum = backupSummary(parsed);
+    if (!sum.ok) { showToast(sum.error, 'error'); input.value = ''; return; }
     const data = (parsed && parsed.data) ? parsed.data : parsed; // accept wrapped or raw
-    if (!data || typeof data !== 'object' || !('days' in data) || !('profile' in data)) {
-      showToast('That doesn\'t look like a Onward backup.', 'error'); input.value = ''; return;
-    }
-    if (!confirm('Import this backup? It will REPLACE all current data for this account.')) { input.value = ''; return; }
+    const c = sum.counts;
+    const parts = [[c.days, 'day'], [c.books, 'book'], [c.contacts, 'contact'], [c.ideas, 'idea'], [c.takeaways, 'takeaway'], [c.vocab, 'vocab word'], [c.weights, 'weigh-in']]
+      .filter(x => x[0] > 0).map(x => x[0] + ' ' + x[1] + (x[0] === 1 ? '' : 's'));
+    const inside = parts.length ? parts.join(', ') : 'no entries yet';
+    const dated = sum.exportedAt ? ('\nExported ' + sum.exportedAt + '.') : '';
+    const warn = sum.knownApp ? '' : '\n\n⚠ This file wasn’t exported by Onward — only import it if you trust where it came from.';
+    if (!confirm('This backup contains: ' + inside + '.' + dated + warn + '\n\nImporting REPLACES all current data for this account. Continue?')) { input.value = ''; return; }
     data.profile = data.profile || {};
     ['days', 'weeks', 'ideas', 'contacts', 'books', 'weights', 'checklist', 'reminders'].forEach(k => { if (!Array.isArray(data[k])) data[k] = []; });
     if (!data.checkDone || typeof data.checkDone !== 'object') data.checkDone = {};
@@ -10230,9 +10265,17 @@ async function importData(input) {
 
 function renderBackupCard() {
   const n = state.data.days.length;
+  const lastBackup = state.data.profile && state.data.profile.lastBackupAt;
+  const since = lastBackup ? daysAgo(lastBackup) : null;
+  const overdue = since === null || since >= 7;
+  const freshness = since === null ? 'You haven’t exported a backup yet — do it now so you never lose your progress.'
+    : since === 0 ? 'Last backup: today. '
+    : since === 1 ? 'Last backup: yesterday.'
+    : 'Last backup: ' + since + ' days ago.' + (overdue ? ' Time for a fresh one.' : '');
   return '<div class="card">' +
     '<h3 class="card-title">Backup & Data</h3>' +
     '<p class="card-sub">Your data is stored only on this computer. Export a backup regularly so you never lose it — you have <strong>' + n + '</strong> day' + (n === 1 ? '' : 's') + ' logged.</p>' +
+    '<p class="backup-note" style="margin-top:0;margin-bottom:16px;font-weight:600;color:' + (overdue ? 'var(--warning)' : 'var(--text-muted)') + '">' + freshness + '</p>' +
     '<div class="backup-btns">' +
     '<button class="btn btn-primary" onclick="exportData()">Export backup (JSON)</button>' +
     '<button class="btn btn-outline" onclick="exportDaysCSV()">Export log (CSV)</button>' +
