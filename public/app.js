@@ -4116,6 +4116,90 @@ function renderGymPlanHint() {
     (nut ? ' · eat ~' + nut.calories.toLocaleString() + ' cal / ' + nut.protein.g + 'g protein' : '') + '</div>';
 }
 
+// ── COACH'S WEEKLY PROGRAM — your split for the week, one tap to start ──
+// Maps your goal + how many days you train to a real weekly schedule built
+// from the existing WORKOUT_PROGRAMS (so "Start" reuses the proven seeding
+// path). Hits each pattern across the week the way a coach would. (pure)
+function weeklyTrainingSplit(goal, days) {
+  days = Math.max(1, Math.min(7, parseInt(days, 10) || 3));
+  const base = {
+    1: ['Full Body'],
+    2: ['Upper Body', 'Leg Day'],
+    3: ['Push Day', 'Pull Day', 'Leg Day'],
+    4: ['Chest & Triceps', 'Back & Biceps', 'Leg Day', 'Shoulders & Arms'],
+    5: ['Push Day', 'Pull Day', 'Leg Day', 'Upper Body', 'Athletic Conditioning'],
+    6: ['Push Day', 'Pull Day', 'Leg Day', 'Push Day', 'Pull Day', 'Leg Day'],
+    7: ['Push Day', 'Pull Day', 'Leg Day', 'Push Day', 'Pull Day', 'Leg Day', 'Core & Abs']
+  };
+  const seq = base[days].slice();
+  if (goal === 'lose' && days >= 3) seq[seq.length - 1] = 'HIIT Cardio (Fat Burn)'; // hold muscle, add a burn day
+  return seq;
+}
+function programFocus(key) {
+  return ({
+    'Full Body': 'Everything in one session',
+    'Upper Body': 'Chest · back · shoulders · arms',
+    'Leg Day': 'Quads · hamstrings · glutes · calves',
+    'Push Day': 'Chest · shoulders · triceps',
+    'Pull Day': 'Back · biceps',
+    'Chest & Triceps': 'Chest · triceps',
+    'Back & Biceps': 'Back · biceps',
+    'Shoulders & Arms': 'Delts · biceps · triceps',
+    'Glutes & Hamstrings': 'Posterior chain',
+    'Athletic Conditioning': 'Conditioning · engine',
+    'Core & Abs': 'Core · midsection',
+    'HIIT Cardio (Fat Burn)': 'Intervals · fat burn'
+  })[key] || '';
+}
+function renderTrainingProgramCard() {
+  if (!isPillarOn('gym')) return '';
+  const n = state.data.profile && state.data.profile.nutrition;
+  const goal = (n && (n.goal === 'lose' || n.goal === 'gain')) ? n.goal : 'maintain';
+  const days = (state.data.profile && state.data.profile.gymDaysPerWeek) || 4;
+  const split = weeklyTrainingSplit(goal, days);
+  const scheme = repSchemeForGoal(goal);
+  const goalWord = goal === 'lose' ? 'fat loss' : goal === 'gain' ? 'muscle gain' : 'staying strong';
+  const rows = split.map((key, i) => {
+    const exs = tailorProgram(WORKOUT_PROGRAMS[key] || [], goal);
+    const nameJs = JSON.stringify(key).replace(/"/g, '&quot;');
+    return '<div class="twk-day">' +
+      '<div class="twk-day-head"><span class="twk-day-n">Day ' + (i + 1) + '</span>' +
+      '<span class="twk-day-name">' + escapeHtml(key) + '</span>' +
+      '<span class="twk-day-focus">' + escapeHtml(programFocus(key)) + '</span></div>' +
+      '<div class="twk-day-exs">' + exs.slice(0, 6).map(escapeHtml).join(' · ') + '</div>' +
+      '<div class="twk-day-acts">' +
+      '<button type="button" class="btn btn-primary btn-sm" onclick="startProgramNow(' + nameJs + ')">Start this session ›</button>' +
+      '<button type="button" class="btn-link" onclick="planProgramForNext(' + nameJs + ')">Plan for next</button>' +
+      '</div></div>';
+  }).join('');
+  return '<div class="card twk-card">' +
+    '<div class="twk-head"><div><div class="twk-eyebrow">🏋️ Your coach’s program</div>' +
+    '<div class="twk-title">' + days + ' days/week · built for ' + goalWord + '</div></div>' +
+    '<div class="twk-rx"><span class="twk-rx-tag">' + escapeHtml(scheme.label) + '</span><span class="twk-rx-v">' + escapeHtml(scheme.sets + ' · ' + scheme.reps) + '</span></div></div>' +
+    (n && n.goal ? '' : '<div class="twk-note">Set your goal in <button type="button" class="btn-link-inline" onclick="navigate(\'settings\')">Nutrition</button> to tailor this to fat loss or muscle gain.</div>') +
+    '<div class="twk-days">' + rows + '</div>' +
+    '<div class="twk-foot">' + escapeHtml(scheme.tip) + '</div>' +
+    '</div>';
+}
+// Start a program's session right now — but never clobber a workout already in progress today.
+function startProgramNow(name) {
+  openWorkout('health');
+  const w = state._workout;
+  const hasWork = w && w.exercises.some(e => (e.sets || []).length);
+  if (!hasWork && typeof woLoadProgram === 'function') {
+    state._wPlanned = '';          // fresh pick from the program card — clear any stale planned-session label
+    woLoadProgram(name);
+  }
+}
+// Queue a session as the next planned workout (shows on the dashboard's "Next workout").
+function planProgramForNext(name) {
+  const p = state.data.profile = state.data.profile || {};
+  p.plannedWorkout = { program: name };
+  saveData();
+  showToast(name + ' is ready for your next session 💪', 'success');
+  if (state.page === 'health') renderHealthPage();
+}
+
 // ─────────────────────────────────────────────────────────────
 // WORKOUT TRACKER — exercise library, set/rep logging, rest timer
 // A day's workout lives on day.gym.exercises = [{ name, muscle, sets:[{reps,weight}] }].
@@ -7121,7 +7205,7 @@ function renderHealthTraining(gymDays, gymGoal, streak) {
     : '';
   return '<div class="biz-insight">' + gymDays + ' / ' + gymGoal + ' workouts this week' + (streak > 1 ? ' · ' + streak + '-day streak 🔥' : '') + '</div>' +
     '<button type="button" class="wo-add" onclick="openWorkout(\'health\')">🏋️ Track a workout</button>' +
-    renderGymPlanCard() + recent + gymChart;
+    renderGymPlanCard() + renderTrainingProgramCard() + recent + gymChart;
 }
 function renderHealthNutrition(nut, td, eatenCal, eatenP) {
   if (!nut) return '<div class="empty-state small"><p>Set up your calorie & protein targets to track nutrition.</p><div class="empty-actions"><button class="btn btn-primary" onclick="navigate(\'settings\')">Set up nutrition →</button></div></div>';
