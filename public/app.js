@@ -5372,6 +5372,7 @@ function renderDashboard() {
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">Share</button>' : '') +
     '</div></div>' +
     gBanners +
+    (hasDays ? renderGamePlanCard() : '') +
     gContext +
     sec('Your goals', gGoals) +
     renderPillarNav() +
@@ -7003,6 +7004,38 @@ function knowledgeBriefing() {
 }
 function knowledgeBriefingCard() { return _briefingCard({ eyebrow: '🎓 Your professor · learning science', items: knowledgeBriefing(), idxKey: '_knowBriefIdx', rerender: 'nextKnowBrief()' }); }
 function nextKnowBrief() { state._knowBriefIdx = (state._knowBriefIdx || 0) + 1; renderKnowledgePage(); }
+
+// ── GAME PLAN — the whole team in one voice ──────────────────────────
+// A chief-of-staff move: instead of four dashboards, one ranked plan —
+// each expert's single most important call this week, most urgent first.
+function weeklyGamePlan() {
+  const topOf = (arr) => (arr || []).slice().sort((a, b) => (b.sev || 0) - (a.sev || 0))[0];
+  const rows = [];
+  const add = (page, item) => { if (item) rows.push({ page, icon: item.icon, expert: item.expert, title: item.title, move: item.move, sev: item.sev || 0 }); };
+  if (isPillarOn('gym') || isPillarOn('food')) add('health', topOf(healthBriefing()));
+  add('business', topOf(businessBriefing()));
+  if (isPillarOn('reading')) add('knowledge', topOf(knowledgeBriefing()));
+  // Most urgent first; a green "on track" note sinks to the bottom.
+  return rows.sort((a, b) => (b.sev || 0) - (a.sev || 0));
+}
+function renderGamePlanCard() {
+  const rows = weeklyGamePlan();
+  if (!rows.length) return '';
+  const anyAction = rows.some(r => r.sev >= 2);
+  const sub = anyAction ? 'Your team’s top call in each area — most urgent first' : 'All areas on track — press your advantage';
+  const body = rows.map(r =>
+    '<button type="button" class="plan-row" onclick="navigate(\'' + r.page + '\')">' +
+    '<span class="plan-dot plan-sev-' + (r.sev || 0) + '"></span>' +
+    '<span class="plan-ico">' + r.icon + '</span>' +
+    '<span class="plan-main"><span class="plan-title">' + escapeHtml(r.title) + '</span>' +
+    '<span class="plan-move">' + escapeHtml(r.move) + '</span></span>' +
+    '<span class="plan-arrow" aria-hidden="true">→</span>' +
+    '</button>').join('');
+  return '<div class="card plan-card">' +
+    '<div class="plan-head"><span class="plan-eyebrow">🧭 This week’s game plan</span>' +
+    '<span class="plan-sub">' + sub + '</span></div>' +
+    '<div class="plan-rows">' + body + '</div></div>';
+}
 
 // ─────────────────────────────────────────────────────────────
 // HEALTH HUB — training + nutrition + body, in one smart place

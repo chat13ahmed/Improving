@@ -1091,6 +1091,28 @@ body {
 .brief-dot.on { background: var(--brief-accent); transform: scale(1.35); }
 .brief-next { border: none; background: none; color: var(--text-muted); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; padding: 4px 0; white-space: nowrap; }
 .brief-next:hover { color: var(--text); }
+
+/* ─── Weekly game plan — the whole expert team in one ranked card ─── */
+.plan-card { background: linear-gradient(155deg, color-mix(in srgb, var(--primary) 7%, transparent), transparent 55%); border-left: 4px solid var(--primary); }
+.plan-head { margin-bottom: 12px; }
+.plan-eyebrow { display: block; font-size: 16px; font-weight: 800; color: var(--text); letter-spacing: -0.2px; }
+.plan-sub { display: block; font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+.plan-rows { display: flex; flex-direction: column; gap: 8px; }
+.plan-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font-family: inherit; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; transition: border-color .15s, transform .1s; }
+.plan-row:hover { border-color: var(--primary); }
+.plan-row:active { transform: scale(.99); }
+.plan-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--text-muted); }
+.plan-sev-3 { background: var(--danger); box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 18%, transparent); }
+.plan-sev-2 { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.plan-sev-1 { background: var(--primary); }
+.plan-sev-0 { background: var(--success); }
+.plan-ico { flex: none; font-size: 20px; line-height: 1; }
+.plan-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.plan-title { font-size: 14.5px; font-weight: 700; color: var(--text); line-height: 1.3; }
+.plan-move { font-size: 12.5px; color: var(--text-muted); line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.plan-arrow { flex: none; color: var(--text-muted); font-size: 16px; font-weight: 700; }
+.plan-row:hover .plan-arrow { color: var(--primary); }
 /* ─── Animated stat rings — hub overview numbers that motivate ─── */
 .sr-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .sr-card {
