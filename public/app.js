@@ -9203,7 +9203,44 @@ function readingBody() {
       '</div></div>'
     : '';
 
-  return statsBar + bookCard + renderChaptersCard() + renderTakeawaysCard() + historyCard + finishedCard;
+  return statsBar + bookCard + renderReadingPlanCard() + renderChaptersCard() + renderTakeawaysCard() + historyCard + finishedCard;
+}
+// ── THE PROFESSOR'S READING PLAN — commit to a finish date, hit a daily target ──
+// Turns the passive "you'll finish someday" projection into an active plan:
+// pick a pace, see the finish date, and get today's page goal with progress.
+function setReadingPace(bookId, pace) {
+  const b = (state.data.books || []).find(x => x.id === bookId); if (!b) return;
+  b.planPace = pace; saveData();
+  if (state.page === 'knowledge') renderKnowledgePage();
+}
+function renderReadingPlanCard() {
+  const b = (state.data.books || []).find(x => x.status === 'reading');
+  if (!b || !(b.totalPages > 0)) return '';
+  const read = (state.data.days || []).filter(d => d.reading && d.reading.bookId === b.id).reduce((s, d) => s + (+d.reading.pages || 0), 0);
+  const left = Math.max(0, b.totalPages - read);
+  if (left <= 0) return '';   // basically done — the "I Finished It!" button takes over
+  const paces = [15, 25, 40];
+  const pace = paces.indexOf(+b.planPace) >= 0 ? +b.planPace : 25;
+  const daysLeft = Math.ceil(left / pace);
+  const finish = new Date(); finish.setDate(finish.getDate() + daysLeft);
+  const finishStr = finish.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const today = todayStr();
+  const readToday = (state.data.days || []).filter(d => d.date === today && d.reading && d.reading.bookId === b.id).reduce((s, d) => s + (+d.reading.pages || 0), 0);
+  const hit = readToday >= pace;
+  const pct = Math.min(100, Math.round(readToday / pace * 100));
+  const chip = (p, label) => '<button type="button" class="rp-chip' + (p === pace ? ' on' : '') + '" onclick="setReadingPace(\'' + b.id + '\',' + p + ')"><b>' + p + '</b><span>' + label + '</span></button>';
+  return '<div class="card rp-card">' +
+    '<div class="rp-eyebrow">🎓 Your reading plan</div>' +
+    '<div class="rp-title">Finish “' + escapeHtml(b.title) + '”</div>' +
+    '<div class="rp-sub">' + left.toLocaleString() + ' pages left · at ' + pace + '/day you finish <b>' + finishStr + '</b> (' + daysLeft + ' day' + (daysLeft === 1 ? '' : 's') + ')</div>' +
+    '<div class="rp-chips">' + chip(15, 'relaxed') + chip(25, 'steady') + chip(40, 'focused') + '</div>' +
+    '<div class="rp-today">' +
+    '<div class="rp-today-top"><span>Today’s goal</span><span class="rp-today-n' + (hit ? ' hit' : '') + '">' + readToday + ' / ' + pace + ' pg' + (hit ? ' ✓' : '') + '</span></div>' +
+    '<div class="rp-bar"><div class="rp-bar-fill" style="width:' + pct + '%"></div></div>' +
+    (hit
+      ? '<div class="rp-done">Today’s pages done — streak protected. 🔥</div>'
+      : '<button type="button" class="btn btn-primary btn-sm" style="margin-top:10px" onclick="navigate(\'log\')">Log today’s reading →</button>') +
+    '</div></div>';
 }
 // Per-book chapter list — define a book's chapters once, then pick them when logging.
 function renderChaptersCard() {
