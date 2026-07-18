@@ -1810,7 +1810,7 @@ body {
   .sidebar-brand { padding: 14px 16px; border-bottom: 1px solid var(--border); }
   /* Top scrolling nav + footer are replaced by the bottom tab bar on phones */
   .sidebar-nav, .sidebar-footer { display: none; }
-  .main { margin-left: 0; padding: 18px 14px 96px; max-width: 100%; min-width: 0; overflow-x: hidden; }
+  .main { margin-left: 0; padding: 18px 14px calc(96px + env(safe-area-inset-bottom)); max-width: 100%; min-width: 0; overflow-x: hidden; }
   .page-title { font-size: 25px; }
   /* Anything that could be wider than the phone scrolls inside its own card */
   .card { max-width: 100%; }
