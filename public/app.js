@@ -8070,7 +8070,7 @@ function renderHistoryRows(days) {
       '<td data-label="' + escapeHtml(pillar('money').label) + '">' + moneyCell + '</td>' +
       '<td class="action-cell">' +
       '<button class="btn-sm" onclick="editDay(\'' + d.id + '\')">Edit</button>' +
-      '<button class="btn-sm btn-sm-danger" onclick="deleteDay(\'' + d.id + '\')"></button>' +
+      '<button class="btn-sm btn-sm-danger" onclick="deleteDay(\'' + d.id + '\')" title="Delete this day" aria-label="Delete">🗑</button>' +
       '</td></tr>';
   }).join('');
   return '<table class="table"><thead><tr><th>Date</th><th>' + pillar('gym').icon + ' ' + escapeHtml(pillar('gym').label) + '</th><th>' + pillar('food').icon + ' ' + escapeHtml(pillar('food').label) + '</th><th>' + pillar('networking').icon + ' ' + escapeHtml(pillar('networking').label) + '</th><th>' + pillar('money').icon + ' ' + escapeHtml(pillar('money').label) + '</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>';
