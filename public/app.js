@@ -6685,6 +6685,325 @@ async function analyzeIdeas() {
 // ─────────────────────────────────────────────────────────────
 // CONTACTS  (mini-CRM for networking → commission)
 // ─────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════
+// EXPERT BRIEFINGS — a resident specialist for each hub. Not a quote
+// widget: pure rules engines that read YOUR real numbers and triage the
+// single most important thing a top professional would tell you today.
+// Works offline, no AI key needed. Every rule is grounded and testable.
+// ═════════════════════════════════════════════════════════════
+function _isoDaysAgo(n) { const d = new Date(todayStr() + 'T00:00:00'); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
+// Map a logged muscle group to a movement pattern for balance analysis
+function _muscleCat(g) {
+  g = String(g || '').toLowerCase();
+  if (/pull|back|row|lat|bicep/.test(g)) return 'pull';
+  if (/leg|squat|quad|glute|hamstring|calf|lunge/.test(g)) return 'legs';
+  if (/push|chest|shoulder|press|tricep|\barms?\b/.test(g)) return 'push';
+  return 'other';
+}
+// Shared briefing renderer — one triaged card, cycle through the rest.
+function _briefingCard(cfg) {
+  const items = (cfg.items || []).slice().sort((a, b) => (b.sev || 0) - (a.sev || 0));
+  if (!items.length) return '';
+  const n = items.length;
+  const i = (((state[cfg.idxKey] || 0) % n) + n) % n;
+  const L = items[i];
+  const sevClass = (L.sev >= 3) ? 'brief-urgent' : (L.sev >= 2) ? 'brief-warn' : 'brief-ok';
+  return '<div class="card brief-card ' + sevClass + '">' +
+    '<div class="brief-eyebrow">' + cfg.eyebrow + '</div>' +
+    '<div class="brief-expert"><span class="brief-ico">' + L.icon + '</span>' + escapeHtml(L.expert) + '</div>' +
+    '<div class="brief-title">' + L.title + '</div>' +
+    '<div class="brief-why">' + L.why + '</div>' +
+    '<div class="brief-move"><span class="brief-move-k">▶ Do this now</span><span class="brief-move-t">' + L.move + '</span></div>' +
+    (L.cta ? '<button type="button" class="btn btn-primary" style="margin-top:12px" onclick="' + L.cta + '">' + L.ctaLabel + '</button>' : '') +
+    (n > 1 ? '<div class="brief-foot"><div class="brief-dots">' + items.map((_, k) => '<span class="brief-dot' + (k === i ? ' on' : '') + '"></span>').join('') + '</div>' +
+      '<button type="button" class="brief-next" onclick="' + cfg.rerender + '">Next from your team →</button></div>' : '') +
+    '</div>';
+}
+
+// ── HEALTH: a doctor, a sports nutritionist and a strength coach ──────
+function healthBriefing() {
+  const days = state.data.days || [];
+  const prof = state.data.profile || {};
+  const nut = getNutrition();
+  const stats = getWeekStats();
+  const out = [];
+  const win7 = days.filter(d => d.date >= _isoDaysAgo(6));
+  const win28 = days.filter(d => d.date >= _isoDaysAgo(27));
+  const trainedLast7 = win7.filter(d => d.gym && d.gym.done).length;
+  const gymGoal = prof.gymDaysPerWeek || 5;
+
+  if (!nut && !days.length) {
+    out.push({ icon: '🩺', expert: 'Your health team', sev: 3, title: 'Let’s get a baseline',
+      why: 'A good clinician starts with numbers, not guesses. Set your body stats and log a day or two — then this panel becomes a real nutritionist, doctor and coach reading your actual trend.',
+      move: 'Set your calorie & protein targets (3 min) — it unlocks macros and everything below.', cta: "navigate('settings')", ctaLabel: 'Set up nutrition →' });
+    return out;
+  }
+
+  // COACH — recovery. Muscle is built during rest; 7/7 trained is a red flag.
+  if (trainedLast7 >= 7) {
+    out.push({ icon: '🩺', expert: 'Dr. — recovery', sev: 3, title: 'You haven’t rested in 7 days',
+      why: 'Muscle isn’t built in the gym — it’s built while you <b>recover</b> from it. Seven straight training days blunts adaptation and quietly raises injury and burnout risk. Elite programs schedule rest on purpose.',
+      move: 'Take a full rest day (or an easy walk). You’ll come back stronger, not weaker.' });
+  } else if (trainedLast7 === 6) {
+    out.push({ icon: '🏋️', expert: 'Coach — recovery', sev: 1, title: 'One rest day, well earned',
+      why: 'Six sessions this week is serious work. A single deliberate rest day is where the growth actually consolidates — it’s training, not slacking.',
+      move: 'Plan tomorrow as recovery: sleep, protein, water, light movement.' });
+  }
+
+  // NUTRITIONIST — protein sufficiency (1.6–2.2 g/kg is the evidence range).
+  if (nut && nut.protein && nut.protein.g) {
+    const pDays = win7.filter(d => d.eaten && +d.eaten.protein > 0);
+    const avgP = pDays.length ? Math.round(pDays.reduce((s, d) => s + (+d.eaten.protein || 0), 0) / pDays.length) : null;
+    if (avgP != null && avgP < Math.round(nut.protein.g * 0.8)) {
+      const gap = nut.protein.g - avgP;
+      out.push({ icon: '🥗', expert: 'Nutritionist — protein', sev: 2, title: 'You’re under on protein',
+        why: 'Over your last ' + pDays.length + ' logged day' + (pDays.length === 1 ? '' : 's') + ' you’ve averaged <b>' + avgP + 'g</b> against a <b>' + nut.protein.g + 'g</b> target. Muscle protein synthesis needs the full dose — under-eating protein means you train hard and adapt slowly.',
+        move: 'Add ~' + gap + 'g today: a scoop of whey (25g), 150g chicken (35g), or 200g Greek yogurt (20g). Anchor it to breakfast — most people miss protein early.' });
+    } else if (avgP != null && avgP >= nut.protein.g) {
+      out.push({ icon: '🥗', expert: 'Nutritionist', sev: 0, title: 'Protein: dialed in',
+        why: 'You’re averaging <b>' + avgP + 'g</b>, at or above your <b>' + nut.protein.g + 'g</b> target — the single biggest lever for recovery and body composition is handled.',
+        move: 'Keep spreading it across meals (~0.4g/kg each) rather than one big hit — absorption favors the even split.' });
+    }
+  }
+
+  // NUTRITIONIST/DOCTOR — rate of weight change (safety + composition).
+  const ws = (state.data.weights || []).slice().sort((a, b) => a.date < b.date ? -1 : 1);
+  if (ws.length >= 2) {
+    const A = ws[ws.length - 1];
+    const B = ws.filter(w => w.date >= _isoDaysAgo(21))[0] || ws[0];
+    const wks = Math.max(0.7, daysBetween(B.date, A.date) / 7);
+    if (daysBetween(B.date, A.date) >= 5 && A.kg > 0) {
+      const perWk = (A.kg - B.kg) / wks;         // kg/week (+ gain, − loss)
+      const pctWk = perWk / A.kg * 100;
+      const disp = Math.abs(Math.round(kgToDisplay(Math.abs(perWk)) * 10) / 10);
+      const unit = weightUnitPref() === 'lbs' ? 'lb' : 'kg';
+      if (pctWk <= -1.0) {
+        out.push({ icon: '🩺', expert: 'Dr. — weight', sev: 2, title: 'You’re losing weight fast',
+          why: 'You’re down about <b>' + disp + ' ' + unit + '/week</b> — over 1% of bodyweight. Past that pace the body starts burning muscle alongside fat, and strength and energy suffer.',
+          move: 'Ease the deficit: add ~150–250 kcal (mostly protein and carbs around training). Aim for ≤1%/week.' });
+      } else if (perWk >= 0.75) {
+        out.push({ icon: '🥗', expert: 'Nutritionist — weight', sev: 2, title: 'You’re gaining quickly',
+          why: 'You’re up about <b>' + disp + ' ' + unit + '/week</b>. Beyond ~0.25–0.5 kg/week, most of the extra is fat, not muscle — a lean bulk builds the same muscle with far less to cut later.',
+          move: 'Trim the surplus by ~200 kcal and keep protein high. Slower is leaner.' });
+      }
+    }
+  }
+
+  // COACH — training volume vs goal (only once the week is underway).
+  const dow = new Date(todayStr() + 'T00:00:00').getDay(); // 0 Sun … 6 Sat
+  if (dow >= 3 && stats.gymDays < gymGoal) {
+    const left = gymGoal - stats.gymDays;
+    out.push({ icon: '🏋️', expert: 'Coach — training', sev: 2, title: left + ' session' + (left === 1 ? '' : 's') + ' to hit your week',
+      why: 'You’re at <b>' + stats.gymDays + '/' + gymGoal + '</b> with the week more than half gone. Consistency — not any single perfect workout — is what actually drives progress. Frequency is the engine.',
+      move: 'Put your remaining ' + left + ' session' + (left === 1 ? '' : 's') + ' in the calendar now, as fixed appointments. A scheduled workout gets done.' });
+  }
+
+  // COACH — push/pull/legs balance over the last 4 weeks.
+  const cats = { push: 0, pull: 0, legs: 0 };
+  win28.forEach(d => { if (d.gym && d.gym.done && d.gym.muscleGroup) { const c = _muscleCat(d.gym.muscleGroup); if (cats[c] != null) cats[c]++; } });
+  const totalCat = cats.push + cats.pull + cats.legs;
+  if (totalCat >= 4) {
+    if (cats.push >= 3 && cats.pull * 2 < cats.push) {
+      out.push({ icon: '🏋️', expert: 'Coach — balance', sev: 2, title: 'Your pushing is outpacing your pulling',
+        why: 'Last 4 weeks: <b>' + cats.push + ' push</b> vs <b>' + cats.pull + ' pull</b>. A push-dominant routine rounds the shoulders forward and sets up impingement — balanced athletes pull at least as much as they push.',
+        move: 'Make your next session pulling: rows, pull-ups, face-pulls. Rebalance toward 1:1.' });
+    } else if (cats.pull >= 3 && cats.push * 2 < cats.pull) {
+      out.push({ icon: '🏋️', expert: 'Coach — balance', sev: 1, title: 'Add some pressing back in',
+        why: 'Last 4 weeks you’ve pulled <b>' + cats.pull + '×</b> but pressed only <b>' + cats.push + '×</b>. Balance across patterns keeps joints healthy and strength even.',
+        move: 'Program a push day next: overhead press, bench, or dips.' });
+    }
+    if (cats.legs === 0 && (cats.push + cats.pull) >= 4) {
+      out.push({ icon: '🏋️', expert: 'Coach — legs', sev: 2, title: 'You’re skipping legs',
+        why: 'Four weeks, <b>zero</b> logged leg sessions. Legs are your largest muscle group and the biggest driver of the hormonal response that grows your whole body — skipping them caps upper-body progress too.',
+        move: 'Book one leg day this week: squats or a leg press, plus hinges. Start lighter than you think.' });
+    }
+  }
+
+  // COACH — progressive overload: training but never logging the actual work.
+  const trainedRecently = win28.filter(d => d.gym && d.gym.done);
+  const withDetail = trainedRecently.filter(d => d.gym.exercises && d.gym.exercises.length);
+  if (trainedRecently.length >= 4 && withDetail.length === 0) {
+    out.push({ icon: '🏋️', expert: 'Coach — progression', sev: 1, title: 'Track the actual work',
+      why: 'You’re showing up (' + trainedRecently.length + ' sessions in 4 weeks) but not logging sets, reps or load. Progressive overload — doing a little more over time — is <i>the</i> mechanism of getting stronger, and you can’t progress what you don’t measure.',
+      move: 'Next session, log your top sets. Beat one number — a rep or a kilo — each week.' });
+  }
+
+  // COACH — hydration (only flag real gaps, not unit guesses).
+  const noWaterDays = win7.filter(d => (d.gym || d.food || d.reading) && !(d.water > 0)).length;
+  if (noWaterDays >= 3) {
+    out.push({ icon: '💧', expert: 'Coach — hydration', sev: 1, title: 'Water is falling through the cracks',
+      why: 'You logged activity but no water on <b>' + noWaterDays + '</b> of the last 7 days. Even 2% dehydration measurably drops strength, endurance and focus — it’s the cheapest performance gain there is.',
+      move: 'Keep a bottle in sight and log it. A glass with each meal covers most of the day.' });
+  }
+
+  // Positive close — everything's on track.
+  if (!out.length) {
+    out.push({ icon: '🏋️', expert: 'Your health team', sev: 0, title: 'Everything’s on track',
+      why: 'Training frequency, protein and recovery all look solid this week. This is exactly where progress is made — nothing dramatic, just the fundamentals done repeatedly.',
+      move: 'Push one number forward: add a rep, a kilo, or 5g of protein. Small overload, compounded.' });
+  }
+  return out;
+}
+function healthBriefingCard() { return _briefingCard({ eyebrow: '🩺 Your health team · doctor · nutritionist · coach', items: healthBriefing(), idxKey: '_healthBriefIdx', rerender: 'nextHealthBrief()' }); }
+function nextHealthBrief() { state._healthBriefIdx = (state._healthBriefIdx || 0) + 1; renderHealthPage(); }
+
+// ── BUSINESS: a CEO, an operations manager and a mentor ──────────────
+function businessBriefing() {
+  const ideas = state.data.ideas || [];
+  const contacts = state.data.contacts || [];
+  const prof = state.data.profile || {};
+  const stats = getWeekStats();
+  const today = todayStr();
+  const out = [];
+  const openC = c => !['closed', 'dropped'].includes(c.status);
+
+  if (!ideas.length && !contacts.length) {
+    out.push({ icon: '👔', expert: 'Your board', sev: 3, title: 'Fill the pipeline first',
+      why: 'A business with no leads and no ideas has nothing to manage. Every operator’s first job is the same: create pipeline. It’s the only thing that reliably cures a slow month.',
+      move: 'Add your first idea or contact. Even one — momentum starts with a single entry.', cta: "navigate('contacts')", ctaLabel: 'Add a contact →' });
+    return out;
+  }
+
+  // MANAGER — overdue follow-ups: commitments you made and haven't kept.
+  const overdue = contacts.filter(c => openC(c) && c.followUpDate && c.followUpDate < today);
+  if (overdue.length) {
+    const top = overdue.slice().sort((a, b) => (+b.dealValue || 0) - (+a.dealValue || 0))[0];
+    out.push({ icon: '🗂️', expert: 'Ops manager', sev: 3, title: overdue.length + ' follow-up' + (overdue.length === 1 ? '' : 's') + ' overdue',
+      why: 'You set these dates for a reason. Overdue follow-ups are the quiet killer of deals — the prospect reads silence as "not a priority," and momentum you already earned leaks away.' + (top ? ' Biggest at risk: <b>' + escapeHtml(top.name) + '</b>' + ((+top.dealValue) ? ' ($' + (+top.dealValue).toLocaleString() + ')' : '') + '.' : ''),
+      move: 'Clear them today — even a one-line "thinking of you, where did we land?" resets the clock.', cta: "navigate('contacts')", ctaLabel: 'Open contacts →' });
+  }
+
+  // MANAGER — leads going cold (no touch in 14+ days, no follow-up set).
+  const cold = contacts.filter(c => isGoingCold(c, today));
+  if (cold.length) {
+    const top = cold.slice().sort((a, b) => (+b.dealValue || 0) - (+a.dealValue || 0))[0];
+    out.push({ icon: '🗂️', expert: 'Ops manager', sev: 2, title: cold.length + ' lead' + (cold.length === 1 ? '' : 's') + ' going cold',
+      why: 'No contact in over two weeks and no next step scheduled. A lead’s odds of converting fall off a cliff with silence — the fortune is in the follow-up, and right now it’s slipping.' + (top ? ' Warm this one first: <b>' + escapeHtml(top.name) + '</b>.' : ''),
+      move: 'Reach out to one today and set a follow-up date on the rest so none can vanish again.', cta: "navigate('contacts')", ctaLabel: 'Open contacts →' });
+  }
+
+  // CEO — pipeline concentration risk.
+  const openDeals = contacts.filter(c => openC(c) && (+c.dealValue) > 0);
+  const pv = pipelineValue(contacts);
+  if (openDeals.length >= 2 && pv.open > 0) {
+    const biggest = openDeals.slice().sort((a, b) => (+b.dealValue) - (+a.dealValue))[0];
+    const share = Math.round((+biggest.dealValue) / pv.open * 100);
+    if (share >= 50) {
+      out.push({ icon: '👔', expert: 'CEO — strategy', sev: 2, title: share + '% of your pipeline is one deal',
+        why: '<b>' + escapeHtml(biggest.name) + '</b> is ' + share + '% of your open pipeline. Concentration like this means one "no" erases your whole quarter — great CEOs love a big deal but never depend on it.',
+        move: 'Add 2–3 new leads this week to dilute the risk. Protect the big one; don’t bet the company on it.', cta: "navigate('contacts')", ctaLabel: 'Add leads →' });
+    }
+  } else if (pv.open > 0 && openDeals.length < 3) {
+    out.push({ icon: '👔', expert: 'CEO — strategy', sev: 1, title: 'Your pipeline is thin',
+      why: 'Only ' + openDeals.length + ' open deal' + (openDeals.length === 1 ? '' : 's') + ' with value attached. A thin pipeline makes every negotiation desperate — you close better from abundance than from need.',
+      move: 'Prospecting is the cure. Add three contacts this week before working the ones you have.', cta: "navigate('contacts')", ctaLabel: 'Add contacts →' });
+  }
+
+  // MENTOR — the strongest idea has no defined next step.
+  const top = topIdea(ideas);
+  if (top && !top.nextStep) {
+    out.push({ icon: '🧭', expert: 'Mentor', sev: 2, title: 'Your best idea has no next move',
+      why: 'Your strongest bet, <b>' + escapeHtml(top.title) + '</b> (scores ' + ideaScore(top.scores) + '/100), has no next step set. Ideas don’t die from being wrong — they die from never being <i>acted on</i>. A goal without a next action is just a wish.',
+      move: 'Define the smallest next step you could do in 30 minutes, and put it on today.', cta: "openIdea('" + top.id + "')", ctaLabel: 'Open the idea →' });
+  } else if (top && ideaScore(top.scores) < 45 && ideas.filter(i => i.status !== 'dropped').length >= 2) {
+    out.push({ icon: '🧭', expert: 'Mentor', sev: 1, title: 'Even your best idea scores low',
+      why: 'Your top-rated idea comes in at <b>' + ideaScore(top.scores) + '/100</b>. That’s a signal, not a verdict — but pouring effort into a weak concept has a real cost: the great idea you’re not looking for.',
+      move: 'Either sharpen it (who exactly is it for, and why now?) or shelve it and generate three fresh ones.', cta: "navigate('ideas')", ctaLabel: 'Review ideas →' });
+  }
+
+  // MANAGER — networking cadence vs the weekly goal.
+  const netGoal = +prof.weeklyNetworkGoal || 0;
+  const dow = new Date(today + 'T00:00:00').getDay();
+  if (netGoal > 0 && dow >= 3 && stats.networkCount < netGoal) {
+    const left = netGoal - stats.networkCount;
+    out.push({ icon: '🗂️', expert: 'Ops manager', sev: 1, title: left + ' more connection' + (left === 1 ? '' : 's') + ' this week',
+      why: 'You’re at <b>' + stats.networkCount + '/' + netGoal + '</b> new contacts. Your network is the top of your funnel — the deals in six months come from the hands you shake this week.',
+      move: 'Reach out to ' + left + ' new person today: a comment, a DM, a coffee ask. Volume compounds.' });
+  }
+
+  if (!out.length) {
+    out.push({ icon: '👔', expert: 'Your board', sev: 0, title: 'The pipeline looks healthy',
+      why: 'Follow-ups are current, leads are warm, and your best idea has a next step. This is when good operators press the advantage instead of coasting.',
+      move: 'Ask the CEO’s question: what’s the ONE move this week that makes everything else easier or unnecessary? Do that first.' });
+  }
+  return out;
+}
+function businessBriefingCard() { return _briefingCard({ eyebrow: '👔 Your board · CEO · manager · mentor', items: businessBriefing(), idxKey: '_bizBriefIdx', rerender: 'nextBizBrief()' }); }
+function nextBizBrief() { state._bizBriefIdx = (state._bizBriefIdx || 0) + 1; renderBusinessPage(); }
+
+// ── KNOWLEDGE: a professor who runs on learning science ──────────────
+function knowledgeBriefing() {
+  const days = state.data.days || [];
+  const books = state.data.books || [];
+  const takeaways = state.data.takeaways || [];
+  const prof = state.data.profile || {};
+  const today = todayStr();
+  const out = [];
+  const active = books.find(b => b.status === 'reading');
+  const finished = books.filter(b => b.status === 'finished').length;
+
+  if (!active && !takeaways.length && !finished) {
+    out.push({ icon: '🎓', expert: 'Professor', sev: 3, title: 'Choose your current book',
+      why: 'Learning compounds like money, but only once it starts. A few pages a day, held for a year, is a shelf of finished books and a genuinely sharper mind.',
+      move: 'Pick the one book you’re reading now — it starts your streak and everything below.', cta: 'showAddBookModal(false)', ctaLabel: 'Set my book →' });
+    return out;
+  }
+
+  // PROFESSOR — retrieval practice: notes saved but never revisited.
+  const neverRevisited = takeaways.filter(t => !t.seenAt && t.createdAt && daysBetween(t.createdAt, today) >= 2);
+  if (neverRevisited.length >= 2) {
+    out.push({ icon: '🎓', expert: 'Professor — memory', sev: 2, title: neverRevisited.length + ' lessons you saved but never revisited',
+      why: 'Highlighting feels like learning; it isn’t. Memory is built by <b>retrieval</b> — pulling an idea back out — not by re-reading. The forgetting curve is steep: a lesson you never recall is one you’ll lose within weeks.',
+      move: 'Open one now and finish it from memory before you look. That single act of recall is what makes it yours.', cta: "setKnowledgeTab('vocabulary')", ctaLabel: 'Review lessons →' });
+  }
+
+  // PROFESSOR — reading pace → projected finish date.
+  if (active && active.totalPages > 0) {
+    const readForBook = days.filter(d => d.reading && d.reading.bookId === active.id);
+    const pagesRead = readForBook.reduce((s, d) => s + (+d.reading.pages || 0), 0);
+    const remaining = Math.max(0, active.totalPages - pagesRead);
+    const last14 = days.filter(d => d.date >= _isoDaysAgo(13) && d.reading && d.reading.bookId === active.id);
+    const paceDaily = last14.reduce((s, d) => s + (+d.reading.pages || 0), 0) / 14;
+    if (remaining > 0 && paceDaily >= 0.5) {
+      const daysLeft = Math.ceil(remaining / paceDaily);
+      const finish = new Date(today + 'T00:00:00'); finish.setDate(finish.getDate() + daysLeft);
+      const finishStr = finish.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const faster = Math.ceil(remaining / (paceDaily + 10));
+      out.push({ icon: '🎓', expert: 'Professor — pace', sev: 1, title: 'You’ll finish around ' + finishStr,
+        why: 'At your recent pace (~' + Math.round(paceDaily) + ' pages/day) you’ll finish <b>' + escapeHtml(active.title) + '</b> in about ' + daysLeft + ' days. Naming a finish date is how a book gets read instead of half-read forever.',
+        move: '+10 pages/day brings that in to ~' + faster + ' days. Read one extra chunk tonight.', cta: "setKnowledgeTab('reading')", ctaLabel: 'Log reading →' });
+    } else if (active && remaining > 0 && paceDaily < 0.5) {
+      out.push({ icon: '🎓', expert: 'Professor — momentum', sev: 2, title: 'Your current book has stalled',
+        why: 'No real progress on <b>' + escapeHtml(active.title) + '</b> in two weeks. A stalled book rarely restarts on its own — the hardest page to read is always the one after a long gap.',
+        move: 'Read just 5 pages today. Tiny and immediate beats ambitious and someday.', cta: "setKnowledgeTab('reading')", ctaLabel: 'Log reading →' });
+    }
+  }
+
+  // PROFESSOR — consistency: no pages at all this week.
+  const readThisWeek = days.filter(d => d.date >= getWeekStart(today) && d.reading && d.reading.pages > 0).length;
+  if (active && readThisWeek === 0) {
+    out.push({ icon: '🎓', expert: 'Professor — habit', sev: 1, title: 'No pages logged this week',
+      why: 'The reader who does ten pages daily finishes eighteen books a year; the one who waits for a free afternoon finishes none. Frequency beats intensity — the daily dose is the whole game.',
+      move: 'Read a few pages today, however few. Protect the chain more than the count.', cta: "setKnowledgeTab('reading')", ctaLabel: 'Log reading →' });
+  }
+
+  // PROFESSOR — finishing rate: lots started, nothing completed.
+  if (!finished && books.length >= 2) {
+    out.push({ icon: '🎓', expert: 'Professor — depth', sev: 1, title: 'Finish one before starting another',
+      why: 'You’ve started ' + books.length + ' books and finished none. The synthesis — where the ideas connect and stick — almost always lives in the last third that most readers skip.',
+      move: 'Pick the closest to done and drive it to the final page this week. Finishing is a skill you can practice.', cta: "setKnowledgeTab('reading')", ctaLabel: 'See my books →' });
+  }
+
+  if (!out.length) {
+    out.push({ icon: '🎓', expert: 'Professor', sev: 0, title: 'You’re reading like a scholar',
+      why: 'Steady pages, lessons captured and revisited — this is how knowledge actually converts into judgment. The last mile of learning is teaching.',
+      move: 'Explain one idea you learned this week to someone, out loud. If you can’t make it simple, you’ve found your next thing to study.' });
+  }
+  return out;
+}
+function knowledgeBriefingCard() { return _briefingCard({ eyebrow: '🎓 Your professor · learning science', items: knowledgeBriefing(), idxKey: '_knowBriefIdx', rerender: 'nextKnowBrief()' }); }
+function nextKnowBrief() { state._knowBriefIdx = (state._knowBriefIdx || 0) + 1; renderKnowledgePage(); }
+
 // ─────────────────────────────────────────────────────────────
 // HEALTH HUB — training + nutrition + body, in one smart place
 // ─────────────────────────────────────────────────────────────
@@ -6740,6 +7059,7 @@ function renderHealthOverview(nut, gymDays, gymGoal, streak, eatenCal, eatenP, w
     wDelta = diff === 0 ? 'holding steady' : (diff > 0 ? '▲ +' : '▼ ') + Math.abs(diff) + ' ' + wUnit + ' since last';
   }
   return '<div class="biz-insight">' + insight + '</div>' +
+    healthBriefingCard() +
     '<div class="dash-section">Today &amp; this week</div>' +
     '<div class="sr-grid">' +
     statRingCard({ label: 'Training this week', value: gymDays, suffix: '/' + gymGoal, pct: gymGoal ? gymDays / gymGoal * 100 : null,
@@ -6861,6 +7181,7 @@ function renderBusinessPage() {
     '<p class="page-sub">Your ideas, pipeline and money — in one place.</p></div>' +
     businessTabs('overview') +
     '<div class="biz-insight">' + insight + '</div>' +
+    businessBriefingCard() +
     '<div class="dash-section">This week</div>' + rings +
     '<div class="dash-section">Pipeline</div>' + grid +
     focusRow +
@@ -8804,6 +9125,7 @@ function renderKnowledgeOverview() {
   const lastStats = getLastWeekStats();
 
   return '<div class="biz-insight">' + insight + '</div>' +
+    knowledgeBriefingCard() +
     renderReviewCard() +
     '<div class="dash-section">This week</div>' +
     '<div class="sr-grid">' +

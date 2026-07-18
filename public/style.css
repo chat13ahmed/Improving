@@ -1069,6 +1069,28 @@ body {
 .mentor-chip b { font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
 .mentor-next { margin-top: 14px; border: none; background: none; color: var(--text-muted); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; padding: 4px 0; }
 .mentor-next:hover { color: var(--text); }
+
+/* ─── Expert briefings — resident specialist per hub ─── */
+.brief-card { position: relative; border-left: 4px solid var(--brief-accent, var(--primary)); overflow: hidden; }
+.brief-card::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; }
+.brief-urgent { --brief-accent: var(--danger); background: linear-gradient(150deg, color-mix(in srgb, var(--danger) 8%, transparent), transparent 62%); }
+.brief-warn   { --brief-accent: var(--accent); background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 62%); }
+.brief-ok     { --brief-accent: var(--success); background: linear-gradient(150deg, color-mix(in srgb, var(--success) 7%, transparent), transparent 62%); }
+.brief-eyebrow { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--brief-accent); }
+.brief-expert { display: inline-flex; align-items: center; gap: 7px; margin-top: 9px; font-size: 12.5px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.brief-ico { font-size: 17px; }
+.brief-title { font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; margin-top: 5px; line-height: 1.22; }
+.brief-why { font-size: 14px; color: var(--text); line-height: 1.65; margin-top: 11px; }
+.brief-why b { color: var(--brief-accent); }
+.brief-move { display: flex; flex-direction: column; gap: 3px; margin-top: 14px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.brief-move-k { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--brief-accent); }
+.brief-move-t { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.5; }
+.brief-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.brief-dots { display: flex; gap: 6px; }
+.brief-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); transition: background .2s, transform .2s; }
+.brief-dot.on { background: var(--brief-accent); transform: scale(1.35); }
+.brief-next { border: none; background: none; color: var(--text-muted); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; padding: 4px 0; white-space: nowrap; }
+.brief-next:hover { color: var(--text); }
 /* ─── Animated stat rings — hub overview numbers that motivate ─── */
 .sr-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .sr-card {
