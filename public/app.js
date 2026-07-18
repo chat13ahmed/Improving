@@ -617,6 +617,17 @@ function openWeekRecap() {
   grid.push('<div class="rv-item"><span>Balance</span><strong>' + balance + '%</strong></div>');
   grid.push('<div class="rv-item"><span>Days logged</span><strong>' + daysLogged + '/7</strong></div>');
   const votesLine = votes.length ? '<div class="wr-votes">You voted for ' + votes.map(v => v.icon + ' <b>' + escapeHtml(v.label) + '</b> ×' + v.votes).join(' · ') + '</div>' : '';
+  // Close the loop: the expert team's top call in each area for the week ahead.
+  const plan = (typeof weeklyGamePlan === 'function') ? weeklyGamePlan() : [];
+  const planHtml = plan.length
+    ? '<div class="wr-plan-h">Your team’s focus for next week</div>' +
+      '<div class="wr-plan">' + plan.map(r =>
+        '<button type="button" class="wr-plan-row" onclick="document.getElementById(\'weekly-modal\').remove(); navigate(\'' + r.page + '\')">' +
+        '<span class="wr-plan-dot plan-sev-' + (r.sev || 0) + '"></span>' +
+        '<span class="wr-plan-ico">' + r.icon + '</span>' +
+        '<span class="wr-plan-t">' + escapeHtml(r.title) + '</span>' +
+        '<span class="wr-plan-go" aria-hidden="true">→</span></button>').join('') + '</div>'
+    : '';
   const tips = [
     'You showed up this week — that\'s what separates you from most people.',
     'Every connection is a seed. Water it with a follow-up next week.',
@@ -634,6 +645,7 @@ function openWeekRecap() {
     '<div class="review-grid">' + grid.join('') + '</div>' +
     votesLine +
     '<div class="review-tip">' + tips[Math.floor(Math.random() * tips.length)] + '</div>' +
+    planHtml +
     '<div class="wr-actions">' +
     '<button class="btn btn-primary" onclick="document.getElementById(\'weekly-modal\').remove(); shareMyWeek();">📲 Share my week</button>' +
     '<button class="btn-link" onclick="document.getElementById(\'weekly-modal\').remove()">Close</button>' +
