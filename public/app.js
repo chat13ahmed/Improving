@@ -7667,6 +7667,56 @@ async function logTouch(id) {
   showToast('Logged — nice. Keep it warm.', 'success');
   renderContactsPage();
 }
+
+// ── DEAL PLAYBOOK — the CEO/manager's next move on every open deal ──
+// Stage-specific plays grounded in consultative selling (The Mom Test:
+// dig into real behavior; propose a concrete next step; ask for the close).
+// Pure ranking; the card wires the existing one-tap contact actions.
+function dealPlayPriority(c, today) {
+  let p = 0;
+  if (c.followUpDate && c.followUpDate < today) p += 100;   // overdue commitment
+  else if (c.followUpDate === today) p += 70;
+  if (isGoingCold(c, today)) p += 60;
+  p += ({ closing: 45, new: 25, warm: 30, contacted: 15 })[c.status] || 0;
+  p += Math.min(25, (Math.max(0, +c.dealValue || 0)) / 200);  // bigger deals nudge up
+  return p;
+}
+function dealPlay(c, today) {
+  const base = ({
+    new: 'First contact not made. Open with a question about their world, not a pitch — earn the right to sell.',
+    contacted: 'You’re in. Dig into their real problem and how they handle it today — concrete past behavior beats hypotheticals.',
+    warm: 'They’re interested. Propose ONE concrete next step — a call, a trial, a quote — with a date. Warm leads cool without one.',
+    closing: 'You’re at the finish. Remove the last friction: send the quote or contract, name the price, and ask for the decision.'
+  })[c.status] || 'Keep this relationship warm — reach out with something genuinely useful to them.';
+  const prefix = (c.followUpDate && c.followUpDate < today) ? 'Follow-up overdue. '
+    : isGoingCold(c, today) ? 'Going cold — reach out before they forget you. ' : '';
+  return prefix + base;
+}
+function renderDealPlaybookCard() {
+  const today = todayStr();
+  const open = (state.data.contacts || []).filter(c => !['closed', 'dropped'].includes(c.status));
+  if (!open.length) return '';
+  const plays = open.slice().sort((a, b) => dealPlayPriority(b, today) - dealPlayPriority(a, today)).slice(0, 5);
+  const label = { new: 'New', contacted: 'Contacted', warm: 'Warm', closing: 'Closing' };
+  const rows = plays.map(c => {
+    const urgent = (c.followUpDate && c.followUpDate < today) || isGoingCold(c, today);
+    const sev = urgent ? 3 : (c.status === 'closing' ? 2 : 1);
+    const deal = Math.max(0, +c.dealValue || 0);
+    return '<div class="play-row">' +
+      '<div class="play-top"><span class="play-dot plan-sev-' + sev + '"></span>' +
+      '<span class="play-name">' + escapeHtml(c.name) + '</span>' +
+      '<span class="play-stage">' + (label[c.status] || escapeHtml(c.status)) + (deal ? ' · $' + deal.toLocaleString() : '') + '</span></div>' +
+      '<div class="play-move">' + escapeHtml(dealPlay(c, today)) + '</div>' +
+      '<div class="play-acts">' +
+      '<button type="button" class="btn btn-primary btn-sm" onclick="logTouch(\'' + c.id + '\')">✓ Reached out</button>' +
+      '<button type="button" class="btn-link" onclick="showSetFollowUp(\'' + c.id + '\')">Set follow-up</button>' +
+      '</div></div>';
+  }).join('');
+  return '<div class="card play-card">' +
+    '<div class="play-head"><span class="play-eyebrow">🎯 Your plays</span>' +
+    '<span class="play-sub">The next move on your top ' + plays.length + ' open deal' + (plays.length === 1 ? '' : 's') + ' — most urgent first</span></div>' +
+    '<div class="play-rows">' + rows + '</div></div>';
+}
 function onContactSearch(val) {
   state._contactSearch = val;
   renderContactsPage();
@@ -7799,7 +7849,7 @@ function renderContactsPage() {
     '<div class="page-header"><h2 class="page-title">Contacts</h2>' +
     '<p class="page-sub">Your network is your pipeline. Nurture it — never let a warm lead go cold.</p></div>' +
     businessTabs('contacts') +
-    statsBar + searchBar + addForm +
+    statsBar + renderDealPlaybookCard() + searchBar + addForm +
     (all.length === 0
       ? '<div class="empty-state small"><p>No contacts yet. Add your first one above — start with someone you met this week.</p></div>'
       : (contacts.length === 0

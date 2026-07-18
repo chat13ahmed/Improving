@@ -1132,6 +1132,20 @@ body {
 .twk-day-exs { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; margin-top: 7px; }
 .twk-day-acts { display: flex; align-items: center; gap: 14px; margin-top: 11px; flex-wrap: wrap; }
 .twk-foot { font-size: 12.5px; color: var(--text-muted); line-height: 1.55; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+/* ─── Deal playbook — next move per open deal ─── */
+.play-card { border-left: 4px solid var(--money-color, var(--primary)); }
+.play-head { margin-bottom: 12px; }
+.play-eyebrow { display: block; font-size: 16px; font-weight: 800; color: var(--text); letter-spacing: -0.2px; }
+.play-sub { display: block; font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+.play-rows { display: flex; flex-direction: column; gap: 10px; }
+.play-row { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.play-top { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.play-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.play-name { font-size: 15px; font-weight: 800; color: var(--text); }
+.play-stage { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+.play-move { font-size: 13px; color: var(--text); line-height: 1.5; margin-top: 7px; }
+.play-acts { display: flex; align-items: center; gap: 14px; margin-top: 11px; flex-wrap: wrap; }
 /* ─── Animated stat rings — hub overview numbers that motivate ─── */
 .sr-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
 .sr-card {
