@@ -3553,3 +3553,27 @@ body { background: transparent; }
   .rbc-actions .btn-sm { min-height: 40px; display: inline-flex; align-items: center; }
   .rp-chip { min-height: 50px; }
 }
+
+/* ═══ Immersive workout logger (phone) ═══
+   The workout is a full-screen sub-page: the bottom nav is already hidden;
+   hide the app's top header too so nothing overlaps the exercise cards, and
+   give the session its own fixed, frosted top bar. Fixes the clipped title
+   (app header sat over the sticky bar) reported on device. */
+@media (max-width: 820px) {
+  body.wo-fullscreen .sidebar { display: none !important; }
+  body.wo-fullscreen .main { padding-top: 0 !important; }
+  body.wo-fullscreen .wo-top {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 40;
+    padding: calc(9px + env(safe-area-inset-top)) 14px 9px;
+    margin: 0;
+    background: var(--chrome-bg);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    backdrop-filter: saturate(180%) blur(16px);
+    border-bottom: 1px solid var(--chrome-border);
+  }
+  body.wo-fullscreen .wo-wrap { padding-top: calc(66px + env(safe-area-inset-top)); }
+  /* Roomy, separated tap targets for the muscle-map + delete icons */
+  .wo-ex-acts { gap: 6px; }
+  .wo-ex-info, .wo-ex-del { min-width: 36px; min-height: 36px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center; }
+}
