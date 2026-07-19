@@ -4619,7 +4619,14 @@ function woAddSet(i) {
   const reps = parseInt(document.getElementById('wo-reps-' + i)?.value) || 0;
   const weight = parseFloat(document.getElementById('wo-weight-' + i)?.value) || 0;
   if (reps <= 0 && weight <= 0) { showToast('Enter reps (and weight, if any)', 'error'); return; }
-  ex.sets.push({ reps, weight });
+  const priorBest = exerciseBestWeightEver(ex.name);   // the bar to clear (before this set is saved)
+  const set = { reps, weight };
+  if (weight > 0 && priorBest > 0 && weight > priorBest) {   // a true heaviest-ever set (not the first time doing it)
+    set.pr = true;
+    const unit = weightUnitPref() === 'lbs' ? 'lb' : 'kg';
+    showToast('🏔️ New PR — ' + weight + ' ' + unit + ' on ' + ex.name + '!', 'success');
+  }
+  ex.sets.push(set);
   saveWorkout();
   woStartRest(state._restDefault || 90);   // auto-start the rest clock after each set (also re-renders)
 }
@@ -4678,6 +4685,20 @@ function lastExercisePerformance(name) {
     return { date: d.date, sets: ex.sets, best };
   }
   return null;
+}
+// Heaviest weight ever logged for an exercise across ALL saved days — the bar a
+// PR has to clear. (Called before the new set is saved, so it excludes it.) Pure.
+function exerciseBestWeightEver(name) {
+  const key = String(name || '').toLowerCase();
+  let best = 0;
+  (state.data.days || []).forEach(d => {
+    if (!d.gym || !Array.isArray(d.gym.exercises)) return;
+    d.gym.exercises.forEach(e => {
+      if (String(e.name || '').toLowerCase() !== key) return;
+      (e.sets || []).forEach(s => { const w = +s.weight || 0; if (w > best) best = w; });
+    });
+  });
+  return best;
 }
 
 // ── Exercise library overlay — body-part first ──
@@ -4871,8 +4892,9 @@ function renderWorkout() {
     const seedReps = last ? last.reps : (prev && prev.best && !prev.best.secs ? (prev.best.reps || '') : '');
     const seedWeight = (last && last.weight) ? last.weight : (prev && prev.best && prev.best.weight ? prev.best.weight : '');
     const setRows = ex.sets.map((s, j) =>
-      '<div class="wo-set"><span class="wo-set-n">' + (j + 1) + '</span>' +
+      '<div class="wo-set' + (s.pr ? ' wo-set-pr-row' : '') + '"><span class="wo-set-n">' + (j + 1) + '</span>' +
       '<span class="wo-set-v">' + (timed ? formatClock(s.secs || 0) : ((s.reps || 0) + ' reps' + (s.weight ? ' × ' + s.weight + ' ' + unit : ''))) + '</span>' +
+      (s.pr ? '<span class="wo-set-pr">🏔️ PR</span>' : '') +
       '<button type="button" class="wo-set-del" onclick="woRemoveSet(' + i + ',' + j + ')" title="Remove set">✕</button></div>').join('');
     const exA = JSON.stringify(ex.name).replace(/"/g, '&quot;'), exB = JSON.stringify(ex.muscle || '').replace(/"/g, '&quot;');
     const lastSecs = last && last.secs ? last.secs : 0;
