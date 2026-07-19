@@ -6492,6 +6492,41 @@ function validationStage(v) {
   if (has('customer') || has('valueHyp') || has('growthHyp')) return { key: 'started', label: 'Getting clear', pct: 15 };
   return { key: 'untested', label: 'Untested', pct: 0 };
 }
+// The single next validation move for an idea, from where it sits in the
+// Build-Measure-Learn loop — grounded in The Mom Test, pretotyping, Lean
+// Startup. The Ideas equivalent of the deal playbook. Pure/testable.
+function ideaNextMove(idea) {
+  const st = validationStage((idea || {}).validation || {});
+  const move = ({
+    untested: 'Talk to 5 people who actually have this problem. Ask what they do about it today — dig into real past behavior, never pitch (The Mom Test).',
+    started: 'Sharpen it: name the exact customer and the one promise you make them. A fuzzy hypothesis can’t be tested.',
+    hypothesis: 'Design the cheapest test of your riskiest assumption — a fake-door, a landing page, a manual concierge run. Pretotype before you build.',
+    experiment: 'Run the experiment — but first write down what result means GO vs NO. Decide the bar before you see the data, so you can’t fool yourself.',
+    measuring: 'You have results. Make the call now: persevere or pivot. A dead idea kept on life support costs you the next one.',
+    validated: 'Validated ✓ — pour fuel on the channel that worked. Your job now is to scale what’s proven, not to keep proving it.',
+    pivot: 'Pivot — keep the lesson, change the bet. Restate the new hypothesis and test its riskiest part next.'
+  })[st.key] || 'Talk to 5 potential customers about the problem before building anything.';
+  return { stage: st, move };
+}
+function renderIdeaPlaybookCard() {
+  const ideas = (state.data.ideas || []).filter(i => i && i.status !== 'dropped');
+  if (!ideas.length) return '';
+  const list = ideas.slice().sort((a, b) => ideaScore(b.scores) - ideaScore(a.scores)).slice(0, 3);
+  const rows = list.map(i => {
+    const nm = ideaNextMove(i);
+    const sev = nm.stage.pct >= 100 ? 0 : (nm.stage.pct >= 60 ? 1 : 2);
+    return '<div class="play-row"><div class="play-top">' +
+      '<span class="play-dot plan-sev-' + sev + '"></span>' +
+      '<span class="play-name">' + escapeHtml(i.title) + '</span>' +
+      '<span class="play-stage">' + nm.stage.label + (ideaRated(i.scores) ? ' · ' + ideaScore(i.scores) + '/100' : '') + '</span></div>' +
+      '<div class="play-move">' + escapeHtml(nm.move) + '</div>' +
+      '<div class="play-acts"><button type="button" class="btn btn-primary btn-sm" onclick="openIdea(\'' + i.id + '\')">Open idea ›</button></div></div>';
+  }).join('');
+  return '<div class="card play-card"><div class="play-head">' +
+    '<span class="play-eyebrow">🧪 Your next experiment</span>' +
+    '<span class="play-sub">The one validation move for your top idea' + (list.length === 1 ? '' : 's') + ' — from The Mom Test &amp; Lean Startup</span></div>' +
+    '<div class="play-rows">' + rows + '</div></div>';
+}
 function renderIdeasPage() {
   const { ideas } = state.data;
   const byScore = list => list.slice().sort((a, b) => ideaScore(b.scores) - ideaScore(a.scores));
@@ -6549,6 +6584,8 @@ function renderIdeasPage() {
         (top.nextStep ? '<div class="if-next">Next step: ' + escapeHtml(top.nextStep) + '</div>' : '<div class="if-next if-muted">Add its next step under “Evaluate” →</div>') +
         '</div>'
       : '') +
+
+    renderIdeaPlaybookCard() +
 
     '<div class="card">' +
     '<h3 class="card-title">Add New Idea</h3>' +
