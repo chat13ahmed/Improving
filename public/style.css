@@ -3417,8 +3417,12 @@ body { background: transparent; }
 .wo-add:hover { border-color: var(--gym-color); color: var(--gym-color); }
 
 /* Rest timer — fixed at the bottom so it's always visible */
-.wo-rest { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: min(600px, calc(100% - 24px));
+/* Centered via left:0/right:0 + auto margins — NOT translateX(-50%), because the
+   mobile page-in animation animates `transform` and would clobber the centering. */
+.wo-rest { position: fixed; left: 0; right: 0; margin-left: auto; margin-right: auto; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: min(600px, calc(100% - 24px));
   background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px; box-shadow: var(--shadow-lg); z-index: 20; }
+#main.page-anim > .wo-rest { animation: none; }              /* keep it still + centered, don't re-slide it */
+body.wo-fullscreen .fab-btn { display: none !important; }    /* hide the global + button during a workout */
 /* When the demo preview bar is pinned to the bottom, float the timer above it */
 body:has(#preview-banner) .wo-rest { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
 .wo-rest-live { border-color: var(--gym-color); background: linear-gradient(135deg, rgba(16,185,129,.08), var(--card)); }
