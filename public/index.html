@@ -113,7 +113,13 @@
   <script src="app.js?v=193"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+      // updateViaCache:'none' — always revalidate sw.js itself, so a new deploy's
+      // worker is picked up immediately instead of served from the HTTP cache.
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+          .then(function (reg) { try { reg.update(); } catch (e) {} })
+          .catch(function () {});
+      });
     }
   </script>
 </body>
