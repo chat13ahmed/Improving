@@ -4983,8 +4983,10 @@ function renderWorkout() {
     plannedBanner + totals + schemeHint +
     '<div class="wo-ex-list">' + exCards + '</div>' +
     '<button type="button" class="wo-add" onclick="woOpenLibrary()">＋ Add exercise</button>' +
-    restBlock +
-    '</div>' + lib + (state._mm ? renderMuscleOverlay(state._mm.name, state._mm.muscle) : '');
+    '</div>' +
+    // Rest timer lives OUTSIDE .wo-wrap: that wrap gets a transform from the page-in
+    // animation, which would otherwise trap this position:fixed bar inside it.
+    restBlock + lib + (state._mm ? renderMuscleOverlay(state._mm.name, state._mm.muscle) : '');
   if (state._mm) { /* muscle map open on top */ }
   else if (state._lib && state._lib.open) setTimeout(() => document.getElementById('wo-lib-search')?.focus(), 60);
 }
