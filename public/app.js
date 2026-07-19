@@ -4659,6 +4659,27 @@ function woAddRest(delta) {
 function woCancelRest() { woStopRest(); renderWorkout(); }
 function woStopRest() { const t = state._restTimer; if (t && t.id) { try { clearInterval(t.id); } catch {} } state._restTimer = null; }
 
+// Your most recent PRIOR session for an exercise + its best set — so you always
+// know the number to beat (progressive overload). Pure/testable.
+function lastExercisePerformance(name) {
+  const today = todayStr();
+  const key = String(name || '').toLowerCase();
+  const days = (state.data.days || []).filter(d => d.date < today && d.gym && Array.isArray(d.gym.exercises))
+    .sort((a, b) => a.date < b.date ? 1 : -1);
+  for (const d of days) {
+    const ex = d.gym.exercises.find(e => String(e.name || '').toLowerCase() === key && e.sets && e.sets.length);
+    if (!ex) continue;
+    let best = null;
+    ex.sets.forEach(s => {
+      if (s.secs) { if (!best || (s.secs > (best.secs || 0))) best = s; return; }
+      const w = +s.weight || 0, r = +s.reps || 0;
+      if (!best || w > (+best.weight || 0) || (w === (+best.weight || 0) && r > (+best.reps || 0))) best = s;
+    });
+    return { date: d.date, sets: ex.sets, best };
+  }
+  return null;
+}
+
 // ── Exercise library overlay — body-part first ──
 // Map a free-text muscle label (e.g. from the gym log) to a library group, if it
 // matches one exactly. Push / Pull / Full Body have no single group → '' (picker).
@@ -4845,6 +4866,10 @@ function renderWorkout() {
   const exCards = exs.length ? exs.map((ex, i) => {
     const timed = isTimedExercise(ex.name, ex.muscle);
     const last = ex.sets[ex.sets.length - 1];
+    const prev = lastExercisePerformance(ex.name);   // your last session for this move
+    // Prefill the add row from the current set, else from last session's best.
+    const seedReps = last ? last.reps : (prev && prev.best && !prev.best.secs ? (prev.best.reps || '') : '');
+    const seedWeight = (last && last.weight) ? last.weight : (prev && prev.best && prev.best.weight ? prev.best.weight : '');
     const setRows = ex.sets.map((s, j) =>
       '<div class="wo-set"><span class="wo-set-n">' + (j + 1) + '</span>' +
       '<span class="wo-set-v">' + (timed ? formatClock(s.secs || 0) : ((s.reps || 0) + ' reps' + (s.weight ? ' × ' + s.weight + ' ' + unit : ''))) + '</span>' +
@@ -4858,16 +4883,34 @@ function renderWorkout() {
         '<input id="wo-sec-' + i + '" class="wo-set-in" type="number" inputmode="numeric" placeholder="sec" value="' + (lastSecs ? (lastSecs % 60) : '') + '">' +
         '<button type="button" class="wo-set-btn" onclick="woAddSet(' + i + ')">＋ Set</button></div>'
       : '<div class="wo-set-add">' +
-        '<input id="wo-reps-' + i + '" class="wo-set-in" type="number" inputmode="numeric" placeholder="reps" value="' + (last ? last.reps : '') + '">' +
+        '<input id="wo-reps-' + i + '" class="wo-set-in" type="number" inputmode="numeric" placeholder="reps" value="' + seedReps + '">' +
         '<span class="wo-x">×</span>' +
-        '<input id="wo-weight-' + i + '" class="wo-set-in" type="number" inputmode="decimal" placeholder="' + unit + '" value="' + (last && last.weight ? last.weight : '') + '">' +
+        '<input id="wo-weight-' + i + '" class="wo-set-in" type="number" inputmode="decimal" placeholder="' + unit + '" value="' + seedWeight + '">' +
         '<button type="button" class="wo-set-btn" onclick="woAddSet(' + i + ')">＋ Set</button></div>';
+    // "Last time" reference — the number to beat. Shows whether you've topped it yet.
+    let lastLine = '';
+    if (prev && prev.best) {
+      const b = prev.best;
+      const bestTxt = b.secs
+        ? formatClock(b.secs)
+        : ((b.weight ? b.weight + ' ' + unit + ' × ' : '') + (b.reps || 0) + (b.weight ? '' : ' reps'));
+      let cue = '<span class="wo-last-goal">beat it</span>';
+      if (!b.secs) {
+        const beaten = ex.sets.some(s => (+s.weight || 0) > (+b.weight || 0) || ((+s.weight || 0) === (+b.weight || 0) && (+s.reps || 0) > (+b.reps || 0)));
+        if (beaten) cue = '<span class="wo-last-win">✓ beaten</span>';
+      } else {
+        if (ex.sets.some(s => (+s.secs || 0) > (+b.secs || 0))) cue = '<span class="wo-last-win">✓ beaten</span>';
+      }
+      lastLine = '<div class="wo-last"><span class="wo-last-k">Last · ' + fmtDate(prev.date) + '</span>' +
+        '<span class="wo-last-v">' + bestTxt + '</span>' + cue + '</div>';
+    }
     return '<div class="wo-ex">' +
       '<div class="wo-ex-head"><div><div class="wo-ex-name">' + escapeHtml(ex.name) + '</div>' +
       (ex.muscle ? '<div class="wo-ex-muscle">' + escapeHtml(ex.muscle) + (timed ? ' · timed' : '') + '</div>' : '') + '</div>' +
       '<div class="wo-ex-acts">' +
       '<button type="button" class="wo-ex-info" onclick="showMuscleMap(' + exA + ',' + exB + ')" title="Muscles worked">' + BODY_ICON + '</button>' +
       '<button type="button" class="wo-ex-del" onclick="woRemoveExercise(' + i + ')" title="Remove exercise">✕</button></div></div>' +
+      lastLine +
       (setRows ? '<div class="wo-sets">' + setRows + '</div>' : '<div class="wo-sets-empty">' + (timed ? 'No sets yet — log your time below.' : 'No sets yet — log your first below.') + '</div>') +
       addRow + '</div>';
   }).join('') : '<div class="wo-empty">🏋️<div class="wo-empty-t">No exercises yet</div><div class="wo-empty-s">Add one from the library and start logging your sets.</div></div>';

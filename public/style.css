@@ -3373,6 +3373,13 @@ body { background: transparent; }
 .wo-ex-del { background: none; border: none; color: var(--text-muted); font-size: 16px; cursor: pointer; padding: 2px 6px; border-radius: 6px; line-height: 1; }
 .wo-ex-del:hover { background: var(--surface); color: var(--danger, #EF4444); }
 
+/* "Last time" reference — the number to beat (progressive overload) */
+.wo-last { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: -2px 0 10px;
+  padding: 7px 11px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
+.wo-last-k { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: var(--text-muted); }
+.wo-last-v { font-size: 13px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.wo-last-goal { margin-left: auto; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: var(--gym-color); }
+.wo-last-win { margin-left: auto; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: var(--success); }
 .wo-sets { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 .wo-set { display: flex; align-items: center; gap: 10px; background: var(--surface); border-radius: 9px; padding: 9px 12px; }
 .wo-set-n { width: 22px; height: 22px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--gym-color); color: #fff; font-size: 12px; font-weight: 700; }
