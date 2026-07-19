@@ -3213,7 +3213,7 @@ body { background: transparent; }
 .bsc-legend { font-size: 11.5px; color: var(--text-muted); text-align: center; margin-top: 9px; }
 
 /* ─── Milestone share-prompt modal ─────────────────── */
-.milestone-box { max-width: 360px; text-align: center; padding: 30px 26px 24px; }
+.milestone-box { max-width: min(360px, 90vw); text-align: center; padding: 30px 26px 24px; }
 .ms-emoji { font-size: 64px; line-height: 1; margin-bottom: 8px; animation: msPop .5s cubic-bezier(.2,1.3,.5,1) both; }
 @keyframes msPop { from { transform: scale(0); } }
 .ms-title { font-size: 26px; font-weight: 900; color: var(--text); letter-spacing: -.5px; }
@@ -3252,7 +3252,7 @@ body { background: transparent; }
 .ss-insight { margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--border); font-size: 14px; color: var(--text-muted); line-height: 1.5; }
 .ss-insight b { color: var(--text); }
 
-.mission-box { max-width: 440px; }
+.mission-box { max-width: min(440px, 90vw); }
 .mission-ta { width: 100%; min-height: 120px; margin-top: 12px; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 10px;
   font-family: var(--font); font-size: 15px; line-height: 1.55; color: var(--text); background: var(--bg); resize: vertical; outline: none; box-sizing: border-box; }
 .mission-ta:focus { border-color: var(--accent, #7C3AED); }
@@ -3309,7 +3309,7 @@ body { background: transparent; }
 .gl-meal-opt.gl-on { border-color: var(--food-color, #F59E0B); background: var(--food-bg, rgba(245,158,11,.10)); color: #B45309; box-shadow: 0 0 0 3px rgba(245,158,11,.12); }
 
 /* ─── Week recap modal (works any day, no AI key) ─── */
-.wr-box { max-width: 420px; }
+.wr-box { max-width: min(420px, 90vw); }   /* keep the base viewport cap so it never clips on phones */
 .wr-votes { font-size: 13.5px; color: var(--text-muted); text-align: center; line-height: 1.6; margin: 14px 0 2px; }
 .wr-votes b { color: var(--text); font-weight: 700; }
 .wr-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 18px; }
@@ -3326,6 +3326,16 @@ body { background: transparent; }
   overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .wr-plan-go { flex: none; color: var(--text-muted); font-weight: 700; }
 .wr-plan-row:hover .wr-plan-go { color: var(--primary); }
+
+/* Workout session-complete summary */
+.wsum-box { max-width: min(400px, 90vw); }   /* keep the base viewport cap so it never clips on phones */
+.wsum-hero { text-align: center; margin: 8px 0 14px; }
+.wsum-hero-n { display: block; font-size: 46px; font-weight: 800; color: var(--gym-color); letter-spacing: -1px; line-height: 1; font-variant-numeric: tabular-nums; }
+.wsum-hero-l { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--text-muted); margin-top: 6px; }
+.wsum-pr { margin-top: 14px; padding: 11px 14px; border-radius: 12px; text-align: center; font-size: 13.5px; font-weight: 700;
+  color: var(--gym-color); background: rgba(16,185,129,.10); border: 1px solid rgba(16,185,129,.28); line-height: 1.5; }
+.wsum-refuel { margin-top: 12px; font-size: 13px; color: var(--text-muted); text-align: center; line-height: 1.6; }
+.wsum-refuel b { color: var(--text); }
 
 /* ─── Signup: optional password-recovery expander (keeps the form short) ─── */
 .auth-recovery { margin: 2px 0 14px; border: 1px solid var(--border); border-radius: 10px; padding: 0 14px; }

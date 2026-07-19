@@ -4576,16 +4576,39 @@ function saveWorkout() {
 function closeWorkout() {
   woStopRest();
   saveWorkout();
-  const tot = workoutTotals(state._workout ? state._workout.exercises : []);
+  const w = state._workout;
+  const tot = workoutTotals(w ? w.exercises : []);
+  const prCount = w ? w.exercises.reduce((n, e) => n + (e.sets || []).filter(s => s.pr).length, 0) : 0;
   state._workout = null; state._lib = null; state._mm = null; state._woChoose = false; state._woProgram = false;
   navigate(state._workoutReturn || 'log');
-  if (tot.sets > 0) {
-    const nut = getNutrition();
-    const td = (state.data.days || []).find(d => d.date === todayStr()) || {};
-    const gap = nut ? Math.max(0, nut.protein.g - Math.round((td.eaten && td.eaten.protein) || 0)) : 0;
-    const base = 'Workout saved — ' + tot.sets + ' sets · ' + tot.reps + ' reps 💪';
-    showToast(gap > 0 ? base + ' · now refuel: ~' + gap + 'g protein to go' : base, 'success');
-  }
+  if (tot.sets > 0) showWorkoutSummary(tot, prCount);
+}
+// The summit moment — a session recap when you finish (volume, PRs, refuel).
+function showWorkoutSummary(tot, prCount) {
+  if (typeof document === 'undefined') return;
+  document.getElementById('wo-summary')?.remove();
+  const unit = weightUnitPref() === 'lbs' ? 'lb' : 'kg';
+  const nut = getNutrition();
+  const td = (state.data.days || []).find(d => d.date === todayStr()) || {};
+  const gap = nut ? Math.max(0, nut.protein.g - Math.round((td.eaten && td.eaten.protein) || 0)) : 0;
+  const heroNum = tot.volume ? tot.volume.toLocaleString() : (tot.reps || 0);
+  const heroLbl = tot.volume ? unit + ' lifted' : (tot.secs ? 'this session' : 'reps');
+  const grid = [['Exercises', tot.exercises], ['Sets', tot.sets], ['Reps', tot.reps], [unit + ' lifted', tot.volume ? tot.volume.toLocaleString() : '—']]
+    .map(x => '<div class="rv-item"><span>' + x[0] + '</span><strong>' + x[1] + '</strong></div>').join('');
+  const prLine = prCount > 0 ? '<div class="wsum-pr">🏔️ ' + prCount + ' new PR' + (prCount === 1 ? '' : 's') + ' this session — you climbed higher than ever.</div>' : '';
+  const refuel = gap > 0 ? '<div class="wsum-refuel">Now refuel — about <b>' + gap + 'g of protein</b> left today to recover well.</div>' : '';
+  const el = document.createElement('div');
+  el.className = 'modal-overlay'; el.id = 'wo-summary';
+  el.innerHTML = '<div class="modal-box wsum-box">' +
+    '<div class="modal-badge">Session complete 🏔️</div>' +
+    '<div class="wsum-hero"><span class="wsum-hero-n">' + heroNum + '</span><span class="wsum-hero-l">' + heroLbl + '</span></div>' +
+    '<div class="review-grid">' + grid + '</div>' +
+    prLine + refuel +
+    '<div class="wr-actions"><button class="btn btn-primary" onclick="document.getElementById(\'wo-summary\').remove()">Done</button>' +
+    (gap > 0 ? '<button class="btn-link" onclick="document.getElementById(\'wo-summary\').remove(); navigate(\'log\')">Log my food</button>' : '') +
+    '</div></div>';
+  el.addEventListener('click', e => { if (e.target === el) el.remove(); });
+  document.body.appendChild(el);
 }
 
 // ── Exercises + sets ──
