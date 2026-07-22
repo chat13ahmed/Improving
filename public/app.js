@@ -9425,10 +9425,131 @@ function knowledgeTabs(active) {
     '<button type="button" class="biz-tab' + (active === id ? ' on' : '') +
     '" onclick="setKnowledgeTab(\'' + id + '\')">' + label + '</button>';
   return '<div class="biz-tabs">' +
-    tab('overview', 'Overview') + tab('reading', 'Reading') + tab('vocabulary', 'Vocabulary') +
+    tab('overview', 'Overview') + tab('reading', 'Reading') + tab('library', 'Library') + tab('vocabulary', 'Vocabulary') +
     '</div>';
 }
 function setKnowledgeTab(t) { state._knowledgeTab = t; renderKnowledgePage(); }
+
+// ═══════════════════════════════════════════════════════════════
+// SELF-KNOWLEDGE LIBRARY — a personal knowledge base. Save the people,
+// history, theories and ideas you want to keep, then get them resurfaced
+// so they actually stick. state.data.library = [{id,type,title,body,source,tags,createdAt,seenAt}]
+// ═══════════════════════════════════════════════════════════════
+const LIBRARY_TYPES = [
+  { key: 'person', label: 'Person', icon: '👤' },
+  { key: 'history', label: 'History', icon: '🏛️' },
+  { key: 'theory', label: 'Theory', icon: '🧠' },
+  { key: 'concept', label: 'Concept', icon: '💡' },
+  { key: 'quote', label: 'Quote', icon: '❝' },
+  { key: 'fact', label: 'Fact', icon: '📌' }
+];
+function libType(key) { return LIBRARY_TYPES.find(t => t.key === key) || LIBRARY_TYPES[3]; }
+function ensureLibrary() { if (!Array.isArray(state.data.library)) state.data.library = []; return state.data.library; }
+function libFilter(lib) {
+  const q = (state._libQ || '').trim().toLowerCase(), typeF = state._libType || '';
+  let items = lib.slice();
+  if (typeF) items = items.filter(e => e.type === typeF);
+  if (q) items = items.filter(e => [e.title, e.body, e.source, (e.tags || []).join(' ')].some(f => String(f || '').toLowerCase().includes(q)));
+  return items;
+}
+function toggleLibAdd() { state._libAdding = !state._libAdding; renderKnowledgePage(); }
+function setLibType(t) { state._libType = (state._libType === t ? '' : t); renderKnowledgePage(); }
+function setLibQuery(v) {
+  state._libQ = v;
+  const el = document.getElementById('lib-list');
+  if (el) el.innerHTML = renderLibraryList(libFilter(ensureLibrary()));
+}
+async function addLibraryEntry() {
+  ensureLibrary();
+  const title = (document.getElementById('lib-title')?.value || '').trim();
+  if (!title) { showToast('Give it a title first.', 'error'); return; }
+  const type = document.getElementById('lib-type')?.value || 'concept';
+  const body = (document.getElementById('lib-body')?.value || '').trim();
+  const source = (document.getElementById('lib-source')?.value || '').trim();
+  const tags = (document.getElementById('lib-tags')?.value || '').split(',').map(t => t.trim()).filter(Boolean).slice(0, 8);
+  state.data.library.unshift({ id: uid(), type, title: title.slice(0, 120), body: body.slice(0, 4000), source: source.slice(0, 200), tags, createdAt: todayStr() });
+  state._libAdding = false;
+  await saveData();
+  showToast('Saved to your library. 📚', 'success');
+  renderKnowledgePage();
+}
+async function deleteLibraryEntry(id) {
+  state.data.library = ensureLibrary().filter(e => e.id !== id);
+  await saveData(); renderKnowledgePage();
+}
+async function markLibSeen(id) {
+  const e = ensureLibrary().find(x => x.id === id);
+  if (e) { e.seenAt = todayStr(); await saveData(); }
+  state._libReviewIdx = (state._libReviewIdx || 0) + 1;
+  renderKnowledgePage();
+}
+function nextLibReview() { state._libReviewIdx = (state._libReviewIdx || 0) + 1; renderKnowledgePage(); }
+// Least-recently-revisited first, so nothing you saved quietly fades.
+function renderLibResurface(lib) {
+  const sorted = lib.slice().sort((a, b) => {
+    const sa = a.seenAt || '', sb = b.seenAt || '';
+    if (sa === sb) return (a.createdAt || '') < (b.createdAt || '') ? -1 : 1;
+    if (!sa) return -1; if (!sb) return 1; return sa < sb ? -1 : 1;
+  });
+  const idx = ((state._libReviewIdx || 0) % sorted.length + sorted.length) % sorted.length;
+  const e = sorted[idx], t = libType(e.type);
+  return '<div class="card lib-review">' +
+    '<div class="lib-review-label">🧠 Worth revisiting</div>' +
+    '<div class="lib-review-badge lib-' + e.type + '">' + t.icon + ' ' + t.label + '</div>' +
+    '<div class="lib-review-title">' + escapeHtml(e.title) + '</div>' +
+    (e.body ? '<div class="lib-review-body">' + escapeHtml(e.body.slice(0, 260)) + (e.body.length > 260 ? '…' : '') + '</div>' : '') +
+    '<div class="lib-review-acts"><button type="button" class="btn-sm" onclick="markLibSeen(\'' + e.id + '\')">Got it ✓</button>' +
+    (lib.length > 1 ? '<button type="button" class="lib-review-next" onclick="nextLibReview()">Another →</button>' : '') + '</div></div>';
+}
+function renderLibraryList(items) {
+  if (!items.length) return '<div class="chk-empty">Nothing matches — try a different search or filter.</div>';
+  return items.map(e => {
+    const t = libType(e.type);
+    const tags = (e.tags || []).length ? '<div class="lib-tags">' + e.tags.map(x => '<span class="lib-tag">' + escapeHtml(x) + '</span>').join('') + '</div>' : '';
+    return '<div class="lib-item">' +
+      '<div class="lib-item-top"><span class="lib-badge lib-' + e.type + '">' + t.icon + ' ' + t.label + '</span>' +
+      '<span class="lib-item-acts"><span class="lib-date">' + fmtDateShort(e.createdAt) + '</span>' +
+      '<button type="button" class="fb-del" onclick="deleteLibraryEntry(\'' + e.id + '\')" title="Delete" aria-label="Delete">✕</button></span></div>' +
+      '<div class="lib-title">' + escapeHtml(e.title) + '</div>' +
+      (e.body ? '<div class="lib-body">' + escapeHtml(e.body) + '</div>' : '') +
+      (e.source ? '<div class="lib-source">— ' + escapeHtml(e.source) + '</div>' : '') +
+      tags + '</div>';
+  }).join('');
+}
+function renderLibraryBody() {
+  const lib = ensureLibrary();
+  const byType = {}; lib.forEach(e => { byType[e.type] = (byType[e.type] || 0) + 1; });
+  const typeOpts = LIBRARY_TYPES.map(t => '<option value="' + t.key + '">' + t.icon + ' ' + t.label + '</option>').join('');
+  const head = '<div class="lib-headbar"><div><div class="lib-eyebrow">📚 Your library</div>' +
+    '<div class="lib-count">' + lib.length + ' entr' + (lib.length === 1 ? 'y' : 'ies') + ' you chose to remember</div></div>' +
+    '<button type="button" class="btn btn-primary btn-sm" onclick="toggleLibAdd()">' + (state._libAdding ? 'Close' : '＋ Add') + '</button></div>';
+  const addForm = state._libAdding
+    ? '<div class="card lib-add">' +
+      '<div class="form-row"><div class="form-group"><label>Title</label>' +
+      '<input id="lib-title" placeholder="e.g. Marcus Aurelius · The fall of Rome · Compound interest" maxlength="120"></div>' +
+      '<div class="form-group"><label>Type</label><select id="lib-type">' + typeOpts + '</select></div></div>' +
+      '<div class="form-group"><label>What you learned</label>' +
+      '<textarea id="lib-body" rows="4" placeholder="The idea, the story, the person — and why it matters to you…" maxlength="4000"></textarea></div>' +
+      '<div class="form-row"><div class="form-group"><label>Source (optional)</label><input id="lib-source" placeholder="Book, video, conversation…" maxlength="200"></div>' +
+      '<div class="form-group"><label>Tags (optional, comma-separated)</label><input id="lib-tags" placeholder="stoicism, mindset"></div></div>' +
+      '<div class="lib-add-acts"><button type="button" class="btn btn-primary" onclick="addLibraryEntry()">Save to library</button>' +
+      '<button type="button" class="btn-link" onclick="toggleLibAdd()">Cancel</button></div></div>'
+    : '';
+  if (!lib.length) {
+    return head + addForm +
+      '<div class="empty-state small"><div class="empty-icon">📚</div><h3>Start your library</h3>' +
+      '<p>Save the people, history, theories and ideas you want to keep — a personal knowledge base that grows with you, and resurfaces so it sticks.</p>' +
+      (state._libAdding ? '' : '<div class="empty-actions"><button type="button" class="btn btn-primary" onclick="toggleLibAdd()">Add your first entry</button></div>') + '</div>';
+  }
+  const resurface = (!(state._libQ || '').trim() && !state._libType && lib.length >= 3) ? renderLibResurface(lib) : '';
+  const chips = '<div class="lib-filters">' +
+    '<button type="button" class="lib-chip' + (!state._libType ? ' on' : '') + '" onclick="setLibType(\'\')">All · ' + lib.length + '</button>' +
+    LIBRARY_TYPES.filter(t => byType[t.key]).map(t => '<button type="button" class="lib-chip' + (state._libType === t.key ? ' on' : '') + '" onclick="setLibType(\'' + t.key + '\')">' + t.icon + ' ' + t.label + ' · ' + byType[t.key] + '</button>').join('') +
+    '</div>';
+  const searchBar = '<input type="search" id="lib-search" class="lib-search" placeholder="Search your library…" value="' + escapeAttr(state._libQ || '') + '" oninput="setLibQuery(this.value)">';
+  return head + addForm + resurface + chips + searchBar +
+    '<div id="lib-list" class="lib-list">' + renderLibraryList(libFilter(lib)) + '</div>';
+}
 
 function renderKnowledgeOverview() {
   const stats    = getWeekStats();
@@ -9493,6 +9614,7 @@ function renderKnowledgePage() {
   let body;
   if (tab === 'reading') body = readingBody();
   else if (tab === 'vocabulary') body = renderVocabCard();
+  else if (tab === 'library') body = renderLibraryBody();
   else body = renderKnowledgeOverview();
   document.getElementById('main').innerHTML =
     '<div class="page-header">' +
