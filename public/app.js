@@ -9469,11 +9469,117 @@ async function addLibraryEntry() {
   const body = (document.getElementById('lib-body')?.value || '').trim();
   const source = (document.getElementById('lib-source')?.value || '').trim();
   const tags = (document.getElementById('lib-tags')?.value || '').split(',').map(t => t.trim()).filter(Boolean).slice(0, 8);
-  state.data.library.unshift({ id: uid(), type, title: title.slice(0, 120), body: body.slice(0, 4000), source: source.slice(0, 200), tags, createdAt: todayStr() });
-  state._libAdding = false;
+  const entry = { id: uid(), type, title: title.slice(0, 120), body: body.slice(0, 4000), source: source.slice(0, 200), tags, createdAt: todayStr() };
+  if ((state._libPhotos || []).length) entry.photos = state._libPhotos.slice(0, 3);
+  if (state._libAudio) entry.audio = state._libAudio;
+  state.data.library.unshift(entry);
+  state._libAdding = false; state._libPhotos = []; state._libAudio = null;
+  libStopRecording(true);
   await saveData();
   showToast('Saved to your library. 📚', 'success');
   renderKnowledgePage();
+}
+
+// ── Attachments: photos (compressed to a small data URL) + a voice note ──
+// Handlers update the preview strip directly — never a full re-render, which
+// would wipe whatever's already typed in the form.
+function libAttPreviews() {
+  const photos = (state._libPhotos || []).map((p, i) =>
+    '<span class="lib-att-thumb"><img src="' + p + '" alt="attached photo ' + (i + 1) + '">' +
+    '<button type="button" class="lib-att-x" onclick="removeLibPhoto(' + i + ')" aria-label="Remove photo">✕</button></span>').join('');
+  const audio = state._libAudio
+    ? '<span class="lib-att-audio"><audio controls src="' + state._libAudio + '"></audio>' +
+      '<button type="button" class="lib-att-x" onclick="removeLibAudio()" aria-label="Remove voice note">✕</button></span>'
+    : '';
+  return photos + audio;
+}
+function refreshLibAtt() {
+  const el = document.getElementById('lib-att-previews');
+  if (el) el.innerHTML = libAttPreviews();
+  const btn = document.getElementById('lib-rec-btn');
+  if (btn) btn.textContent = state._libRec ? '⏹ Stop (' + (state._libRecSecs || 0) + 's)' : '🎙 Record voice';
+}
+// Downscale + JPEG-compress a photo so it stays tiny inside the data blob.
+function compressImageFile(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, (maxDim || 900) / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale));
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', quality || 0.72));
+      } catch (e) { URL.revokeObjectURL(url); reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('bad image')); };
+    img.src = url;
+  });
+}
+async function addLibPhoto(input) {
+  const files = Array.from((input && input.files) || []).slice(0, 3);
+  if (!files.length) return;
+  state._libPhotos = state._libPhotos || [];
+  for (const f of files) {
+    if (state._libPhotos.length >= 3) { showToast('Up to 3 photos per note.', 'error'); break; }
+    try {
+      const dataUrl = await compressImageFile(f, 900, 0.72);
+      if (dataUrl.length > 500000) { showToast('That photo is too large even compressed — try another.', 'error'); continue; }
+      state._libPhotos.push(dataUrl);
+    } catch { showToast('Couldn’t read that image.', 'error'); }
+  }
+  if (input) input.value = '';
+  refreshLibAtt();
+}
+function removeLibPhoto(i) { (state._libPhotos || []).splice(i, 1); refreshLibAtt(); }
+function removeLibAudio() { state._libAudio = null; refreshLibAtt(); }
+// Voice note: MediaRecorder → compact data URL. Capped at 60s.
+async function toggleLibRecord() {
+  if (state._libRec) { libStopRecording(); return; }
+  if (!navigator.mediaDevices || !window.MediaRecorder) { showToast('Voice recording isn’t supported here.', 'error'); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const rec = new MediaRecorder(stream);
+    const chunks = [];
+    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
+      if (blob.size > 900000) { showToast('Voice note too long — keep it under a minute.', 'error'); state._libRec = null; refreshLibAtt(); return; }
+      const fr = new FileReader();
+      fr.onload = () => { state._libAudio = fr.result; state._libRec = null; refreshLibAtt(); };
+      fr.readAsDataURL(blob);
+    };
+    state._libRec = { rec, stream }; state._libRecSecs = 0;
+    state._libRecTimer = setInterval(() => {
+      state._libRecSecs = (state._libRecSecs || 0) + 1;
+      if (state._libRecSecs >= 60) libStopRecording();   // hard cap
+      else refreshLibAtt();
+    }, 1000);
+    rec.start();
+    refreshLibAtt();
+  } catch { showToast('Microphone blocked — allow it in your browser settings.', 'error'); }
+}
+// Tap a thumbnail → full-size photo in a lightbox.
+function showLibPhoto(entryId, i) {
+  const e = ensureLibrary().find(x => x.id === entryId);
+  const src = e && e.photos && e.photos[i];
+  if (!src) return;
+  document.getElementById('lib-lightbox')?.remove();
+  const el = document.createElement('div');
+  el.className = 'modal-overlay'; el.id = 'lib-lightbox';
+  el.innerHTML = '<div class="lib-lightbox-box"><img src="' + src + '" alt="' + escapeAttr(e.title) + '"></div>';
+  el.addEventListener('click', () => el.remove());
+  document.body.appendChild(el);
+}
+function libStopRecording(discard) {
+  if (state._libRecTimer) { clearInterval(state._libRecTimer); state._libRecTimer = null; }
+  const r = state._libRec;
+  if (r && r.rec && r.rec.state !== 'inactive') { if (discard) { try { r.rec.ondataavailable = null; r.rec.onstop = () => r.stream.getTracks().forEach(t => t.stop()); } catch (e) {} } try { r.rec.stop(); } catch (e) {} }
+  if (discard) state._libRec = null;
+  refreshLibAtt();
 }
 async function deleteLibraryEntry(id) {
   state.data.library = ensureLibrary().filter(e => e.id !== id);
@@ -9514,6 +9620,10 @@ function renderLibraryList(items) {
       '<button type="button" class="fb-del" onclick="deleteLibraryEntry(\'' + e.id + '\')" title="Delete" aria-label="Delete">✕</button></span></div>' +
       '<div class="lib-title">' + escapeHtml(e.title) + '</div>' +
       (e.body ? '<div class="lib-body">' + escapeHtml(e.body) + '</div>' : '') +
+      ((e.photos || []).length ? '<div class="lib-photos">' + e.photos.map(function (p, i) {
+        return '<img class="lib-photo" src="' + p + '" alt="photo ' + (i + 1) + ' on ' + escapeAttr(e.title) + '" onclick="showLibPhoto(\'' + e.id + '\',' + i + ')">';
+      }).join('') + '</div>' : '') +
+      (e.audio ? '<audio class="lib-audio" controls src="' + e.audio + '"></audio>' : '') +
       (e.source ? '<div class="lib-source">— ' + escapeHtml(e.source) + '</div>' : '') +
       tags + '</div>';
   }).join('');
@@ -9537,6 +9647,11 @@ function renderLibraryBody() {
       '<textarea id="lib-body" rows="4" placeholder="The idea, the story, the person — and why it matters to you…" maxlength="4000"></textarea></div>' +
       '<div class="form-row"><div class="form-group"><label>Source (optional)</label><input id="lib-source" placeholder="Book, video, conversation…" maxlength="200"></div>' +
       '<div class="form-group"><label>Tags (optional, comma-separated)</label><input id="lib-tags" placeholder="stoicism, mindset"></div></div>' +
+      '<div class="lib-att-row">' +
+      '<label class="btn btn-outline btn-sm lib-att-btn">📷 Add photo<input type="file" accept="image/*" multiple onchange="addLibPhoto(this)" hidden></label>' +
+      '<button type="button" id="lib-rec-btn" class="btn btn-outline btn-sm" onclick="toggleLibRecord()">' + (state._libRec ? '⏹ Stop' : '🎙 Record voice') + '</button>' +
+      '</div>' +
+      '<div id="lib-att-previews" class="lib-att-previews">' + libAttPreviews() + '</div>' +
       '<div class="lib-add-acts"><button type="button" class="btn btn-primary" onclick="addLibraryEntry()">Save to library</button>' +
       '<button type="button" class="btn-link" onclick="toggleLibAdd()">Cancel</button></div></div>'
     : '';

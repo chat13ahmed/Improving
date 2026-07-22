@@ -1841,6 +1841,23 @@ body {
 .lib-review-next { border: none; background: none; color: var(--text-muted); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; padding: 4px 0; }
 .lib-review-next:hover { color: var(--text); }
 
+/* ── Library attachments: photos + voice notes ── */
+.lib-att-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.lib-att-btn { cursor: pointer; }
+.lib-att-previews { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.lib-att-previews:empty { margin-bottom: 0; }
+.lib-att-thumb { position: relative; display: inline-block; }
+.lib-att-thumb img { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); display: block; }
+.lib-att-x { position: absolute; top: -7px; right: -7px; width: 22px; height: 22px; border-radius: 50%; border: none; background: var(--danger, #EF4444); color: #fff; font-size: 11px; line-height: 1; cursor: pointer; box-shadow: var(--shadow); }
+.lib-att-audio { display: inline-flex; align-items: center; gap: 6px; position: relative; padding-right: 4px; }
+.lib-att-audio audio { height: 36px; max-width: 220px; }
+.lib-photos { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.lib-photo { width: 84px; height: 84px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); cursor: zoom-in; transition: transform .12s; }
+.lib-photo:hover { transform: scale(1.03); }
+.lib-audio { display: block; width: 100%; max-width: 340px; height: 38px; margin-top: 10px; }
+.lib-lightbox-box { margin: auto; max-width: min(920px, 94vw); }
+.lib-lightbox-box img { width: 100%; height: auto; max-height: 86vh; object-fit: contain; border-radius: 14px; box-shadow: var(--shadow-lg); }
+
 /* ── Knowledge games: quiz + flashcards ── */
 .lib-head-acts { display: inline-flex; gap: 8px; flex: none; }
 .game-box { max-width: min(460px, 92vw); text-align: left; position: relative; }
