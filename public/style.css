@@ -1795,9 +1795,12 @@ body {
 .fb-sent { margin-top: 10px; font-size: 13px; font-weight: 600; color: var(--success); }
 .fb-list { display: flex; flex-direction: column; gap: 10px; }
 .fb-item { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
-.fb-item-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 5px; }
+.fb-item-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 5px; }
 .fb-who { font-size: 13px; font-weight: 800; color: var(--text); }
-.fb-date { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; flex: none; }
+.fb-item-right { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.fb-date { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.fb-del { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; line-height: 1; padding: 4px 7px; border-radius: 6px; transition: color .15s, background .15s; }
+.fb-del:hover { color: var(--danger, #EF4444); background: var(--danger-bg, rgba(239,68,68,.1)); }
 .fb-body { font-size: 14px; color: var(--text); line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
 
 .rem-list { display: flex; flex-direction: column; gap: 8px; }

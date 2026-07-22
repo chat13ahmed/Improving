@@ -11738,9 +11738,20 @@ function renderFeedbackInbox(list) {
   const rows = list.map(f =>
     '<div class="fb-item"><div class="fb-item-top">' +
     '<span class="fb-who">' + escapeHtml(f.username || 'someone') + '</span>' +
-    (f.date ? '<span class="fb-date">' + fmtDateShort(f.date) + '</span>' : '') + '</div>' +
+    '<span class="fb-item-right">' +
+    (f.date ? '<span class="fb-date">' + fmtDateShort(f.date) + '</span>' : '') +
+    (f.id ? '<button type="button" class="fb-del" onclick="deleteFeedback(\'' + escapeAttr(f.id) + '\')" title="Delete this note" aria-label="Delete">✕</button>' : '') +
+    '</span></div>' +
     '<div class="fb-body">' + escapeHtml(f.text || '') + '</div></div>').join('');
   return admSection('Feedback', list.length + ' note' + (list.length === 1 ? '' : 's') + ' from your users', '<div class="fb-list">' + rows + '</div>');
+}
+// Owner-only: delete a feedback note once read, then refresh the inbox.
+async function deleteFeedback(id) {
+  try {
+    const r = await fetch('/api/admin/feedback/' + encodeURIComponent(id), { method: 'DELETE', headers: authHeaders() });
+    if (r.ok) { showToast('Feedback removed.', 'success'); loadAdminFeedback(); }
+    else showToast('Could not remove it — try again.', 'error');
+  } catch { showToast('Could not remove it — check your connection.', 'error'); }
 }
 
 async function loadBroadcastReach() {

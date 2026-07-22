@@ -904,12 +904,35 @@ app.get('/api/admin/feedback', requireAuth, async (req, res) => {
       const list = (r.data && Array.isArray(r.data.feedback)) ? r.data.feedback : [];
       list.forEach(f => {
         const text = String((f && f.text) || '').trim();
-        if (text) out.push({ username: nameById[String(r.user_id)] || 'someone', text: text.slice(0, 1000), date: (f && f.date) || '' });
+        if (text && f && f.id) out.push({ id: String(f.id), username: nameById[String(r.user_id)] || 'someone', text: text.slice(0, 1000), date: f.date || '' });
       });
     });
     out.sort((a, b) => String(b.date).localeCompare(String(a.date)));
     res.json({ feedback: out.slice(0, 500), count: out.length });
   } catch { res.status(500).json({ error: 'Feedback failed' }); }
+});
+
+// Owner-only: delete a single feedback note (after reading it). Finds the note
+// by id across users' data blobs and rewrites that blob WITHOUT bumping its
+// version (saveDataMeta), so it never clobbers the sender's client.
+app.delete('/api/admin/feedback/:id', requireAuth, async (req, res) => {
+  if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });
+  const fid = String(req.params.id || '');
+  if (!fid) return res.status(400).json({ error: 'Missing id' });
+  try {
+    const dataRows = await DB.allUserData();
+    for (const r of dataRows) {
+      const list = (r.data && Array.isArray(r.data.feedback)) ? r.data.feedback : null;
+      if (!list || !list.some(f => f && String(f.id) === fid)) continue;
+      const cur = await DB.getData(r.user_id);   // fresh read for the current version
+      if (cur && cur.data && Array.isArray(cur.data.feedback)) {
+        cur.data.feedback = cur.data.feedback.filter(f => !(f && String(f.id) === fid));
+        await DB.saveDataMeta(r.user_id, cur.data, cur.version);
+      }
+      return res.json({ ok: true });
+    }
+    res.json({ ok: true, notFound: true });
+  } catch { res.status(500).json({ error: 'Delete failed' }); }
 });
 
 // Owner-only: live usage numbers (how many people use it & how active they are).
