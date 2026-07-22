@@ -9522,9 +9522,12 @@ function renderLibraryBody() {
   const lib = ensureLibrary();
   const byType = {}; lib.forEach(e => { byType[e.type] = (byType[e.type] || 0) + 1; });
   const typeOpts = LIBRARY_TYPES.map(t => '<option value="' + t.key + '">' + t.icon + ' ' + t.label + '</option>').join('');
+  const canPlay = knowledgeQuizPool().length >= 3;
   const head = '<div class="lib-headbar"><div><div class="lib-eyebrow">📚 Your library</div>' +
     '<div class="lib-count">' + lib.length + ' entr' + (lib.length === 1 ? 'y' : 'ies') + ' you chose to remember</div></div>' +
-    '<button type="button" class="btn btn-primary btn-sm" onclick="toggleLibAdd()">' + (state._libAdding ? 'Close' : '＋ Add') + '</button></div>';
+    '<div class="lib-head-acts">' +
+    (canPlay ? '<button type="button" class="btn btn-outline btn-sm" onclick="openKnowledgeGames()">🎮 Play</button>' : '') +
+    '<button type="button" class="btn btn-primary btn-sm" onclick="toggleLibAdd()">' + (state._libAdding ? 'Close' : '＋ Add') + '</button></div></div>';
   const addForm = state._libAdding
     ? '<div class="card lib-add">' +
       '<div class="form-row"><div class="form-group"><label>Title</label>' +
@@ -9551,6 +9554,111 @@ function renderLibraryBody() {
   const searchBar = '<input type="search" id="lib-search" class="lib-search" placeholder="Search your library…" value="' + escapeAttr(state._libQ || '') + '" oninput="setLibQuery(this.value)">';
   return head + addForm + resurface + chips + searchBar +
     '<div id="lib-list" class="lib-list">' + renderLibraryList(libFilter(lib)) + '</div>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KNOWLEDGE GAMES — quiz + flashcards over everything you saved: library
+// entries (recall the person/theory/history from your note) AND vocabulary
+// (recall the word from its meaning). Turns memory into a game.
+// ═══════════════════════════════════════════════════════════════
+function _shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[a[i], a[j]] = [a[j], a[i]]; } return a; }
+function knowledgeQuizPool() {
+  const pool = [];
+  ensureLibrary().forEach(e => { if (e.title && (e.body || '').trim()) pool.push({ id: e.id, answer: e.title, clue: e.body, tag: libType(e.type).icon + ' ' + libType(e.type).label }); });
+  (state.data.vocab || []).forEach(w => { if (w.word && (w.meaning || '').trim()) pool.push({ id: w.id, answer: w.word, clue: w.meaning, tag: '🔤 Word' }); });
+  // de-dupe answers so distractors are never accidentally "also correct"
+  const seen = {}; return pool.filter(p => { const k = p.answer.toLowerCase(); if (seen[k]) return false; seen[k] = 1; return true; });
+}
+function openKnowledgeGames() {
+  if (knowledgeQuizPool().length < 3) { showToast('Save a few notes with details first — then you can play.', 'error'); return; }
+  startQuizGame(knowledgeQuizPool().length >= 4 ? 'quiz' : 'cards');
+}
+function startQuizGame(mode) {
+  const pool = knowledgeQuizPool();
+  if (mode === 'quiz' && pool.length < 4) mode = 'cards';
+  if (mode === 'quiz') {
+    const answers = pool.map(p => p.answer);
+    const qs = _shuffle(pool).slice(0, Math.min(10, pool.length)).map(p => {
+      const distractors = _shuffle(answers.filter(a => a !== p.answer)).slice(0, 3);
+      return { clue: p.clue, tag: p.tag, answer: p.answer, id: p.id, options: _shuffle([p.answer].concat(distractors)) };
+    });
+    state._game = { mode: 'quiz', qs, idx: 0, score: 0, streak: 0, best: 0, picked: null };
+  } else {
+    state._game = { mode: 'cards', cards: _shuffle(pool), idx: 0, revealed: false, known: 0 };
+  }
+  renderGameOverlay();
+}
+function closeGame() { document.getElementById('game-overlay')?.remove(); state._game = null; if (state.page === 'knowledge') renderKnowledgePage(); }
+function markGameSeen(id) { const e = ensureLibrary().find(x => x.id === id); if (e) { e.seenAt = todayStr(); try { saveData(); } catch (err) {} } }
+function quizPick(i) {
+  const g = state._game; if (!g || g.mode !== 'quiz' || g.picked != null) return;
+  const q = g.qs[g.idx]; g.picked = i;
+  if (q.options[i] === q.answer) { g.score++; g.streak++; g.best = Math.max(g.best, g.streak); } else { g.streak = 0; }
+  markGameSeen(q.id);
+  renderGameOverlay();
+}
+function quizNext() { const g = state._game; if (!g) return; g.idx++; g.picked = null; renderGameOverlay(); }
+function cardReveal() { const g = state._game; if (g && g.mode === 'cards') { g.revealed = true; renderGameOverlay(); } }
+function cardRate(known) {
+  const g = state._game; if (!g || g.mode !== 'cards') return;
+  const c = g.cards[g.idx]; if (known) g.known++; if (c) markGameSeen(c.id);
+  g.idx++; g.revealed = false; renderGameOverlay();
+}
+function renderGameOverlay() {
+  document.getElementById('game-overlay')?.remove();
+  const g = state._game; if (!g) return;
+  let inner = '';
+  if (g.mode === 'quiz') {
+    if (g.idx >= g.qs.length) {
+      const total = g.qs.length, pct = total ? Math.round(g.score / total * 100) : 0;
+      const msg = pct >= 80 ? 'Sharp memory! 🧠' : pct >= 50 ? 'Solid — keep revisiting.' : 'The more you revisit, the more sticks.';
+      inner = '<div class="game-badge">Quiz complete</div>' +
+        '<div class="game-score-big">' + g.score + '<span>/' + total + '</span></div>' +
+        '<div class="game-msg">' + msg + (g.best > 1 ? ' · best streak ' + g.best + ' 🔥' : '') + '</div>' +
+        '<div class="game-actions"><button type="button" class="btn btn-primary" onclick="startQuizGame(\'quiz\')">Play again</button>' +
+        '<button type="button" class="btn btn-outline" onclick="startQuizGame(\'cards\')">Flashcards</button>' +
+        '<button type="button" class="btn-link" onclick="closeGame()">Done</button></div>';
+    } else {
+      const q = g.qs[g.idx];
+      const opts = q.options.map((o, i) => {
+        let cls = 'game-opt';
+        if (g.picked != null) { if (o === q.answer) cls += ' game-opt-correct'; else if (i === g.picked) cls += ' game-opt-wrong'; }
+        return '<button type="button" class="' + cls + '"' + (g.picked != null ? ' disabled' : '') + ' onclick="quizPick(' + i + ')">' + escapeHtml(o) + '</button>';
+      }).join('');
+      const correct = g.picked != null && q.options[g.picked] === q.answer;
+      const fb = g.picked != null
+        ? '<div class="game-fb ' + (correct ? 'ok' : 'no') + '">' + (correct ? '✓ Correct' : '✗ It was <b>' + escapeHtml(q.answer) + '</b>') + '</div>' +
+          '<button type="button" class="btn btn-primary game-next" onclick="quizNext()">' + (g.idx + 1 >= g.qs.length ? 'See score →' : 'Next →') + '</button>'
+        : '';
+      inner = '<div class="game-top"><span class="game-prog">Q' + (g.idx + 1) + ' / ' + g.qs.length + '</span>' +
+        '<span class="game-stats">Score ' + g.score + ' · 🔥 ' + g.streak + '</span></div>' +
+        '<div class="game-clue-tag">' + q.tag + '</div>' +
+        '<div class="game-clue">' + escapeHtml(q.clue) + '</div>' +
+        '<div class="game-opts">' + opts + '</div>' + fb;
+    }
+  } else {
+    if (g.idx >= g.cards.length) {
+      inner = '<div class="game-badge">Deck done</div>' +
+        '<div class="game-score-big">' + g.known + '<span>/' + g.cards.length + '</span></div>' +
+        '<div class="game-msg">you knew</div>' +
+        '<div class="game-actions"><button type="button" class="btn btn-primary" onclick="startQuizGame(\'cards\')">Again</button>' +
+        '<button type="button" class="btn btn-outline" onclick="startQuizGame(\'quiz\')">Quiz mode</button>' +
+        '<button type="button" class="btn-link" onclick="closeGame()">Done</button></div>';
+    } else {
+      const c = g.cards[g.idx];
+      inner = '<div class="game-top"><span class="game-prog">Card ' + (g.idx + 1) + ' / ' + g.cards.length + '</span><span class="game-stats">✓ ' + g.known + '</span></div>' +
+        '<div class="game-clue-tag">' + c.tag + '</div>' +
+        '<button type="button" class="game-card' + (g.revealed ? ' flipped' : '') + '" onclick="cardReveal()">' +
+        '<div class="game-card-q">' + escapeHtml(c.clue) + '</div>' +
+        (g.revealed ? '<div class="game-card-a">' + escapeHtml(c.answer) + '</div>' : '<div class="game-card-hint">Tap to reveal</div>') +
+        '</button>' +
+        (g.revealed ? '<div class="game-actions"><button type="button" class="btn btn-outline" onclick="cardRate(false)">Review again</button><button type="button" class="btn btn-primary" onclick="cardRate(true)">Knew it ✓</button></div>' : '');
+    }
+  }
+  const el = document.createElement('div'); el.className = 'modal-overlay'; el.id = 'game-overlay';
+  el.innerHTML = '<div class="modal-box game-box"><button type="button" class="game-close" onclick="closeGame()" aria-label="Close">✕</button>' + inner + '</div>';
+  el.addEventListener('click', e => { if (e.target === el) closeGame(); });
+  document.body.appendChild(el);
 }
 
 function renderKnowledgeOverview() {

@@ -1841,6 +1841,37 @@ body {
 .lib-review-next { border: none; background: none; color: var(--text-muted); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; padding: 4px 0; }
 .lib-review-next:hover { color: var(--text); }
 
+/* ── Knowledge games: quiz + flashcards ── */
+.lib-head-acts { display: inline-flex; gap: 8px; flex: none; }
+.game-box { max-width: min(460px, 92vw); text-align: left; position: relative; }
+.game-close { position: absolute; top: 10px; right: 12px; background: none; border: none; color: var(--text-muted); font-size: 16px; cursor: pointer; padding: 6px 8px; border-radius: 8px; }
+.game-close:hover { color: var(--text); background: var(--surface); }
+.game-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; padding-right: 30px; }
+.game-prog { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); }
+.game-stats { font-size: 13px; font-weight: 800; color: var(--read-color, var(--primary)); font-variant-numeric: tabular-nums; }
+.game-clue-tag { display: inline-block; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: var(--text-muted); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; margin-bottom: 10px; }
+.game-clue { font-size: 16px; font-weight: 600; color: var(--text); line-height: 1.55; margin-bottom: 16px; }
+.game-opts { display: flex; flex-direction: column; gap: 8px; }
+.game-opt { font-family: inherit; text-align: left; font-size: 14.5px; font-weight: 600; color: var(--text); background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; padding: 12px 14px; cursor: pointer; transition: border-color .15s, background .15s; }
+.game-opt:hover:not(:disabled) { border-color: var(--read-color, var(--primary)); }
+.game-opt:disabled { cursor: default; }
+.game-opt-correct { border-color: var(--success) !important; background: rgba(16,185,129,.12) !important; color: var(--success); font-weight: 800; }
+.game-opt-wrong { border-color: var(--danger) !important; background: rgba(239,68,68,.10) !important; color: var(--danger); }
+.game-fb { margin-top: 12px; font-size: 14px; font-weight: 700; }
+.game-fb.ok { color: var(--success); } .game-fb.no { color: var(--danger); }
+.game-next { margin-top: 12px; width: 100%; }
+.game-badge { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--read-color, var(--primary)); text-align: center; }
+.game-score-big { text-align: center; font-size: 52px; font-weight: 800; color: var(--read-color, var(--primary)); letter-spacing: -1px; margin: 10px 0 2px; font-variant-numeric: tabular-nums; }
+.game-score-big span { font-size: 24px; color: var(--text-muted); font-weight: 700; }
+.game-msg { text-align: center; font-size: 14px; color: var(--text-muted); margin-bottom: 16px; }
+.game-actions { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.game-card { display: block; width: 100%; font-family: inherit; text-align: center; background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 26px 18px; cursor: pointer; transition: border-color .15s; }
+.game-card:hover { border-color: var(--read-color, var(--primary)); }
+.game-card.flipped { border-color: var(--read-color, var(--primary)); }
+.game-card-q { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.55; }
+.game-card-hint { margin-top: 14px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--text-muted); }
+.game-card-a { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border); font-size: 20px; font-weight: 800; color: var(--read-color, var(--primary)); }
+
 /* Log-form pointer to the Reading page (where notes now live) */
 .read-notes-hint { font-size: 13px; color: var(--text-muted); line-height: 1.6; background: color-mix(in srgb, var(--read-color, #6366f1) 7%, transparent);
   border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px; margin-top: 4px; }
