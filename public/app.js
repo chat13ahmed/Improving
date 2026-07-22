@@ -11560,12 +11560,39 @@ function renderSettingsPage() {
     '<button class="btn btn-outline" onclick="navigate(\'checklist\')">Open Checklist & Reminders →</button>' +
     '</div>' +
 
+    // Send feedback to the team (hidden for the owner, who reads it in Admin)
+    renderFeedbackCard() +
+
     // Security & password
     renderSecurityCard() +
 
     // Backup & data
     renderBackupCard() +
     '</div>';
+}
+// ── Feedback: anyone (except the owner) can send a note; it rides in their own
+// data blob and the owner reads all of them in the Admin console. ──
+function renderFeedbackCard() {
+  if (state.isOwner) return '';   // the owner reads feedback in Admin, doesn't submit
+  const sent = (state.data.feedback || []).length;
+  return '<div class="card">' +
+    '<h3 class="card-title">Send feedback</h3>' +
+    '<p class="card-sub">Hit a bug, or have an idea to make Onward better? Tell the team — they read every note.</p>' +
+    '<textarea id="fb-text" class="fb-text" rows="3" maxlength="1000" placeholder="What’s working, what’s not, what you wish it did…"></textarea>' +
+    '<button type="button" class="btn btn-primary" onclick="submitFeedback()">Send feedback</button>' +
+    (sent ? '<div class="fb-sent">You’ve sent ' + sent + ' note' + (sent === 1 ? '' : 's') + ' — thank you. 🙌</div>' : '') +
+    '</div>';
+}
+async function submitFeedback() {
+  const inp = document.getElementById('fb-text');
+  const text = (inp && inp.value || '').trim();
+  if (!text) { showToast('Write a little something first.', 'error'); return; }
+  state.data.feedback = state.data.feedback || [];
+  state.data.feedback.push({ id: uid(), text: text.slice(0, 1000), date: todayStr() });
+  if (inp) inp.value = '';
+  await saveData();
+  showToast('Thanks — your feedback is in. 🙌', 'success');
+  if (state.page === 'settings') renderSettingsPage();
 }
 
 // Owner-only card: type a message → push it to everyone's phone. Returns '' for normal users.
@@ -11689,8 +11716,31 @@ function renderAdminConsole(j) {
       '<th style="text-align:right">Joined</th><th style="text-align:right">Last active</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
       : '<p class="card-sub">No signups yet — share your link to get your first users.</p>');
 
-  body.innerHTML = kpis + growth + eng + adoption + money + usersTable + renderOwnerCard();
+  body.innerHTML = kpis + '<div id="adm-feedback"></div>' + growth + eng + adoption + money + usersTable + renderOwnerCard();
   loadBroadcastReach();
+  loadAdminFeedback();
+}
+// Owner-only: fetch every user's feedback notes and show them, newest first.
+async function loadAdminFeedback() {
+  const el = document.getElementById('adm-feedback');
+  if (!el) return;
+  el.innerHTML = admSection('Feedback', 'Loading…', '<div class="di-loading"><div class="spinner"></div></div>');
+  try {
+    const j = await fetch('/api/admin/feedback', { headers: authHeaders() }).then(r => r.json());
+    el.innerHTML = renderFeedbackInbox((j && Array.isArray(j.feedback)) ? j.feedback : []);
+  } catch {
+    el.innerHTML = admSection('Feedback', '', '<p class="card-sub">Couldn’t load feedback right now — hit Refresh.</p>');
+  }
+}
+function renderFeedbackInbox(list) {
+  if (!list.length) return admSection('Feedback', 'What your users are telling you',
+    '<p class="card-sub">No feedback yet. When people send a note from Settings → Send feedback, it lands here.</p>');
+  const rows = list.map(f =>
+    '<div class="fb-item"><div class="fb-item-top">' +
+    '<span class="fb-who">' + escapeHtml(f.username || 'someone') + '</span>' +
+    (f.date ? '<span class="fb-date">' + fmtDateShort(f.date) + '</span>' : '') + '</div>' +
+    '<div class="fb-body">' + escapeHtml(f.text || '') + '</div></div>').join('');
+  return admSection('Feedback', list.length + ' note' + (list.length === 1 ? '' : 's') + ' from your users', '<div class="fb-list">' + rows + '</div>');
 }
 
 async function loadBroadcastReach() {

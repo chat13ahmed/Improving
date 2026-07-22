@@ -892,6 +892,26 @@ app.get('/api/admin/reach', requireAuth, async (req, res) => {
   catch { res.json({ devices: 0, users: 0 }); }
 });
 
+// Owner-only: every user's feedback notes, newest first. Feedback rides inside
+// each person's own data blob (data.feedback), so no separate table is needed.
+app.get('/api/admin/feedback', requireAuth, async (req, res) => {
+  if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });
+  try {
+    const [users, dataRows] = await Promise.all([DB.allUsers(), DB.allUserData()]);
+    const nameById = {}; users.forEach(u => { nameById[String(u.id)] = u.username; });
+    const out = [];
+    dataRows.forEach(r => {
+      const list = (r.data && Array.isArray(r.data.feedback)) ? r.data.feedback : [];
+      list.forEach(f => {
+        const text = String((f && f.text) || '').trim();
+        if (text) out.push({ username: nameById[String(r.user_id)] || 'someone', text: text.slice(0, 1000), date: (f && f.date) || '' });
+      });
+    });
+    out.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    res.json({ feedback: out.slice(0, 500), count: out.length });
+  } catch { res.status(500).json({ error: 'Feedback failed' }); }
+});
+
 // Owner-only: live usage numbers (how many people use it & how active they are).
 app.get('/api/admin/stats', requireAuth, async (req, res) => {
   if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });
