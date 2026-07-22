@@ -1771,6 +1771,23 @@ body {
 .chk-add input { flex: 1; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--field-bg); color: var(--text); font-size: 14px; outline: none; }
 .chk-add input:focus { border-color: var(--success); box-shadow: 0 0 0 3px rgba(16,185,129,0.12); }
 
+/* ── Grouped checklists — named lists, each with its own ordered items ── */
+.chk-groups { display: flex; flex-direction: column; gap: 14px; }
+.chk-group { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 12px 14px; background: var(--card); }
+.chk-group-head { display: flex; align-items: center; gap: 8px; }
+.chk-group-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 800; color: var(--text); background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; margin: -5px 0; font-family: inherit; outline: none; }
+.chk-group-name:hover { border-color: var(--border); }
+.chk-group-name:focus { border-color: var(--success); background: var(--field-bg); box-shadow: 0 0 0 3px rgba(16,185,129,0.12); }
+.chk-group-prog { flex: none; font-size: 12px; font-weight: 800; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.chk-group-bar { height: 4px; border-radius: 3px; background: var(--tint-3); overflow: hidden; margin: 10px 0; }
+.chk-group-bar > i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--success), #34D399); transition: width 0.4s ease; }
+.chk-ord { flex: none; display: inline-flex; flex-direction: column; gap: 1px; }
+.chk-move { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 9px; line-height: 1; padding: 3px 5px; border-radius: 4px; transition: color .15s, background .15s; }
+.chk-move:hover:not(:disabled) { color: var(--text); background: var(--surface); }
+.chk-move:disabled { opacity: 0.25; cursor: default; }
+.chk-group-head .chk-move { font-size: 10px; }
+.chk-add-group input { border-style: dashed; }
+
 .rem-list { display: flex; flex-direction: column; gap: 8px; }
 .rem-row { display: grid; grid-template-columns: 70px 1fr auto auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--border); }
 .rem-row.rem-off { opacity: 0.5; }

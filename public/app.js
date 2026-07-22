@@ -11050,32 +11050,82 @@ function renderBackupCard() {
 // ─────────────────────────────────────────────────────────────
 // CHECKLIST & REMINDERS
 // ─────────────────────────────────────────────────────────────
+// Checklist data model: named GROUPS, each an ordered list of items.
+// state.data.checklistGroups = [{ id, name, items: [{ id, text }] }]
+// Per-day checked state stays keyed by item id (ids are unique across groups).
+// Migrates the old flat state.data.checklist into a first "My checklist" group.
 function ensureChecklistData() {
-  if (!state.data.checklist) state.data.checklist = [];
+  if (!Array.isArray(state.data.checklistGroups)) {
+    const old = Array.isArray(state.data.checklist) ? state.data.checklist : [];
+    state.data.checklistGroups = old.length
+      ? [{ id: uid(), name: 'My checklist', items: old.map(i => ({ id: i.id || uid(), text: i.text })) }]
+      : [];
+    delete state.data.checklist;   // one-way migration to groups
+  }
   if (!state.data.checkDone || typeof state.data.checkDone !== 'object') state.data.checkDone = {};
   if (!state.data.reminders) state.data.reminders = [];
 }
+function checklistGroups() { ensureChecklistData(); return state.data.checklistGroups; }
+function allCheckItems() { const out = []; checklistGroups().forEach(g => (g.items || []).forEach(it => out.push(it))); return out; }
 function checkDoneToday() { return (state.data.checkDone && state.data.checkDone[todayStr()]) || []; }
 function isChecked(id) { return checkDoneToday().includes(id); }
 function checklistProgress() {
-  const items = state.data.checklist || [];
+  const items = allCheckItems();
   return { done: items.filter(i => isChecked(i.id)).length, total: items.length };
 }
-
-async function addCheckItem() {
-  const inp = document.getElementById('chk-new');
-  const text = (inp && inp.value || '').trim();
-  if (!text) return;
+function groupProgress(g) {
+  const items = (g && g.items) || [];
+  return { done: items.filter(i => isChecked(i.id)).length, total: items.length };
+}
+// ── Groups ──
+async function addCheckGroup() {
+  const inp = document.getElementById('chk-new-group');
+  const name = (inp && inp.value || '').trim();
+  if (!name) return;
   ensureChecklistData();
-  state.data.checklist.push({ id: uid(), text });
+  state.data.checklistGroups.push({ id: uid(), name, items: [] });
   if (inp) inp.value = '';
+  await saveData(); renderChecklistPage();
+}
+async function renameCheckGroup(gid, name) {
+  const g = checklistGroups().find(x => x.id === gid); if (!g) return;
+  const v = (name || '').trim(); if (v) g.name = v;
   await saveData();
-  renderChecklistPage();
+}
+async function deleteCheckGroup(gid) {
+  const g = checklistGroups().find(x => x.id === gid);
+  if (g && (g.items || []).length && !confirm('Delete "' + g.name + '" and its ' + g.items.length + ' item' + (g.items.length === 1 ? '' : 's') + '?')) return;
+  state.data.checklistGroups = checklistGroups().filter(x => x.id !== gid);
+  await saveData(); renderChecklistPage();
+}
+async function moveCheckGroup(gid, dir) {
+  const gs = checklistGroups(); const i = gs.findIndex(g => g.id === gid); if (i < 0) return;
+  const j = i + dir; if (j < 0 || j >= gs.length) return;
+  const t = gs[i]; gs[i] = gs[j]; gs[j] = t;
+  await saveData(); renderChecklistPage();
+}
+// ── Items within a group ──
+async function addCheckItem(gid) {
+  ensureChecklistData();
+  const g = gid ? checklistGroups().find(x => x.id === gid) : checklistGroups()[0];
+  if (!g) return;
+  const inp = document.getElementById('chk-new-' + g.id);
+  const text = (inp && inp.value || '').trim(); if (!text) return;
+  g.items = g.items || []; g.items.push({ id: uid(), text });
+  if (inp) inp.value = '';
+  await saveData(); renderChecklistPage();
 }
 async function deleteCheckItem(id) {
-  state.data.checklist = (state.data.checklist || []).filter(i => i.id !== id);
+  checklistGroups().forEach(g => { g.items = (g.items || []).filter(it => it.id !== id); });
   await saveData();
   if (state.page === 'checklist') renderChecklistPage(); else renderDashboard();
+}
+async function moveCheckItem(gid, id, dir) {
+  const g = checklistGroups().find(x => x.id === gid); if (!g) return;
+  const items = g.items || []; const i = items.findIndex(it => it.id === id); if (i < 0) return;
+  const j = i + dir; if (j < 0 || j >= items.length) return;
+  const t = items[i]; items[i] = items[j]; items[j] = t;
+  await saveData(); renderChecklistPage();
 }
 async function toggleCheck(id) {
   ensureChecklistData();
@@ -11204,7 +11254,7 @@ function startReminderLoop() {
 
 // Compact checklist card for the dashboard (hidden if no items)
 function renderChecklistCard() {
-  const items = state.data.checklist || [];
+  const items = allCheckItems();
   if (!items.length) return '';
   const prog = checklistProgress();
   const pct = prog.total ? Math.round((prog.done / prog.total) * 100) : 0;
@@ -11304,17 +11354,42 @@ async function setNudgeHour(v) {
 
 function renderChecklistPage() {
   ensureChecklistData();
-  const items = state.data.checklist;
+  const groups = checklistGroups();
   const prog = checklistProgress();
   const pct = prog.total ? Math.round((prog.done / prog.total) * 100) : 0;
 
-  const checklistRows = items.length
-    ? items.map(i => '<div class="chk-row' + (isChecked(i.id) ? ' chk-done' : '') + '">' +
-        '<button type="button" class="chk-box" onclick="toggleCheck(\'' + i.id + '\')">' + (isChecked(i.id) ? '✓' : '') + '</button>' +
-        '<span class="chk-text">' + escapeHtml(i.text) + '</span>' +
-        '<button type="button" class="chk-del" onclick="deleteCheckItem(\'' + i.id + '\')" title="Remove">✕</button>' +
-        '</div>').join('')
-    : '<div class="chk-empty">No checklist items yet — add your daily must-dos below.</div>';
+  const groupHtml = (g, gi) => {
+    const gp = groupProgress(g);
+    const gpct = gp.total ? Math.round((gp.done / gp.total) * 100) : 0;
+    const items = g.items || [];
+    const itemRows = items.length
+      ? items.map((it, ii) => '<div class="chk-row' + (isChecked(it.id) ? ' chk-done' : '') + '">' +
+          '<button type="button" class="chk-box" onclick="toggleCheck(\'' + it.id + '\')">' + (isChecked(it.id) ? '✓' : '') + '</button>' +
+          '<span class="chk-text">' + escapeHtml(it.text) + '</span>' +
+          '<span class="chk-ord">' +
+          '<button type="button" class="chk-move" onclick="moveCheckItem(\'' + g.id + '\',\'' + it.id + '\',-1)"' + (ii === 0 ? ' disabled' : '') + ' title="Move up" aria-label="Move up">▲</button>' +
+          '<button type="button" class="chk-move" onclick="moveCheckItem(\'' + g.id + '\',\'' + it.id + '\',1)"' + (ii === items.length - 1 ? ' disabled' : '') + ' title="Move down" aria-label="Move down">▼</button>' +
+          '</span>' +
+          '<button type="button" class="chk-del" onclick="deleteCheckItem(\'' + it.id + '\')" title="Remove" aria-label="Remove">✕</button>' +
+          '</div>').join('')
+      : '<div class="chk-empty">No items yet — add your first below.</div>';
+    return '<div class="chk-group">' +
+      '<div class="chk-group-head">' +
+      '<input class="chk-group-name" value="' + escapeAttr(g.name) + '" onchange="renameCheckGroup(\'' + g.id + '\',this.value)" aria-label="List name" maxlength="60">' +
+      '<span class="chk-group-prog">' + gp.done + '/' + gp.total + '</span>' +
+      '<button type="button" class="chk-move" onclick="moveCheckGroup(\'' + g.id + '\',-1)"' + (gi === 0 ? ' disabled' : '') + ' title="Move list up" aria-label="Move list up">▲</button>' +
+      '<button type="button" class="chk-move" onclick="moveCheckGroup(\'' + g.id + '\',1)"' + (gi === groups.length - 1 ? ' disabled' : '') + ' title="Move list down" aria-label="Move list down">▼</button>' +
+      '<button type="button" class="chk-del" onclick="deleteCheckGroup(\'' + g.id + '\')" title="Delete list" aria-label="Delete list">✕</button>' +
+      '</div>' +
+      '<div class="chk-group-bar"><i style="width:' + gpct + '%"></i></div>' +
+      '<div class="chk-list">' + itemRows + '</div>' +
+      '<div class="chk-add"><input type="text" id="chk-new-' + g.id + '" placeholder="Add to ' + escapeAttr(g.name) + '…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addCheckItem(\'' + g.id + '\')}">' +
+      '<button type="button" class="btn btn-primary" onclick="addCheckItem(\'' + g.id + '\')">+ Add</button></div>' +
+      '</div>';
+  };
+  const checklistRows = groups.length
+    ? groups.map(groupHtml).join('')
+    : '<div class="chk-empty">No lists yet — create your first below (e.g. Morning, Work, Errands), then add tasks and drag them into the order that matters.</div>';
 
   const reminders = state.data.reminders;
   const remRows = reminders.length
@@ -11340,9 +11415,9 @@ function renderChecklistPage() {
     '<h3 class="card-title" style="margin-bottom:0">Today\'s Checklist</h3>' +
     '<span style="font-size:13px;color:var(--text-muted)">' + prog.done + '/' + prog.total + ' done</span></div>' +
     '<div class="chk-progress"><div style="width:' + pct + '%"></div></div>' +
-    '<div class="chk-list">' + checklistRows + '</div>' +
-    '<div class="chk-add"><input type="text" id="chk-new" placeholder="Add a daily task… (e.g. Take vitamins)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addCheckItem();}">' +
-    '<button type="button" class="btn btn-primary" onclick="addCheckItem()">+ Add</button></div>' +
+    '<div class="chk-groups">' + checklistRows + '</div>' +
+    '<div class="chk-add chk-add-group"><input type="text" id="chk-new-group" placeholder="New list name (e.g. Morning routine)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addCheckGroup()}">' +
+    '<button type="button" class="btn btn-outline" onclick="addCheckGroup()">+ New list</button></div>' +
     '</div>' +
     '<div class="card">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
