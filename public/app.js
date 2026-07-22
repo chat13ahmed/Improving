@@ -6210,17 +6210,8 @@ function renderLogToday(editDay) {
             '<div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:16px">' +
             '<button type="button" class="btn btn-outline" style="font-size:12px" onclick="showAddBookModal(true)">Change Book</button>' +
             '</div></div>' +
-            '<div class="form-row">' +
-            '<div class="form-group"><label>Chapter <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>' +
-            '<input type="text" id="read-chapter" list="read-chapter-list" maxlength="80" placeholder="e.g. Ch. 3 — Compounding" value="' + escapeAttr(rChapter) + '">' +
-            '<datalist id="read-chapter-list">' + (ab.chapters || []).map(c => '<option value="' + escapeAttr(c) + '"></option>').join('') + '</datalist></div>' +
-            '<div class="form-group"><label>Page <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>' +
-            '<input type="number" id="read-page" min="0" step="1" placeholder="e.g. 42" value="' + rPage + '"></div>' +
-            '</div>' +
-            '<div class="form-group"><label>Highlighted quote <span style="font-weight:400;color:var(--text-muted)">(optional — a line worth keeping)</span></label>' +
-            '<input type="text" id="read-quote" maxlength="300" placeholder="Paste the exact sentence you want to remember…" value="' + escapeAttr(rQuote) + '"></div>' +
-            '<div class="form-group"><label>What did you read? <span style="font-weight:400;color:var(--text-muted)">(summary — helps you retain it)</span></label>' +
-            '<textarea id="read-summary" rows="3" placeholder="e.g. Learned the difference between assets and liabilities. The author argues that buying your own home is a liability, not an asset…">' + escapeHtml(rSummary) + '</textarea></div>'
+            '<div class="read-notes-hint">📝 Quotes, chapters and what you took from it now live on the ' +
+            '<button type="button" class="btn-link-inline" onclick="navigate(\'knowledge\');setKnowledgeTab(\'reading\')">Reading page</button> — capture them there while they’re fresh.</div>'
           : '<div class="no-book-prompt">' +
             '<span>No book set yet.</span>' +
             '<button type="button" class="btn-link-inline" onclick="showAddBookModal(false)">Set your current book →</button>' +
@@ -6364,11 +6355,22 @@ function readDayForm(date, prior) {
     entry.calories = prior.calories || 0;
     entry.eaten = prior.eaten || null;
   }
-  // Reading — section is present whenever the reading pillar is on
+  // Reading — section is present whenever the reading pillar is on. Notes
+  // (quote/summary/chapter/page) now live on the Knowledge → Reading page, so
+  // when those inputs aren't in the log form we PRESERVE the existing values
+  // instead of wiping them.
   if (document.querySelector('.read-section')) {
     const ab = (state.data.books || []).find(b => b.status === 'reading');
-    entry.reading = { pages: parseInt(document.getElementById('read-pages')?.value) || 0, bookId: ab?.id || '', bookTitle: ab?.title || '', summary: document.getElementById('read-summary')?.value?.trim() || '',
-      chapter: document.getElementById('read-chapter')?.value?.trim() || '', page: parseInt(document.getElementById('read-page')?.value) || '', quote: document.getElementById('read-quote')?.value?.trim() || '' };
+    const pr = prior.reading || {};
+    const el = id => document.getElementById(id);
+    entry.reading = {
+      pages: parseInt(el('read-pages')?.value) || 0,
+      bookId: ab?.id || pr.bookId || '', bookTitle: ab?.title || pr.bookTitle || '',
+      summary: el('read-summary') ? el('read-summary').value.trim() : (pr.summary || ''),
+      chapter: el('read-chapter') ? el('read-chapter').value.trim() : (pr.chapter || ''),
+      page: el('read-page') ? (parseInt(el('read-page').value) || '') : (pr.page || ''),
+      quote: el('read-quote') ? el('read-quote').value.trim() : (pr.quote || '')
+    };
   } else {
     entry.reading = prior.reading || { pages: 0, bookId: '', bookTitle: '', summary: '' };
   }
@@ -9342,7 +9344,7 @@ function readingBody() {
       '</div></div>'
     : '';
 
-  return statsBar + bookCard + renderReadingPlanCard() + renderChaptersCard() + renderTakeawaysCard() + historyCard + finishedCard;
+  return statsBar + bookCard + renderReadingLogCard() + renderReadingPlanCard() + renderChaptersCard() + renderTakeawaysCard() + historyCard + finishedCard;
 }
 // ── THE PROFESSOR'S READING PLAN — commit to a finish date, hit a daily target ──
 // Turns the passive "you'll finish someday" projection into an active plan:
@@ -9626,6 +9628,53 @@ function renderKnowledgePage() {
   wireStatRings();
 }
 function renderReadingPage() { state._knowledgeTab = 'reading'; renderKnowledgePage(); }
+// Reading notes now live here (moved off the daily Log). Capture today's pages,
+// chapter, a highlighted quote, and what you took from it — while it's fresh.
+function renderReadingLogCard() {
+  const ab = (state.data.books || []).find(b => b.status === 'reading');
+  if (!ab) return '';
+  const today = (state.data.days || []).find(d => d.date === todayStr());
+  const r = (today && today.reading) || {};
+  return '<div class="card rlog-log-card">' +
+    '<h3 class="card-title">Log today’s reading</h3>' +
+    '<p class="card-sub">Pages, a line worth keeping, and what you took from it — capture it while it’s fresh.</p>' +
+    '<div class="form-row">' +
+    '<div class="form-group"><label>Pages read today</label>' +
+    '<input type="number" id="rs-pages" min="0" step="1" placeholder="0" value="' + (r.pages || '') + '" style="font-size:20px;font-weight:800"></div>' +
+    '<div class="form-group"><label>Chapter <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>' +
+    '<input type="text" id="rs-chapter" list="rs-chap-list" maxlength="80" placeholder="e.g. Ch. 3 — Compounding" value="' + escapeAttr(r.chapter || '') + '">' +
+    '<datalist id="rs-chap-list">' + (ab.chapters || []).map(c => '<option value="' + escapeAttr(c) + '"></option>').join('') + '</datalist></div>' +
+    '</div>' +
+    '<div class="form-group"><label>Page <span style="font-weight:400;color:var(--text-muted)">(optional)</span></label>' +
+    '<input type="number" id="rs-page" min="0" step="1" placeholder="e.g. 42" value="' + (r.page || '') + '"></div>' +
+    '<div class="form-group"><label>Highlighted quote <span style="font-weight:400;color:var(--text-muted)">(optional — a line worth keeping)</span></label>' +
+    '<input type="text" id="rs-quote" maxlength="300" placeholder="Paste the exact sentence you want to remember…" value="' + escapeAttr(r.quote || '') + '"></div>' +
+    '<div class="form-group"><label>What did you take from it? <span style="font-weight:400;color:var(--text-muted)">(summary — helps you retain it)</span></label>' +
+    '<textarea id="rs-summary" rows="3" placeholder="e.g. The difference between assets and liabilities — and why your own home can be a liability…">' + escapeHtml(r.summary || '') + '</textarea></div>' +
+    '<button type="button" class="btn btn-primary" onclick="saveReadingSession()">Save reading</button>' +
+    '</div>';
+}
+async function saveReadingSession() {
+  const ab = (state.data.books || []).find(b => b.status === 'reading');
+  if (!ab) { showToast('Set your current book first.', 'error'); return; }
+  const el = id => document.getElementById(id);
+  const pages = parseInt(el('rs-pages')?.value) || 0;
+  const summary = (el('rs-summary')?.value || '').trim();
+  const quote = (el('rs-quote')?.value || '').trim();
+  const chapter = (el('rs-chapter')?.value || '').trim();
+  const page = parseInt(el('rs-page')?.value) || '';
+  if (!pages && !summary && !quote) { showToast('Add pages, a quote, or a note first.', 'error'); return; }
+  const t = todayStr();
+  const days = state.data.days = state.data.days || [];
+  let day = days.find(d => d.date === t);
+  if (!day) { day = { id: uid(), date: t }; days.push(day); }
+  day.reading = { pages, bookId: ab.id, bookTitle: ab.title, summary, chapter, page, quote };
+  day._logged = Array.isArray(day._logged) ? day._logged : [];
+  if (day._logged.indexOf('reading') < 0) day._logged.push('reading');   // counts as today's reading log
+  await saveData();
+  showToast('Reading saved 📖', 'success');
+  renderKnowledgePage();
+}
 
 // ---- Key takeaways: capture a lesson, then resurface it later --------------
 // Priority for resurfacing: never-revisited first, then least-recently revisited.

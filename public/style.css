@@ -1841,6 +1841,11 @@ body {
 .lib-review-next { border: none; background: none; color: var(--text-muted); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; padding: 4px 0; }
 .lib-review-next:hover { color: var(--text); }
 
+/* Log-form pointer to the Reading page (where notes now live) */
+.read-notes-hint { font-size: 13px; color: var(--text-muted); line-height: 1.6; background: color-mix(in srgb, var(--read-color, #6366f1) 7%, transparent);
+  border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px; margin-top: 4px; }
+.read-notes-hint .btn-link-inline { font-weight: 700; }
+
 .rem-list { display: flex; flex-direction: column; gap: 8px; }
 .rem-row { display: grid; grid-template-columns: 70px 1fr auto auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--border); }
 .rem-row.rem-off { opacity: 0.5; }
