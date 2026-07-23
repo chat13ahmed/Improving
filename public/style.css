@@ -2087,6 +2087,19 @@ body.wo-fullscreen .bottom-nav { display: none !important; }   /* workout is an 
   .sidebar-brand { height: 54px; padding: 0 16px; border-bottom: none; background: none; }
   .main { padding-top: 66px; }   /* clear the fixed 54px header */
 
+  /* XP bar: on phones it lives INSIDE the 54px header as a compact right-side
+     readout (level + XP + micro track). Without this it overflowed below the
+     fixed header and covered the top of every page (Log Today form, etc.). */
+  .xp-bar-wrap {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    width: 132px; padding: 0; border-bottom: none; background: none;
+  }
+  .xp-top { margin-bottom: 3px; }
+  .xp-label { font-size: 9.5px; letter-spacing: 0.5px; white-space: nowrap; }
+  .xp-pts { font-size: 9px; white-space: nowrap; }
+  .xp-track { height: 4px; margin-bottom: 0; }
+  .xp-next { display: none; }   /* the "to next level" line doesn't fit the compact strip */
+
   /* Matching frosted bottom tab bar */
   .bottom-nav {
     background: var(--chrome-bg);
