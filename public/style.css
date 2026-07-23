@@ -2119,11 +2119,63 @@ body.wo-fullscreen .bottom-nav { display: none !important; }   /* workout is an 
 .km-another:active, .more-logout:active, .contact-card:active, .biz-tab:active { transform: scale(0.97); }
 .fab-btn:active { transform: scale(0.93); }
 
-/* Smooth page-in when navigating between sections (honours reduced-motion) */
+/* ═══ Motion & feel — one orchestrated entrance, quiet physics everywhere ═══
+   All of it honours reduced-motion. */
 @media (prefers-reduced-motion: no-preference) {
-  #main.page-anim > * { animation: pageIn 0.26s cubic-bezier(.22,.61,.36,1) both; }
-  @keyframes pageIn { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+  /* Page entrance: cards cascade in, top to bottom — 40ms apart, settled by ~0.6s */
+  #main.page-anim > * { animation: pageIn 0.32s cubic-bezier(.22,1,.36,1) both; }
+  #main.page-anim > :nth-child(2) { animation-delay: .04s; }
+  #main.page-anim > :nth-child(3) { animation-delay: .08s; }
+  #main.page-anim > :nth-child(4) { animation-delay: .12s; }
+  #main.page-anim > :nth-child(5) { animation-delay: .16s; }
+  #main.page-anim > :nth-child(6) { animation-delay: .20s; }
+  #main.page-anim > :nth-child(7) { animation-delay: .24s; }
+  #main.page-anim > :nth-child(8) { animation-delay: .27s; }
+  #main.page-anim > :nth-child(n+9) { animation-delay: .30s; }
+  @keyframes pageIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  /* Modals arrive with a soft spring (slight overshoot), not a plain fade */
+  .modal-box { animation: modalIn .34s cubic-bezier(.3,1.35,.55,1) both; }
+  @keyframes modalIn { from { opacity: 0; transform: translateY(12px) scale(.965); } to { opacity: 1; transform: none; } }
+
+  /* Progress bars fill in from zero when a view appears — progress you can SEE move */
+  .goal-bar-fill, .chk-progress > div, .chk-group-bar > i, .rp-bar-fill,
+  .hl-macro-bar i, .ss-fill, .adm-bar-fill, .rbc-bar-fill {
+    animation: barIn .7s cubic-bezier(.22,1,.36,1) .12s both;
+  }
+  @keyframes barIn { from { width: 0; } }
+
+  html { scroll-behavior: smooth; }
 }
+
+/* Tactile press on every control — instant, universal */
+.btn:active, .btn-sm:active, .btn-outline:active, .play-row:active, .wr-plan-row:active,
+.lib-chip:active, .rp-chip:active, .coach-starter:active, .game-opt:active, .game-card:active,
+.cf-type:active, .cf-filter:active, .biz-tab:active, .view-btn:active, .theme-seg-btn:active,
+.chk-box:active, .gl-big:active, .gl-muscle:active, .wo-prog:active, .wplan-prog:active {
+  transform: scale(.97);
+}
+.btn, .btn-sm, .play-row, .wr-plan-row, .lib-chip, .rp-chip, .coach-starter,
+.game-opt, .game-card, .cf-type, .cf-filter, .biz-tab, .view-btn, .theme-seg-btn, .chk-box {
+  transition-property: transform, border-color, background-color, color, box-shadow, filter;
+  transition-duration: .15s;
+}
+/* Pointer devices: tappable rows float up a hair on hover */
+@media (hover: hover) and (pointer: fine) {
+  .plan-row:hover, .play-row:hover, .wr-plan-row:hover { transform: translateY(-1px); }
+  .btn-primary:hover { transform: translateY(-1px); }
+}
+
+/* Keyboard users get a clear, on-brand focus ring */
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; } /* fields keep their border/glow treatment */
+
+/* Slim, themed scrollbars (desktop) */
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
 
 /* ─── Water / Hydration ───────────────────────── */
 .water-section { border-color: var(--water-border); }
