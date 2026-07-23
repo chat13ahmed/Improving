@@ -9632,11 +9632,9 @@ function renderLibraryBody() {
   const lib = ensureLibrary();
   const byType = {}; lib.forEach(e => { byType[e.type] = (byType[e.type] || 0) + 1; });
   const typeOpts = LIBRARY_TYPES.map(t => '<option value="' + t.key + '">' + t.icon + ' ' + t.label + '</option>').join('');
-  const canPlay = knowledgeQuizPool().length >= 3;
   const head = '<div class="lib-headbar"><div><div class="lib-eyebrow">📚 Your library</div>' +
     '<div class="lib-count">' + lib.length + ' entr' + (lib.length === 1 ? 'y' : 'ies') + ' you chose to remember</div></div>' +
     '<div class="lib-head-acts">' +
-    (canPlay ? '<button type="button" class="btn btn-outline btn-sm" onclick="openKnowledgeGames()">🎮 Play</button>' : '') +
     '<button type="button" class="btn btn-primary btn-sm" onclick="toggleLibAdd()">' + (state._libAdding ? 'Close' : '＋ Add') + '</button></div></div>';
   const addForm = state._libAdding
     ? '<div class="card lib-add">' +
@@ -9687,6 +9685,32 @@ function knowledgeQuizPool() {
 function openKnowledgeGames() {
   if (knowledgeQuizPool().length < 3) { showToast('Save a few notes with details first — then you can play.', 'error'); return; }
   startQuizGame(knowledgeQuizPool().length >= 4 ? 'quiz' : 'cards');
+}
+// A proper "practice" card for the Knowledge overview — the games' front door.
+function renderKnowledgePlayCard() {
+  const pool = knowledgeQuizPool();
+  const libN = ensureLibrary().filter(e => e.title && (e.body || '').trim()).length;
+  const wordN = (state.data.vocab || []).filter(w => w.word && (w.meaning || '').trim()).length;
+  if (pool.length < 3) {
+    // Not enough yet — invite them to build the deck rather than hide the feature.
+    return '<div class="card kplay-card kplay-empty">' +
+      '<div class="kplay-main"><div class="kplay-ico">🎮</div>' +
+      '<div><div class="kplay-title">Turn your notes into a game</div>' +
+      '<div class="kplay-sub">Save a few library entries or vocab words with details, and you can quiz yourself on them here.</div></div></div>' +
+      '<div class="kplay-acts"><button type="button" class="btn btn-outline kplay-btn" onclick="setKnowledgeTab(\'library\')">Add to library →</button></div></div>';
+  }
+  const bits = [];
+  if (libN) bits.push('<b>' + libN + '</b> entr' + (libN === 1 ? 'y' : 'ies'));
+  if (wordN) bits.push('<b>' + wordN + '</b> word' + (wordN === 1 ? '' : 's'));
+  const canQuiz = pool.length >= 4;
+  return '<div class="card kplay-card">' +
+    '<div class="kplay-main"><div class="kplay-ico">🎮</div>' +
+    '<div><div class="kplay-title">Play &amp; remember</div>' +
+    '<div class="kplay-sub">Test yourself on ' + bits.join(' + ') + ' you’ve saved. Recalling them is what makes them stick.</div></div></div>' +
+    '<div class="kplay-acts">' +
+    (canQuiz ? '<button type="button" class="btn btn-primary kplay-btn" onclick="startQuizGame(\'quiz\')">🎯 Quiz me</button>' : '') +
+    '<button type="button" class="btn btn-outline kplay-btn" onclick="startQuizGame(\'cards\')">🃏 Flashcards</button>' +
+    '</div></div>';
 }
 function startQuizGame(mode) {
   const pool = knowledgeQuizPool();
@@ -9831,6 +9855,8 @@ function renderKnowledgeOverview() {
     statRingCard({ label: 'Books finished', value: finished, pct: null, color: 'var(--accent)', icon: '🏆',
       sub: (finished ? 'nice work' : 'finish your first'), onclick: "setKnowledgeTab('reading')" }) +
     '</div>' +
+    '<div class="dash-section">Practice</div>' +
+    renderKnowledgePlayCard() +
     renderYearInKnowledge();
 }
 
