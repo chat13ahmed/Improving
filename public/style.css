@@ -1787,6 +1787,12 @@ body {
 .chk-move:disabled { opacity: 0.25; cursor: default; }
 .chk-group-head .chk-move { font-size: 10px; }
 .chk-add-group input { border-style: dashed; }
+/* Task text doubles as an inline rename field — invisible until you touch it */
+.chk-text-edit { min-width: 0; background: transparent; border: 1px solid transparent; border-radius: 7px;
+  padding: 4px 7px; margin: -4px 0; font-family: inherit; font-size: 14px; outline: none; }
+.chk-text-edit:hover { border-color: var(--border); }
+.chk-text-edit:focus { border-color: var(--success); background: var(--field-bg); box-shadow: 0 0 0 3px rgba(16,185,129,0.12); }
+.chk-row.chk-done .chk-text-edit { text-decoration: line-through; color: var(--text-muted); }
 
 /* ── Feedback: user form (Settings) + admin inbox ── */
 .fb-text { width: 100%; box-sizing: border-box; padding: 11px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);

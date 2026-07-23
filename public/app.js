@@ -9461,6 +9461,22 @@ function setLibQuery(v) {
   const el = document.getElementById('lib-list');
   if (el) el.innerHTML = renderLibraryList(libFilter(ensureLibrary()));
 }
+// Open an existing entry in the form to edit it (attachments come along).
+function startLibEdit(id) {
+  const e = ensureLibrary().find(x => x.id === id); if (!e) return;
+  state._libEditId = id;
+  state._libAdding = true;
+  state._libPhotos = (e.photos || []).slice();
+  state._libAudio = e.audio || null;
+  renderKnowledgePage();
+  setTimeout(() => document.getElementById('lib-title')?.focus(), 60);
+}
+function cancelLibEdit() {
+  state._libEditId = null; state._libAdding = false;
+  state._libPhotos = []; state._libAudio = null;
+  libStopRecording(true);
+  renderKnowledgePage();
+}
 async function addLibraryEntry() {
   ensureLibrary();
   const title = (document.getElementById('lib-title')?.value || '').trim();
@@ -9469,14 +9485,28 @@ async function addLibraryEntry() {
   const body = (document.getElementById('lib-body')?.value || '').trim();
   const source = (document.getElementById('lib-source')?.value || '').trim();
   const tags = (document.getElementById('lib-tags')?.value || '').split(',').map(t => t.trim()).filter(Boolean).slice(0, 8);
-  const entry = { id: uid(), type, title: title.slice(0, 120), body: body.slice(0, 4000), source: source.slice(0, 200), tags, createdAt: todayStr() };
-  if ((state._libPhotos || []).length) entry.photos = state._libPhotos.slice(0, 3);
-  if (state._libAudio) entry.audio = state._libAudio;
-  state.data.library.unshift(entry);
-  state._libAdding = false; state._libPhotos = []; state._libAudio = null;
+  const photos = (state._libPhotos || []).slice(0, 3);
+  const editing = state._libEditId ? state.data.library.find(x => x.id === state._libEditId) : null;
+  if (editing) {
+    // Update in place — keeps its id, createdAt and revisit history.
+    editing.type = type;
+    editing.title = title.slice(0, 120);
+    editing.body = body.slice(0, 4000);
+    editing.source = source.slice(0, 200);
+    editing.tags = tags;
+    if (photos.length) editing.photos = photos; else delete editing.photos;
+    if (state._libAudio) editing.audio = state._libAudio; else delete editing.audio;
+    editing.updatedAt = todayStr();
+  } else {
+    const entry = { id: uid(), type, title: title.slice(0, 120), body: body.slice(0, 4000), source: source.slice(0, 200), tags, createdAt: todayStr() };
+    if (photos.length) entry.photos = photos;
+    if (state._libAudio) entry.audio = state._libAudio;
+    state.data.library.unshift(entry);
+  }
+  state._libAdding = false; state._libEditId = null; state._libPhotos = []; state._libAudio = null;
   libStopRecording(true);
   await saveData();
-  showToast('Saved to your library. 📚', 'success');
+  showToast(editing ? 'Entry updated. ✓' : 'Saved to your library. 📚', 'success');
   renderKnowledgePage();
 }
 
@@ -9616,7 +9646,8 @@ function renderLibraryList(items) {
     const tags = (e.tags || []).length ? '<div class="lib-tags">' + e.tags.map(x => '<span class="lib-tag">' + escapeHtml(x) + '</span>').join('') + '</div>' : '';
     return '<div class="lib-item">' +
       '<div class="lib-item-top"><span class="lib-badge lib-' + e.type + '">' + t.icon + ' ' + t.label + '</span>' +
-      '<span class="lib-item-acts"><span class="lib-date">' + fmtDateShort(e.createdAt) + '</span>' +
+      '<span class="lib-item-acts"><span class="lib-date">' + fmtDateShort(e.createdAt) + (e.updatedAt ? ' · edited' : '') + '</span>' +
+      '<button type="button" class="fb-del" onclick="startLibEdit(\'' + e.id + '\')" title="Edit" aria-label="Edit">✎</button>' +
       '<button type="button" class="fb-del" onclick="deleteLibraryEntry(\'' + e.id + '\')" title="Delete" aria-label="Delete">✕</button></span></div>' +
       '<div class="lib-title">' + escapeHtml(e.title) + '</div>' +
       (e.body ? '<div class="lib-body">' + escapeHtml(e.body) + '</div>' : '') +
@@ -9631,27 +9662,29 @@ function renderLibraryList(items) {
 function renderLibraryBody() {
   const lib = ensureLibrary();
   const byType = {}; lib.forEach(e => { byType[e.type] = (byType[e.type] || 0) + 1; });
-  const typeOpts = LIBRARY_TYPES.map(t => '<option value="' + t.key + '">' + t.icon + ' ' + t.label + '</option>').join('');
+  const ed = state._libEditId ? (lib.find(x => x.id === state._libEditId) || {}) : {};
+  const typeOpts = LIBRARY_TYPES.map(t => '<option value="' + t.key + '"' + (ed.type === t.key ? ' selected' : '') + '>' + t.icon + ' ' + t.label + '</option>').join('');
   const head = '<div class="lib-headbar"><div><div class="lib-eyebrow">📚 Your library</div>' +
     '<div class="lib-count">' + lib.length + ' entr' + (lib.length === 1 ? 'y' : 'ies') + ' you chose to remember</div></div>' +
     '<div class="lib-head-acts">' +
     '<button type="button" class="btn btn-primary btn-sm" onclick="toggleLibAdd()">' + (state._libAdding ? 'Close' : '＋ Add') + '</button></div></div>';
   const addForm = state._libAdding
     ? '<div class="card lib-add">' +
+      (state._libEditId ? '<div class="lib-eyebrow" style="margin-bottom:10px">✎ Editing entry</div>' : '') +
       '<div class="form-row"><div class="form-group"><label>Title</label>' +
-      '<input id="lib-title" placeholder="e.g. Marcus Aurelius · The fall of Rome · Compound interest" maxlength="120"></div>' +
+      '<input id="lib-title" placeholder="e.g. Marcus Aurelius · The fall of Rome · Compound interest" maxlength="120" value="' + escapeAttr(ed.title || '') + '"></div>' +
       '<div class="form-group"><label>Type</label><select id="lib-type">' + typeOpts + '</select></div></div>' +
       '<div class="form-group"><label>What you learned</label>' +
-      '<textarea id="lib-body" rows="4" placeholder="The idea, the story, the person — and why it matters to you…" maxlength="4000"></textarea></div>' +
-      '<div class="form-row"><div class="form-group"><label>Source (optional)</label><input id="lib-source" placeholder="Book, video, conversation…" maxlength="200"></div>' +
-      '<div class="form-group"><label>Tags (optional, comma-separated)</label><input id="lib-tags" placeholder="stoicism, mindset"></div></div>' +
+      '<textarea id="lib-body" rows="4" placeholder="The idea, the story, the person — and why it matters to you…" maxlength="4000">' + escapeHtml(ed.body || '') + '</textarea></div>' +
+      '<div class="form-row"><div class="form-group"><label>Source (optional)</label><input id="lib-source" placeholder="Book, video, conversation…" maxlength="200" value="' + escapeAttr(ed.source || '') + '"></div>' +
+      '<div class="form-group"><label>Tags (optional, comma-separated)</label><input id="lib-tags" placeholder="stoicism, mindset" value="' + escapeAttr((ed.tags || []).join(', ')) + '"></div></div>' +
       '<div class="lib-att-row">' +
       '<label class="btn btn-outline btn-sm lib-att-btn">📷 Add photo<input type="file" accept="image/*" multiple onchange="addLibPhoto(this)" hidden></label>' +
       '<button type="button" id="lib-rec-btn" class="btn btn-outline btn-sm" onclick="toggleLibRecord()">' + (state._libRec ? '⏹ Stop' : '🎙 Record voice') + '</button>' +
       '</div>' +
       '<div id="lib-att-previews" class="lib-att-previews">' + libAttPreviews() + '</div>' +
-      '<div class="lib-add-acts"><button type="button" class="btn btn-primary" onclick="addLibraryEntry()">Save to library</button>' +
-      '<button type="button" class="btn-link" onclick="toggleLibAdd()">Cancel</button></div></div>'
+      '<div class="lib-add-acts"><button type="button" class="btn btn-primary" onclick="addLibraryEntry()">' + (state._libEditId ? 'Save changes' : 'Save to library') + '</button>' +
+      '<button type="button" class="btn-link" onclick="cancelLibEdit()">Cancel</button></div></div>'
     : '';
   if (!lib.length) {
     return head + addForm +
@@ -11540,6 +11573,12 @@ async function deleteCheckItem(id) {
   await saveData();
   if (state.page === 'checklist') renderChecklistPage(); else renderDashboard();
 }
+async function renameCheckItem(gid, id, text) {
+  const g = checklistGroups().find(x => x.id === gid); if (!g) return;
+  const it = (g.items || []).find(i => i.id === id); if (!it) return;
+  const v = (text || '').trim(); if (v) it.text = v.slice(0, 200);
+  await saveData();
+}
 async function moveCheckItem(gid, id, dir) {
   const g = checklistGroups().find(x => x.id === gid); if (!g) return;
   const items = g.items || []; const i = items.findIndex(it => it.id === id); if (i < 0) return;
@@ -11785,7 +11824,7 @@ function renderChecklistPage() {
     const itemRows = items.length
       ? items.map((it, ii) => '<div class="chk-row' + (isChecked(it.id) ? ' chk-done' : '') + '">' +
           '<button type="button" class="chk-box" onclick="toggleCheck(\'' + it.id + '\')">' + (isChecked(it.id) ? '✓' : '') + '</button>' +
-          '<span class="chk-text">' + escapeHtml(it.text) + '</span>' +
+          '<input class="chk-text chk-text-edit" value="' + escapeAttr(it.text) + '" maxlength="200" aria-label="Task name" onchange="renameCheckItem(\'' + g.id + '\',\'' + it.id + '\',this.value)">' +
           '<span class="chk-ord">' +
           '<button type="button" class="chk-move" onclick="moveCheckItem(\'' + g.id + '\',\'' + it.id + '\',-1)"' + (ii === 0 ? ' disabled' : '') + ' title="Move up" aria-label="Move up">▲</button>' +
           '<button type="button" class="chk-move" onclick="moveCheckItem(\'' + g.id + '\',\'' + it.id + '\',1)"' + (ii === items.length - 1 ? ' disabled' : '') + ' title="Move down" aria-label="Move down">▼</button>' +
