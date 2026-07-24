@@ -4268,6 +4268,117 @@ const EXERCISE_LIBRARY = {
     // Steady-state — the fat-burning base you can do daily
     'Zone 2 Run', 'Power Walk', 'Rucking']
 };
+
+// ─────────────────────────────────────────────────────────────
+// MUSCLE PARTS — every muscle broken into the regions you actually train
+// separately (chest → upper / middle / lower, back → lats / thickness /
+// lower, etc). A muscle only grows evenly if you hit each part, so the
+// library groups exercises by part and every muscle gets a full-coverage day.
+// ─────────────────────────────────────────────────────────────
+const MUSCLE_PARTS = {
+  Chest: [
+    { key: 'upper',  name: 'Upper Chest',   sub: 'Clavicular head', why: 'The part almost everyone under-trains. Any incline angle — or a fly that travels low-to-high.' },
+    { key: 'middle', name: 'Middle Chest',  sub: 'Sternal head',    why: 'The bulk of the muscle. Flat pressing and mid-height flyes.' },
+    { key: 'lower',  name: 'Lower Chest',   sub: 'Costal head',     why: 'Builds the line under the pec. Decline angles and dips.' }
+  ],
+  Back: [
+    { key: 'lats',   name: 'Lats',          sub: 'Width',           why: 'Vertical pulling — anything overhead down to you. This is what builds the V.' },
+    { key: 'upper',  name: 'Upper Back',    sub: 'Thickness',       why: 'Horizontal pulling — rows and face pulls. Traps, rhomboids and rear delts.' },
+    { key: 'lower',  name: 'Lower Back',    sub: 'Spinal erectors', why: 'Hip hinges. The muscle that protects your spine under every heavy lift.' }
+  ],
+  Legs: [
+    { key: 'quads',  name: 'Quads',         sub: 'Front of thigh',  why: 'Knee-dominant work — squats, presses, extensions.' },
+    { key: 'hams',   name: 'Hamstrings',    sub: 'Back of thigh',   why: 'Hip hinges and leg curls. Skipping these is the fastest way to a knee injury.' },
+    { key: 'glutes', name: 'Glutes',        sub: 'Hips',            why: 'Thrusts, bridges and split squats. Your strongest muscle — train it directly.' },
+    { key: 'calves', name: 'Calves',        sub: 'Lower leg',       why: 'Stubborn and high-rep. Needs frequency more than heavy load.' },
+    { key: 'inner',  name: 'Adductors & Abductors', sub: 'Inner / outer thigh', why: 'Side-to-side stability. Neglected until something tears.' }
+  ],
+  Shoulders: [
+    { key: 'front',  name: 'Front Delts',   sub: 'Anterior',        why: 'Overhead pressing. Already gets hit hard by every chest day — do not overdo it.' },
+    { key: 'side',   name: 'Side Delts',    sub: 'Lateral',         why: 'Lateral raises. This is the part that actually makes shoulders look wide.' },
+    { key: 'rear',   name: 'Rear Delts',    sub: 'Posterior',       why: 'Reverse flyes. Fixes rounded posture and balances all your pressing.' },
+    { key: 'traps',  name: 'Traps',         sub: 'Upper back yoke', why: 'Shrugs and upright rows.' }
+  ],
+  Arms: [
+    { key: 'biceps',   name: 'Biceps',      sub: 'Front of arm',    why: 'Curls. Incline curls stretch the long head; preacher hits the short head.' },
+    { key: 'triceps',  name: 'Triceps',     sub: 'Back of arm',     why: 'Two-thirds of your arm. Overhead work is the only way to load the long head.' },
+    { key: 'forearms', name: 'Forearms',    sub: 'Grip',            why: 'Wrist curls and carries. Weak grip caps every pulling lift you do.' }
+  ],
+  Core: [
+    { key: 'upper',    name: 'Upper Abs',   sub: 'Flexion',         why: 'Crunches and sit-ups — bringing your ribs toward your hips.' },
+    { key: 'lower',    name: 'Lower Abs',   sub: 'Leg raises',      why: 'Raises and hanging work — bringing your hips toward your ribs.' },
+    { key: 'obliques', name: 'Obliques',    sub: 'Sides',           why: 'Twists and side bends. Rotation and lateral bending.' },
+    { key: 'deep',     name: 'Deep Core',   sub: 'Anti-movement',   why: 'Planks, Pallof presses, carries. Resisting movement — what actually protects your back.' }
+  ],
+  Cardio: [
+    { key: 'hiit',     name: 'HIIT & Intervals', sub: 'Short and brutal', why: 'Max effort, short rests. Biggest calorie burn per minute.' },
+    { key: 'steady',   name: 'Steady State',     sub: 'Zone 2',           why: 'Conversational pace. Builds the aerobic base you recover with.' },
+    { key: 'power',    name: 'Athletic & Power', sub: 'Carries, sleds',   why: 'Loaded movement. Conditioning that also builds muscle.' }
+  ]
+};
+// Pure: which part of its muscle an exercise trains. Keyword rules rather than a
+// per-exercise table, so the library stays one list. Every exercise resolves to a
+// real part — the test suite asserts that, so a new exercise can't slip through
+// unclassified. (testable)
+function exercisePart(name, group) {
+  const n = String(name || '').toLowerCase();
+  const g = group || exerciseGroup(name);
+  switch (g) {
+    case 'Chest':
+      // Push-ups invert: hands elevated (incline) hits LOWER chest, feet up (decline) hits UPPER.
+      if (/push-up/.test(n)) return /incline/.test(n) ? 'lower' : /decline/.test(n) ? 'upper' : 'middle';
+      if (/incline|low cable fly|landmine/.test(n)) return 'upper';
+      if (/decline|dip|high cable fly/.test(n)) return 'lower';
+      return 'middle';
+    case 'Back':
+      if (/deadlift|rack pull|good morning|back extension/.test(n)) return 'lower';
+      if (/pull-up|chin-up|pulldown|pullover/.test(n)) return 'lats';
+      if (/row|face pull/.test(n)) return 'upper';
+      return 'lats';
+    case 'Legs':
+      if (/calf|calves/.test(n)) return 'calves';
+      if (/adductor|abductor|cossack/.test(n)) return 'inner';
+      if (/romanian|stiff-leg|rdl|leg curl|nordic/.test(n)) return 'hams';
+      if (/hip thrust|glute bridge|curtsy|bulgarian|step-up|sumo deadlift/.test(n)) return 'glutes';
+      return 'quads';
+    case 'Shoulders':
+      if (/shrug|upright row/.test(n)) return 'traps';
+      if (/rear delt|reverse pec/.test(n)) return 'rear';
+      if (/lateral raise/.test(n)) return 'side';
+      return 'front';
+    case 'Arms':
+      if (/wrist|plate pinch|reverse curl|zottman/.test(n)) return 'forearms';
+      if (/pushdown|skull|triceps|extension|jm press|close-grip|bench dip|diamond push-up/.test(n)) return 'triceps';
+      return 'biceps';
+    case 'Core':
+      if (/side plank|copenhagen|russian twist|woodchop|rotation|oblique|windshield|bicycle|suitcase/.test(n)) return 'obliques';
+      if (/leg raise|knee raise|toes-to-bar|reverse crunch|flutter|dragon flag|l-sit/.test(n)) return 'lower';
+      if (/plank|hollow|pallof|ab wheel|dead bug|bird dog|mountain climber|carry/.test(n)) return 'deep';
+      return 'upper';
+    case 'Cardio':
+      if (/sprint|interval|burpee|jump rope|double under|jumping jack|high knee|battle rope|thruster|wall ball|slam|sprawl|squat jump|tuck jump|skater|assault bike|shadow boxing/.test(n)) return 'hiit';
+      if (/sled|kettlebell swing|bear crawl|farmer|box jump/.test(n)) return 'power';
+      return 'steady';
+    default:
+      return '';
+  }
+}
+// Pure: how many exercises the library holds in total. (testable)
+function libraryCount() {
+  return Object.keys(EXERCISE_LIBRARY).reduce((n, g) => n + EXERCISE_LIBRARY[g].length, 0);
+}
+// Pure: the part descriptor {key,name,sub,why} for a muscle group + part key. (testable)
+function partMeta(group, key) {
+  return (MUSCLE_PARTS[group] || []).find(p => p.key === key) || null;
+}
+// Pure: a muscle group's exercises, split into its parts and kept in part order.
+// Returns [{ part, exercises: [...] }] and never includes an empty part. (testable)
+function exercisesByPart(group) {
+  const parts = MUSCLE_PARTS[group] || [];
+  const all = EXERCISE_LIBRARY[group] || [];
+  return parts.map(part => ({ part, exercises: all.filter(n => exercisePart(n, group) === part.key) }))
+    .filter(sec => sec.exercises.length > 0);
+}
 // Ready-made workouts — each is a list of library exercises. Pick one and just
 // log your sets/reps, instead of building the workout from scratch.
 const WORKOUT_PROGRAMS = {
@@ -4289,8 +4400,73 @@ const WORKOUT_PROGRAMS = {
   'Steady Cardio (Endurance)': ['Zone 2 Run', 'Incline Walk', 'Cycling', 'Rowing Machine'],
   'Fat Burn — Full Body': ['Kettlebell Swing', 'Goblet Squat', 'Push-Up', 'Inverted Row', 'Thrusters', 'Jump Rope'],
   'Fat Burn — Chest Focus': ['Push-Up', 'Incline Dumbbell Press', 'Cable Crossover', 'Plyo Push-Up', 'Burpees', 'Mountain Climber'],
-  'Muscle Builder — Chest': ['Barbell Bench Press', 'Incline Dumbbell Press', 'Machine Fly', 'Dips', 'Cable Crossover']
+  'Muscle Builder — Chest': ['Barbell Bench Press', 'Incline Dumbbell Press', 'Machine Fly', 'Dips', 'Cable Crossover'],
+
+  // ── Full muscle days: every part of one muscle, in one session ──
+  'Chest — Every Part': ['Incline Barbell Bench Press', 'Barbell Bench Press', 'Decline Dumbbell Press', 'Low Cable Fly', 'Pec Deck Machine', 'Dips'],
+  'Back — Every Part': ['Pull-Up', 'Bent-Over Row', 'Straight-Arm Pulldown', 'Seated Cable Row', 'Back Extension', 'Face Pull'],
+  'Shoulders — Every Part': ['Overhead Press', 'Lateral Raise', 'Rear Delt Fly', 'Cable Lateral Raise', 'Reverse Pec Deck', 'Barbell Shrug'],
+  'Arms — Every Part': ['Barbell Curl', 'Incline Dumbbell Curl', 'Close-Grip Bench Press', 'Overhead Cable Extension', 'Hammer Curl', 'Rope Triceps Pushdown', 'Wrist Curl'],
+  'Legs — Every Part': ['Back Squat', 'Romanian Deadlift', 'Hip Thrust', 'Leg Extension', 'Seated Leg Curl', 'Standing Calf Raise', 'Adductor Machine'],
+  'Core — Every Part': ['Cable Crunch', 'Hanging Leg Raise', 'Russian Twist', 'Pallof Press', 'Plank'],
+
+  // ── Part focus: bring up one weak point ──
+  'Upper Chest Focus': ['Incline Barbell Bench Press', 'Incline Dumbbell Press', 'Low Cable Fly', 'Incline Machine Press', 'Landmine Press'],
+  'Lower Chest Focus': ['Decline Bench Press', 'Dips', 'High Cable Fly', 'Decline Dumbbell Press', 'Incline Push-Up'],
+  'Lat Width Focus': ['Wide-Grip Lat Pulldown', 'Pull-Up', 'Straight-Arm Pulldown', 'Single-Arm Lat Pulldown', 'Cable Pullover'],
+  'Back Thickness Focus': ['Pendlay Row', 'Chest-Supported Row', 'Seal Row', 'Meadows Row', 'Face Pull'],
+  'Side Delt Focus': ['Lateral Raise', 'Cable Lateral Raise', 'Leaning Cable Lateral Raise', 'Machine Lateral Raise', 'Upright Row'],
+  'Rear Delt Focus': ['Rear Delt Fly', 'Reverse Pec Deck', 'Cable Rear Delt Fly', 'Face Pull', 'Bent-Over Row'],
+  'Biceps Focus': ['Barbell Curl', 'Incline Dumbbell Curl', 'Preacher Curl', 'Bayesian Cable Curl', 'Hammer Curl', '21s'],
+  'Triceps Focus': ['Close-Grip Bench Press', 'Skull Crusher', 'Overhead Cable Extension', 'Rope Triceps Pushdown', 'Triceps Kickback'],
+  'Forearm & Grip Focus': ['Wrist Curl', 'Reverse Wrist Curl', 'Reverse Curl', 'Wrist Roller', 'Plate Pinch', 'Farmer’s Carry'],
+  'Quad Focus': ['Back Squat', 'Hack Squat', 'Leg Press', 'Bulgarian Split Squat', 'Leg Extension', 'Sissy Squat'],
+  'Hamstring Focus': ['Romanian Deadlift', 'Seated Leg Curl', 'Nordic Curl', 'Stiff-Leg Deadlift', 'Single-Leg RDL'],
+  'Glute Focus': ['Hip Thrust', 'Romanian Deadlift', 'Bulgarian Split Squat', 'Curtsy Lunge', 'Glute Bridge', 'Abductor Machine'],
+  'Calf Focus': ['Standing Calf Raise', 'Seated Calf Raise', 'Donkey Calf Raise', 'Calf Raise'],
+  'Lower Abs Focus': ['Hanging Leg Raise', 'Reverse Crunch', 'Lying Leg Raise', 'Flutter Kicks', 'Dragon Flag'],
+  'Oblique Focus': ['Russian Twist', 'Cable Woodchop', 'Side Plank', 'Windshield Wipers', 'Suitcase Carry']
 };
+// How the program picker is organised. Without this the list is 40 flat buttons;
+// with it you scan by intent — a whole muscle, one weak part, a split, or a goal.
+const PROGRAM_GROUPS = [
+  { name: 'Full muscle days', hint: 'Every part of one muscle in a single session',
+    keys: ['Chest — Every Part', 'Back — Every Part', 'Shoulders — Every Part', 'Arms — Every Part', 'Legs — Every Part', 'Core — Every Part'] },
+  { name: 'Bring up a weak part', hint: 'Specialise on one region until it catches up',
+    keys: ['Upper Chest Focus', 'Lower Chest Focus', 'Lat Width Focus', 'Back Thickness Focus', 'Side Delt Focus', 'Rear Delt Focus',
+      'Biceps Focus', 'Triceps Focus', 'Forearm & Grip Focus', 'Quad Focus', 'Hamstring Focus', 'Glute Focus', 'Calf Focus', 'Lower Abs Focus', 'Oblique Focus'] },
+  { name: 'Splits', hint: 'Classic push / pull / legs style days',
+    keys: ['Full Body', 'Beginner Full Body', '5x5 Strength', 'Push Day', 'Pull Day', 'Leg Day', 'Upper Body',
+      'Chest & Triceps', 'Back & Biceps', 'Shoulders & Arms', 'Glutes & Hamstrings', 'Core & Abs'] },
+  { name: 'By goal', hint: 'Burn fat, build your engine, or add size',
+    keys: ['HIIT Cardio (Fat Burn)', 'Steady Cardio (Endurance)', 'Fat Burn — Full Body', 'Fat Burn — Chest Focus',
+      'Muscle Builder — Chest', 'Athletic Conditioning'] }
+];
+// Pure: the program picker's sections, with any program missing from PROGRAM_GROUPS
+// swept into a final "More" section — so adding a workout can never make it
+// invisible in the UI just because someone forgot to file it. (testable)
+function programSections() {
+  const filed = new Set();
+  const secs = PROGRAM_GROUPS.map(g => {
+    const keys = g.keys.filter(k => WORKOUT_PROGRAMS[k]);
+    keys.forEach(k => filed.add(k));
+    return { name: g.name, hint: g.hint, keys };
+  }).filter(s => s.keys.length > 0);
+  const rest = Object.keys(WORKOUT_PROGRAMS).filter(k => !filed.has(k));
+  if (rest.length) secs.push({ name: 'More workouts', hint: 'Everything else in the library', keys: rest });
+  return secs;
+}
+// Pure: the distinct muscle parts a program covers, in body order — this is what
+// tells you at a glance that "Chest — Every Part" really does hit all three. (testable)
+function programPartLabel(name) {
+  const out = [];
+  (WORKOUT_PROGRAMS[name] || []).forEach(ex => {
+    const g = exerciseGroup(ex);
+    const pm = partMeta(g, exercisePart(ex, g));
+    if (pm && out.indexOf(pm.name) === -1) out.push(pm.name);
+  });
+  return out;
+}
 // Which body group a library exercise belongs to (for its card label + muscle map).
 function exerciseGroup(name) {
   for (const g of Object.keys(EXERCISE_LIBRARY)) if (EXERCISE_LIBRARY[g].indexOf(name) !== -1) return g;
@@ -4742,9 +4918,12 @@ function woLibRefresh() { const el = document.getElementById('wo-lib-list'); if 
 const BODY_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4.5" r="2.5"/><path d="M12 7.5v7M12 9.5l-5 2M12 9.5l5 2M9.5 21l2.5-6 2.5 6"/></svg>';
 function libItemHtml(e) {
   const a = JSON.stringify(e.name).replace(/"/g, '&quot;'), b = JSON.stringify(e.muscle).replace(/"/g, '&quot;');
+  // Inside a part section the muscle name repeats on every row, so callers pass
+  // `tag` to label the row with something that actually adds information.
+  const tag = e.tag !== undefined ? e.tag : e.muscle;   // '' deliberately means "no tag"
   return '<div class="wo-lib-row">' +
     '<button type="button" class="wo-lib-item wo-lib-pick" onclick="woAddExercise(' + a + ',' + b + ')">' +
-    '<span class="wo-lib-name">' + escapeHtml(e.name) + '</span><span class="wo-lib-tag">' + escapeHtml(e.muscle) + '</span></button>' +
+    '<span class="wo-lib-name">' + escapeHtml(e.name) + '</span><span class="wo-lib-tag">' + escapeHtml(tag) + '</span></button>' +
     '<button type="button" class="wo-lib-info" onclick="showMuscleMap(' + a + ',' + b + ')" aria-label="Muscles worked" title="See muscles worked">' + BODY_ICON + '</button>' +
     '</div>';
 }
@@ -4754,23 +4933,49 @@ function renderLibBody() {
   const q = (state._lib.q || '').trim();
   if (q) {
     const res = searchExercises(q, 'All');
-    const rows = res.map(libItemHtml).join('') || '<div class="wo-lib-empty">No matches in the library.</div>';
+    // In search results the part is the useful label — "Chest · Upper Chest"
+    // tells you what the lift is for, where a bare "Chest" does not.
+    const rows = res.map(e => {
+      const pm = partMeta(e.muscle, exercisePart(e.name, e.muscle));
+      return libItemHtml(Object.assign({}, e, { tag: pm ? e.muscle + ' · ' + pm.name : e.muscle }));
+    }).join('') || '<div class="wo-lib-empty">No matches in the library.</div>';
     return '<div class="wo-lib-sec">Results for &ldquo;' + escapeHtml(q) + '&rdquo;</div>' + rows +
       '<button type="button" class="wo-lib-item wo-lib-custom" onclick="woAddCustomExercise()">＋ Add &ldquo;' + escapeHtml(q) + '&rdquo; as a custom exercise</button>';
   }
   const m = state._lib.muscle;
   if (!m || m === 'All') {
     return '<div class="wo-lib-sec">Choose a body part</div>' +
-      '<div class="wo-bp-grid">' + Object.keys(EXERCISE_LIBRARY).map(part =>
-        '<button type="button" class="wo-bp" onclick="woLibFilter(\'' + part + '\')">' +
-        '<span class="wo-bp-name">' + part + '</span>' +
-        '<span class="wo-bp-count">' + EXERCISE_LIBRARY[part].length + ' exercises ›</span></button>').join('') +
+      '<div class="wo-bp-grid">' + Object.keys(EXERCISE_LIBRARY).map(part => {
+        const parts = MUSCLE_PARTS[part] || [];
+        return '<button type="button" class="wo-bp" onclick="woLibFilter(\'' + part + '\')">' +
+          '<span class="wo-bp-name">' + part + '</span>' +
+          (parts.length ? '<span class="wo-bp-parts">' + parts.map(p => escapeHtml(p.name)).join(' · ') + '</span>' : '') +
+          '<span class="wo-bp-count">' + EXERCISE_LIBRARY[part].length + ' exercises ›</span></button>';
+      }).join('') +
       '</div>';
   }
-  const res = searchExercises('', m);
-  return '<button type="button" class="wo-lib-back" onclick="woLibBack()">‹ All body parts</button>' +
-    '<div class="wo-lib-part-title">' + escapeHtml(m) + ' · ' + res.length + ' exercises</div>' +
-    res.map(libItemHtml).join('');
+  const secs = exercisesByPart(m);
+  const total = (EXERCISE_LIBRARY[m] || []).length;
+  const head = '<button type="button" class="wo-lib-back" onclick="woLibBack()">‹ All body parts</button>' +
+    '<div class="wo-lib-part-title">' + escapeHtml(m) + ' · ' + total + ' exercises</div>';
+  if (!secs.length) return head + searchExercises('', m).map(libItemHtml).join('');
+  // Jump chips, so a long muscle (Legs has 5 parts) is one tap from any region.
+  const chips = secs.length > 1
+    ? '<div class="wo-part-chips">' + secs.map(s =>
+        '<a class="wo-part-chip" href="#wo-part-' + s.part.key + '">' + escapeHtml(s.part.name) +
+        '<span>' + s.exercises.length + '</span></a>').join('') + '</div>'
+    : '';
+  return head + chips + secs.map(s =>
+    '<div class="wo-part-sec" id="wo-part-' + s.part.key + '">' +
+      '<div class="wo-part-head">' +
+        '<div class="wo-part-name">' + escapeHtml(s.part.name) +
+          '<span class="wo-part-sub">' + escapeHtml(s.part.sub) + '</span>' +
+          '<span class="wo-part-n">' + s.exercises.length + '</span>' +
+        '</div>' +
+        '<div class="wo-part-why">' + escapeHtml(s.part.why) + '</div>' +
+      '</div>' +
+      s.exercises.map(n => libItemHtml({ name: n, muscle: m, tag: '' })).join('') +
+    '</div>').join('');
 }
 
 // ── Start choice: a ready-made program, or build your own ──
@@ -4807,13 +5012,19 @@ function renderWoChooser() {
       '<div class="wo-choose-h">Pick a workout</div>' +
       '<div class="wo-choose-sub">Tap one to load it — then just log your sets and reps.</div>' +
       programGoalBanner() +
-      '<div class="wo-prog-grid">' + Object.keys(WORKOUT_PROGRAMS).map(name => {
-        const exs = WORKOUT_PROGRAMS[name];
-        return '<button type="button" class="wo-prog" onclick="woLoadProgram(' + JSON.stringify(name).replace(/"/g, '&quot;') + ')">' +
-          '<div class="wo-prog-top"><span class="wo-prog-name">' + escapeHtml(name) + '</span><span class="wo-prog-count">' + exs.length + ' exercises</span></div>' +
-          '<div class="wo-prog-list">' + exs.map(escapeHtml).join(' · ') + '</div>' +
-          '<span class="wo-prog-go">Start this workout ›</span></button>';
-      }).join('') + '</div>';
+      programSections().map(sec =>
+        '<div class="wo-prog-sec">' +
+          '<div class="wo-prog-sec-h">' + escapeHtml(sec.name) + '</div>' +
+          '<div class="wo-prog-sec-s">' + escapeHtml(sec.hint) + '</div>' +
+          '<div class="wo-prog-grid">' + sec.keys.map(name => {
+            const exs = WORKOUT_PROGRAMS[name];
+            return '<button type="button" class="wo-prog" onclick="woLoadProgram(' + JSON.stringify(name).replace(/"/g, '&quot;') + ')">' +
+              '<div class="wo-prog-top"><span class="wo-prog-name">' + escapeHtml(name) + '</span><span class="wo-prog-count">' + exs.length + ' exercises</span></div>' +
+              '<div class="wo-prog-parts">' + programPartLabel(name).map(p => '<span>' + escapeHtml(p) + '</span>').join('') + '</div>' +
+              '<div class="wo-prog-list">' + exs.map(escapeHtml).join(' · ') + '</div>' +
+              '<span class="wo-prog-go">Start this workout ›</span></button>';
+          }).join('') + '</div>' +
+        '</div>').join('');
   }
   return '<div class="wo-choose-h">How do you want to train?</div>' +
     '<div class="wo-choose-opts">' +
@@ -4822,7 +5033,7 @@ function renderWoChooser() {
     '<div class="wo-opt-s">Pick a ready-made workout — then just tap your sets &amp; reps.</div></button>' +
     '<button type="button" class="wo-opt" onclick="woChooseOwn()">' +
     '<div class="wo-opt-ic">✏️</div><div class="wo-opt-t">Choose my own</div>' +
-    '<div class="wo-opt-s">Build it yourself from 128 exercises across every body part.</div></button>' +
+    '<div class="wo-opt-s">Build it yourself from ' + libraryCount() + ' exercises, grouped by the part of each muscle they hit.</div></button>' +
     '</div>';
 }
 
@@ -4852,9 +5063,12 @@ function openWorkoutPlanner() {
     '<div class="wplan-head"><div class="wplan-title">Plan your next workout</div><button type="button" class="wplan-close" onclick="closeWorkoutPlanner()">✕</button></div>' +
     '<div class="wplan-sub">Pick it now so it\'s loaded and ready when you get to the gym.</div>' +
     (goal ? '<div class="wplan-goal">' + s.label + ' · aim ' + s.sets + ' · ' + s.reps + '</div>' : '') +
-    '<div class="wplan-list">' + Object.keys(WORKOUT_PROGRAMS).map(name =>
-      '<button type="button" class="wplan-prog" onclick="planWorkout(' + JSON.stringify(name).replace(/"/g, '&quot;') + ')">' +
-      '<span class="wplan-prog-name">' + escapeHtml(name) + '</span><span class="wplan-prog-ex">' + WORKOUT_PROGRAMS[name].length + ' exercises ›</span></button>').join('') +
+    '<div class="wplan-list">' + programSections().map(sec =>
+      '<div class="wplan-sec">' + escapeHtml(sec.name) + '</div>' +
+      sec.keys.map(name =>
+        '<button type="button" class="wplan-prog" onclick="planWorkout(' + JSON.stringify(name).replace(/"/g, '&quot;') + ')">' +
+        '<span class="wplan-prog-name">' + escapeHtml(name) + '</span><span class="wplan-prog-ex">' + WORKOUT_PROGRAMS[name].length + ' exercises ›</span></button>').join('')
+    ).join('') +
     '</div>' +
     '<button type="button" class="wplan-own" onclick="planWorkoutOwn()">I\'ll choose at the gym</button>' +
     '</div>';

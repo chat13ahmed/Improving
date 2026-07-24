@@ -64,7 +64,8 @@ function loadApp(fieldValues) {
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
     ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats, moneyMentorLessons, compoundProjection, snapshotAgeDays, wowArrow, getLastWeekStats, setupProgress, applyFinishRitual,' +
     ' todayStr, weeklyTrainingSplit, lastExercisePerformance, exerciseBestWeightEver, dealPlay, dealPlayPriority, ideaNextMove,' +
-    ' knowledgeQuizPool, groupProgress, allCheckItems, healthBriefing, businessBriefing, knowledgeBriefing, weeklyGamePlan, libFilter });';
+    ' knowledgeQuizPool, groupProgress, allCheckItems, healthBriefing, businessBriefing, knowledgeBriefing, weeklyGamePlan, libFilter,' +
+    ' MUSCLE_PARTS, exercisePart, partMeta, exercisesByPart, libraryCount, PROGRAM_GROUPS, programSections, programPartLabel });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -1032,6 +1033,93 @@ eq('split: undefined days falls back to the 3-day default', A.weeklyTrainingSpli
 eq('split: 1 day clamps up to Full Body', A.weeklyTrainingSplit('gain', 1), ['Full Body']);
 eq('split: 9 days clamps down to 7', A.weeklyTrainingSplit('gain', 9).length, 7);
 ok('split: every session maps to a real program', A.weeklyTrainingSplit('maintain', 4).every(k => !!A.WORKOUT_PROGRAMS[k]));
+
+// ── Muscle parts: every muscle split into the regions you train separately ──
+// The two structural guarantees. If either breaks, the library silently drops
+// exercises out of the UI — they'd exist in the data and be unreachable.
+ok('parts: every exercise in the library resolves to a real part of its muscle', (() => {
+  const bad = [];
+  Object.keys(A.EXERCISE_LIBRARY).forEach(g => A.EXERCISE_LIBRARY[g].forEach(n => {
+    if (!A.partMeta(g, A.exercisePart(n, g))) bad.push(g + '/' + n);
+  }));
+  if (bad.length) failures.push('  unclassified: ' + bad.join(', '));
+  return bad.length === 0;
+})());
+ok('parts: grouping by part loses no exercises', Object.keys(A.EXERCISE_LIBRARY).every(g =>
+  A.exercisesByPart(g).reduce((n, s) => n + s.exercises.length, 0) === A.EXERCISE_LIBRARY[g].length));
+ok('parts: every declared part has at least one exercise', Object.keys(A.MUSCLE_PARTS).every(g => {
+  const filled = new Set(A.exercisesByPart(g).map(s => s.part.key));
+  return A.MUSCLE_PARTS[g].every(p => filled.has(p.key));
+}));
+ok('parts: every muscle group declares its parts', Object.keys(A.EXERCISE_LIBRARY).every(g => (A.MUSCLE_PARTS[g] || []).length >= 3));
+ok('parts: each part carries a name, a sub-label and a coach note', Object.keys(A.MUSCLE_PARTS).every(g =>
+  A.MUSCLE_PARTS[g].every(p => p.key && p.name && p.sub && p.why && p.why.length > 20)));
+eq('parts: chest splits upper / middle / lower', A.MUSCLE_PARTS.Chest.map(p => p.key), ['upper', 'middle', 'lower']);
+// The classifications a lifter would argue about — pinned so they stay right.
+eq('chest: incline bench is upper chest', A.exercisePart('Incline Barbell Bench Press', 'Chest'), 'upper');
+eq('chest: flat bench is middle chest', A.exercisePart('Barbell Bench Press', 'Chest'), 'middle');
+eq('chest: decline + dips are lower chest', A.exercisePart('Decline Bench Press', 'Chest'), 'lower');
+eq('chest: dips count as lower chest', A.exercisePart('Dips', 'Chest'), 'lower');
+eq('chest: low cable fly travels low-to-high → upper', A.exercisePart('Low Cable Fly', 'Chest'), 'upper');
+eq('chest: high cable fly travels high-to-low → lower', A.exercisePart('High Cable Fly', 'Chest'), 'lower');
+// Push-ups invert the bench naming — hands elevated is the EASIER, lower-chest version.
+eq('chest: incline push-up (hands up) is lower chest, not upper', A.exercisePart('Incline Push-Up', 'Chest'), 'lower');
+eq('chest: decline push-up (feet up) is upper chest', A.exercisePart('Decline Push-Up', 'Chest'), 'upper');
+eq('back: pulldowns build lat width', A.exercisePart('Wide-Grip Lat Pulldown', 'Back'), 'lats');
+eq('back: rows build thickness', A.exercisePart('Pendlay Row', 'Back'), 'upper');
+eq('back: deadlifts load the erectors', A.exercisePart('Deadlift', 'Back'), 'lower');
+eq('back: rack pull is a hinge, not a pull-up', A.exercisePart('Rack Pull', 'Back'), 'lower');
+eq('legs: RDL is hamstrings, not quads', A.exercisePart('Romanian Deadlift', 'Legs'), 'hams');
+eq('legs: hip thrust is glutes', A.exercisePart('Hip Thrust', 'Legs'), 'glutes');
+eq('legs: leg extension is quads', A.exercisePart('Leg Extension', 'Legs'), 'quads');
+eq('legs: calf raise is calves', A.exercisePart('Seated Calf Raise', 'Legs'), 'calves');
+eq('shoulders: lateral raise is side delts (the width builder)', A.exercisePart('Lateral Raise', 'Shoulders'), 'side');
+eq('shoulders: overhead press is front delts', A.exercisePart('Overhead Press', 'Shoulders'), 'front');
+eq('shoulders: reverse pec deck is rear delts', A.exercisePart('Reverse Pec Deck', 'Shoulders'), 'rear');
+eq('shoulders: shrugs are traps', A.exercisePart('Barbell Shrug', 'Shoulders'), 'traps');
+eq('arms: skull crusher is triceps', A.exercisePart('Skull Crusher', 'Arms'), 'triceps');
+eq('arms: overhead cable extension is triceps', A.exercisePart('Overhead Cable Extension', 'Arms'), 'triceps');
+eq('arms: barbell curl is biceps', A.exercisePart('Barbell Curl', 'Arms'), 'biceps');
+eq('arms: reverse curl works the forearm, not the bicep', A.exercisePart('Reverse Curl', 'Arms'), 'forearms');
+eq('core: hanging leg raise is lower abs', A.exercisePart('Hanging Leg Raise', 'Core'), 'lower');
+eq('core: side plank is obliques, not deep core', A.exercisePart('Side Plank', 'Core'), 'obliques');
+eq('core: plank is anti-movement deep core', A.exercisePart('Plank', 'Core'), 'deep');
+eq('core: cable crunch is upper abs', A.exercisePart('Cable Crunch', 'Core'), 'upper');
+eq('cardio: sprints are intervals', A.exercisePart('Hill Sprints', 'Cardio'), 'hiit');
+eq('cardio: zone 2 run is steady state', A.exercisePart('Zone 2 Run', 'Cardio'), 'steady');
+eq('cardio: sled push is athletic power', A.exercisePart('Sled Push', 'Cardio'), 'power');
+eq('exercisePart infers the group when not given', A.exercisePart('Incline Dumbbell Press'), 'upper');
+eq('exercisePart: unknown exercise → ""', A.exercisePart('Zercher Carry Thing', ''), '');
+ok('library count is the real total', A.libraryCount() === Object.keys(A.EXERCISE_LIBRARY).reduce((n, g) => n + A.EXERCISE_LIBRARY[g].length, 0) && A.libraryCount() > 150);
+
+// ── Programs: one per muscle covering every part, plus part-focus days ──
+ok('programs: every exercise in every program exists in the library', (() => {
+  const bad = [];
+  Object.keys(A.WORKOUT_PROGRAMS).forEach(p => A.WORKOUT_PROGRAMS[p].forEach(ex => { if (!A.exerciseGroup(ex)) bad.push(p + ' → ' + ex); }));
+  if (bad.length) failures.push('  phantom exercises: ' + bad.join(', '));
+  return bad.length === 0;
+})());
+['Chest', 'Back', 'Shoulders', 'Arms', 'Legs', 'Core'].forEach(g => {
+  const name = g + ' — Every Part';
+  ok('program "' + name + '" exists', !!A.WORKOUT_PROGRAMS[name]);
+  const covered = new Set(A.WORKOUT_PROGRAMS[name].map(ex => A.exercisePart(ex, A.exerciseGroup(ex))));
+  ok(name + ' really does hit every part of ' + g, A.MUSCLE_PARTS[g].every(p => covered.has(p.key)),
+    'missing ' + A.MUSCLE_PARTS[g].filter(p => !covered.has(p.key)).map(p => p.name).join(', '));
+});
+eq('programPartLabel names the parts a program covers', A.programPartLabel('Chest — Every Part').sort(), ['Lower Chest', 'Middle Chest', 'Upper Chest']);
+ok('a focus program stays on its one part', A.programPartLabel('Upper Chest Focus').indexOf('Upper Chest') > -1);
+eq('Calf Focus is calves only', A.programPartLabel('Calf Focus'), ['Calves']);
+ok('programSections: every program is filed somewhere (none hidden from the UI)', (() => {
+  const shown = new Set(); A.programSections().forEach(s => s.keys.forEach(k => shown.add(k)));
+  const missing = Object.keys(A.WORKOUT_PROGRAMS).filter(k => !shown.has(k));
+  if (missing.length) failures.push('  unfiled programs: ' + missing.join(', '));
+  return missing.length === 0;
+})());
+ok('programSections: no program is listed twice', (() => {
+  const seen = []; A.programSections().forEach(s => s.keys.forEach(k => seen.push(k)));
+  return seen.length === new Set(seen).size;
+})());
+ok('programSections: no empty section', A.programSections().every(s => s.keys.length > 0 && s.name && s.hint));
 
 // ── Progressive overload: last time + all-time best ──
 A.state.data = _iBase({ days: [

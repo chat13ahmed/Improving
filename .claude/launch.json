@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "pastry-dashboard",
+      "name": "onward",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["server.js"],
-      "port": 3000
+      "runtimeArgs": ["cloud/server.js"],
+      "port": 4891
     }
   ]
 }
