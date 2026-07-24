@@ -62,7 +62,9 @@ function loadApp(fieldValues) {
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
-    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats, moneyMentorLessons, compoundProjection, snapshotAgeDays, wowArrow, getLastWeekStats, setupProgress, applyFinishRitual });';
+    ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats, moneyMentorLessons, compoundProjection, snapshotAgeDays, wowArrow, getLastWeekStats, setupProgress, applyFinishRitual,' +
+    ' todayStr, weeklyTrainingSplit, lastExercisePerformance, exerciseBestWeightEver, dealPlay, dealPlayPriority, ideaNextMove,' +
+    ' knowledgeQuizPool, groupProgress, allCheckItems, healthBriefing, businessBriefing, knowledgeBriefing, weeklyGamePlan, libFilter });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -638,7 +640,7 @@ ok('reminderDue: dated future not due', A.reminderDue({ enabled: true, _lastFire
 ok('reminderDue: dated today is due', A.reminderDue({ enabled: true, _lastFired: '', time: '08:00', date: _t }, '09:00', _t) === true);
 A.state.data = { profile: {}, days: [], weeks: [], weights: [] };
 A.ensureChecklistData();
-ok('ensureChecklistData creates the fields', Array.isArray(A.state.data.checklist) && Array.isArray(A.state.data.reminders) && typeof A.state.data.checkDone === 'object');
+ok('ensureChecklistData creates the fields', Array.isArray(A.state.data.checklistGroups) && Array.isArray(A.state.data.reminders) && typeof A.state.data.checkDone === 'object');
 
 // Shareable week card — streak + stats (pure; canvas itself needs a real browser)
 const _sd0 = new Date().toISOString().split('T')[0];
@@ -1007,6 +1009,132 @@ eq('normalizeLibMuscle: case-insensitive (from full form)', A.normalizeLibMuscle
 eq('normalizeLibMuscle: Push has no single group → ""', A.normalizeLibMuscle('Push'), '');
 eq('normalizeLibMuscle: Full Body → "" (picker)', A.normalizeLibMuscle('Full Body'), '');
 eq('normalizeLibMuscle: empty → ""', A.normalizeLibMuscle(''), '');
+
+// ─────────────────────────────────────────────────────────────
+// INTELLIGENCE ENGINES — the rules that decide what the app tells you.
+// All pure-ish (read state.data, return data). These encode the product's
+// judgement, so a silent regression here is the costliest kind.
+// ─────────────────────────────────────────────────────────────
+const _iToday = A.todayStr();
+const _iAgo = (n) => { const d = new Date(_iToday + 'T00:00:00'); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+const _iBase = (over) => Object.assign({
+  profile: { pillars: A.defaultPillars(), gymDaysPerWeek: 5, weeklyNetworkGoal: 3, weeklyReadGoal: 100 },
+  days: [], weeks: [], weights: [], books: [], vocab: [], takeaways: [], library: [], ideas: [], contacts: [], finance: {}
+}, over || {});
+
+// ── Coach's weekly training split ──
+eq('split: 3 days → push/pull/legs', A.weeklyTrainingSplit('gain', 3), ['Push Day', 'Pull Day', 'Leg Day']);
+eq('split: 6 days → PPL twice', A.weeklyTrainingSplit('gain', 6).length, 6);
+ok('split: fat-loss swaps the last day for conditioning', A.weeklyTrainingSplit('lose', 5).slice(-1)[0] === 'HIIT Cardio (Fat Burn)');
+ok('split: gain keeps the last day as lifting', A.weeklyTrainingSplit('gain', 5).slice(-1)[0] !== 'HIIT Cardio (Fat Burn)');
+eq('split: missing/0 days falls back to the 3-day default', A.weeklyTrainingSplit('gain', 0).length, 3);
+eq('split: undefined days falls back to the 3-day default', A.weeklyTrainingSplit('gain').length, 3);
+eq('split: 1 day clamps up to Full Body', A.weeklyTrainingSplit('gain', 1), ['Full Body']);
+eq('split: 9 days clamps down to 7', A.weeklyTrainingSplit('gain', 9).length, 7);
+ok('split: every session maps to a real program', A.weeklyTrainingSplit('maintain', 4).every(k => !!A.WORKOUT_PROGRAMS[k]));
+
+// ── Progressive overload: last time + all-time best ──
+A.state.data = _iBase({ days: [
+  { date: _iAgo(9), gym: { done: true, exercises: [{ name: 'Barbell Bench Press', sets: [{ reps: 8, weight: 80 }, { reps: 6, weight: 85 }] }] } },
+  { date: _iAgo(3), gym: { done: true, exercises: [{ name: 'Barbell Bench Press', sets: [{ reps: 5, weight: 82.5 }] }] } }
+] });
+const _lp = A.lastExercisePerformance('Barbell Bench Press');
+eq('last time: picks the most recent prior session', _lp.date, _iAgo(3));
+eq('last time: best set of that session', _lp.best.weight, 82.5);
+eq('last time: name match is case-insensitive', A.lastExercisePerformance('barbell bench press').date, _iAgo(3));
+eq('last time: unknown exercise → null', A.lastExercisePerformance('Zercher Squat'), null);
+eq('PR bar = heaviest ever across all days', A.exerciseBestWeightEver('Barbell Bench Press'), 85);
+eq('PR bar for a never-done lift is 0 (so a first set is never a "PR")', A.exerciseBestWeightEver('Zercher Squat'), 0);
+ok('last time: best set breaks ties on reps', (() => {
+  A.state.data = _iBase({ days: [{ date: _iAgo(2), gym: { done: true, exercises: [{ name: 'Row', sets: [{ reps: 5, weight: 60 }, { reps: 9, weight: 60 }] }] } }] });
+  return A.lastExercisePerformance('Row').best.reps === 9;
+})());
+
+// ── Deal playbook (Contacts) ──
+A.state.data = _iBase();
+ok('deal play: overdue follow-up is prefixed as overdue', A.dealPlay({ status: 'warm', followUpDate: _iAgo(2) }, _iToday).indexOf('overdue') > -1);
+ok('deal play: new contact → open with a question, not a pitch', A.dealPlay({ status: 'new' }, _iToday).toLowerCase().indexOf('pitch') > -1);
+ok('deal play: closing → ask for the decision', A.dealPlay({ status: 'closing' }, _iToday).toLowerCase().indexOf('decision') > -1);
+ok('deal priority: overdue outranks a fresh closing deal',
+  A.dealPlayPriority({ status: 'warm', followUpDate: _iAgo(1) }, _iToday) > A.dealPlayPriority({ status: 'closing' }, _iToday));
+ok('deal priority: bigger deal edges out an equal-stage smaller one',
+  A.dealPlayPriority({ status: 'warm', dealValue: 5000 }, _iToday) > A.dealPlayPriority({ status: 'warm', dealValue: 100 }, _iToday));
+
+// ── Idea validation playbook ──
+eq('idea move: untested → talk to people first', A.ideaNextMove({ validation: {} }).stage.key, 'untested');
+eq('idea move: hypotheses set → experiment stage', A.ideaNextMove({ validation: { customer: 'gyms', valueHyp: 'saves time' } }).stage.key, 'hypothesis');
+ok('idea move: experiment ready → decide go/no-go BEFORE running',
+  A.ideaNextMove({ validation: { customer: 'a', valueHyp: 'b', experiment: 'landing page', metric: 'signups' } }).move.indexOf('GO') > -1);
+eq('idea move: results + persevere → validated', A.ideaNextMove({ validation: { result: '20 signups', decision: 'persevere' } }).stage.key, 'validated');
+ok('idea move: results in, undecided → forces the call',
+  A.ideaNextMove({ validation: { result: 'flat' } }).move.toLowerCase().indexOf('pivot') > -1);
+
+// ── Knowledge games pool ──
+A.state.data = _iBase({
+  library: [{ id: 'a', type: 'person', title: 'Marcus Aurelius', body: 'Stoic emperor.' }, { id: 'b', type: 'theory', title: 'Compounding', body: 'Growth on growth.' }, { id: 'c', type: 'fact', title: 'No note', body: '' }],
+  vocab: [{ id: 'w', word: 'Ephemeral', meaning: 'Lasting a short time' }, { id: 'w2', word: 'NoMeaning', meaning: '' }]
+});
+const _pool = A.knowledgeQuizPool();
+eq('quiz pool: merges library + vocab, skips entries with no clue', _pool.length, 3);
+ok('quiz pool: a library entry is asked by its note', _pool.find(p => p.answer === 'Marcus Aurelius').clue.indexOf('Stoic') > -1);
+ok('quiz pool: a word is asked by its meaning', _pool.find(p => p.answer === 'Ephemeral').clue.indexOf('short time') > -1);
+ok('quiz pool: de-dupes answers so a distractor is never also correct', (() => {
+  A.state.data = _iBase({ library: [{ id: '1', title: 'Dup', body: 'x' }, { id: '2', title: 'dup', body: 'y' }] });
+  return A.knowledgeQuizPool().length === 1;
+})());
+
+// ── Grouped checklists (incl. one-way migration) ──
+A.state.data = _iBase({ checklist: [{ id: 'i1', text: 'Vitamins' }, { id: 'i2', text: 'Walk' }] });
+A.ensureChecklistData();
+eq('checklist: old flat list migrates into one group', A.state.data.checklistGroups.length, 1);
+eq('checklist: migrated group keeps every item', A.state.data.checklistGroups[0].items.length, 2);
+ok('checklist: the old flat array is removed after migrating', A.state.data.checklist === undefined);
+A.state.data.checkDone = {}; A.state.data.checkDone[_iToday] = ['i1'];
+eq('checklist: overall progress counts across groups', A.checklistProgress(), { done: 1, total: 2 });
+eq('checklist: per-group progress', A.groupProgress(A.state.data.checklistGroups[0]), { done: 1, total: 2 });
+eq('checklist: allCheckItems flattens groups', A.allCheckItems().length, 2);
+
+// ── Expert briefings: shape + the rules that must fire ──
+A.state.data = _iBase({ days: [0, 1, 2, 3, 4, 5, 6].map(n => ({ date: _iAgo(n), gym: { done: true, muscleGroup: 'Push' } })) });
+const _hb = A.healthBriefing();
+ok('health briefing: returns triaged items', Array.isArray(_hb) && _hb.length > 0);
+ok('health briefing: every item has a severity and a concrete move', _hb.every(i => typeof i.sev === 'number' && i.move && i.title));
+ok('health briefing: 7 straight training days raises a recovery flag',
+  _hb.some(i => i.sev >= 3 && (i.title + i.why).toLowerCase().indexOf('rest') > -1));
+ok('health briefing: push-only month flags the pull imbalance',
+  _hb.some(i => (i.title + i.why).toLowerCase().indexOf('pull') > -1));
+A.state.data = _iBase({ contacts: [{ id: 'c1', name: 'Jordan', status: 'warm', dealValue: 9000, followUpDate: _iAgo(3) }] });
+const _bb = A.businessBriefing();
+ok('business briefing: an overdue follow-up is the top call', _bb[0].sev >= 3 && _bb[0].title.toLowerCase().indexOf('overdue') > -1);
+A.state.data = _iBase({ books: [], takeaways: [{ id: 't1', text: 'A', createdAt: _iAgo(5) }, { id: 't2', text: 'B', createdAt: _iAgo(6) }] });
+const _kb = A.knowledgeBriefing();
+ok('knowledge briefing: unrevisited lessons surface for retrieval practice',
+  _kb.some(i => (i.title + i.why).toLowerCase().indexOf('revisit') > -1));
+ok('briefings: never empty — always give the user something', A.healthBriefing().length > 0 && A.businessBriefing().length > 0 && A.knowledgeBriefing().length > 0);
+
+// ── Cross-hub game plan ──
+A.state.data = _iBase({ contacts: [{ id: 'c1', name: 'Jordan', status: 'warm', followUpDate: _iAgo(4) }] });
+const _plan = A.weeklyGamePlan();
+ok('game plan: one row per enabled area', _plan.length >= 1 && _plan.length <= 3);
+ok('game plan: sorted most-urgent first', _plan.every((r, i) => i === 0 || _plan[i - 1].sev >= r.sev));
+ok('game plan: each row deep-links to a hub', _plan.every(r => ['health', 'business', 'knowledge'].includes(r.page)));
+
+// ── Library search + filter ──
+A.state.data = _iBase({ library: [
+  { id: '1', type: 'person', title: 'Marcus Aurelius', body: 'Stoic emperor', tags: ['stoicism'] },
+  { id: '2', type: 'history', title: 'Berlin Wall', body: 'Fell in 1989', tags: [] }
+] });
+A.state._libQ = ''; A.state._libType = '';
+eq('library: no filter returns everything', A.libFilter(A.state.data.library).length, 2);
+A.state._libQ = 'berlin';
+eq('library: search matches the title', A.libFilter(A.state.data.library).length, 1);
+A.state._libQ = 'stoicism';
+eq('library: search also matches tags', A.libFilter(A.state.data.library)[0].id, '1');
+A.state._libQ = '1989';
+eq('library: search also matches the note body', A.libFilter(A.state.data.library)[0].id, '2');
+A.state._libQ = ''; A.state._libType = 'person';
+eq('library: type filter narrows to that type', A.libFilter(A.state.data.library).length, 1);
+A.state._libQ = ''; A.state._libType = '';
 
 // ─────────────────────────────────────────────────────────────
 // CLOUD DATABASE — real SQLite round-trip (in-memory, no install)
