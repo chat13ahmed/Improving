@@ -276,6 +276,21 @@ app.post('/api/change-password', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Error' }); }
 });
 
+// Permanently delete the signed-in user's account and ALL their data. Required
+// by the App Store (Guideline 5.1.1(v)) and Google Play for any app with
+// accounts. Guarded by the current password so a stolen/idle session can't nuke
+// an account; the DB delete cascades to every table the user owns.
+app.delete('/api/account', requireAuth, async (req, res) => {
+  try {
+    const u = await DB.findUserById(req.userId);
+    if (!u) return res.status(404).json({ error: 'Account not found.' });
+    if (!verifyPassword(req.body.password || '', u.pw_salt, u.pw_hash)) return res.status(401).json({ error: 'Password is incorrect.' });
+    const ok = await DB.deleteUser(u.id);
+    if (!ok) return res.status(500).json({ error: 'Could not delete the account.' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: 'Could not delete the account.' }); }
+});
+
 app.post('/api/set-security', requireAuth, async (req, res) => {
   try {
     const u = await DB.findUserById(req.userId);

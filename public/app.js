@@ -12337,7 +12337,75 @@ function renderSettingsPage() {
 
     // Backup & data
     renderBackupCard() +
+
+    // Delete account (cloud accounts only) — required by the app stores
+    renderDangerCard() +
     '</div>';
+}
+// Permanent account deletion — a store requirement and a genuine user right.
+// Only shown for a signed-in cloud account (local-only mode has no server account).
+function renderDangerCard() {
+  if (!state.user) return '';
+  return '<div class="card danger-card">' +
+    '<h3 class="card-title">Delete account</h3>' +
+    '<p class="card-sub">Permanently delete your account and <strong>all</strong> your data — logs, workouts, notes, library, community posts. This cannot be undone. Export a backup first if you want to keep a copy.</p>' +
+    '<button type="button" class="btn btn-danger" onclick="openDeleteAccount()">Delete my account…</button>' +
+    '</div>';
+}
+function openDeleteAccount() {
+  document.getElementById('del-acct-modal')?.remove();
+  const m = document.createElement('div');
+  m.id = 'del-acct-modal';
+  m.className = 'modal-overlay';
+  m.innerHTML =
+    '<div class="modal-box da-box" onclick="event.stopPropagation()">' +
+    '<h3 class="da-title">Delete your account?</h3>' +
+    '<p class="da-warn">This permanently erases <strong>' + escapeHtml(state.user || 'your account') + '</strong> and every bit of data in it. It can’t be undone.</p>' +
+    '<label class="da-label">Confirm your password</label>' +
+    '<input type="password" id="da-pw" class="cf-input" autocomplete="current-password" placeholder="Your password">' +
+    '<label class="da-label">Type <b>DELETE</b> to confirm</label>' +
+    '<input type="text" id="da-confirm" class="cf-input" autocomplete="off" oninput="daSyncBtn()" placeholder="DELETE">' +
+    '<div class="da-actions">' +
+    '<button type="button" class="btn btn-outline" onclick="closeDeleteAccount()">Cancel</button>' +
+    '<button type="button" id="da-go" class="btn btn-danger" disabled onclick="confirmDeleteAccount()">Delete forever</button>' +
+    '</div></div>';
+  m.addEventListener('click', closeDeleteAccount);
+  document.body.appendChild(m);
+  setTimeout(() => { const p = document.getElementById('da-pw'); if (p) p.focus(); }, 30);
+}
+function closeDeleteAccount() { document.getElementById('del-acct-modal')?.remove(); }
+function daSyncBtn() {
+  const btn = document.getElementById('da-go');
+  const typed = (document.getElementById('da-confirm')?.value || '').trim();
+  if (btn) btn.disabled = typed !== 'DELETE';
+}
+async function confirmDeleteAccount() {
+  const pw = document.getElementById('da-pw')?.value || '';
+  const typed = (document.getElementById('da-confirm')?.value || '').trim();
+  if (typed !== 'DELETE') return;
+  if (!pw) { showToast('Enter your password to confirm.', 'error'); return; }
+  const btn = document.getElementById('da-go');
+  if (btn) { btn.disabled = true; btn.textContent = 'Deleting…'; }
+  try {
+    const res = await fetch(API_BASE + '/api/account', { method: 'DELETE', headers: authHeaders(), body: JSON.stringify({ password: pw }) });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      showToast(j.error || 'Could not delete the account.', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = 'Delete forever'; }
+      return;
+    }
+    // Wipe every local trace and drop back to the sign-up screen.
+    closeDeleteAccount();
+    localStorage.removeItem('be_token');
+    state.token = null; state.user = null;
+    try { Object.values(charts).forEach(c => c.destroy()); charts = {}; } catch {}
+    document.getElementById('main').innerHTML = '<div class="loading-screen"><div class="loading-spinner"></div><p>Deleting your account…</p></div>';
+    showToast('Your account and all its data have been deleted.', 'success');
+    renderAuthScreen('login');
+  } catch {
+    showToast('You appear to be offline — try again when connected.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Delete forever'; }
+  }
 }
 // ── Feedback: anyone (except the owner) can send a note; it rides in their own
 // data blob and the owner reads all of them in the Admin console. ──

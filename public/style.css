@@ -2616,6 +2616,19 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .fp-x { margin-left: auto; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: none; color: var(--text-muted); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .fp-x:hover { color: var(--danger); border-color: var(--danger); }
 
+/* Delete-account: danger card + confirm modal (store requirement) */
+.btn-danger { background: var(--danger); color: #fff; border: 1px solid var(--danger); }
+.btn-danger:hover { filter: brightness(1.06); }
+.btn-danger:disabled { opacity: .5; cursor: not-allowed; filter: none; }
+.danger-card { border-color: rgba(239,68,68,.35); }
+.danger-card .card-title { color: var(--danger); }
+.da-box { text-align: left; width: 420px; }
+.da-title { font-size: 19px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+.da-warn { font-size: 14px; color: var(--text-muted); line-height: 1.55; margin-bottom: 16px; }
+.da-label { display: block; font-size: 12.5px; font-weight: 700; color: var(--text-muted); margin: 4px 2px 6px; }
+.da-actions { display: flex; gap: 10px; margin-top: 8px; }
+.da-actions .btn { flex: 1; }
+
 /* Connection of the Week — the cross-pillar "wow" card */
 .conn-card { border: 1px solid var(--accent); background: var(--tint-1); }
 .conn-tag { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: var(--accent); margin-bottom: 8px; }

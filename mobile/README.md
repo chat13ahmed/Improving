@@ -1,4 +1,4 @@
-# Business Escalate — Mobile (App Store & Google Play)
+# Onward — Mobile (App Store & Google Play)
 
 A [Capacitor](https://capacitorjs.com) wrapper that turns the web app into a
 native iOS + Android app you can submit to the stores. One codebase, both

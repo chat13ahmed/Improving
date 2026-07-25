@@ -33,6 +33,10 @@ function sqliteImpl() {
   const file = process.env.SQLITE_FILE || path.join(__dirname, 'data.db');
   const db = new DatabaseSync(file);
   try { db.exec('PRAGMA journal_mode = WAL;'); } catch {}
+  // SQLite ignores FK constraints unless this is on. The schema declares
+  // ON DELETE CASCADE everywhere (so deleting a user removes all their rows) —
+  // this makes those declarations actually fire, matching Postgres.
+  try { db.exec('PRAGMA foreign_keys = ON;'); } catch {}
   return {
     kind: 'sqlite',
     async ensureSchema() {
@@ -130,6 +134,9 @@ function sqliteImpl() {
     async findUserByEmail(email) { return email ? (db.prepare('SELECT * FROM users WHERE email = ? COLLATE NOCASE').get(email) || null) : null; },
     async findUserByPhone(phone) { return phone ? (db.prepare('SELECT * FROM users WHERE phone = ?').get(phone) || null) : null; },
     async findUserById(id) { return db.prepare('SELECT * FROM users WHERE id = ?').get(id) || null; },
+    // Permanently delete a user and everything they own (cascades via FKs — see
+    // PRAGMA foreign_keys above). Required for App Store / Play Store compliance.
+    async deleteUser(id) { const r = db.prepare('DELETE FROM users WHERE id=?').run(id); return r.changes > 0; },
     async updatePassword(id, salt, hash) { db.prepare('UPDATE users SET pw_salt=?, pw_hash=? WHERE id=?').run(salt, hash, id); },
     async setSecurity(id, q, salt, hash) { db.prepare('UPDATE users SET sec_question=?, sec_salt=?, sec_hash=? WHERE id=?').run(q, salt, hash, id); },
     async getData(userId) { const row = db.prepare('SELECT data, version FROM user_data WHERE user_id=?').get(userId); return row ? { data: ENC.decryptData(JSON.parse(row.data)), version: row.version } : null; },
@@ -332,6 +339,7 @@ function pgImpl() {
     async findUserByEmail(email) { if (!email) return null; const r = await q('SELECT * FROM users WHERE lower(email)=lower($1)', [email]); return r.rows[0] || null; },
     async findUserByPhone(phone) { if (!phone) return null; const r = await q('SELECT * FROM users WHERE phone=$1', [phone]); return r.rows[0] || null; },
     async findUserById(id) { const r = await q('SELECT * FROM users WHERE id=$1', [id]); return r.rows[0] || null; },
+    async deleteUser(id) { const r = await q('DELETE FROM users WHERE id=$1', [id]); return r.rowCount > 0; },   // cascades via FKs
     async updatePassword(id, salt, hash) { await q('UPDATE users SET pw_salt=$1, pw_hash=$2 WHERE id=$3', [salt, hash, id]); },
     async setSecurity(id, ques, salt, hash) { await q('UPDATE users SET sec_question=$1, sec_salt=$2, sec_hash=$3 WHERE id=$4', [ques, salt, hash, id]); },
     async getData(userId) { const r = await q('SELECT data, version FROM user_data WHERE user_id=$1', [userId]); return r.rowCount ? { data: ENC.decryptData(r.rows[0].data), version: r.rows[0].version } : null; },
@@ -485,6 +493,7 @@ module.exports = {
   findUserByEmail: (e) => impl.findUserByEmail(e),
   findUserByPhone: (p) => impl.findUserByPhone(p),
   findUserById: (i) => impl.findUserById(i),
+  deleteUser: (i) => impl.deleteUser(i),
   updatePassword: (i, s, h) => impl.updatePassword(i, s, h),
   setSecurity: (i, q, s, h) => impl.setSecurity(i, q, s, h),
   getData: (i) => impl.getData(i),

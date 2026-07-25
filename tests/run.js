@@ -1351,6 +1351,19 @@ A.state._libQ = ''; A.state._libType = '';
     ok('cleanPost: DROPS an over-cap photo', C.cleanPost({ type: 'update', body: 'x', photo: 'data:image/png;base64,' + 'A'.repeat(900000) }).data.photo === undefined);
     ok('cleanPost: a photo-only post survives sanitizing (body can be empty)', (() => { const p = C.cleanPost({ type: 'update', photo: 'data:image/png;base64,QQ==' }); return !!p.data.photo && p.body === ''; })());
     ok('cleanPost: program/meal never carry a link or photo', (() => { const a = C.cleanPost({ type: 'program', title: 'P', link: 'https://x.com', photo: 'data:image/png;base64,QQ==' }); return a.data.link === undefined && a.data.photo === undefined; })());
+    // ── account deletion (App Store / Play requirement) — must remove the user AND cascade ──
+    const delId = await DBm.createUser({ username: 'todelete', pw_salt: 's', pw_hash: 'h', sec_question: null, sec_salt: null, sec_hash: null });
+    await DBm.saveData(delId, { profile: { name: 'Bye' }, days: [1, 2] }, 1);
+    await DBm.savePushSub(delId, { endpoint: 'https://push.example/del', keys: { p256dh: 'x', auth: 'y' } });
+    await DBm.createPost({ user_id: delId, author_name: 'todelete', type: 'update', title: '', body: 'my post', data: {} });
+    ok('pre-delete: the user, their data + push sub all exist', !!(await DBm.findUserById(delId)) && !!(await DBm.getData(delId)) && (await DBm.allPushSubs()).some(s => String(s.user_id) === String(delId)));
+    const delOk = await DBm.deleteUser(delId);
+    ok('deleteUser reports success', delOk === true);
+    ok('after delete: the user row is gone', (await DBm.findUserById(delId)) === null);
+    ok('after delete: their data blob is gone (cascade)', (await DBm.getData(delId)) === null);
+    ok('after delete: their push subs are gone (cascade)', !(await DBm.allPushSubs()).some(s => String(s.user_id) === String(delId)));
+    ok('after delete: their community posts are gone (cascade)', !(await DBm.listPosts('')).some(p => String(p.user_id) === String(delId)));
+    ok('deleteUser on a missing id returns false', (await DBm.deleteUser(9999999)) === false);
   } catch (e) { failures.push('cloud DB (sqlite) — ' + e.message); }
 
   // ── report ──
