@@ -50,7 +50,7 @@ function loadApp(fieldValues) {
     performance: { now: () => 0 }, requestAnimationFrame: () => 0,
     Node: { TEXT_NODE: 3, ELEMENT_NODE: 1 }, confirm: () => true, prompt: () => '', alert: () => {},
     Blob: function (p) { this.parts = p; }, URL: { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} },
-    Date, Math, JSON, Object, Array, parseInt, parseFloat, isNaN, String, Number, RegExp, __exports__: {}
+    Date, Math, JSON, Object, Array, parseInt, parseFloat, isNaN, String, Number, RegExp, URL, __exports__: {}
   };
   sandbox.window = sandbox; sandbox.globalThis = sandbox;
   let code = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8').replace(/\ninit\(\);\s*$/, '\n');
@@ -65,7 +65,8 @@ function loadApp(fieldValues) {
     ' musclesForExercise, muscleMapSVG, MUSCLE_NAMES, WORKOUT_PROGRAMS, exerciseGroup, repSchemeForGoal, tailorProgram, plannedWorkoutLabel, sortTakeawaysByPriority, fuelStatus, proteinFoodForGap, financeMetrics, debtPayoffMonths, yearsToFI, nextReviewBox, reviewIntervalDays, vocabDue, vocabMastered, readingPacePerDay, knowledgeYearStats, moneyMentorLessons, compoundProjection, snapshotAgeDays, wowArrow, getLastWeekStats, setupProgress, applyFinishRitual,' +
     ' todayStr, weeklyTrainingSplit, lastExercisePerformance, exerciseBestWeightEver, dealPlay, dealPlayPriority, ideaNextMove,' +
     ' knowledgeQuizPool, groupProgress, allCheckItems, healthBriefing, businessBriefing, knowledgeBriefing, weeklyGamePlan, libFilter,' +
-    ' MUSCLE_PARTS, exercisePart, partMeta, exercisesByPart, libraryCount, PROGRAM_GROUPS, programSections, programPartLabel });';
+    ' MUSCLE_PARTS, exercisePart, partMeta, exercisesByPart, libraryCount, PROGRAM_GROUPS, programSections, programPartLabel,' +
+    ' safeUrl, linkHost });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -1207,6 +1208,16 @@ ok('game plan: one row per enabled area', _plan.length >= 1 && _plan.length <= 3
 ok('game plan: sorted most-urgent first', _plan.every((r, i) => i === 0 || _plan[i - 1].sev >= r.sev));
 ok('game plan: each row deep-links to a hub', _plan.every(r => ['health', 'business', 'knowledge'].includes(r.page)));
 
+// ── Community: safe link display (mirrors the server's own validation) ──
+eq('safeUrl passes a real https link', A.safeUrl('https://youtube.com/watch?v=1'), 'https://youtube.com/watch?v=1');
+eq('safeUrl passes a real http link', A.safeUrl('http://example.com/'), 'http://example.com/');
+eq('safeUrl blocks javascript: (XSS)', A.safeUrl('javascript:alert(1)'), '');
+eq('safeUrl blocks data: URLs', A.safeUrl('data:text/html,<script>'), '');
+eq('safeUrl blocks a bare word', A.safeUrl('example.com'), '');
+eq('safeUrl blocks empty / null', A.safeUrl(''), '');
+eq('linkHost strips the scheme and www', A.linkHost('https://www.youtube.com/watch?v=1'), 'youtube.com');
+eq('linkHost of a bad url is ""', A.linkHost('not a url'), '');
+
 // ── Library search + filter ──
 A.state.data = _iBase({ library: [
   { id: '1', type: 'person', title: 'Marcus Aurelius', body: 'Stoic emperor', tags: ['stoicism'] },
@@ -1321,10 +1332,25 @@ A.state._libQ = ''; A.state._libType = '';
     ok('DB deletePost blocks non-author', (await DBm.deletePost(pid, 99999, false)) === false);
     ok('DB deletePost author removes own', (await DBm.deletePost(pid, id, false)) === true);
     // server-side post sanitizer
-    ok('cleanPost defaults unknown type to thought', C.cleanPost({ type: 'spam', body: 'hi' }).type === 'thought');
+    ok('cleanPost defaults unknown type to the open post', C.cleanPost({ type: 'spam', body: 'hi' }).type === 'update');
     ok('cleanPost keeps program goal + days/week', (() => { const p = C.cleanPost({ type: 'program', title: 'X', daysPerWeek: '6', goal: 'gain' }); return p.data.daysPerWeek === 6 && p.data.goal === 'gain'; })());
     ok('cleanPost coerces meal macros to numbers', (() => { const p = C.cleanPost({ type: 'meal', title: 'Oats', kcal: '450', p: 'x' }); return p.data.kcal === 450 && p.data.p === 0; })());
     ok('cleanPost caps very long bodies', C.cleanPost({ type: 'thought', body: 'a'.repeat(5000) }).body.length === 4000);
+    // ── open "share anything" post: topic + link + photo, all sanitized ──
+    ok('cleanPost: open post keeps a whitelisted topic', C.cleanPost({ type: 'update', body: 'hi', topic: 'money' }).data.topic === 'money');
+    ok('cleanPost: unknown topic falls back to general (stored as undefined)', C.cleanPost({ type: 'update', body: 'hi', topic: 'crypto-shill' }).data.topic === undefined);
+    ok('cleanPost: general topic is not stored', C.cleanPost({ type: 'update', body: 'hi', topic: 'general' }).data.topic === undefined);
+    ok('cleanPost: keeps a real https link', C.cleanPost({ type: 'update', body: 'x', link: 'https://example.com/a' }).data.link === 'https://example.com/a');
+    ok('cleanPost: keeps a real http link', !!C.cleanPost({ type: 'update', body: 'x', link: 'http://example.com' }).data.link);
+    ok('cleanPost: DROPS a javascript: link (XSS)', C.cleanPost({ type: 'update', body: 'x', link: 'javascript:alert(1)' }).data.link === undefined);
+    ok('cleanPost: DROPS a data: link', C.cleanPost({ type: 'update', body: 'x', link: 'data:text/html,<script>' }).data.link === undefined);
+    ok('cleanPost: DROPS a mailto: / bare-word link', C.cleanPost({ type: 'update', body: 'x', link: 'mailto:a@b.com' }).data.link === undefined && C.cleanPost({ type: 'update', body: 'x', link: 'notaurl' }).data.link === undefined);
+    ok('cleanPost: keeps an image data-URL photo', !!C.cleanPost({ type: 'update', body: 'x', photo: 'data:image/jpeg;base64,QQ==' }).data.photo);
+    ok('cleanPost: DROPS a non-image data URL as a "photo"', C.cleanPost({ type: 'update', body: 'x', photo: 'data:text/html;base64,PHNjcmlwdD4=' }).data.photo === undefined);
+    ok('cleanPost: DROPS a remote-URL photo (no external fetch in the feed)', C.cleanPost({ type: 'update', body: 'x', photo: 'https://evil.example/track.gif' }).data.photo === undefined);
+    ok('cleanPost: DROPS an over-cap photo', C.cleanPost({ type: 'update', body: 'x', photo: 'data:image/png;base64,' + 'A'.repeat(900000) }).data.photo === undefined);
+    ok('cleanPost: a photo-only post survives sanitizing (body can be empty)', (() => { const p = C.cleanPost({ type: 'update', photo: 'data:image/png;base64,QQ==' }); return !!p.data.photo && p.body === ''; })());
+    ok('cleanPost: program/meal never carry a link or photo', (() => { const a = C.cleanPost({ type: 'program', title: 'P', link: 'https://x.com', photo: 'data:image/png;base64,QQ==' }); return a.data.link === undefined && a.data.photo === undefined; })());
   } catch (e) { failures.push('cloud DB (sqlite) — ' + e.message); }
 
   // ── report ──

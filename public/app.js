@@ -2539,8 +2539,39 @@ async function removeCommunityMeal(id) {
 // ─────────────────────────────────────────────────────────────
 // COMMUNITY FEED — thoughts / training programs / meals
 // ─────────────────────────────────────────────────────────────
-const POST_TYPE_LABELS = { thought: 'Thought', program: 'Training program', meal: 'Meal' };
+const POST_TYPE_LABELS = { update: 'Post', thought: 'Thought', program: 'Training program', meal: 'Meal' };
+// Topics let people share ANY information but still keep the feed browsable.
+const POST_TOPICS = [
+  ['general', 'General'], ['fitness', 'Fitness'], ['nutrition', 'Nutrition'], ['money', 'Money'],
+  ['reading', 'Reading'], ['mindset', 'Mindset'], ['win', 'Win 🎉'], ['question', 'Question']
+];
+const POST_TOPIC_LABELS = Object.fromEntries(POST_TOPICS);
+// Pure: keep only real http(s) links; drop javascript:/data:/anything else. Used
+// for DISPLAY — the server validates independently before storing. (testable)
+function safeUrl(u) {
+  const s = String(u || '').trim();
+  if (!/^https?:\/\//i.test(s)) return '';
+  try { const p = new URL(s); return (p.protocol === 'http:' || p.protocol === 'https:') ? p.href : ''; }
+  catch { return ''; }
+}
+// Pure: the bare host for a link chip, e.g. "youtube.com" from a full URL. (testable)
+function linkHost(u) {
+  try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; }
+}
 function composerFields(type) {
+  if (type === 'update') {
+    const topic = state._postTopic || 'general';
+    return '<input type="text" id="cf-title" class="cf-input" placeholder="Title (optional)" maxlength="120">' +
+      '<textarea id="cf-body" class="cf-input cf-area" placeholder="Share anything — a thought, a win, a lesson, a link, a question for the community…"></textarea>' +
+      '<div class="cf-topics" id="cf-topics">' +
+      POST_TOPICS.map(([v, l]) => '<button type="button" class="cf-topic' + (v === topic ? ' active' : '') + '" data-topic="' + v + '" onclick="setPostTopic(\'' + v + '\')">' + l + '</button>').join('') +
+      '</div>' +
+      '<input type="url" id="cf-link" class="cf-input" placeholder="Add a link (optional) — https://…" maxlength="500">' +
+      '<div class="cf-attach" id="cf-attach">' +
+      '<label class="cf-photo-btn">📷 <span>Add photo</span><input type="file" accept="image/*" onchange="addPostPhoto(this)" hidden></label>' +
+      '<div id="cf-photo-preview"></div>' +
+      '</div>';
+  }
   if (type === 'program') {
     return '<input type="text" id="cf-title" class="cf-input" placeholder="Program name — e.g. Push / Pull / Legs" maxlength="120">' +
       '<div class="cf-row">' +
@@ -2566,21 +2597,54 @@ function setComposerType(type) {
   document.querySelectorAll('.cf-type').forEach(el => el.classList.toggle('active', el.dataset.t === type));
   const f = document.getElementById('cf-fields');
   if (f) f.innerHTML = composerFields(type);
+  refreshPostPhoto();
+}
+function setPostTopic(topic) {
+  state._postTopic = topic;
+  document.querySelectorAll('.cf-topic').forEach(el => el.classList.toggle('active', el.dataset.topic === topic));
+}
+async function addPostPhoto(input) {
+  const f = (input && input.files && input.files[0]) || null;
+  if (!f) return;
+  try {
+    const dataUrl = await compressImageFile(f, 1100, 0.72);
+    if (dataUrl.length > 750000) { showToast('That photo is too large even compressed — try another.', 'error'); return; }
+    state._postPhoto = dataUrl;
+  } catch { showToast('Couldn’t read that image.', 'error'); }
+  if (input) input.value = '';
+  refreshPostPhoto();
+}
+function removePostPhoto() { state._postPhoto = null; refreshPostPhoto(); }
+function refreshPostPhoto() {
+  const el = document.getElementById('cf-photo-preview');
+  if (!el) return;
+  el.innerHTML = state._postPhoto
+    ? '<div class="cf-photo-thumb"><img src="' + state._postPhoto + '" alt="Attached photo"><button type="button" class="cf-photo-x" onclick="removePostPhoto()" aria-label="Remove photo">✕</button></div>'
+    : '';
 }
 async function submitCommunityPost() {
-  const type = state._composerType || 'thought';
+  const type = state._composerType || 'update';
   const body = { type, author: state.user || '' };
   body.body = (document.getElementById('cf-body')?.value || '').trim();
-  if (type !== 'thought') body.title = (document.getElementById('cf-title')?.value || '').trim();
+  body.title = (document.getElementById('cf-title')?.value || '').trim();
+  if (type === 'update') {
+    body.topic = state._postTopic || 'general';
+    const link = (document.getElementById('cf-link')?.value || '').trim();
+    if (link && !safeUrl(link)) { showToast('That link doesn’t look right — it should start with http:// or https://', 'error'); return; }
+    if (link) body.link = link;
+    if (state._postPhoto) body.photo = state._postPhoto;
+  }
   if (type === 'program') { body.goal = document.getElementById('cf-goal')?.value || ''; body.daysPerWeek = document.getElementById('cf-days')?.value || ''; }
   if (type === 'meal') { body.kcal = document.getElementById('cf-kcal')?.value || 0; body.p = document.getElementById('cf-p')?.value || 0; body.c = document.getElementById('cf-c')?.value || 0; body.f = document.getElementById('cf-f')?.value || 0; }
-  if (!body.body && !body.title) { showToast('Write something first.', 'error'); return; }
+  if (!body.body && !body.title && !body.photo && !body.link) { showToast('Share something first.', 'error'); return; }
   try {
     const res = await fetch('/api/community/posts', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
     if (!res.ok) { const j = await res.json().catch(() => ({})); showToast(j.error || 'Could not post.', 'error'); return; }
     showToast('Posted to the community', 'success');
+    state._postPhoto = null; state._postTopic = 'general';
     const b = document.getElementById('cf-body'); if (b) b.value = '';
-    ['cf-title', 'cf-goal', 'cf-days', 'cf-kcal', 'cf-p', 'cf-c', 'cf-f'].forEach(idv => { const e = document.getElementById(idv); if (e) e.value = ''; });
+    ['cf-title', 'cf-link', 'cf-goal', 'cf-days', 'cf-kcal', 'cf-p', 'cf-c', 'cf-f'].forEach(idv => { const e = document.getElementById(idv); if (e) e.value = ''; });
+    setComposerType(type);   // reset the rich fields (topic chips, photo preview)
     loadCommunityFeed();
   } catch { showToast('You appear to be offline.', 'error'); }
 }
@@ -2620,22 +2684,53 @@ function feedMetaLine(p) {
   }
   return '';
 }
+// A post's photo + link, rendered safely. Link is re-validated at display time
+// and always carries rel="noopener noreferrer nofollow" — never trust stored data.
+function feedMediaBlock(p) {
+  const d = p.data || {};
+  let html = '';
+  if (d.photo && /^data:image\//i.test(String(d.photo))) {
+    html += '<div class="fp-photo"><img src="' + escapeAttr(d.photo) + '" alt="Shared photo" loading="lazy" onclick="showPostPhoto(' + p.id + ')"></div>';
+  }
+  const link = safeUrl(d.link);
+  if (link) {
+    html += '<a class="fp-link" href="' + escapeAttr(link) + '" target="_blank" rel="noopener noreferrer nofollow">' +
+      '<span class="fp-link-ico">🔗</span><span class="fp-link-host">' + escapeHtml(linkHost(link) || link) + '</span>' +
+      '<span class="fp-link-go">Open ›</span></a>';
+  }
+  return html;
+}
 function renderFeedList(posts) {
-  if (!posts.length) return '<div class="my-meals-empty">Nothing here yet — be the first to post.</div>';
-  return posts.map(p =>
-    '<div class="feed-post">' +
+  if (!posts.length) return '<div class="my-meals-empty">Nothing here yet — be the first to share.</div>';
+  return posts.map(p => {
+    const topic = p.data && p.data.topic;
+    return '<div class="feed-post">' +
     '<div class="fp-head"><span class="fp-badge fp-' + p.type + '">' + (POST_TYPE_LABELS[p.type] || 'Post') + '</span>' +
+    (topic && POST_TOPIC_LABELS[topic] ? '<span class="fp-topic">' + escapeHtml(POST_TOPIC_LABELS[topic]) + '</span>' : '') +
     '<span class="fp-author">' + escapeHtml(p.author || 'Someone') + '</span></div>' +
     (p.title ? '<div class="fp-title">' + escapeHtml(p.title) + '</div>' : '') +
     feedMetaLine(p) +
     (p.body ? '<div class="fp-body">' + escapeHtml(p.body) + '</div>' : '') +
+    feedMediaBlock(p) +
     '<div class="fp-actions">' +
     '<button type="button" class="fp-like' + (p.likedByMe ? ' liked' : '') + '" onclick="likeCommunityPost(' + p.id + ')">' + (p.likedByMe ? '♥' : '♡') + ' <span>' + (p.likeCount || 0) + '</span></button>' +
     (p.mine
       ? '<button type="button" class="fp-x" onclick="deleteCommunityPost(' + p.id + ')">Delete</button>'
       : '<button type="button" class="fp-x" onclick="reportCommunityPost(' + p.id + ')">Report</button>') +
-    '</div></div>'
-  ).join('');
+    '</div></div>';
+  }).join('');
+}
+// Lightbox for a shared photo (reuses the same overlay style as library photos).
+function showPostPhoto(id) {
+  const p = (state._feed || []).find(x => x.id === id);
+  const src = p && p.data && p.data.photo;
+  if (!src || !/^data:image\//i.test(String(src))) return;
+  document.getElementById('post-lightbox')?.remove();
+  const el = document.createElement('div');
+  el.className = 'modal-overlay'; el.id = 'post-lightbox';
+  el.innerHTML = '<div class="lib-lightbox-box"><img src="' + escapeAttr(src) + '" alt="Shared photo"></div>';
+  el.addEventListener('click', () => el.remove());
+  document.body.appendChild(el);
 }
 async function likeCommunityPost(id) {
   try {
@@ -2662,21 +2757,22 @@ async function deleteCommunityPost(id) {
   } catch { showToast('Could not reach the server.', 'error'); }
 }
 function renderCommunityPage() {
-  if (!state._composerType) state._composerType = 'thought';
+  if (!state._composerType || state._composerType === 'thought') state._composerType = 'update';
+  if (!state._postTopic) state._postTopic = 'general';
   if (state._feedFilter == null) state._feedFilter = '';
-  const filters = [['', 'All'], ['thought', 'Thoughts'], ['program', 'Programs'], ['meal', 'Meals']];
+  const filters = [['', 'All'], ['update', 'Posts'], ['program', 'Programs'], ['meal', 'Meals']];
   // Desktop: composer rides a sticky left rail beside the feed; mobile stacks.
   document.getElementById('main').innerHTML =
     '<div class="page-header">' +
     '<h2 class="page-title">Community</h2>' +
-    '<p class="page-sub">Share thoughts, training programs, and meals — and see what others post</p>' +
+    '<p class="page-sub">Share anything — a thought, a win, a lesson, a link, a photo, a program or a meal</p>' +
     '</div>' +
     '<div class="comm-layout">' +
     '<div class="comm-rail">' +
     '<div class="card comm-composer">' +
     '<h3 class="card-title">Share something</h3>' +
     '<div class="cf-typetabs">' +
-    ['thought', 'program', 'meal'].map(t => '<button type="button" class="cf-type' + (t === state._composerType ? ' active' : '') + '" data-t="' + t + '" onclick="setComposerType(\'' + t + '\')">' + POST_TYPE_LABELS[t] + '</button>').join('') +
+    [['update', 'Post'], ['program', 'Program'], ['meal', 'Meal']].map(([t, l]) => '<button type="button" class="cf-type' + (t === state._composerType ? ' active' : '') + '" data-t="' + t + '" onclick="setComposerType(\'' + t + '\')">' + l + '</button>').join('') +
     '</div>' +
     '<div id="cf-fields">' + composerFields(state._composerType) + '</div>' +
     '<button class="btn btn-primary" style="margin-top:12px" onclick="submitCommunityPost()">Post</button>' +

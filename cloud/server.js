@@ -700,10 +700,30 @@ app.delete('/api/community/meals/:id', requireAuth, async (req, res) => {
 // ── Community feed: thoughts / training programs / meals ──────────────
 // Sanitize a post: type is whitelisted; title/body length-capped; structured
 // `data` kept small + numeric. The server never trusts the client beyond this.
-const POST_TYPES = ['thought', 'program', 'meal'];
+// 'update' is the open "share anything" post (the default). 'thought' is kept for
+// posts made before the open post existed, so they still render.
+const POST_TYPES = ['update', 'thought', 'program', 'meal'];
+const POST_TOPICS = ['general', 'fitness', 'nutrition', 'money', 'reading', 'mindset', 'win', 'question'];
+// A user-supplied link is only ever stored if it's a real http(s) URL. Anything
+// else (javascript:, data:, mailto:, garbage) is dropped, never stored.
+function safeHttpUrl(s) {
+  const u = String(s || '').trim();
+  if (!u || u.length > 500) return '';
+  let parsed; try { parsed = new URL(u); } catch { return ''; }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+  return parsed.href.slice(0, 500);
+}
+// A shared photo must be a self-contained image data URL (no external fetch) and
+// size-capped, so the feed can never be used to embed a tracking pixel or a bomb.
+function safeImageDataUrl(s) {
+  const p = String(s || '');
+  if (!/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(p)) return '';
+  if (p.length > 800000) return '';
+  return p;
+}
 function cleanPost(b) {
   const num = (x, max) => Math.max(0, Math.min(max, Math.round(Number(x) || 0)));
-  const type = POST_TYPES.includes(String(b.type)) ? String(b.type) : 'thought';
+  const type = POST_TYPES.includes(String(b.type)) ? String(b.type) : 'update';
   const title = String(b.title || '').trim().slice(0, 120);
   const body = String(b.body || '').trim().slice(0, 4000);
   const data = {};
@@ -713,6 +733,12 @@ function cleanPost(b) {
     if (d) data.daysPerWeek = Math.max(1, Math.min(7, d));
   } else if (type === 'meal') {
     data.kcal = num(b.kcal, 20000); data.p = num(b.p, 2000); data.c = num(b.c, 2000); data.f = num(b.f, 2000);
+  } else {
+    // Open posts (update / legacy thought) can carry a topic, a link and a photo.
+    const topic = POST_TOPICS.includes(String(b.topic)) ? String(b.topic) : 'general';
+    if (topic !== 'general') data.topic = topic;
+    const link = safeHttpUrl(b.link); if (link) data.link = link;
+    const photo = safeImageDataUrl(b.photo); if (photo) data.photo = photo;
   }
   return { type, title, body, data };
 }
