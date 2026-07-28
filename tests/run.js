@@ -66,7 +66,7 @@ function loadApp(fieldValues) {
     ' todayStr, weeklyTrainingSplit, lastExercisePerformance, exerciseBestWeightEver, dealPlay, dealPlayPriority, ideaNextMove,' +
     ' knowledgeQuizPool, groupProgress, allCheckItems, healthBriefing, businessBriefing, knowledgeBriefing, weeklyGamePlan, libFilter,' +
     ' MUSCLE_PARTS, exercisePart, partMeta, exercisesByPart, libraryCount, PROGRAM_GROUPS, programSections, programPartLabel,' +
-    ' safeUrl, linkHost });';
+    ' safeUrl, linkHost, libGroups });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -1234,6 +1234,26 @@ eq('library: search also matches the note body', A.libFilter(A.state.data.librar
 A.state._libQ = ''; A.state._libType = 'person';
 eq('library: type filter narrows to that type', A.libFilter(A.state.data.library).length, 1);
 A.state._libQ = ''; A.state._libType = '';
+
+// ── Library user-defined categories (groups) ──
+A.state.data = _iBase({ library: [
+  { id: '1', type: 'person', title: 'Marcus Aurelius', body: 'Stoic emperor', group: 'Philosophy' },
+  { id: '2', type: 'theory', title: 'Stoicism', body: 'Control what you can', group: 'philosophy' },   // case-variant of same category
+  { id: '3', type: 'history', title: 'Berlin Wall', body: 'Fell in 1989', group: 'History' },
+  { id: '4', type: 'fact', title: 'Loose note', body: 'no category' }                                  // uncategorized
+] });
+A.state._libQ = ''; A.state._libType = ''; A.state._libGroup = undefined;
+eq('libGroups: distinct categories, case-folded, alphabetical', A.libGroups(), ['History', 'Philosophy']);
+eq('library: no category filter returns everything', A.libFilter(A.state.data.library).length, 4);
+A.state._libGroup = 'Philosophy';
+eq('library: category filter narrows to that category', A.libFilter(A.state.data.library).length, 1);
+A.state._libGroup = '';
+eq('library: "" category filter shows only uncategorized', A.libFilter(A.state.data.library).map(e => e.id), ['4']);
+A.state._libGroup = 'Philosophy'; A.state._libQ = 'berlin';
+eq('library: category + search combine (no match across categories)', A.libFilter(A.state.data.library).length, 0);
+A.state._libQ = 'philosophy'; A.state._libGroup = undefined;
+ok('library: search also matches the category name', A.libFilter(A.state.data.library).some(e => e.id === '1'));
+A.state._libQ = ''; A.state._libType = ''; A.state._libGroup = undefined;
 
 // ─────────────────────────────────────────────────────────────
 // CLOUD DATABASE — real SQLite round-trip (in-memory, no install)

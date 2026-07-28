@@ -9758,18 +9758,28 @@ const LIBRARY_TYPES = [
 function libType(key) { return LIBRARY_TYPES.find(t => t.key === key) || LIBRARY_TYPES[3]; }
 function ensureLibrary() { if (!Array.isArray(state.data.library)) state.data.library = []; return state.data.library; }
 function libFilter(lib) {
-  const q = (state._libQ || '').trim().toLowerCase(), typeF = state._libType || '';
+  const q = (state._libQ || '').trim().toLowerCase(), typeF = state._libType || '', groupF = state._libGroup;
   let items = lib.slice();
   if (typeF) items = items.filter(e => e.type === typeF);
-  if (q) items = items.filter(e => [e.title, e.body, e.source, (e.tags || []).join(' ')].some(f => String(f || '').toLowerCase().includes(q)));
+  // undefined = no category filter; a string (incl. '' for Uncategorized) narrows to that category.
+  if (groupF !== undefined) items = items.filter(e => (e.group || '').trim() === groupF);
+  if (q) items = items.filter(e => [e.title, e.body, e.source, e.group, (e.tags || []).join(' ')].some(f => String(f || '').toLowerCase().includes(q)));
   return items;
+}
+// The distinct categories the user has actually used, alphabetical. (testable)
+function libGroups() {
+  const seen = {}, out = [];
+  ensureLibrary().forEach(e => { const g = (e.group || '').trim(); if (g && !seen[g.toLowerCase()]) { seen[g.toLowerCase()] = 1; out.push(g); } });
+  return out.sort((a, b) => a.localeCompare(b));
 }
 function toggleLibAdd() { state._libAdding = !state._libAdding; renderKnowledgePage(); }
 function setLibType(t) { state._libType = (state._libType === t ? '' : t); renderKnowledgePage(); }
+function setLibGroup(g) { state._libGroup = (state._libGroup === g ? undefined : g); renderKnowledgePage(); }   // string ('' = Uncategorized)
+function clearLibGroup() { state._libGroup = undefined; renderKnowledgePage(); }
 function setLibQuery(v) {
   state._libQ = v;
   const el = document.getElementById('lib-list');
-  if (el) el.innerHTML = renderLibraryList(libFilter(ensureLibrary()));
+  if (el) el.innerHTML = renderLibListInner();
 }
 // Open an existing entry in the form to edit it (attachments come along).
 function startLibEdit(id) {
@@ -9792,6 +9802,7 @@ async function addLibraryEntry() {
   const title = (document.getElementById('lib-title')?.value || '').trim();
   if (!title) { showToast('Give it a title first.', 'error'); return; }
   const type = document.getElementById('lib-type')?.value || 'concept';
+  const group = (document.getElementById('lib-group')?.value || '').trim().slice(0, 60);
   const body = (document.getElementById('lib-body')?.value || '').trim();
   const source = (document.getElementById('lib-source')?.value || '').trim();
   const tags = (document.getElementById('lib-tags')?.value || '').split(',').map(t => t.trim()).filter(Boolean).slice(0, 8);
@@ -9800,6 +9811,7 @@ async function addLibraryEntry() {
   if (editing) {
     // Update in place — keeps its id, createdAt and revisit history.
     editing.type = type;
+    if (group) editing.group = group; else delete editing.group;
     editing.title = title.slice(0, 120);
     editing.body = body.slice(0, 4000);
     editing.source = source.slice(0, 200);
@@ -9809,6 +9821,7 @@ async function addLibraryEntry() {
     editing.updatedAt = todayStr();
   } else {
     const entry = { id: uid(), type, title: title.slice(0, 120), body: body.slice(0, 4000), source: source.slice(0, 200), tags, createdAt: todayStr() };
+    if (group) entry.group = group;
     if (photos.length) entry.photos = photos;
     if (state._libAudio) entry.audio = state._libAudio;
     state.data.library.unshift(entry);
@@ -9956,6 +9969,7 @@ function renderLibraryList(items) {
     const tags = (e.tags || []).length ? '<div class="lib-tags">' + e.tags.map(x => '<span class="lib-tag">' + escapeHtml(x) + '</span>').join('') + '</div>' : '';
     return '<div class="lib-item">' +
       '<div class="lib-item-top"><span class="lib-badge lib-' + e.type + '">' + t.icon + ' ' + t.label + '</span>' +
+      ((e.group || '').trim() ? '<button type="button" class="lib-cat-chip" onclick="setLibGroup(' + JSON.stringify(e.group.trim()).replace(/"/g, '&quot;') + ')" title="Filter this category">🗂 ' + escapeHtml(e.group.trim()) + '</button>' : '') +
       '<span class="lib-item-acts"><span class="lib-date">' + fmtDateShort(e.createdAt) + (e.updatedAt ? ' · edited' : '') + '</span>' +
       '<button type="button" class="fb-del" onclick="startLibEdit(\'' + e.id + '\')" title="Edit" aria-label="Edit">✎</button>' +
       '<button type="button" class="fb-del" onclick="deleteLibraryEntry(\'' + e.id + '\')" title="Delete" aria-label="Delete">✕</button></span></div>' +
@@ -9971,7 +9985,6 @@ function renderLibraryList(items) {
 }
 function renderLibraryBody() {
   const lib = ensureLibrary();
-  const byType = {}; lib.forEach(e => { byType[e.type] = (byType[e.type] || 0) + 1; });
   const ed = state._libEditId ? (lib.find(x => x.id === state._libEditId) || {}) : {};
   const typeOpts = LIBRARY_TYPES.map(t => '<option value="' + t.key + '"' + (ed.type === t.key ? ' selected' : '') + '>' + t.icon + ' ' + t.label + '</option>').join('');
   const head = '<div class="lib-headbar"><div><div class="lib-eyebrow">📚 Your library</div>' +
@@ -9984,10 +9997,13 @@ function renderLibraryBody() {
       '<div class="form-row"><div class="form-group"><label>Title</label>' +
       '<input id="lib-title" placeholder="e.g. Marcus Aurelius · The fall of Rome · Compound interest" maxlength="120" value="' + escapeAttr(ed.title || '') + '"></div>' +
       '<div class="form-group"><label>Type</label><select id="lib-type">' + typeOpts + '</select></div></div>' +
+      '<div class="form-row"><div class="form-group"><label>Category</label>' +
+      '<input id="lib-group" list="lib-group-opts" placeholder="Your own — e.g. Philosophy, Physics, Business" maxlength="60" value="' + escapeAttr(ed.group || '') + '">' +
+      '<datalist id="lib-group-opts">' + libGroups().map(g => '<option value="' + escapeAttr(g) + '"></option>').join('') + '</datalist></div>' +
+      '<div class="form-group"><label>Source (optional)</label><input id="lib-source" placeholder="Book, video, conversation…" maxlength="200" value="' + escapeAttr(ed.source || '') + '"></div></div>' +
       '<div class="form-group"><label>What you learned</label>' +
       '<textarea id="lib-body" rows="4" placeholder="The idea, the story, the person — and why it matters to you…" maxlength="4000">' + escapeHtml(ed.body || '') + '</textarea></div>' +
-      '<div class="form-row"><div class="form-group"><label>Source (optional)</label><input id="lib-source" placeholder="Book, video, conversation…" maxlength="200" value="' + escapeAttr(ed.source || '') + '"></div>' +
-      '<div class="form-group"><label>Tags (optional, comma-separated)</label><input id="lib-tags" placeholder="stoicism, mindset" value="' + escapeAttr((ed.tags || []).join(', ')) + '"></div></div>' +
+      '<div class="form-group"><label>Tags (optional, comma-separated)</label><input id="lib-tags" placeholder="stoicism, mindset" value="' + escapeAttr((ed.tags || []).join(', ')) + '"></div>' +
       '<div class="lib-att-row">' +
       '<label class="btn btn-outline btn-sm lib-att-btn">📷 Add photo<input type="file" accept="image/*" multiple onchange="addLibPhoto(this)" hidden></label>' +
       '<button type="button" id="lib-rec-btn" class="btn btn-outline btn-sm" onclick="toggleLibRecord()">' + (state._libRec ? '⏹ Stop' : '🎙 Record voice') + '</button>' +
@@ -10002,14 +10018,39 @@ function renderLibraryBody() {
       '<p>Save the people, history, theories and ideas you want to keep — a personal knowledge base that grows with you, and resurfaces so it sticks.</p>' +
       (state._libAdding ? '' : '<div class="empty-actions"><button type="button" class="btn btn-primary" onclick="toggleLibAdd()">Add your first entry</button></div>') + '</div>';
   }
-  const resurface = (!(state._libQ || '').trim() && !state._libType && lib.length >= 3) ? renderLibResurface(lib) : '';
-  const chips = '<div class="lib-filters">' +
-    '<button type="button" class="lib-chip' + (!state._libType ? ' on' : '') + '" onclick="setLibType(\'\')">All · ' + lib.length + '</button>' +
-    LIBRARY_TYPES.filter(t => byType[t.key]).map(t => '<button type="button" class="lib-chip' + (state._libType === t.key ? ' on' : '') + '" onclick="setLibType(\'' + t.key + '\')">' + t.icon + ' ' + t.label + ' · ' + byType[t.key] + '</button>').join('') +
-    '</div>';
+  const resurface = (!(state._libQ || '').trim() && state._libGroup === undefined && lib.length >= 3) ? renderLibResurface(lib) : '';
+  // Category chips — the user's own groups drive these. All · each category · Uncategorized.
+  const groups = libGroups();
+  const uncat = lib.filter(e => !(e.group || '').trim()).length;
+  const chip = (label, active, onclick) => '<button type="button" class="lib-chip' + (active ? ' on' : '') + '" onclick="' + onclick + '">' + label + '</button>';
+  const chips = (groups.length || uncat) ? '<div class="lib-filters">' +
+    chip('All · ' + lib.length, state._libGroup === undefined, 'clearLibGroup()') +
+    groups.map(g => chip('🗂 ' + escapeHtml(g) + ' · ' + lib.filter(e => (e.group || '').trim() === g).length, state._libGroup === g, 'setLibGroup(' + JSON.stringify(g).replace(/"/g, '&quot;') + ')')).join('') +
+    (uncat ? chip('Uncategorized · ' + uncat, state._libGroup === '', "setLibGroup('')") : '') +
+    '</div>' : '';
   const searchBar = '<input type="search" id="lib-search" class="lib-search" placeholder="Search your library…" value="' + escapeAttr(state._libQ || '') + '" oninput="setLibQuery(this.value)">';
   return head + addForm + resurface + chips + searchBar +
-    '<div id="lib-list" class="lib-list">' + renderLibraryList(libFilter(lib)) + '</div>';
+    '<div id="lib-list" class="lib-list">' + renderLibListInner() + '</div>';
+}
+// The list under the filters: sectioned by category when browsing everything,
+// or a flat filtered list when searching or a specific category is picked.
+function renderLibListInner() {
+  const lib = ensureLibrary();
+  const q = (state._libQ || '').trim();
+  if (q || state._libGroup !== undefined) return renderLibraryList(libFilter(lib));
+  return renderLibraryGrouped(lib);
+}
+// Everything, grouped into the user's own categories (Uncategorized last).
+function renderLibraryGrouped(lib) {
+  const groups = libGroups();
+  if (!groups.length) return renderLibraryList(lib);   // no categories yet → plain list
+  const section = (name, items) => !items.length ? '' :
+    '<div class="lib-group-sec"><div class="lib-group-head">' +
+    '<span class="lib-group-name">🗂 ' + escapeHtml(name) + '</span><span class="lib-group-n">' + items.length + '</span>' +
+    '</div>' + renderLibraryList(items) + '</div>';
+  let html = groups.map(g => section(g, lib.filter(e => (e.group || '').trim() === g))).join('');
+  html += section('Uncategorized', lib.filter(e => !(e.group || '').trim()));
+  return html;
 }
 
 // ═══════════════════════════════════════════════════════════════
