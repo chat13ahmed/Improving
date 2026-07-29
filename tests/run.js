@@ -66,7 +66,7 @@ function loadApp(fieldValues) {
     ' todayStr, weeklyTrainingSplit, lastExercisePerformance, exerciseBestWeightEver, dealPlay, dealPlayPriority, ideaNextMove,' +
     ' knowledgeQuizPool, groupProgress, allCheckItems, healthBriefing, businessBriefing, knowledgeBriefing, weeklyGamePlan, libFilter,' +
     ' MUSCLE_PARTS, exercisePart, partMeta, exercisesByPart, libraryCount, PROGRAM_GROUPS, programSections, programPartLabel,' +
-    ' safeUrl, linkHost, libGroups, hubEnabled, HUB_PILLARS });';
+    ' safeUrl, linkHost, libGroups, hubEnabled, HUB_PILLARS, dayXp, dayCompleteStats, getLevel });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -1272,6 +1272,29 @@ ok('hubs: Income alone lights the Business hub', A.hubEnabled('business') === tr
 A.state.data.profile.pillars = _pill(['networking']);
 ok('hubs: Networking alone lights the Business hub', A.hubEnabled('business') === true);
 ok('hubs: a non-hub page (Log/Coach) is never gated', A.hubEnabled('log') === true && A.hubEnabled('coach') === true);
+A.state.data = _iBase();
+
+// ── Day-complete celebration stats (the daily "you climbed" moment) ──
+eq('dayXp: gym+food+reading+networking uses the right weights',
+  A.dayXp({ gym: { done: true }, food: { rating: 4 }, reading: { pages: 12 }, networking: { count: 2 } }), 10 + 5 + 8 + 2 * 3);
+eq('dayXp: a rest day with nothing logged earns 0', A.dayXp({ gym: { done: false } }), 0);
+eq('dayXp: missing/blank day → 0', A.dayXp(null), 0);
+(() => {
+  const day = { gym: { done: true }, reading: { pages: 10 } };   // 18 XP
+  const st = A.dayCompleteStats(day, 200, 5);
+  eq('dayCompleteStats: earned = the day\'s XP', st.earned, 18);
+  eq('dayCompleteStats: total carries through', st.total, 200);
+  eq('dayCompleteStats: streak carries through', st.streak, 5);
+  ok('dayCompleteStats: exposes the level + colour for the bar', typeof st.level === 'number' && !!st.color);
+})();
+ok('dayCompleteStats: 7-day streak surfaces a milestone', !!A.dayCompleteStats({}, 100, 7).milestone);
+ok('dayCompleteStats: an ordinary streak has no milestone', A.dayCompleteStats({}, 100, 6).milestone === '');
+// Levels: Base Camp 0, Foothills 100, Treeline 300… A day that carries the total
+// across the 100 boundary should flag a level-up; one that stays put should not.
+ok('dayCompleteStats: crossing the Foothills (100) boundary flags leveledUp',
+  A.dayCompleteStats({ gym: { done: true } }, 105, 3).leveledUp === true);   // total 105, earned 10 → 95→105
+ok('dayCompleteStats: staying inside a level → leveledUp false',
+  A.dayCompleteStats({ gym: { done: true } }, 200, 3).leveledUp === false);  // 190→200, both Foothills
 A.state.data = _iBase();
 
 // ─────────────────────────────────────────────────────────────

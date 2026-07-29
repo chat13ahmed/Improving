@@ -337,6 +337,33 @@ function getLevel(xp) {
   const pct = next ? Math.min(100, Math.round(((xp - cur.min) / (next.min - cur.min)) * 100)) : 100;
   return { level: idx + 1, label: cur.label, color: cur.color, xp, pct, nextMin: next?.min, nextLabel: next?.label };
 }
+// Pure: the XP a single day earned — same weights as computeXP, per-day parts. (testable)
+function dayXp(day) {
+  let xp = 0;
+  if (day && day.gym && day.gym.done) xp += 10;
+  if (day && day.food && day.food.rating > 0) xp += 5;
+  xp += ((day && day.networking && day.networking.count) || 0) * 3;
+  if (day && day.reading && day.reading.pages > 0) xp += 8;
+  return xp;
+}
+// Streak milestones worth a special shout — the "don't break the chain" hooks.
+const STREAK_MILESTONES = { 3: 'Three in a row', 7: 'One week strong', 14: 'Two weeks', 30: '30 days — this is a habit now', 50: '50-day streak', 100: '100 days — unstoppable', 365: 'One full year 🏔️' };
+// Pure: everything the day-complete celebration shows — XP earned, the new total
+// and level, whether this log leveled you up, the streak and any milestone. No
+// state read: caller passes the current total XP and streak. (testable)
+function dayCompleteStats(day, totalXp, streak) {
+  const earned = dayXp(day);
+  const total = Math.max(0, totalXp || 0);
+  const after = getLevel(total);
+  const before = getLevel(Math.max(0, total - earned));
+  return {
+    earned, total,
+    level: after.level, label: after.label, color: after.color, pct: after.pct,
+    toNext: after.nextMin ? Math.max(0, after.nextMin - total) : 0, nextLabel: after.nextLabel || '',
+    leveledUp: after.level > before.level,
+    streak: streak || 0, milestone: STREAK_MILESTONES[streak] || ''
+  };
+}
 
 function renderXPBar() {
   const xp  = computeXP();
@@ -6064,32 +6091,65 @@ function todaysVotes(day, on) {
 // The end-of-day moment where it all comes together: the day is logged (the
 // system), it casts votes for who you're becoming (identity), it's a step up the
 // climb (progress), and it ties back to your why (meaning).
+// Smoothly count a number up from 0 → target inside an element (ease-out).
+function animateCount(el, target, ms) {
+  if (!el) return;
+  target = Math.round(target || 0);
+  if (target <= 0) { el.textContent = '0'; return; }
+  const start = performance.now(), dur = ms || 900;
+  (function step(now) {
+    const t = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(target * eased).toLocaleString();
+    if (t < 1) requestAnimationFrame(step);
+  })(start);
+}
 function showDayComplete(day) {
   const on = { gym: isPillarOn('gym'), reading: isPillarOn('reading'), networking: isPillarOn('networking'), food: isPillarOn('food') };
   const votes = todaysVotes(day, on);
-  const streak = loggingStreak();
-  const voteLine = (votes.length ? votes : [{ icon: '🧗', who: 'someone who shows up' }])
-    .map(v => '<span class="dc-vote">' + v.icon + ' a vote for <b>' + v.who + '</b></span>').join('');
+  const s = dayCompleteStats(day, computeXP(), loggingStreak());
   const firstEver = (state.data.days || []).filter(d => Array.isArray(d._logged) && d._logged.length).length <= 1;
-  const title = firstEver ? 'You\'re on the board! 🧗' : 'Day logged' + (streak > 1 ? ' · ' + streak + '-day streak 🔥' : '');
-  const close = firstEver ? 'Day 1 of your climb. Come back tomorrow — that\'s where it compounds.'
-    : (getMission() ? 'One step closer to your why.' : 'Every vote builds the person you\'re becoming.');
+  const title = s.leveledUp ? 'LEVEL UP!' : firstEver ? "You're on the board!" : s.milestone ? s.milestone : 'Day climbed';
+  const close = firstEver ? 'Day 1 of your climb — this is where it compounds.'
+    : s.leveledUp ? 'You reached <b>Lv.' + s.level + ' ' + escapeHtml(s.label) + '</b>.'
+    : (getMission() ? 'One step closer to your why.' : 'Every day logged builds the person you\'re becoming.');
+  const voteLine = (votes.length ? votes : [{ icon: '🧗', who: 'someone who shows up' }])
+    .map(v => '<span class="dc-vote">' + v.icon + ' a vote for <b>' + escapeHtml(v.who) + '</b></span>').join('');
   const cols = ['#10B981', '#22D3EE', '#F472B6', '#A78BFA', '#fbbf24'];
   let conf = '';
-  for (let i = 0; i < 26; i++) { const left = Math.random() * 100, delay = Math.random() * 1.4, dur = 2 + Math.random() * 2, w = 6 + Math.random() * 7; conf += '<div class="conf-p" style="left:' + left + '%;width:' + w + 'px;height:' + (w * 1.5) + 'px;background:' + cols[i % cols.length] + ';border-radius:2px;animation-delay:' + delay + 's;animation-duration:' + dur + 's"></div>'; }
+  const nConf = s.leveledUp || s.milestone ? 42 : 26;
+  for (let i = 0; i < nConf; i++) { const left = Math.random() * 100, delay = Math.random() * 1.4, dur = 2 + Math.random() * 2, w = 6 + Math.random() * 7; conf += '<div class="conf-p" style="left:' + left + '%;width:' + w + 'px;height:' + (w * 1.5) + 'px;background:' + cols[i % cols.length] + ';border-radius:2px;animation-delay:' + delay + 's;animation-duration:' + dur + 's"></div>'; }
+
   const el = document.createElement('div');
-  el.className = 'celebration-overlay';
+  el.className = 'celebration-overlay dc2' + (s.leveledUp ? ' dc2-levelup' : '');
   el.onclick = () => el.remove();
   el.innerHTML = conf +
-    '<div class="celeb-box">' +
-    '<div class="dc-check">✓</div>' +
-    '<div class="celeb-title">' + title + '</div>' +
+    '<div class="dc2-box" style="--dc-accent:' + s.color + '">' +
+    '<div class="dc2-ring"><svg viewBox="0 0 80 80"><circle class="dc2-ring-bg" cx="40" cy="40" r="34"/><circle class="dc2-ring-fg" cx="40" cy="40" r="34"/></svg><span class="dc2-ring-check">✓</span></div>' +
+    '<div class="dc2-title">' + title + '</div>' +
+    // Streak flame
+    (s.streak > 0 ? '<div class="dc2-streak"><span class="dc2-flame">🔥</span><span class="dc2-streak-n">' + s.streak + '</span><span class="dc2-streak-word">day streak</span></div>' : '') +
+    (s.milestone && s.leveledUp ? '<div class="dc2-milestone">' + escapeHtml(s.milestone) + '</div>' : '') +   // title already carries the milestone unless we leveled up
+    // XP earned + level bar
+    '<div class="dc2-xp">' +
+    '<div class="dc2-xp-gain">+<span class="dc2-xp-num">0</span> XP</div>' +
+    '<div class="dc2-xp-track"><div class="dc2-xp-fill"></div></div>' +
+    '<div class="dc2-xp-meta"><span style="color:' + s.color + ';font-weight:800">Lv.' + s.level + ' ' + escapeHtml(s.label) + '</span>' +
+    (s.toNext > 0 ? '<span>' + s.toNext.toLocaleString() + ' XP to ' + escapeHtml(s.nextLabel) + '</span>' : '<span>MAX LEVEL</span>') + '</div>' +
+    '</div>' +
     '<div class="dc-votes">' + voteLine + '</div>' +
     '<div class="celeb-sub">' + close + '</div>' +
     '<div class="celeb-tap">tap to continue</div>' +
     '</div>';
   document.body.appendChild(el);
-  setTimeout(() => { if (el.parentNode) el.remove(); }, 5200);
+  // Kick the animations after mount: ring draws, bar fills, XP counts up.
+  requestAnimationFrame(() => {
+    const fill = el.querySelector('.dc2-xp-fill');
+    if (fill) { fill.style.background = s.color; fill.style.width = s.pct + '%'; }
+    animateCount(el.querySelector('.dc2-xp-num'), s.earned, 950);
+  });
+  renderXPBar();   // reflect the new total in the sidebar behind the overlay
+  setTimeout(() => { if (el.parentNode) el.remove(); }, s.leveledUp || s.milestone ? 6500 : 5200);
 }
 
 function renderStars(rating) {

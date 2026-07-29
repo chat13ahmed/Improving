@@ -877,6 +877,45 @@ body {
 .celeb-title { font-size: 52px; font-weight: 900; color: #fff; text-shadow: 0 0 40px rgba(245,158,11,0.8); margin-bottom: 12px; }
 .celeb-sub   { font-size: 20px; color: rgba(255,255,255,0.8); margin-bottom: 24px; }
 .celeb-tap   { font-size: 13px; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 1.5px; }
+/* ─── Day-complete celebration (the daily "you climbed" moment) ─── */
+.dc2-box { text-align: center; width: min(360px, 88vw); padding: 8px; animation: popIn .45s cubic-bezier(.34,1.56,.64,1); }
+/* Draw-in ring around the checkmark */
+.dc2-ring { position: relative; width: 92px; height: 92px; margin: 0 auto 14px; }
+.dc2-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.dc2-ring circle { fill: none; stroke-width: 6; }
+.dc2-ring-bg { stroke: rgba(255,255,255,.14); }
+.dc2-ring-fg { stroke: var(--dc-accent, #10B981); stroke-linecap: round; stroke-dasharray: 214; stroke-dashoffset: 214; animation: dcRing .8s .1s cubic-bezier(.4,0,.2,1) forwards; filter: drop-shadow(0 0 6px var(--dc-accent, #10B981)); }
+@keyframes dcRing { to { stroke-dashoffset: 0; } }
+.dc2-ring-check { position: absolute; inset: 0; display: grid; place-items: center; font-size: 40px; color: #fff; opacity: 0; transform: scale(.4); animation: dcCheck .4s .55s cubic-bezier(.34,1.7,.6,1) forwards; }
+@keyframes dcCheck { to { opacity: 1; transform: scale(1); } }
+.dc2-title { font-size: 34px; font-weight: 900; color: #fff; letter-spacing: -.5px; text-shadow: 0 0 30px var(--dc-accent, rgba(245,158,11,.7)); margin-bottom: 10px; }
+.dc2-levelup .dc2-title { background: linear-gradient(90deg,#fbbf24,#f472b6,#a78bfa,#22d3ee); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: dcHue 3s linear infinite; }
+@keyframes dcHue { to { filter: hue-rotate(360deg); } }
+/* Streak flame */
+.dc2-streak { display: inline-flex; align-items: baseline; gap: 6px; margin: 2px 0 10px; padding: 6px 16px; border-radius: 999px; background: rgba(249,115,22,.16); border: 1px solid rgba(249,115,22,.4); }
+.dc2-flame { font-size: 22px; animation: dcFlame 1.1s ease-in-out infinite; transform-origin: bottom center; }
+@keyframes dcFlame { 0%,100% { transform: scale(1) rotate(-3deg); } 50% { transform: scale(1.18) rotate(3deg); } }
+.dc2-streak-n { font-size: 26px; font-weight: 900; color: #fb923c; animation: dcPop .5s .2s cubic-bezier(.34,1.7,.6,1) both; }
+.dc2-streak-word { font-size: 13px; font-weight: 700; color: rgba(255,255,255,.6); text-transform: uppercase; letter-spacing: .5px; }
+@keyframes dcPop { from { transform: scale(0); } to { transform: scale(1); } }
+.dc2-milestone { font-size: 14px; font-weight: 800; color: #fbbf24; margin: -2px 0 10px; letter-spacing: .3px; }
+/* XP earned + level bar */
+.dc2-xp { margin: 6px auto 16px; max-width: 280px; }
+.dc2-xp-gain { font-size: 30px; font-weight: 900; color: var(--dc-accent, #10B981); margin-bottom: 8px; text-shadow: 0 0 20px var(--dc-accent, #10B981); }
+.dc2-xp-track { height: 12px; border-radius: 999px; background: rgba(255,255,255,.12); overflow: hidden; }
+.dc2-xp-fill { height: 100%; width: 0; border-radius: 999px; background: var(--dc-accent, #10B981); transition: width 1.1s .3s cubic-bezier(.4,0,.2,1); box-shadow: 0 0 12px var(--dc-accent, #10B981); position: relative; }
+.dc2-xp-fill::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent); transform: translateX(-100%); animation: dcShimmer 1.4s 1s ease-out; }
+@keyframes dcShimmer { to { transform: translateX(100%); } }
+.dc2-xp-meta { display: flex; justify-content: space-between; gap: 10px; margin-top: 7px; font-size: 12px; color: rgba(255,255,255,.65); font-weight: 600; }
+.dc2 .dc-votes { margin: 4px 0 6px; }
+.dc2 .celeb-sub { font-size: 15px; line-height: 1.5; color: rgba(255,255,255,.8); margin-bottom: 18px; }
+.dc2 .celeb-sub b { color: #fff; }
+.dc2-levelup .dc2-box { animation: popIn .45s cubic-bezier(.34,1.56,.64,1), dcGlow 1.6s ease-in-out infinite; }
+@keyframes dcGlow { 0%,100% { filter: none; } 50% { filter: drop-shadow(0 0 24px rgba(167,139,250,.5)); } }
+@media (prefers-reduced-motion: reduce) {
+  .dc2-ring-fg, .dc2-ring-check, .dc2-flame, .dc2-streak-n, .dc2-xp-fill::after, .dc2-levelup .dc2-box, .dc2-levelup .dc2-title { animation: none; }
+  .dc2-ring-fg { stroke-dashoffset: 0; } .dc2-ring-check { opacity: 1; transform: none; }
+}
 .conf-p {
   position: absolute;
   top: -30px;
