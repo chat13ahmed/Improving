@@ -1084,12 +1084,25 @@ function renderUserChip() {
   footer.prepend(chip);
 }
 
-// Hide nav items whose pillar is turned off (Knowledge ↔ reading pillar)
+// Which hub pages a user actually chose, derived from their pillars. Each hub
+// shows only if at least one of its underlying pillars is on — so someone who
+// picked "Knowledge" only never sees Health or Business in the nav. (pure/testable)
+const HUB_PILLARS = { health: ['gym', 'food'], business: ['money', 'networking'], knowledge: ['reading'] };
+function hubEnabled(hub) {
+  const ids = HUB_PILLARS[hub];
+  return ids ? ids.some(id => isPillarOn(id)) : true;   // non-hub pages (Log, Coach…) always show
+}
+// Hide the hub nav items the user didn't choose (Health / Business / Knowledge),
+// so the menu shows only what they asked for. Admin stays owner-only.
 function applyNavVisibility() {
-  const knowledgeNav = document.querySelector('.nav-item[data-page="knowledge"]');
-  if (knowledgeNav) knowledgeNav.style.display = isPillarOn('reading') ? '' : 'none';
+  Object.keys(HUB_PILLARS).forEach(hub => {
+    const el = document.querySelector('.nav-item[data-page="' + hub + '"]');
+    if (el) el.style.display = hubEnabled(hub) ? '' : 'none';
+  });
   const adminNav = document.querySelector('.nav-item[data-page="admin"]');   // owner-only console
   if (adminNav) adminNav.style.display = state.isOwner ? '' : 'none';
+  // If we're sitting on a hub that just got hidden, fall back to the dashboard.
+  if (HUB_PILLARS[state.page] && !hubEnabled(state.page)) navigate('dashboard');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1125,6 +1138,7 @@ function paintNavIcons() {
 function navigate(page) {
   if (page === 'admin' && !state.isOwner) page = 'dashboard';   // owner-only console (the server also enforces this)
   if (page === 'stats') page = 'dashboard';   // the stats page retired — its numbers live in each hub's overview now
+  if (HUB_PILLARS[page] && !hubEnabled(page)) page = 'dashboard';   // a hub the user didn't choose — don't open it
   state.page = page;
   if (page !== 'workout') document.body.classList.remove('wo-fullscreen');   // restore the bottom nav when leaving the workout
   state._openIdea = null;   // leaving to any page closes an open idea workspace

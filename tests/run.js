@@ -66,7 +66,7 @@ function loadApp(fieldValues) {
     ' todayStr, weeklyTrainingSplit, lastExercisePerformance, exerciseBestWeightEver, dealPlay, dealPlayPriority, ideaNextMove,' +
     ' knowledgeQuizPool, groupProgress, allCheckItems, healthBriefing, businessBriefing, knowledgeBriefing, weeklyGamePlan, libFilter,' +
     ' MUSCLE_PARTS, exercisePart, partMeta, exercisesByPart, libraryCount, PROGRAM_GROUPS, programSections, programPartLabel,' +
-    ' safeUrl, linkHost, libGroups });';
+    ' safeUrl, linkHost, libGroups, hubEnabled, HUB_PILLARS });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -1254,6 +1254,25 @@ eq('library: category + search combine (no match across categories)', A.libFilte
 A.state._libQ = 'philosophy'; A.state._libGroup = undefined;
 ok('library: search also matches the category name', A.libFilter(A.state.data.library).some(e => e.id === '1'));
 A.state._libQ = ''; A.state._libType = ''; A.state._libGroup = undefined;
+
+// ── Focus areas → which hubs show in the nav (onboarding "what do you want") ──
+const _pill = (on) => { const p = {}; ['gym', 'food', 'networking', 'money', 'reading'].forEach(id => p[id] = { enabled: on.includes(id) }); return p; };
+A.state.data = _iBase(); A.state.data.profile.pillars = _pill(['gym', 'food', 'networking', 'money', 'reading']);
+ok('hubs: everything chosen → all three hubs show', A.hubEnabled('health') && A.hubEnabled('business') && A.hubEnabled('knowledge'));
+A.state.data.profile.pillars = _pill(['reading']);
+ok('hubs: only Knowledge → Knowledge shows', A.hubEnabled('knowledge') === true);
+ok('hubs: only Knowledge → Health hidden', A.hubEnabled('health') === false);
+ok('hubs: only Knowledge → Business hidden', A.hubEnabled('business') === false);
+A.state.data.profile.pillars = _pill(['gym']);
+ok('hubs: Fitness alone lights the Health hub', A.hubEnabled('health') === true && A.hubEnabled('business') === false && A.hubEnabled('knowledge') === false);
+A.state.data.profile.pillars = _pill(['food']);
+ok('hubs: Nutrition alone still lights Health (either pillar counts)', A.hubEnabled('health') === true);
+A.state.data.profile.pillars = _pill(['money']);
+ok('hubs: Income alone lights the Business hub', A.hubEnabled('business') === true && A.hubEnabled('health') === false);
+A.state.data.profile.pillars = _pill(['networking']);
+ok('hubs: Networking alone lights the Business hub', A.hubEnabled('business') === true);
+ok('hubs: a non-hub page (Log/Coach) is never gated', A.hubEnabled('log') === true && A.hubEnabled('coach') === true);
+A.state.data = _iBase();
 
 // ─────────────────────────────────────────────────────────────
 // CLOUD DATABASE — real SQLite round-trip (in-memory, no install)
