@@ -184,13 +184,47 @@ app.use(express.json({ limit: '10mb' }));
 // dotfiles: 'allow' so /.well-known/assetlinks.json (Android app verification) is served
 app.use(express.static(CLIENT_DIR, { dotfiles: 'allow' }));
 
+const TOKEN_TTL = 60 * 60 * 24 * 30;   // 30 days
 function tokenFrom(req) {
   const a = req.headers.authorization || '';
-  if (a.startsWith('Bearer ')) return a.slice(7);
+  if (a.startsWith('Bearer ')) return a.slice(7);          // mobile / API clients
+  const m = (req.headers.cookie || '').match(/(?:^|;\s*)be_token=([^;]+)/);   // web: httpOnly cookie
+  if (m) return decodeURIComponent(m[1]);
   return (req.body && req.body.token) || req.query.token || null;
 }
-function requireAuth(req, res, next) {
+// The web client gets its token as an httpOnly cookie — JavaScript can't read it,
+// so an XSS bug can't steal the session (the token is never in localStorage).
+// Secure is set only over HTTPS so local http dev still works. SameSite=Lax is
+// safe because the app is same-origin; the mobile app uses Bearer, not the cookie.
+function isHttps(req) { return req.secure || req.headers['x-forwarded-proto'] === 'https'; }
+function setAuthCookie(req, res, token) {
+  const p = ['be_token=' + token, 'HttpOnly', 'Path=/', 'SameSite=Lax', 'Max-Age=' + TOKEN_TTL];
+  if (isHttps(req)) p.push('Secure');
+  res.setHeader('Set-Cookie', p.join('; '));
+}
+function clearAuthCookie(req, res) {
+  const p = ['be_token=', 'HttpOnly', 'Path=/', 'SameSite=Lax', 'Max-Age=0'];
+  if (isHttps(req)) p.push('Secure');
+  res.setHeader('Set-Cookie', p.join('; '));
+}
+// Auth responses carry a token — never let a shared cache keep them.
+function issueSession(req, res, user, extra) {
+  const token = signJwt({ sub: user.id, username: user.username, tv: user.token_version || 0 }, JWT_SECRET);
+  setAuthCookie(req, res, token);
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(Object.assign({ token, username: user.username }, extra || {}));
+}
+// Verify a token AND that it hasn't been revoked (its version still matches the
+// account's). Returns the payload or null. One PK lookup per authed request.
+async function authedPayload(req) {
   const p = verifyJwt(tokenFrom(req), JWT_SECRET);
+  if (!p) return null;
+  try { const tv = await DB.getTokenVersion(p.sub); if (tv === null || (p.tv || 0) !== tv) return null; }
+  catch { return null; }
+  return p;
+}
+async function requireAuth(req, res, next) {
+  const p = await authedPayload(req);
   if (!p) return res.status(401).json({ error: 'NOT_AUTHED' });
   req.userId = p.sub; req.username = p.username; next();
 }
@@ -225,7 +259,7 @@ app.post('/api/signup', async (req, res) => {
     const id = await DB.createUser({ username, email, phone: phone || null, pw_salt: salt, pw_hash: hash, sec_question: sq, sec_salt: ss, sec_hash: sh });
     const seed = defaultData(); seed.profile = { ...(seed.profile || {}), email, phone, trialEnds: Date.now() + 14 * 86400000, pro: false };
     await DB.saveData(id, seed, 1);
-    res.json({ token: signJwt({ sub: id, username }, JWT_SECRET), username, hasSecurity: !!sq });
+    issueSession(req, res, { id, username, token_version: 0 }, { hasSecurity: !!sq });
   } catch (e) {
     // Backstop the unique checks against a race (two signups at once)
     if (e && (e.code === '23505' || /unique/i.test(String(e.message || '')))) {
@@ -243,15 +277,20 @@ app.post('/api/login', async (req, res) => {
     const u = await DB.findUserByName(username);
     if (!u || !verifyPassword(password, u.pw_salt, u.pw_hash)) return res.status(401).json({ error: 'Wrong username or password.' });
     if (!(await DB.getData(u.id))) await DB.saveData(u.id, defaultData(), 1);
-    res.json({ token: signJwt({ sub: u.id, username: u.username }, JWT_SECRET), username: u.username, hasSecurity: !!u.sec_question });
+    issueSession(req, res, u, { hasSecurity: !!u.sec_question });
   } catch (e) { res.status(500).json({ error: 'Login failed' }); }
 });
 
-// JWT is stateless — logout is client-side token discard
-app.post('/api/logout', (req, res) => res.json({ success: true }));
+// Logout now actually revokes the session: bumping the token version invalidates
+// this token (and every other one for the account) server-side, and clears the cookie.
+app.post('/api/logout', async (req, res) => {
+  try { const p = verifyJwt(tokenFrom(req), JWT_SECRET); if (p) await DB.bumpTokenVersion(p.sub); } catch {}
+  clearAuthCookie(req, res);
+  res.json({ success: true });
+});
 
-app.get('/api/session', (req, res) => {
-  const p = verifyJwt(tokenFrom(req), JWT_SECRET);
+app.get('/api/session', async (req, res) => {
+  const p = await authedPayload(req);
   if (!p) return res.json({ authed: false });
   DB.findUserById(p.sub)
     .then(u => u ? res.json({ authed: true, username: u.username, hasSecurity: !!u.sec_question, isOwner: isOwner(u.username) }) : res.json({ authed: false }))
@@ -289,6 +328,7 @@ app.post('/api/forgot/reset', async (req, res) => {
     clearResetFails(u.id);   // correct answer wipes the failure counter
     const { salt, hash } = hashPassword(newPassword);
     await DB.updatePassword(u.id, salt, hash);
+    await DB.bumpTokenVersion(u.id);   // a reset kills every existing session — they log in fresh
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: 'Error' }); }
 });
@@ -301,7 +341,11 @@ app.post('/api/change-password', requireAuth, async (req, res) => {
     if ((req.body.newPassword || '').length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters.' });
     const { salt, hash } = hashPassword(req.body.newPassword);
     await DB.updatePassword(u.id, salt, hash);
-    res.json({ success: true });
+    // Revoke every OTHER session, then hand THIS one a fresh token so the user
+    // who just changed their password stays logged in here.
+    await DB.bumpTokenVersion(u.id);
+    const tv = await DB.getTokenVersion(u.id);
+    issueSession(req, res, { id: u.id, username: u.username, token_version: tv }, { success: true });
   } catch (e) { res.status(500).json({ error: 'Error' }); }
 });
 

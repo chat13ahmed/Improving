@@ -50,6 +50,7 @@ function sqliteImpl() {
         created_at TEXT DEFAULT (datetime('now'))
       )`);
       try { db.exec('ALTER TABLE users ADD COLUMN phone TEXT'); } catch {} // migrate older DBs
+      try { db.exec('ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0'); } catch {} // session-revocation counter
       db.exec(`CREATE TABLE IF NOT EXISTS user_data (
         user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
         data TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1,
@@ -137,6 +138,10 @@ function sqliteImpl() {
     // Permanently delete a user and everything they own (cascades via FKs — see
     // PRAGMA foreign_keys above). Required for App Store / Play Store compliance.
     async deleteUser(id) { const r = db.prepare('DELETE FROM users WHERE id=?').run(id); return r.changes > 0; },
+    // Session revocation: the token carries a version; bumping it invalidates every
+    // token issued before (logout, password change/reset). null = user is gone.
+    async getTokenVersion(id) { const r = db.prepare('SELECT token_version AS tv FROM users WHERE id=?').get(id); return r ? (r.tv || 0) : null; },
+    async bumpTokenVersion(id) { db.prepare('UPDATE users SET token_version = COALESCE(token_version,0) + 1 WHERE id=?').run(id); },
     async updatePassword(id, salt, hash) { db.prepare('UPDATE users SET pw_salt=?, pw_hash=? WHERE id=?').run(salt, hash, id); },
     async setSecurity(id, q, salt, hash) { db.prepare('UPDATE users SET sec_question=?, sec_salt=?, sec_hash=? WHERE id=?').run(q, salt, hash, id); },
     async getData(userId) { const row = db.prepare('SELECT data, version FROM user_data WHERE user_id=?').get(userId); return row ? { data: ENC.decryptData(JSON.parse(row.data)), version: row.version } : null; },
@@ -296,6 +301,7 @@ function pgImpl() {
       await q(`CREATE TABLE IF NOT EXISTS users (id BIGSERIAL PRIMARY KEY, username TEXT UNIQUE NOT NULL, email TEXT UNIQUE, phone TEXT,
                pw_salt TEXT NOT NULL, pw_hash TEXT NOT NULL, sec_question TEXT, sec_salt TEXT, sec_hash TEXT, created_at TIMESTAMPTZ DEFAULT now())`);
       await q('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT'); // migrate older DBs
+      await q('ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER DEFAULT 0'); // session-revocation counter
       await q(`CREATE TABLE IF NOT EXISTS user_data (user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
                data JSONB NOT NULL, version INTEGER NOT NULL DEFAULT 1, updated_at TIMESTAMPTZ DEFAULT now())`);
       await q(`CREATE TABLE IF NOT EXISTS push_subscriptions (id BIGSERIAL PRIMARY KEY, user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
@@ -340,6 +346,8 @@ function pgImpl() {
     async findUserByPhone(phone) { if (!phone) return null; const r = await q('SELECT * FROM users WHERE phone=$1', [phone]); return r.rows[0] || null; },
     async findUserById(id) { const r = await q('SELECT * FROM users WHERE id=$1', [id]); return r.rows[0] || null; },
     async deleteUser(id) { const r = await q('DELETE FROM users WHERE id=$1', [id]); return r.rowCount > 0; },   // cascades via FKs
+    async getTokenVersion(id) { const r = await q('SELECT token_version AS tv FROM users WHERE id=$1', [id]); return r.rows[0] ? (r.rows[0].tv || 0) : null; },
+    async bumpTokenVersion(id) { await q('UPDATE users SET token_version = COALESCE(token_version,0) + 1 WHERE id=$1', [id]); },
     async updatePassword(id, salt, hash) { await q('UPDATE users SET pw_salt=$1, pw_hash=$2 WHERE id=$3', [salt, hash, id]); },
     async setSecurity(id, ques, salt, hash) { await q('UPDATE users SET sec_question=$1, sec_salt=$2, sec_hash=$3 WHERE id=$4', [ques, salt, hash, id]); },
     async getData(userId) { const r = await q('SELECT data, version FROM user_data WHERE user_id=$1', [userId]); return r.rowCount ? { data: ENC.decryptData(r.rows[0].data), version: r.rows[0].version } : null; },
@@ -494,6 +502,8 @@ module.exports = {
   findUserByPhone: (p) => impl.findUserByPhone(p),
   findUserById: (i) => impl.findUserById(i),
   deleteUser: (i) => impl.deleteUser(i),
+  getTokenVersion: (i) => impl.getTokenVersion(i),
+  bumpTokenVersion: (i) => impl.bumpTokenVersion(i),
   updatePassword: (i, s, h) => impl.updatePassword(i, s, h),
   setSecurity: (i, q, s, h) => impl.setSecurity(i, q, s, h),
   getData: (i) => impl.getData(i),

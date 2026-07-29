@@ -28,9 +28,16 @@ function aiBase() { try { return localStorage.getItem('onward_ai_base') || ''; }
 // A safe preview of the saved key — enough to spot a truncated/partial paste.
 // A real Anthropic key is ~108 chars and starts with "sk-ant-api03-".
 function maskKey(k) { k = String(k || ''); if (!k) return ''; const tail = k.length > 8 ? k.slice(-4) : ''; return k.slice(0, 12) + '…' + tail + ' · ' + k.length + ' chars'; }
+// Web: the server hands the session out as an httpOnly cookie, so the token is
+// never kept in JavaScript (an XSS bug can't read it). Mobile (API_BASE set →
+// cross-origin, no cookie) keeps the Bearer token in storage as before.
+function persistSession(token) {
+  if (API_BASE) { state.token = token; try { localStorage.setItem('be_token', token); } catch {} }
+  else { state.token = null; try { localStorage.removeItem('be_token'); } catch {} }
+}
 function authHeaders() {
   const h = { 'Content-Type': 'application/json' };
-  if (state.token) h.Authorization = 'Bearer ' + state.token;
+  if (state.token) h.Authorization = 'Bearer ' + state.token;   // mobile only; web relies on the cookie
   const k = aiKey();
   if (k) {
     h['X-Api-Key'] = k;   // server uses this if no server-side key is set
@@ -722,12 +729,12 @@ async function init() {
   applyTheme();      // resolve Auto/Light/Dark and wire the OS-change listener
   paintNavIcons();   // fill the sidebar's line icons
   buildScene3d();   // animated 3D backdrop, behind every screen
-  state.token = localStorage.getItem('be_token');
+  state.token = localStorage.getItem('be_token');   // mobile Bearer token, if any; web authenticates via the cookie
   let session = { authed: false };
-  if (state.token) {
-    try { session = await fetch('/api/session', { headers: authHeaders() }).then(r => r.json()); } catch {}
-  }
-  if (!session.authed) { state.token = null; localStorage.removeItem('be_token'); renderAuthScreen(); return; }
+  // Always ask: the web session rides in an httpOnly cookie (sent automatically),
+  // so there may be no token in JS yet we're still logged in.
+  try { session = await fetch('/api/session', { headers: authHeaders() }).then(r => r.json()); } catch {}
+  if (!session.authed) { state.token = null; try { localStorage.removeItem('be_token'); } catch {} renderAuthScreen(); return; }
   state.user = session.username;
   state.hasSecurity = session.hasSecurity;
   state.isOwner = !!session.isOwner;
@@ -898,7 +905,7 @@ async function doLogin(e) {
     const res = await authFetch('/api/login', { username, password });
     const j = await res.json();
     if (!res.ok) { authError(j.error || 'Login failed.'); return; }
-    state.token = j.token; state.user = j.username; state.hasSecurity = j.hasSecurity; localStorage.setItem('be_token', j.token);
+    state.user = j.username; state.hasSecurity = j.hasSecurity; persistSession(j.token);
     await startApp();
     showToast('Welcome back, ' + j.username + '! ', 'success');
   } catch { authError('Could not reach the server — check your connection and try again.'); }
@@ -924,7 +931,7 @@ async function doSignup(e) {
     const res = await authFetch('/api/signup', { username, password, email, phone, securityQuestion, securityAnswer });
     const j = await res.json();
     if (!res.ok) { authError(j.error || 'Sign up failed.'); return; }
-    state.token = j.token; state.user = j.username; state.hasSecurity = !!j.hasSecurity; localStorage.setItem('be_token', j.token);
+    state.user = j.username; state.hasSecurity = !!j.hasSecurity; persistSession(j.token);
     await startApp();
     showToast('Account created — welcome, ' + j.username + '! ', 'success');
   } catch { authError('Could not reach the server — check your connection and try again.'); }

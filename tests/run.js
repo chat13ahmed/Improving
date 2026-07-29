@@ -1412,6 +1412,14 @@ A.state.data = _iBase();
     ok('after delete: their push subs are gone (cascade)', !(await DBm.allPushSubs()).some(s => String(s.user_id) === String(delId)));
     ok('after delete: their community posts are gone (cascade)', !(await DBm.listPosts('')).some(p => String(p.user_id) === String(delId)));
     ok('deleteUser on a missing id returns false', (await DBm.deleteUser(9999999)) === false);
+    // ── token version (session revocation) ──
+    const tvId = await DBm.createUser({ username: 'tvuser', pw_salt: 's', pw_hash: 'h', sec_question: null, sec_salt: null, sec_hash: null });
+    ok('new user starts at token version 0', (await DBm.getTokenVersion(tvId)) === 0);
+    await DBm.bumpTokenVersion(tvId);
+    ok('bumpTokenVersion increments (logout/password-change revokes old tokens)', (await DBm.getTokenVersion(tvId)) === 1);
+    await DBm.bumpTokenVersion(tvId);
+    ok('bumpTokenVersion is monotonic', (await DBm.getTokenVersion(tvId)) === 2);
+    ok('getTokenVersion of a missing user is null (treated as revoked)', (await DBm.getTokenVersion(9999999)) === null);
   } catch (e) { failures.push('cloud DB (sqlite) — ' + e.message); }
 
   // ── report ──
