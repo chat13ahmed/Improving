@@ -1390,6 +1390,15 @@ A.state.data = _iBase();
     ok('cleanPost: DROPS an over-cap photo', C.cleanPost({ type: 'update', body: 'x', photo: 'data:image/png;base64,' + 'A'.repeat(900000) }).data.photo === undefined);
     ok('cleanPost: a photo-only post survives sanitizing (body can be empty)', (() => { const p = C.cleanPost({ type: 'update', photo: 'data:image/png;base64,QQ==' }); return !!p.data.photo && p.body === ''; })());
     ok('cleanPost: program/meal never carry a link or photo', (() => { const a = C.cleanPost({ type: 'program', title: 'P', link: 'https://x.com', photo: 'data:image/png;base64,QQ==' }); return a.data.link === undefined && a.data.photo === undefined; })());
+    // ── password-reset per-account answer lockout (hardening the recovery flow) ──
+    const _ru = 'resetuser-' + Date.now();
+    ok('reset lockout: a fresh account is not locked', C.resetLocked(_ru) === false);
+    C.recordResetFail(_ru); C.recordResetFail(_ru); C.recordResetFail(_ru); C.recordResetFail(_ru);
+    ok('reset lockout: still open after 4 wrong answers', C.resetLocked(_ru) === false);
+    C.recordResetFail(_ru);
+    ok('reset lockout: locked at the 5th wrong answer', C.resetLocked(_ru) === true);
+    C.clearResetFails(_ru);
+    ok('reset lockout: a correct answer clears the lock', C.resetLocked(_ru) === false);
     // ── account deletion (App Store / Play requirement) — must remove the user AND cascade ──
     const delId = await DBm.createUser({ username: 'todelete', pw_salt: 's', pw_hash: 'h', sec_question: null, sec_salt: null, sec_hash: null });
     await DBm.saveData(delId, { profile: { name: 'Bye' }, days: [1, 2] }, 1);

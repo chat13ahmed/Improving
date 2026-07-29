@@ -142,6 +142,24 @@ function authRateLimited(ip) {
   arr.push(now); authHits.set(String(ip), arr);
   return arr.length > 12;
 }
+// Per-ACCOUNT lockout for security-question password resets. The IP limiter
+// above stops one machine hammering; this stops a distributed guessing attack
+// from grinding a single account's answer (5 wrong answers → locked 15 min).
+// In-memory (like authHits): resets on restart, per-process — noted as a limit.
+const resetFails = new Map();   // userId -> { count, first }
+const RESET_MAX = 5, RESET_WIN = 900000;
+function resetLocked(userId) {
+  const r = resetFails.get(String(userId));
+  if (!r) return false;
+  if (Date.now() - r.first > RESET_WIN) { resetFails.delete(String(userId)); return false; }
+  return r.count >= RESET_MAX;
+}
+function recordResetFail(userId) {
+  const k = String(userId), r = resetFails.get(k);
+  if (!r || Date.now() - r.first > RESET_WIN) resetFails.set(k, { count: 1, first: Date.now() });
+  else r.count++;
+}
+function clearResetFails(userId) { resetFails.delete(String(userId)); }
 
 // ── App ──
 const app = express();
@@ -241,15 +259,20 @@ app.get('/api/session', (req, res) => {
 });
 
 app.post('/api/forgot/question', async (req, res) => {
+  if (authRateLimited(req.ip)) return res.status(429).json({ error: 'Too many attempts — please wait a few minutes.' });
   try {
     const u = await DB.findUserByName((req.body.username || '').trim());
-    if (!u) return res.status(404).json({ error: 'No account with that username.' });
-    if (!u.sec_question) return res.status(400).json({ error: 'This account has no security question set. Log in and add one in Settings → Security.' });
+    // Missing account AND account-without-a-question return the SAME response, so
+    // this endpoint can't be used to confirm which usernames exist. A functional
+    // security-question flow must still show the question when there is one — the
+    // rate limit above is what stops that being farmed at scale.
+    if (!u || !u.sec_question) return res.status(404).json({ error: 'No security-question reset is available for that account.' });
     res.json({ question: u.sec_question });
   } catch (e) { res.status(500).json({ error: 'Error' }); }
 });
 
 app.post('/api/forgot/reset', async (req, res) => {
+  if (authRateLimited(req.ip)) return res.status(429).json({ error: 'Too many attempts — please wait a few minutes.' });
   try {
     const username = (req.body.username || '').trim();
     const answer = req.body.answer || '';
@@ -257,7 +280,13 @@ app.post('/api/forgot/reset', async (req, res) => {
     if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters.' });
     const u = await DB.findUserByName(username);
     if (!u || !u.sec_question) return res.status(400).json({ error: 'Could not reset that account.' });
-    if (!verifyPassword(normalizeAnswer(answer), u.sec_salt, u.sec_hash)) return res.status(401).json({ error: 'That answer is incorrect.' });
+    // Stop targeted answer-guessing even from rotating IPs.
+    if (resetLocked(u.id)) return res.status(429).json({ error: 'Too many incorrect answers — try again in 15 minutes.' });
+    if (!verifyPassword(normalizeAnswer(answer), u.sec_salt, u.sec_hash)) {
+      recordResetFail(u.id);
+      return res.status(401).json({ error: 'That answer is incorrect.' });
+    }
+    clearResetFails(u.id);   // correct answer wipes the failure counter
     const { salt, hash } = hashPassword(newPassword);
     await DB.updatePassword(u.id, salt, hash);
     res.json({ success: true });
@@ -1171,4 +1200,4 @@ if (require.main === module) {
     .catch(err => { console.error('Startup failed:', err.message); process.exit(1); });
 }
 
-module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner, cleanMeal, cleanPost };
+module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner, cleanMeal, cleanPost, resetLocked, recordResetFail, clearResetFails };
