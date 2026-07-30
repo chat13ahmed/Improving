@@ -182,6 +182,62 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: '10mb' }));
 // dotfiles: 'allow' so /.well-known/assetlinks.json (Android app verification) is served
+// ── gzip for static assets ───────────────────────────────────────────────
+// The client ships ~1.3MB of JS/CSS uncompressed; gzipped it's under 300KB.
+// Deliberately scoped to STATIC FILES ONLY (it runs before express.static and
+// never sees /api), so the AI coach's streamed responses are untouched — a
+// generic response-compression middleware would risk buffering those.
+// Compressed bytes are cached in memory, keyed by mtime+size, so each file is
+// compressed once per deploy but a dev edit still invalidates immediately.
+const zlib = require('zlib');
+const fsp = require('fs');
+const GZ_TYPES = {
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.webmanifest': 'application/manifest+json',
+  '.txt': 'text/plain; charset=utf-8'
+};
+const gzCache = new Map();   // absolute path -> { key, buf, type }
+const GZ_MIN_BYTES = 1024;   // below this, gzip overhead isn't worth it
+app.use((req, res, next) => {
+  try {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    if (!/\bgzip\b/.test(req.headers['accept-encoding'] || '')) return next();
+    const clean = decodeURIComponent((req.path || '').split('?')[0]);
+    const ext = path.extname(clean).toLowerCase();
+    const type = GZ_TYPES[ext];
+    if (!type) return next();
+    // Resolve inside CLIENT_DIR only — never serve outside the public folder.
+    const abs = path.resolve(CLIENT_DIR, '.' + (clean.startsWith('/') ? clean : '/' + clean));
+    const root = path.resolve(CLIENT_DIR);
+    if (abs !== root && !abs.startsWith(root + path.sep)) return next();
+    const st = fsp.statSync(abs, { throwIfNoEntry: false });
+    if (!st || !st.isFile() || st.size < GZ_MIN_BYTES) return next();
+    const key = st.mtimeMs + ':' + st.size;
+    let hit = gzCache.get(abs);
+    if (!hit || hit.key !== key) {
+      hit = { key, buf: zlib.gzipSync(fsp.readFileSync(abs), { level: 6 }), type };
+      gzCache.set(abs, hit);
+    }
+    const etag = 'W/"gz-' + Buffer.byteLength(key) + '-' + crypto.createHash('sha1').update(key).digest('hex').slice(0, 16) + '"';
+    res.setHeader('Content-Type', hit.type);
+    res.setHeader('Content-Encoding', 'gzip');
+    res.setHeader('Vary', 'Accept-Encoding');
+    res.setHeader('ETag', etag);
+    // index.html/sw.js must always revalidate so a deploy lands immediately;
+    // everything else is requested with a ?v= cache-buster.
+    const base = path.basename(abs);
+    res.setHeader('Cache-Control', (base === 'index.html' || base === 'sw.js') ? 'no-cache' : 'public, max-age=3600');
+    if (req.headers['if-none-match'] === etag) return res.status(304).end();
+    res.setHeader('Content-Length', hit.buf.length);
+    if (req.method === 'HEAD') return res.end();
+    return res.end(hit.buf);
+  } catch (e) { /* fall through to express.static — never break serving */ }
+  next();
+});
 app.use(express.static(CLIENT_DIR, { dotfiles: 'allow' }));
 
 const TOKEN_TTL = 60 * 60 * 24 * 30;   // 30 days

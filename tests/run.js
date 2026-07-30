@@ -1495,6 +1495,56 @@ A.state.data = _iBase();
     ok('getTokenVersion of a missing user is null (treated as revoked)', (await DBm.getTokenVersion(9999999)) === null);
   } catch (e) { failures.push('cloud DB (sqlite) — ' + e.message); }
 
+  // ── static gzip layer (real HTTP round-trip) ──
+  // The safety-critical property is that it compresses static assets but never
+  // touches /api — the AI coach streams, and buffering that would break it.
+  try {
+    const srv = C.app.listen(0);
+    srv.unref();   // never hold the process open
+    await new Promise(r => srv.once('listening', r));
+    const base = 'http://127.0.0.1:' + srv.address().port;
+    const gz = (p, h) => fetch(base + p, { headers: Object.assign({ 'accept-encoding': 'gzip' }, h || {}) });
+
+    const js = await gz('/app.js');
+    ok('gzip: app.js is served compressed', js.headers.get('content-encoding') === 'gzip');
+    ok('gzip: sets Vary: Accept-Encoding (safe for caches/CDNs)', /accept-encoding/i.test(js.headers.get('vary') || ''));
+    const wire = +(js.headers.get('content-length') || 0);
+    const decoded = Buffer.from(await js.arrayBuffer()).length;
+    ok('gzip: the wire payload is far smaller than the file', wire > 0 && decoded > wire * 2,
+      'wire ' + wire + ' vs decoded ' + decoded);
+    ok('gzip: decoded bytes are the real, runnable file', decoded > 100000);
+
+    // a client that cannot gzip still gets a valid, uncompressed file
+    const plain = await fetch(base + '/app.js', { headers: { 'accept-encoding': 'identity' } });
+    ok('gzip: identity clients still get uncompressed JS', !plain.headers.get('content-encoding'));
+    ok('gzip: identity body is the full file', Buffer.from(await plain.arrayBuffer()).length === decoded);
+
+    // API routes must never be intercepted (streaming safety)
+    const api = await gz('/api/settings');
+    ok('gzip: /api responses are NOT intercepted (streaming stays safe)', !api.headers.get('content-encoding'));
+
+    // conditional requests still 304
+    const et = js.headers.get('etag');
+    const again = await gz('/app.js', { 'if-none-match': et });
+    ok('gzip: matching ETag returns 304', !!et && again.status === 304);
+
+    // deploys must land immediately for the shell + service worker
+    const idx = await gz('/index.html');
+    ok('gzip: index.html stays no-cache so a deploy lands immediately', /no-cache/.test(idx.headers.get('cache-control') || ''));
+    const sw = await gz('/sw.js');
+    ok('gzip: sw.js stays no-cache', /no-cache/.test(sw.headers.get('cache-control') || ''));
+
+    // path traversal must never leak server source
+    const trav = await gz('/../cloud/server.js');
+    const travBody = await trav.text();
+    ok('gzip: path traversal cannot leak server source', !/JWT_SECRET|DATABASE_URL|require\(/.test(travBody));
+
+    // Node's fetch keeps sockets alive; leaving them open when the suite calls
+    // process.exit trips a libuv assertion on Windows. Drop them explicitly.
+    try { srv.closeAllConnections(); } catch (e) {}
+    try { srv.close(); } catch (e) {}
+  } catch (e) { failures.push('static gzip layer — ' + e.message); }
+
   // ── report ──
   console.log('');
   if (failures.length) {
