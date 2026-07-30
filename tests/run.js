@@ -58,7 +58,7 @@ function loadApp(fieldValues) {
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
-    ' loggingStreak, bestStreak, computeStreak, freezeToUse, freezeAward, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
+    ' loggingStreak, bestStreak, computeStreak, freezeToUse, freezeAward, weekStoryData, weekStorySlides, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
@@ -698,6 +698,30 @@ const _ms7 = []; for (let i = 0; i < 7; i++) { const dt = new Date(); dt.setDate
 A.state.data = { profile: { pillars: dp }, weeks: [], weights: [], days: _ms7 };
 ok('pendingShareMilestone fires at a 7-day streak', (() => { const m = A.pendingShareMilestone(); return m && m.kind === 'streak' && m.n === 7; })());
 ok('pendingShareMilestone suppressed once that milestone is seen', (() => { A.state.data.profile._sharePrompts = { s7: true }; return A.pendingShareMilestone() === null; })());
+
+// ── Onward Story — the weekly recap slideshow assembles from real data ──
+(() => {
+  const _wk = A.getWeekStart(new Date().toISOString().split('T')[0]);
+  const d0 = new Date().toISOString().split('T')[0];
+  const d1 = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  A.state.data = { profile: { pillars: dp, gymDaysPerWeek: 5, weeklyReadGoal: 100 }, weeks: [], weights: [], books: [], contacts: [], days: [
+    { date: d1, gym: { done: true }, reading: { pages: 30 } },
+    { date: d0, gym: { done: true }, reading: { pages: 20 }, networking: { count: 2 } }
+  ] };
+  const sd = A.weekStoryData();
+  ok('weekStoryData: counts days logged this week', sd.daysLogged === 2);
+  ok('weekStoryData: only enabled pillars appear in the stats', sd.stats.every(s => ['Gym', 'Reading', 'Networking'].includes(s.label)) && sd.stats.length >= 1);
+  ok('weekStoryData: reading pages summed for the week', (sd.stats.find(s => s.label === 'Reading') || {}).value === 50);
+  ok('weekStoryData: goals % is a 0–100 number with a label + colour', typeof sd.goalsPct === 'number' && sd.goalsPct >= 0 && sd.goalsPct <= 100 && !!sd.goalsLabel && /^#/.test(sd.goalsColor));
+  const slides = A.weekStorySlides(sd);
+  ok('weekStorySlides: always has an intro and a final share slide', slides.length >= 3 && slides[0].html.indexOf('Your week in review') > -1 && slides[slides.length - 1].last === true);
+  ok('weekStorySlides: every slide carries an auto-advance duration', slides.every(s => typeof s.dur === 'number' && s.dur > 0));
+  ok('weekStorySlides: the counting slides declare a count target', slides.filter(s => s.count).length >= 1 && slides.filter(s => s.count).every(s => typeof s.count.to === 'number'));
+  // an empty week still produces a valid, non-crashing story
+  A.state.data = { profile: { pillars: dp }, weeks: [], weights: [], books: [], contacts: [], days: [] };
+  const empty = A.weekStorySlides(A.weekStoryData());
+  ok('weekStorySlides: an empty week still yields intro + outro (never crashes)', empty.length >= 2 && empty[empty.length - 1].last === true);
+})();
 
 // Money: weekly net = income − summed DAILY spend (spending is logged per day now)
 const _wkS = A.getWeekStart(new Date().toISOString().split('T')[0]);

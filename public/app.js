@@ -626,7 +626,7 @@ function showWeeklyReview() {
   if (localStorage.getItem(key)) return;
   if (!(state.data.days || []).length) return;
   localStorage.setItem(key, '1');
-  setTimeout(openWeekRecap, 1800);
+  setTimeout(openWeekStory, 1800);
 }
 // A client-side week recap (no AI key needed) — goals %, the week's headline
 // numbers, the votes you cast and your balance, with a one-tap share.
@@ -687,6 +687,107 @@ function openWeekRecap() {
   el.addEventListener('click', e => { if (e.target === el) el.remove(); });
   document.body.appendChild(el);
 }
+
+// ─────────────────────────────────────────────────────────────
+// ONWARD STORY — your week as a swipeable, animated recap (Wrapped-style)
+// Reuses the same week data as openWeekRecap, presented as auto-playing slides.
+// ─────────────────────────────────────────────────────────────
+// Pure-ish: assemble everything the Story shows from this week's data. (testable)
+function weekStoryData() {
+  const days = state.data.days || [], profile = state.data.profile || {};
+  const stats = getWeekStats();
+  const ws = getWeekStart(todayStr());
+  const daysLogged = days.filter(d => d.date >= ws).length;
+  const on = { gym: isPillarOn('gym'), networking: isPillarOn('networking'), reading: isPillarOn('reading'), money: isPillarOn('money') };
+  const moneyNet = (typeof getMoneyPeriod === 'function') ? (getMoneyPeriod().net || 0) : 0;
+  const goalsPct = weeklyGoalsReached(stats, profile, moneyNet, on);
+  const goalsLabel = goalsPct >= 80 ? 'Crushing it' : goalsPct >= 60 ? 'Solid week' : goalsPct >= 40 ? 'Room to grow' : 'Time to push';
+  const goalsColor = goalsPct >= 80 ? '#34D399' : goalsPct >= 60 ? '#FBBF24' : goalsPct >= 40 ? '#FB923C' : '#F87171';
+  const st = [];
+  if (on.gym)        st.push({ icon: '🏋️', label: pillar('gym').label,        value: stats.gymDays || 0,      unit: 'days' });
+  if (on.reading)    st.push({ icon: '📚', label: pillar('reading').label,    value: stats.readPages || 0,    unit: 'pages' });
+  if (on.networking) st.push({ icon: '🤝', label: pillar('networking').label, value: stats.networkCount || 0, unit: '' });
+  const votes = identityVotes(days, { gym: on.gym, reading: on.reading, networking: on.networking }, 7).filter(v => v.votes > 0);
+  const plan = (typeof weeklyGamePlan === 'function') ? weeklyGamePlan() : [];
+  return { range: formatWeekRange(ws, true), daysLogged, streak: loggingStreak(), stats: st, goalsPct, goalsLabel, goalsColor, votes, plan };
+}
+function wsMtn() {
+  return '<svg viewBox="0 0 120 70" width="120" height="70" aria-hidden="true">' +
+    '<polygon points="0,70 30,26 52,48 78,14 98,38 120,22 120,70" fill="#34C48E" opacity="0.5"></polygon>' +
+    '<polygon points="0,70 22,44 54,58 84,32 108,52 120,42 120,70" fill="#0F8A63"></polygon>' +
+    '<line x1="78" y1="14" x2="78" y2="0" stroke="#0B3D2E" stroke-width="2.5"></line>' +
+    '<polygon points="78,1 96,6 78,11" fill="#FBBF24"></polygon></svg>';
+}
+// Build the ordered slide list from the week's data (skips empty sections). (testable)
+function weekStorySlides(d) {
+  const s = [];
+  s.push({ dur: 3200, html:
+    '<div class="ws-c ws-intro"><div class="ws-mtn">' + wsMtn() + '</div>' +
+    '<div class="ws-eyebrow">Your week in review</div><div class="ws-big">' + escapeHtml(d.range) + '</div>' +
+    '<div class="ws-sub">Let’s see how you climbed.</div></div>' });
+  s.push({ dur: 4200, count: { sel: '.ws-count', to: d.daysLogged }, html:
+    '<div class="ws-c"><div class="ws-eyebrow">You showed up</div>' +
+    '<div class="ws-num"><span class="ws-count">0</span><span class="ws-den">/ 7 days</span></div>' +
+    (d.streak > 0 ? '<div class="ws-streak">🔥 ' + d.streak + '-day streak going</div>' : '') +
+    '<div class="ws-sub">' + (d.daysLogged >= 6 ? 'Almost perfect. That’s dedication.' : d.daysLogged >= 4 ? 'A strong week of showing up.' : 'Every day logged is a vote for you.') + '</div></div>' });
+  if (d.stats.length) s.push({ dur: 4600, html:
+    '<div class="ws-c"><div class="ws-eyebrow">By the numbers</div><div class="ws-stats">' +
+    d.stats.map((x, i) => '<div class="ws-stat" style="animation-delay:' + (i * 0.14) + 's"><span class="ws-stat-ic">' + x.icon + '</span><span class="ws-stat-v">' + x.value + '</span><span class="ws-stat-l">' + escapeHtml(x.label) + (x.unit ? ' · ' + x.unit : '') + '</span></div>').join('') + '</div></div>' });
+  s.push({ dur: 4200, count: { sel: '.ws-count', to: d.goalsPct }, html:
+    '<div class="ws-c"><div class="ws-eyebrow">Weekly goals</div>' +
+    '<div class="ws-num" style="color:' + d.goalsColor + '"><span class="ws-count">0</span><span class="ws-den" style="color:' + d.goalsColor + '">%</span></div>' +
+    '<div class="ws-badge" style="color:' + d.goalsColor + ';border-color:' + d.goalsColor + '">' + d.goalsLabel + '</div></div>' });
+  if (d.votes.length) s.push({ dur: 4200, html:
+    '<div class="ws-c"><div class="ws-eyebrow">Who you’re becoming</div><div class="ws-sub2">This week you cast votes for:</div>' +
+    '<div class="ws-votes">' + d.votes.map(v => '<div class="ws-vote">' + v.icon + ' <b>' + escapeHtml(v.label) + '</b> <span>×' + v.votes + '</span></div>').join('') + '</div></div>' });
+  if (d.plan.length) s.push({ dur: 5000, html:
+    '<div class="ws-c"><div class="ws-eyebrow">Your team’s focus next week</div>' +
+    '<div class="ws-plan">' + d.plan.map(r => '<div class="ws-plan-row"><span class="ws-plan-ic">' + r.icon + '</span><span>' + escapeHtml(r.title) + '</span></div>').join('') + '</div></div>' });
+  s.push({ dur: 7000, last: true, html:
+    '<div class="ws-c ws-outro"><div class="ws-mtn">' + wsMtn() + '</div><div class="ws-big2">Keep climbing.</div>' +
+    '<div class="ws-serif">Onward.</div><div class="ws-actions">' +
+    '<button type="button" class="btn btn-primary" onclick="wsShare()">📲 Share my week</button>' +
+    '<button type="button" class="ws-done" onclick="closeWeekStory()">Done</button></div></div>' });
+  return s;
+}
+function openWeekStory() {
+  if (typeof document === 'undefined') return;
+  closeWeekStory();
+  const slides = weekStorySlides(weekStoryData());
+  const el = document.createElement('div');
+  el.id = 'ws-overlay'; el.className = 'ws-overlay';
+  el.innerHTML =
+    '<div class="ws-bars">' + slides.map(() => '<div class="ws-bar"><i></i></div>').join('') + '</div>' +
+    '<button type="button" class="ws-close" onclick="closeWeekStory()" aria-label="Close">✕</button>' +
+    '<div class="ws-stage" id="ws-stage"></div>' +
+    '<button type="button" class="ws-tap ws-tap-l" onclick="wsPrev()" aria-label="Previous"></button>' +
+    '<button type="button" class="ws-tap ws-tap-r" onclick="wsNext()" aria-label="Next"></button>';
+  document.body.appendChild(el);
+  state._ws = { i: -1, slides, timer: null };
+  wsGo(0);
+}
+function wsGo(n) {
+  const w = state._ws; if (!w) return;
+  if (n < 0) n = 0;
+  if (n >= w.slides.length) { closeWeekStory(); return; }
+  clearTimeout(w.timer);
+  w.i = n;
+  const slide = w.slides[n];
+  const stage = document.getElementById('ws-stage');
+  if (stage) { stage.innerHTML = slide.html; void stage.offsetWidth; stage.classList.remove('ws-in'); void stage.offsetWidth; stage.classList.add('ws-in'); }
+  // progress bars
+  const bars = document.querySelectorAll('#ws-overlay .ws-bar i');
+  bars.forEach((b, k) => { b.style.transition = 'none'; b.style.width = k < n ? '100%' : '0%'; });
+  const cur = bars[n];
+  if (cur) { void cur.offsetWidth; cur.style.transition = 'width ' + slide.dur + 'ms linear'; cur.style.width = '100%'; }
+  // count-up
+  if (slide.count && stage) { const el = stage.querySelector(slide.count.sel); animateCount(el, slide.count.to, Math.min(1100, slide.dur - 300)); }
+  if (!slide.last) w.timer = setTimeout(() => wsGo(n + 1), slide.dur);
+}
+function wsNext() { if (state._ws) wsGo(state._ws.i + 1); }
+function wsPrev() { if (state._ws) wsGo(Math.max(0, state._ws.i - 1)); }
+function closeWeekStory() { const w = state._ws; if (w) clearTimeout(w.timer); state._ws = null; document.getElementById('ws-overlay')?.remove(); }
+function wsShare() { closeWeekStory(); if (typeof shareMyWeek === 'function') shareMyWeek(); }
 
 // ─────────────────────────────────────────────────────────────
 // STREAK CELEBRATION
@@ -3325,10 +3426,13 @@ function renderStreakCard() {
   const freezeChip = freezes > 0
     ? '<div class="streak-freezes" title="Auto-protects your streak if you miss a day">🧊 ' + freezes + ' freeze' + (freezes === 1 ? '' : 's') + '</div>'
     : '';
+  const storyBtn = days.length >= 2
+    ? '<button type="button" class="streak-story" onclick="openWeekStory()">✨ Your week in review</button>'
+    : '';
   return '<div class="card streak-card' + (urgent ? ' streak-urgent' : '') + '">' +
     '<div class="streak-flame"></div>' +
     '<div class="streak-main"><div class="streak-num">' + cur + '</div><div class="streak-unit">day' + (cur === 1 ? '' : 's') + ' streak</div></div>' +
-    '<div class="streak-msg">' + msg + (best > 0 ? '<div class="streak-best">Best: ' + best + ' day' + (best === 1 ? '' : 's') + '</div>' : '') + freezeChip + '</div>' +
+    '<div class="streak-msg">' + msg + (best > 0 ? '<div class="streak-best">Best: ' + best + ' day' + (best === 1 ? '' : 's') + '</div>' : '') + freezeChip + storyBtn + '</div>' +
     '</div>';
 }
 function weekShareStats() {
