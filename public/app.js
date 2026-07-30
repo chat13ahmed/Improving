@@ -798,6 +798,8 @@ async function startApp() {
   if (!state.data.vocab)    state.data.vocab    = [];
   if (!state.data.weights)  state.data.weights  = [];
   ensureChecklistData();
+  ensureStreakData();
+  applyStreakFreeze();   // spend a freeze to bridge a single missed day, before anything shows the streak
   if (!state.data.profile.pillars) state.data.profile.pillars = defaultPillars();
   if (backfillBookData()) saveData(); // fill missing author/pages on saved books
 
@@ -3227,19 +3229,75 @@ async function fetchReview() {
   }
 }
 
-// ── One-tap shareable week card (the growth loop) ──
-// Consecutive days logged up to today (today counts; if not logged yet, counts through yesterday)
-function loggingStreak() {
-  const set = new Set((state.data.days || []).map(d => d.date));
-  let n = 0;
-  const d = new Date(todayStr() + 'T00:00:00');
-  if (!set.has(todayStr())) d.setDate(d.getDate() - 1);
-  while (set.has(d.toISOString().split('T')[0])) { n++; d.setDate(d.getDate() - 1); }
+// ── Streak protection (freezes) ──
+// A freeze is earned every 7-day streak (cap 2) and auto-bridges ONE missed day
+// so a single slip never breaks the chain. All three helpers below are pure so
+// the rules are locked by tests — a streak bug is a trust bug.
+function _isoShift(dateStr, delta) { const d = new Date(dateStr + 'T00:00:00'); d.setDate(d.getDate() + delta); return d.toISOString().slice(0, 10); }
+// Consecutive days up to today, counting frozen days as present. Today counts if
+// logged; otherwise the count runs through yesterday. (testable)
+function computeStreak(dateSet, frozenSet, today) {
+  const has = k => dateSet.has(k) || frozenSet.has(k);
+  let n = 0, cur = today;
+  if (!has(today)) cur = _isoShift(today, -1);
+  while (has(cur)) { n++; cur = _isoShift(cur, -1); }
   return n;
 }
-// Longest run of consecutive logged days ever (computed from history — your record)
+// Which single day a freeze should cover, or '' if none should be spent. Bridges
+// ONLY yesterday, and only when a real streak existed (day-before-yesterday was
+// present) — so it protects an active chain but never resurrects a dead one, and
+// never spans two missed days. Idempotent: once yesterday is frozen it returns ''. (testable)
+function freezeToUse(dateSet, frozenSet, freezes, today) {
+  if (!(freezes > 0)) return '';
+  const has = k => dateSet.has(k) || frozenSet.has(k);
+  const y = _isoShift(today, -1), dby = _isoShift(today, -2);
+  if (has(y)) return '';        // no gap at yesterday
+  if (!has(dby)) return '';     // no active streak to protect (would be resurrecting)
+  return y;
+}
+// Whether logging just earned a freeze: every multiple of 7, once each. (testable)
+function freezeAward(streak, lastAward) {
+  return streak > 0 && streak % 7 === 0 && streak !== lastAward;
+}
+const STREAK_FREEZE_CAP = 2;
+function ensureStreakData() {
+  const p = state.data.profile = state.data.profile || {};
+  if (typeof p.freezes !== 'number') p.freezes = 0;
+  if (!Array.isArray(p.frozen)) p.frozen = [];
+  if (typeof p._lastFreezeAward !== 'number') p._lastFreezeAward = 0;
+  return p;
+}
+// Run on app open: spend a freeze to save the chain if a single day was missed.
+function applyStreakFreeze() {
+  const p = ensureStreakData();
+  const dateSet = new Set((state.data.days || []).map(d => d.date));
+  const use = freezeToUse(dateSet, new Set(p.frozen), p.freezes, todayStr());
+  if (!use) return;
+  p.frozen.push(use); p.freezes--; saveData();
+  showToast('🧊 A streak freeze saved your chain — you didn\'t lose your progress.', 'success');
+}
+// Run after logging: grant a freeze on each new 7-day milestone (capped).
+function awardStreakFreeze() {
+  const p = ensureStreakData();
+  const s = loggingStreak();
+  if (!freezeAward(s, p._lastFreezeAward)) return;
+  p._lastFreezeAward = s;
+  if (p.freezes < STREAK_FREEZE_CAP) { p.freezes++; showToast('🧊 Streak freeze earned! One skipped day won\'t break your chain.', 'success'); }
+  saveData();
+}
+// ── One-tap shareable week card (the growth loop) ──
+// Consecutive days logged up to today (frozen days count), today or through yesterday.
+function loggingStreak() {
+  const p = state.data.profile || {};
+  const dateSet = new Set((state.data.days || []).map(d => d.date));
+  const frozenSet = new Set(Array.isArray(p.frozen) ? p.frozen : []);
+  return computeStreak(dateSet, frozenSet, todayStr());
+}
+// Longest run of consecutive present days ever — frozen days bridge, so your record
+// reflects a chain a freeze saved. (your record)
 function bestStreak() {
-  const dates = [...new Set((state.data.days || []).map(d => d.date))].sort();
+  const p = state.data.profile || {};
+  const dates = [...new Set([].concat((state.data.days || []).map(d => d.date), Array.isArray(p.frozen) ? p.frozen : []))].sort();
   let best = 0, run = 0, prev = null;
   for (const ds of dates) {
     run = (prev && (Date.parse(ds + 'T00:00:00') - Date.parse(prev + 'T00:00:00')) === 86400000) ? run + 1 : 1;
@@ -3263,10 +3321,14 @@ function renderStreakCard() {
   } else {
     msg = best >= 3 ? 'You reached ' + best + ' days before — start a new streak today!' : 'Log today to start your streak '; urgent = true;
   }
+  const freezes = (state.data.profile && state.data.profile.freezes) || 0;
+  const freezeChip = freezes > 0
+    ? '<div class="streak-freezes" title="Auto-protects your streak if you miss a day">🧊 ' + freezes + ' freeze' + (freezes === 1 ? '' : 's') + '</div>'
+    : '';
   return '<div class="card streak-card' + (urgent ? ' streak-urgent' : '') + '">' +
     '<div class="streak-flame"></div>' +
     '<div class="streak-main"><div class="streak-num">' + cur + '</div><div class="streak-unit">day' + (cur === 1 ? '' : 's') + ' streak</div></div>' +
-    '<div class="streak-msg">' + msg + (best > 0 ? '<div class="streak-best">Best: ' + best + ' day' + (best === 1 ? '' : 's') + '</div>' : '') + '</div>' +
+    '<div class="streak-msg">' + msg + (best > 0 ? '<div class="streak-best">Best: ' + best + ' day' + (best === 1 ? '' : 's') + '</div>' : '') + freezeChip + '</div>' +
     '</div>';
 }
 function weekShareStats() {
@@ -6439,6 +6501,7 @@ function persistStep(key) {
 function finishGuidedLog() {
   // Every step was already saved by glNext; just celebrate the finished day.
   const day = (state.data.days || []).find(x => x.date === todayStr());
+  awardStreakFreeze();   // logging today may have hit a 7-day milestone → earn a freeze
   state._guided = null;
   navigate('dashboard');
   if (day) setTimeout(() => showDayComplete(day), 250);   // votes + streak + your why

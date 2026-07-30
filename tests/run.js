@@ -58,7 +58,7 @@ function loadApp(fieldValues) {
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
-    ' loggingStreak, bestStreak, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
+    ' loggingStreak, bestStreak, computeStreak, freezeToUse, freezeAward, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
@@ -660,6 +660,32 @@ A.state.data = { profile: { pillars: dp }, weeks: [], weights: [], days: [
 ok('bestStreak = longest run (3, gap resets)', A.bestStreak() === 3);
 ok('bestStreak single day = 1', (() => { A.state.data.days = [{ date: '2026-06-01' }]; return A.bestStreak() === 1; })());
 ok('bestStreak empty = 0', (() => { A.state.data.days = []; return A.bestStreak() === 0; })());
+
+// ── Streak protection (freezes) — the "don't rage-quit" safety net ──
+const _fSet = (arr) => new Set(arr);
+// computeStreak: frozen days count as present
+eq('computeStreak: 3 straight incl today', A.computeStreak(_fSet(['2026-06-08','2026-06-09','2026-06-10']), _fSet([]), '2026-06-10'), 3);
+eq('computeStreak: through yesterday when today blank', A.computeStreak(_fSet(['2026-06-08','2026-06-09']), _fSet([]), '2026-06-10'), 2);
+eq('computeStreak: a frozen day bridges the gap', A.computeStreak(_fSet(['2026-06-08','2026-06-10']), _fSet(['2026-06-09']), '2026-06-10'), 3);
+eq('computeStreak: a real (unfrozen) gap breaks it', A.computeStreak(_fSet(['2026-06-08','2026-06-10']), _fSet([]), '2026-06-10'), 1);
+eq('computeStreak: no data → 0', A.computeStreak(_fSet([]), _fSet([]), '2026-06-10'), 0);
+// freezeToUse: bridges only a single missed yesterday, only when a streak existed
+eq('freezeToUse: bridges yesterday when day-before was logged', A.freezeToUse(_fSet(['2026-06-08']), _fSet([]), 1, '2026-06-10'), '2026-06-09');
+eq('freezeToUse: no freeze available → ""', A.freezeToUse(_fSet(['2026-06-08']), _fSet([]), 0, '2026-06-10'), '');
+eq('freezeToUse: yesterday already logged → "" (no gap)', A.freezeToUse(_fSet(['2026-06-08','2026-06-09']), _fSet([]), 1, '2026-06-10'), '');
+eq('freezeToUse: two days missed → "" (never spans a 2-day gap)', A.freezeToUse(_fSet(['2026-06-07']), _fSet([]), 1, '2026-06-10'), '');
+eq('freezeToUse: idempotent — yesterday already frozen → ""', A.freezeToUse(_fSet(['2026-06-08']), _fSet(['2026-06-09']), 1, '2026-06-10'), '');
+eq('freezeToUse: brand-new user (no prior streak) → ""', A.freezeToUse(_fSet([]), _fSet([]), 2, '2026-06-10'), '');
+// freezeAward: one per 7-day multiple, never twice for the same streak
+ok('freezeAward: earned at 7', A.freezeAward(7, 0) === true);
+ok('freezeAward: earned at 14', A.freezeAward(14, 7) === true);
+ok('freezeAward: not at 8', A.freezeAward(8, 7) === false);
+ok('freezeAward: not re-earned at the same streak length', A.freezeAward(7, 7) === false);
+ok('freezeAward: nothing at streak 0', A.freezeAward(0, 0) === false);
+// loggingStreak honours frozen days end-to-end
+A.state.data = { profile: { pillars: dp, frozen: [_sd1] }, weeks: [], weights: [], days: [{ date: _sd2 }, { date: _sd0 }] };
+eq('loggingStreak: a stored frozen day keeps the chain at 3', A.loggingStreak(), 3);
+A.state.data.profile.frozen = [];
 A.state.data.days = [{ date: _sd0, gym: { done: true }, reading: { pages: 15 }, networking: { count: 3 }, water: 1.5 }];
 const _ws = A.weekShareStats();
 ok('weekShareStats reads today', _ws.daysLogged === 1 && _ws.workouts === 1 && _ws.pages === 15 && _ws.connections === 3);
