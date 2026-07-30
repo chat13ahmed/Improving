@@ -1540,9 +1540,12 @@ A.state.data = _iBase();
     ok('gzip: path traversal cannot leak server source', !/JWT_SECRET|DATABASE_URL|require\(/.test(travBody));
 
     // Node's fetch keeps sockets alive; leaving them open when the suite calls
-    // process.exit trips a libuv assertion on Windows. Drop them explicitly.
+    // process.exit trips a libuv assertion on Windows. Drop them explicitly, then
+    // yield a tick so the handles are fully released before the report exits —
+    // closing alone still left a ~1-in-4 race.
     try { srv.closeAllConnections(); } catch (e) {}
-    try { srv.close(); } catch (e) {}
+    await new Promise(r => srv.close(r));
+    await new Promise(r => setTimeout(r, 60));
   } catch (e) { failures.push('static gzip layer — ' + e.message); }
 
   // ── report ──

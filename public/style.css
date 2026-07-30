@@ -13,7 +13,10 @@ html { background: var(--bg); }
   --card:          #FFFFFF;
   --card-2:        #F1F5F9;
   --text:          #1E293B;
-  --text-muted:    #64748B;
+  /* Nudged darker than the usual slate-500: on --surface/--card-2 (#F1F5F9),
+     #64748B only reaches 4.34:1, just under AA. This clears it on every light
+     surface, white included, while still reading as muted. */
+  --text-muted:    #5B6A80;
   --border:        #E4E9F0;
   --border-bright: #CBD5E1;
   /* Surface fills + form fields (light) and neutral tints, used everywhere via vars */
@@ -470,6 +473,19 @@ body {
 }
 .btn-sm:hover { border-color: var(--primary); color: var(--primary); background: rgba(52,211,153,0.06); }
 .btn-sm-danger:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-bg); }
+/* .btn-sm is a SIZE modifier, but it also sets colour — and it's declared after
+   the variants, so at equal specificity a .btn-primary.btn-sm silently lost its
+   fill and rendered as a plain grey chip. These restore each variant's identity
+   when combined, while leaving a standalone .btn-sm untouched. */
+.btn-primary.btn-sm {
+  background: linear-gradient(180deg, #0C825B, #0B7A54); color: #fff; border-color: transparent;
+  box-shadow: 0 1px 2px rgba(11,122,84,0.24), 0 4px 12px -4px rgba(11,122,84,0.34);
+}
+.btn-primary.btn-sm:hover { background: linear-gradient(180deg, #0D8760, #0C7F58); color: #fff; border-color: transparent; }
+.btn-outline.btn-sm { background: transparent; color: var(--text); border-color: var(--border-bright); }
+.btn-outline.btn-sm:hover { border-color: var(--primary); color: var(--primary); background: rgba(52,211,153,0.06); }
+.btn-danger.btn-sm { background: #DC2626; color: #fff; border-color: #DC2626; }
+.btn-danger.btn-sm:hover { background: #C21D1D; color: #fff; border-color: #C21D1D; }
 
 .btn-link { background: none; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; padding: 2px 6px; border-radius: 4px; text-decoration: underline; transition: color 0.15s; }
 .btn-link:hover { color: var(--primary); }
