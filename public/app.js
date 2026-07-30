@@ -12525,7 +12525,8 @@ function renderSettingsPage() {
 
     // Delete account (cloud accounts only) — required by the app stores
     renderDangerCard() +
-    '</div>';
+    '</div>' +
+    '<div style="text-align:center;margin-top:10px"><a class="btn-link" href="about.html" target="_blank" rel="noopener">What is Onward? — the tour &amp; explainer ↗</a></div>';
 }
 // Permanent account deletion — a store requirement and a genuine user right.
 // Only shown for a signed-in cloud account (local-only mode has no server account).
