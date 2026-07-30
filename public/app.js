@@ -1287,7 +1287,7 @@ async function setSecurity(e) {
 }
 
 async function logout() {
-  if (!confirm('Log out of ' + (state.user || 'your account') + '?')) return;
+  if (!await uiConfirm({ title: 'Log out?', message: 'You’ll need your password to get back in.', okText: 'Log out', danger: false })) return;
   try { await fetch('/api/logout', { method: 'POST', headers: authHeaders() }); } catch {}
   localStorage.removeItem('be_token');
   state.token = null; state.user = null;
@@ -2764,12 +2764,12 @@ async function addCommunityMeal(id) {
   refreshMyMeals();
 }
 async function reportCommunityMeal(id) {
-  if (!confirm('Report this meal as wrong or inappropriate? It gets hidden automatically once enough members report it.')) return;
+  if (!await uiConfirm({ title: 'Report this meal?', message: 'It gets hidden automatically once enough members report it.', okText: 'Report' })) return;
   fetch('/api/community/meals/' + id + '/report', { method: 'POST', headers: authHeaders() }).catch(() => {});
   showToast('Reported — thanks for keeping it clean.', 'success');
 }
 async function removeCommunityMeal(id) {
-  if (!confirm('Remove this shared meal from the community?')) return;
+  if (!await uiConfirm({ title: 'Remove this meal?', message: 'It will no longer appear in the community feed.', okText: 'Remove' })) return;
   try {
     const res = await fetch('/api/community/meals/' + id, { method: 'DELETE', headers: authHeaders() });
     if (res.ok) { showToast('Removed.', 'success'); loadCommunityMeals(); }
@@ -2985,12 +2985,12 @@ async function likeCommunityPost(id) {
   } catch {}
 }
 async function reportCommunityPost(id) {
-  if (!confirm('Report this post as inappropriate? It gets hidden automatically once enough members report it.')) return;
+  if (!await uiConfirm({ title: 'Report this post?', message: 'It gets hidden automatically once enough members report it.', okText: 'Report' })) return;
   fetch('/api/community/posts/' + id + '/report', { method: 'POST', headers: authHeaders() }).catch(() => {});
   showToast('Reported — thanks for keeping it clean.', 'success');
 }
 async function deleteCommunityPost(id) {
-  if (!confirm('Delete your post?')) return;
+  if (!await uiConfirm({ title: 'Delete your post?', message: 'This can’t be undone.', okText: 'Delete' })) return;
   try {
     const res = await fetch('/api/community/posts/' + id, { method: 'DELETE', headers: authHeaders() });
     if (res.ok) { showToast('Deleted.', 'success'); loadCommunityFeed(); }
@@ -4075,7 +4075,7 @@ async function saveGoal() {
   if (state.page === 'dashboard') renderDashboard();
 }
 async function clearGoal() {
-  if (!confirm('Remove your goal?')) return;
+  if (!await uiConfirm({ title: 'Remove your goal?', message: 'Your progress toward it won’t be kept.', okText: 'Remove' })) return;
   if (state.data.profile) delete state.data.profile.goal;
   await saveData();
   showToast('Goal removed.', 'success');
@@ -4083,7 +4083,8 @@ async function clearGoal() {
 }
 async function updateGoalProgress() {
   const g = state.data.profile && state.data.profile.goal; if (!g) return;
-  const v = prompt('Update your progress (' + (g.unit || '') + '):', g.current != null ? g.current : g.start);
+  const v = await uiPrompt({ title: 'Update your progress', message: g.unit ? 'In ' + g.unit + '.' : '', type: 'number',
+    value: g.current != null ? g.current : g.start, okText: 'Update' });
   if (v == null) return;
   g.current = parseFloat(v) || 0;
   await saveData();
@@ -7100,7 +7101,7 @@ function editDay(id) {
 
 async function deleteDay(id) {
   const day = state.data.days.find(d => d.id === id);
-  if (!confirm('Delete entry for ' + (day ? fmtDate(day.date) : 'this day') + '?')) return;
+  if (!await uiConfirm({ title: 'Delete this day?', message: 'Everything logged for ' + (day ? fmtDate(day.date) : 'this day') + ' will be removed.', okText: 'Delete' })) return;
   state.data.days = state.data.days.filter(d => d.id !== id);
   await saveData();
   showToast('Deleted.', 'success');
@@ -7293,7 +7294,7 @@ async function setIdeaStatus(id, status) {
 }
 
 async function deleteIdea(id) {
-  if (!confirm('Delete this idea?')) return;
+  if (!await uiConfirm({ title: 'Delete this idea?', message: 'Its notes and validation progress go with it.', okText: 'Delete' })) return;
   state.data.ideas = state.data.ideas.filter(i => i.id !== id);
   state._openIdea = null;
   await saveData();
@@ -8773,7 +8774,7 @@ function editContact(id) {
 
 async function deleteContact(id) {
   const c = state.data.contacts.find(x => x.id === id);
-  if (!confirm('Delete ' + (c?.name || 'this contact') + '?')) return;
+  if (!await uiConfirm({ title: 'Delete ' + (c?.name || 'this contact') + '?', message: 'Their deal history and follow-ups will be removed.', okText: 'Delete' })) return;
   state.data.contacts = state.data.contacts.filter(x => x.id !== id);
   await saveData();
   showToast('Contact deleted.', 'success');
@@ -9220,7 +9221,7 @@ async function saveApiKey() {
 }
 
 async function clearApiKey() {
-  if (!confirm('Remove your API key?')) return;
+  if (!await uiConfirm({ title: 'Remove your API key?', message: 'The AI coach will stop working until you add a key again.', okText: 'Remove' })) return;
   try { ['onward_ai_key', 'onward_ai_provider', 'onward_ai_model', 'onward_ai_base'].forEach(x => localStorage.removeItem(x)); } catch {}
   state.hasApiKey = false;
   showToast('Key removed.', 'success');
@@ -9794,7 +9795,7 @@ async function saveVocabSentence(id) {
   renderKnowledgePage();
 }
 async function deleteVocabWord(id) {
-  if (!confirm('Remove this word?')) return;
+  if (!await uiConfirm({ title: 'Remove this word?', message: 'It will drop out of your vocabulary and the games.', okText: 'Remove' })) return;
   state.data.vocab = (state.data.vocab || []).filter(x => x.id !== id);
   await saveData();
   renderKnowledgePage();
@@ -10739,7 +10740,7 @@ async function addTakeaway() {
   renderKnowledgePage();
 }
 async function deleteTakeaway(id) {
-  if (!confirm('Remove this lesson?')) return;
+  if (!await uiConfirm({ title: 'Remove this lesson?', message: 'This takeaway will be deleted.', okText: 'Remove' })) return;
   state.data.takeaways = (state.data.takeaways || []).filter(x => x.id !== id);
   await saveData();
   renderKnowledgePage();
@@ -12150,7 +12151,7 @@ async function importData(input) {
     const inside = parts.length ? parts.join(', ') : 'no entries yet';
     const dated = sum.exportedAt ? ('\nExported ' + sum.exportedAt + '.') : '';
     const warn = sum.knownApp ? '' : '\n\n⚠ This file wasn’t exported by Onward — only import it if you trust where it came from.';
-    if (!confirm('This backup contains: ' + inside + '.' + dated + warn + '\n\nImporting REPLACES all current data for this account. Continue?')) { input.value = ''; return; }
+    if (!await uiConfirm({ title: 'Import this backup?', message: 'This backup contains: ' + inside + '.' + dated + warn + '\n\nImporting REPLACES all current data for this account.', okText: 'Import & replace' })) { input.value = ''; return; }
     data.profile = data.profile || {};
     ['days', 'weeks', 'ideas', 'contacts', 'books', 'weights', 'checklist', 'reminders'].forEach(k => { if (!Array.isArray(data[k])) data[k] = []; });
     if (!data.checkDone || typeof data.checkDone !== 'object') data.checkDone = {};
@@ -12236,7 +12237,7 @@ async function renameCheckGroup(gid, name) {
 }
 async function deleteCheckGroup(gid) {
   const g = checklistGroups().find(x => x.id === gid);
-  if (g && (g.items || []).length && !confirm('Delete "' + g.name + '" and its ' + g.items.length + ' item' + (g.items.length === 1 ? '' : 's') + '?')) return;
+  if (g && (g.items || []).length && !await uiConfirm({ title: 'Delete "' + g.name + '"?', message: 'Its ' + g.items.length + ' item' + (g.items.length === 1 ? '' : 's') + ' will be deleted too.', okText: 'Delete' })) return;
   state.data.checklistGroups = checklistGroups().filter(x => x.id !== gid);
   await saveData(); renderChecklistPage();
 }
@@ -12985,7 +12986,7 @@ async function sendBroadcast() {
   const title = (document.getElementById('bc-title').value || '').trim();
   const body = (document.getElementById('bc-body').value || '').trim();
   if (!title) { showToast('Add a title first.', 'error'); return; }
-  if (!confirm('Send this notification to everyone who enabled notifications?')) return;
+  if (!await uiConfirm({ title: 'Send to everyone?', message: 'This notification goes to every member who enabled notifications.', okText: 'Send', danger: false })) return;
   try {
     const r = await fetch('/api/admin/broadcast', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ title, body }) });
     const j = await r.json();
@@ -13019,6 +13020,94 @@ function formatWeekRange(weekStart, short) {
   return s.toLocaleDateString('en-US', opts) + ' – ' + e.toLocaleDateString('en-US', { ...opts, year: 'numeric' });
 }
 
+// In-app confirm — replaces the browser's native confirm(), which blocks the
+// page, ignores the theme, and on an installed PWA reads like a system error.
+// Returns a Promise<boolean>; Esc / backdrop / Cancel all resolve false.
+function uiConfirm(opts) {
+  const o = typeof opts === 'string' ? { message: opts } : (opts || {});
+  const title = o.title || 'Are you sure?';
+  const message = o.message || '';
+  const okText = o.okText || 'Confirm';
+  const cancelText = o.cancelText || 'Cancel';
+  const danger = o.danger !== false;   // most confirms in this app are destructive
+  if (typeof document === 'undefined') return Promise.resolve(false);
+  return new Promise(resolve => {
+    document.getElementById('ui-confirm')?.remove();
+    const el = document.createElement('div');
+    el.id = 'ui-confirm';
+    el.className = 'modal-overlay uic-overlay';
+    el.innerHTML =
+      '<div class="modal-box uic-box" role="alertdialog" aria-modal="true" aria-labelledby="uic-t">' +
+      '<div class="uic-icon' + (danger ? ' uic-icon-danger' : '') + '">' + (danger ? '!' : '?') + '</div>' +
+      '<h3 class="uic-title" id="uic-t">' + escapeHtml(title) + '</h3>' +
+      (message ? '<p class="uic-msg">' + escapeHtml(message) + '</p>' : '') +
+      '<div class="uic-actions">' +
+      '<button type="button" class="btn btn-outline uic-cancel">' + escapeHtml(cancelText) + '</button>' +
+      '<button type="button" class="btn ' + (danger ? 'btn-danger' : 'btn-primary') + ' uic-ok">' + escapeHtml(okText) + '</button>' +
+      '</div></div>';
+    let done = false;
+    const finish = (v) => {
+      if (done) return; done = true;
+      document.removeEventListener('keydown', onKey);
+      el.classList.add('uic-out');
+      setTimeout(() => el.remove(), 140);
+      resolve(v);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+      else if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    };
+    el.addEventListener('click', e => { if (e.target === el) finish(false); });
+    el.querySelector('.uic-cancel').addEventListener('click', () => finish(false));
+    el.querySelector('.uic-ok').addEventListener('click', () => finish(true));
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(el);
+    setTimeout(() => el.querySelector('.uic-ok')?.focus(), 40);
+  });
+}
+// In-app prompt — same treatment as uiConfirm, for the one place we ask for a
+// value. Resolves the string, or null if cancelled.
+function uiPrompt(opts) {
+  const o = opts || {};
+  if (typeof document === 'undefined') return Promise.resolve(null);
+  return new Promise(resolve => {
+    document.getElementById('ui-confirm')?.remove();
+    const el = document.createElement('div');
+    el.id = 'ui-confirm';
+    el.className = 'modal-overlay uic-overlay';
+    el.innerHTML =
+      '<div class="modal-box uic-box" role="dialog" aria-modal="true" aria-labelledby="uip-t">' +
+      '<h3 class="uic-title" id="uip-t">' + escapeHtml(o.title || 'Enter a value') + '</h3>' +
+      (o.message ? '<p class="uic-msg">' + escapeHtml(o.message) + '</p>' : '') +
+      '<input type="' + (o.type === 'number' ? 'number' : 'text') + '" class="uic-input" id="uic-input"' +
+      (o.type === 'number' ? ' inputmode="decimal" step="any"' : '') +
+      ' value="' + escapeAttr(o.value == null ? '' : String(o.value)) + '"' +
+      (o.placeholder ? ' placeholder="' + escapeAttr(o.placeholder) + '"' : '') + '>' +
+      '<div class="uic-actions">' +
+      '<button type="button" class="btn btn-outline uic-cancel">Cancel</button>' +
+      '<button type="button" class="btn btn-primary uic-ok">' + escapeHtml(o.okText || 'Save') + '</button>' +
+      '</div></div>';
+    let done = false;
+    const input = () => el.querySelector('#uic-input');
+    const finish = (v) => {
+      if (done) return; done = true;
+      document.removeEventListener('keydown', onKey);
+      el.classList.add('uic-out');
+      setTimeout(() => el.remove(), 140);
+      resolve(v);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); finish(null); }
+      else if (e.key === 'Enter') { e.preventDefault(); finish(input() ? input().value : null); }
+    };
+    el.addEventListener('click', e => { if (e.target === el) finish(null); });
+    el.querySelector('.uic-cancel').addEventListener('click', () => finish(null));
+    el.querySelector('.uic-ok').addEventListener('click', () => finish(input() ? input().value : null));
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(el);
+    setTimeout(() => { const i = input(); if (i) { i.focus(); i.select(); } }, 40);
+  });
+}
 function showToast(msg, type) {
   document.querySelector('.toast')?.remove();
   const t = document.createElement('div');
