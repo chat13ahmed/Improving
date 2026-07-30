@@ -941,15 +941,23 @@ function renderAuthScreen(mode) {
     '<div class="auth-hero">' +
     '<div class="auth-hero-sun"></div>' +
     '<svg class="auth-hero-mtn" viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden="true">' +
-    '<polygon points="0,120 70,58 130,96 200,40 270,92 340,54 400,88 400,120" fill="#34C48E" opacity="0.5"></polygon>' +
-    '<polygon points="0,120 60,84 140,107 220,72 300,105 370,82 400,99 400,120" fill="#0F8A63"></polygon>' +
-    '<line x1="200" y1="42" x2="200" y2="23" stroke="#0B3D2E" stroke-width="3"></line>' +
-    '<polygon points="200,23 227,30 200,37" fill="#F97316"></polygon>' +
+    '<polygon points="0,120 70,58 130,96 200,40 270,92 340,54 400,88 400,120" fill="#34D399" opacity="0.30"></polygon>' +
+    '<polygon points="0,120 60,84 140,107 220,72 300,105 370,82 400,99 400,120" fill="#0d1b30"></polygon>' +
+    '<line x1="200" y1="42" x2="200" y2="21" stroke="#34D399" stroke-width="3"></line>' +
+    '<polygon points="200,21 227,28 200,35" fill="#34D399"></polygon>' +
     '</svg>' +
-    '<div class="auth-hero-top"><span class="auth-logo-mark">▲</span><span class="auth-logo-word">Onward</span></div>' +
+    '<div class="auth-hero-top">' +
+    '<svg class="auth-logo-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">' +
+    '<rect width="32" height="32" rx="9" fill="url(#authg)"></rect>' +
+    '<path d="M6 23l6-9 4 5 3-4.5L26 23z" fill="#fff" fill-opacity=".92"></path>' +
+    '<circle cx="19" cy="14.5" r="1.7" fill="#FBBF24"></circle>' +
+    '<defs><linearGradient id="authg" x1="0" y1="0" x2="32" y2="32">' +
+    '<stop stop-color="#34D399"></stop><stop offset="1" stop-color="#0E9F6E"></stop></linearGradient></defs></svg>' +
+    '<span class="auth-logo-word">Onward</span></div>' +
     '<div class="auth-hero-copy">' +
-    '<h1 class="auth-headline">Build the life<br>you want.</h1>' +
-    '<p class="auth-tagline">Fitness, money, reading &amp; habits — tracked in 30 seconds a day, with an AI coach.</p>' +
+    '<h1 class="auth-headline">Build the life you<br>keep meaning to.' +
+    '<span class="auth-thesis">One life. One climb.</span></h1>' +
+    '<p class="auth-tagline">Fitness, money, reading &amp; habits — tracked in 30 seconds a day, with an AI coach that connects them.</p>' +
     '</div></div>' +
     '<div class="auth-body">' +
     '<div class="auth-tabs">' +
@@ -985,13 +993,94 @@ function renderAuthScreen(mode) {
     (isSignup ? 'Already have an account? <button class="btn-link" onclick="renderAuthScreen(\'login\')">Log in</button>'
               : 'New here? <button class="btn-link" onclick="renderAuthScreen(\'signup\')">Create an account</button>') +
     '<div class="auth-note">Your account is private — only you can see your data.</div>' +
-    '<div style="margin-top:10px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap">' +
+    '<div class="auth-links">' +
     '<button type="button" class="btn-link" onclick="startDemo()">See a live demo</button>' +
     '<a class="btn-link" href="about.html">What is Onward? →</a></div>' +
     '</div>' +
     '</div></div>';
   document.body.appendChild(screen);
+  paintAuthRidge();
   setTimeout(() => document.getElementById('auth-username')?.focus(), 50);
+}
+
+// The animated alpine ridgeline behind the auth card — the same scene as the
+// "What is Onward?" page, so the first screen and the story match.
+function paintAuthRidge() {
+  const screen = document.getElementById('auth-screen');
+  if (!screen || typeof document === 'undefined') return;
+  document.getElementById('auth-ridge')?.remove();
+  const c = document.createElement('canvas');
+  c.id = 'auth-ridge'; c.setAttribute('aria-hidden', 'true');
+  screen.appendChild(c);
+  const x = c.getContext && c.getContext('2d');
+  if (!x) return;
+  const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion:reduce)').matches;
+  let W = 0, H = 0, far, mid, near, t0 = Date.now(), stopped = false;
+  const ridge = (baseY, amp, rough, seed) => {
+    const pts = [], n = 10;
+    for (let i = 0; i <= n; i++) {
+      const r = Math.sin(seed + i * rough) * 0.5 + Math.sin(seed * 1.7 + i * rough * 2.3) * 0.5;
+      pts.push({ x: i / n * W, y: baseY - Math.abs(r) * amp });
+    }
+    return pts;
+  };
+  const fillRidge = (pts, color) => {
+    x.beginPath(); x.moveTo(0, H); x.lineTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) {
+      const p = pts[i - 1], q = pts[i], mx = (p.x + q.x) / 2;
+      x.quadraticCurveTo(p.x, p.y, mx, (p.y + q.y) / 2);
+      x.quadraticCurveTo(mx, (p.y + q.y) / 2, q.x, q.y);
+    }
+    x.lineTo(W, H); x.closePath(); x.fillStyle = color; x.fill();
+  };
+  const resize = () => {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = c.clientWidth; H = c.clientHeight;
+    c.width = W * dpr; c.height = H * dpr; x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    far = ridge(H * 0.60, H * 0.20, 0.9, 1.3);
+    mid = ridge(H * 0.72, H * 0.26, 1.1, 4.1);
+    near = ridge(H * 0.86, H * 0.30, 1.4, 7.9);
+  };
+  const draw = () => {
+    if (!W || !H) return;
+    const g = x.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#0B1120'); g.addColorStop(1, '#152744');
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+    x.fillStyle = 'rgba(255,255,255,.5)';
+    for (let i = 0; i < 44; i++) {
+      const sx = (i * 73.3) % W, sy = (i * i * 13.7) % (H * 0.5);
+      const tw = reduce ? 1 : 0.5 + 0.5 * Math.sin(Date.now() / 700 + i);
+      x.globalAlpha = 0.22 + 0.5 * tw; x.fillRect(sx, sy, 1.4, 1.4);
+    }
+    x.globalAlpha = 1;
+    const sunX = W * 0.74, sunY = H * 0.26;
+    const sg = x.createRadialGradient(sunX, sunY, 0, sunX, sunY, H * 0.4);
+    sg.addColorStop(0, 'rgba(52,211,153,.42)'); sg.addColorStop(1, 'transparent');
+    x.fillStyle = sg; x.fillRect(0, 0, W, H);
+    x.beginPath(); x.arc(sunX, sunY, 10, 0, 7); x.fillStyle = '#EAFBF3'; x.fill();
+    fillRidge(far, 'rgba(20,44,72,.9)');
+    fillRidge(mid, 'rgba(14,32,53,.96)');
+    fillRidge(near, '#0a1424');
+    const peak = near.reduce((a, b) => (b.y < a.y ? b : a));
+    const sx0 = W * 0.10, sy0 = H * 0.9;
+    x.setLineDash([2, 7]); x.lineWidth = 2; x.strokeStyle = 'rgba(52,211,153,.55)';
+    x.beginPath(); x.moveTo(sx0, sy0); x.quadraticCurveTo(W * 0.4, H * 0.78, peak.x, peak.y + 6); x.stroke();
+    x.setLineDash([]);
+    const prog = reduce ? 0.62 : ((Date.now() - t0) % 9000) / 9000;
+    const cx = sx0 + (peak.x - sx0) * prog, cy = sy0 + (peak.y + 6 - sy0) * (prog * prog * (3 - 2 * prog));
+    x.beginPath(); x.arc(cx, cy, 4.5, 0, 7); x.fillStyle = '#FBBF24'; x.fill();
+    x.strokeStyle = '#34D399'; x.lineWidth = 2;
+    x.beginPath(); x.moveTo(peak.x, peak.y + 6); x.lineTo(peak.x, peak.y - 12); x.stroke();
+    x.beginPath(); x.moveTo(peak.x, peak.y - 12); x.lineTo(peak.x + 11, peak.y - 8.5); x.lineTo(peak.x, peak.y - 5);
+    x.closePath(); x.fillStyle = '#34D399'; x.fill();
+  };
+  // Self-healing: re-measure whenever the element's box differs from the bitmap.
+  // The first paint can land before layout settles, which used to leave it 0×0 (blank).
+  const sync = () => { if (c.clientWidth !== W || c.clientHeight !== H) resize(); };
+  const loop = () => { if (stopped || !document.getElementById('auth-ridge')) { stopped = true; return; } sync(); draw(); requestAnimationFrame(loop); };
+  window.addEventListener('resize', () => { if (!stopped) { resize(); if (reduce) draw(); } });
+  resize();
+  if (reduce) { requestAnimationFrame(() => { sync(); draw(); }); } else loop();
 }
 
 function authError(msg) {
@@ -1101,6 +1190,7 @@ function renderForgotScreen() {
     '<div class="auth-foot"><button class="btn-link" onclick="backToLogin()">← Back to log in</button></div>' +
     '</div>';
   document.body.appendChild(screen);
+  paintAuthRidge();
   setTimeout(() => document.getElementById(f.step === 1 ? 'forgot-username' : 'forgot-answer')?.focus(), 50);
 }
 

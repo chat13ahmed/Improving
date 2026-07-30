@@ -3182,36 +3182,43 @@ body.auth-active .sidebar,
 body.auth-active .main,
 body.auth-active .fab-btn { display: none !important; }
 
+/* ═══ AUTH — alpine identity, matched to the "What is Onward?" page ═══ */
 #auth-screen {
+  --a-bg:#0B1120; --a-bg2:#0F1729; --a-line:rgba(255,255,255,.10); --a-line2:rgba(255,255,255,.18);
+  --a-text:#E6EDF7; --a-muted:#8DA1BF; --a-faint:#5D708F;
+  /* accent = bright (text/borders/glow); accent-deep = button ground, dark enough
+     that white label text clears WCAG AA (mid-green + white only reaches ~2.5:1) */
+  --a-accent:#34D399; --a-accent-deep:#0B7A54; --a-amber:#FBBF24;
+  --a-field:rgba(255,255,255,.05);
   position: fixed; inset: 0; z-index: 20000;
   display: block;                             /* block + overflow scroll = reliable everywhere (no flex clipping) */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 24px 24px 48px;
-  background: var(--bg);
+  padding: 40px 24px calc(48px + env(safe-area-inset-bottom, 0px));
+  background: var(--a-bg);
+  color: var(--a-text);
   isolation: isolate;
   animation: fadeIn 0.3s ease;
 }
+/* animated ridgeline canvas sits behind everything */
+#auth-ridge { position: fixed; inset: 0; z-index: -2; width: 100%; height: 100%; pointer-events: none; }
 #auth-screen::before {
   content: '';
-  position: fixed; inset: -10%;
+  position: fixed; inset: 0;
   z-index: -1; pointer-events: none;
-  background:
-    radial-gradient(ellipse at 82% 8%, rgba(249,115,22,0.13) 0%, transparent 55%),
-    radial-gradient(ellipse at 12% 88%, rgba(236,72,153,0.10) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 120%, rgba(239,68,68,0.07) 0%, transparent 55%);
-  animation: bgDrift 22s ease-in-out infinite alternate;
-  will-change: transform;
+  background: linear-gradient(180deg, transparent 42%, var(--a-bg) 92%);
 }
 .auth-card {
   width: 100%; max-width: 400px;
   margin: 0 auto;                             /* horizontal center; flows top-down so it always scrolls */
-  background: var(--card);
-  border: 1px solid var(--border-bright);
-  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--a-bg2) 86%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  backdrop-filter: blur(14px) saturate(120%);
+  border: 1px solid var(--a-line2);
+  border-radius: 20px;
   padding: 32px;
-  box-shadow: 0 0 80px rgba(59,130,246,0.12), var(--shadow-lg);
-  animation: slideUp 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  box-shadow: 0 30px 80px -24px rgba(0,0,0,.8);
+  animation: slideUp 0.5s cubic-bezier(0.22,1,0.36,1);
 }
 .auth-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; justify-content: center; }
 .auth-brand .brand-icon { font-size: 32px; }
@@ -3231,50 +3238,63 @@ body.auth-active .fab-btn { display: none !important; }
 .auth-warn { font-size: 12px; color: var(--warning); background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); border-radius: 8px; padding: 8px 11px; margin-bottom: 12px; line-height: 1.45; }
 .auth-status { font-size: 13px; color: #0d9488; background: rgba(45,212,191,0.08); border: 1px solid rgba(45,212,191,0.22); border-radius: 8px; padding: 9px 12px; margin-bottom: 12px; line-height: 1.45; }
 
-.auth-tabs { display: flex; gap: 6px; background: var(--field-bg); border-radius: var(--radius-sm); padding: 4px; margin-bottom: 22px; }
+.auth-tabs { display: flex; gap: 4px; background: var(--a-field); border: 1px solid var(--a-line); border-radius: 999px; padding: 4px; margin-bottom: 22px; }
 .auth-tab {
-  flex: 1; padding: 9px; border: none; background: transparent;
-  color: var(--text-muted); font-size: 14px; font-weight: 700; cursor: pointer;
-  border-radius: 6px; transition: all 0.15s;
+  flex: 1; padding: 10px; border: none; background: transparent;
+  color: var(--a-muted); font-family: inherit; font-size: 14px; font-weight: 750; cursor: pointer;
+  border-radius: 999px; transition: all 0.18s;
 }
-.auth-tab.active { background: var(--primary); color: #fff; box-shadow: 0 0 16px rgba(59,130,246,0.4); }
+.auth-tab.active { background: var(--a-accent-deep); color: #fff; box-shadow: 0 6px 18px -6px var(--a-accent-deep); }
 
 .auth-field { margin-bottom: 16px; }
-.auth-field label { display: block; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.auth-field label { display: block; font-size: 12px; font-weight: 700; color: var(--a-muted); margin-bottom: 7px;
+  text-transform: uppercase; letter-spacing: .09em; }
 .auth-field input {
-  width: 100%; padding: 11px 14px;
-  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
-  background: var(--field-bg); color: var(--text); font-size: 15px; outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%; padding: 13px 15px;
+  border: 1px solid var(--a-line2); border-radius: 12px;
+  background: var(--a-field); color: var(--a-text); font-family: inherit; font-size: 15px; outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
-.auth-field input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
+.auth-field input::placeholder { color: var(--a-faint); }
+.auth-field input:focus { border-color: var(--a-accent); background: rgba(52,211,153,.06); box-shadow: 0 0 0 3px rgba(52,211,153,0.16); }
 
-.auth-error { font-size: 13px; color: var(--danger); min-height: 18px; margin-bottom: 8px; font-weight: 600; opacity: 0; transition: opacity 0.15s; }
+.auth-error { font-size: 13px; color: #F87171; min-height: 18px; margin-bottom: 8px; font-weight: 650; opacity: 0; transition: opacity 0.15s; }
 .auth-error.visible { opacity: 1; }
-.auth-submit { width: 100%; padding: 12px; font-size: 15px; margin-top: 4px; }
-.auth-foot { text-align: center; margin-top: 20px; font-size: 13px; color: var(--text-muted); }
-.auth-note { font-size: 11px; color: var(--text-muted); margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); line-height: 1.5; }
+.auth-submit { width: 100%; padding: 15px; font-size: 15.5px; font-weight: 750; margin-top: 4px; border-radius: 13px;
+  background: var(--a-accent-deep); border: 1px solid var(--a-accent-deep); color: #fff;
+  box-shadow: 0 12px 30px -10px var(--a-accent-deep); transition: transform .18s, box-shadow .18s; }
+.auth-submit:hover { transform: translateY(-2px); box-shadow: 0 18px 38px -12px var(--a-accent-deep); }
+.auth-foot { text-align: center; margin-top: 20px; font-size: 13px; color: var(--a-muted); }
+.auth-foot .btn-link { color: var(--a-accent); font-weight: 700; }
+.auth-note { font-size: 11.5px; color: var(--a-muted); margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--a-line); line-height: 1.5; }
+#auth-screen .btn-link { color: var(--a-accent); }
+#auth-screen .auth-status { color: var(--a-accent); background: rgba(52,211,153,.08); border-color: rgba(52,211,153,.25); }
 
-/* ─── Redesigned first screen: a branded summit hero above the form ─── */
+/* ─── First screen: the alpine summit hero above the form ─── */
 .auth-card--hero { padding: 0; overflow: hidden; }
 .auth-hero {
   position: relative; overflow: hidden; color: #fff;
-  padding: 20px 26px 72px;
-  background: linear-gradient(157deg, #38BDF8 0%, #3B82F6 52%, #1E40AF 100%);
+  padding: 22px 26px 68px;
+  background: linear-gradient(168deg, #10243c 0%, #0d1b30 55%, #0b1526 100%);
 }
 .auth-hero-sun {
-  position: absolute; top: -24px; right: -14px; width: 132px; height: 132px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,227,142,0.95) 0%, rgba(255,205,80,0.45) 40%, transparent 68%);
+  position: absolute; top: -30px; right: -18px; width: 150px; height: 150px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(52,211,153,.55) 0%, rgba(52,211,153,.16) 42%, transparent 70%);
   pointer-events: none;
 }
-.auth-hero-mtn { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 66px; display: block; }
-.auth-hero-top { position: relative; display: flex; align-items: center; gap: 7px; }
-.auth-logo-mark { font-size: 17px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25)); }
-.auth-logo-word { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; }
-.auth-hero-copy { position: relative; margin-top: 30px; }
-.auth-headline { font-size: 27px; font-weight: 800; line-height: 1.1; letter-spacing: -0.6px; text-shadow: 0 2px 14px rgba(2,18,55,0.35); }
-.auth-tagline { font-size: 13px; margin-top: 9px; line-height: 1.5; max-width: 290px; color: rgba(255,255,255,0.92); text-shadow: 0 1px 8px rgba(2,18,55,0.3); }
-.auth-body { padding: 22px 26px 26px; }
+.auth-hero-mtn { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 74px; display: block; }
+.auth-hero-top { position: relative; display: flex; align-items: center; gap: 9px; }
+.auth-logo-mark { width: 26px; height: 26px; flex: none; }
+.auth-logo-word { font-size: 16.5px; font-weight: 800; letter-spacing: -0.3px; }
+.auth-hero-copy { position: relative; margin-top: 26px; }
+.auth-headline { font-size: 28px; font-weight: 850; line-height: 1.06; letter-spacing: -0.7px; text-wrap: balance; }
+.auth-thesis { display: block; font-family: Georgia, "Iowan Old Style", "Times New Roman", serif; font-style: italic;
+  font-weight: 500; font-size: 21px; color: var(--a-accent); margin-top: 6px; letter-spacing: -.2px; }
+.auth-tagline { font-size: 13.5px; margin-top: 12px; line-height: 1.55; max-width: 300px; color: rgba(255,255,255,0.74); }
+.auth-body { padding: 24px 26px 26px; }
+/* the "what is Onward" / demo links under the form */
+.auth-links { margin-top: 12px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.auth-links a, .auth-links button { color: var(--a-accent); font-weight: 700; font-size: 13px; }
 
 /* ─── User chip (sidebar footer) ──────────────── */
 .user-chip {
@@ -3299,15 +3319,16 @@ body.auth-active .fab-btn { display: none !important; }
 /* ─── Forgot-password ─────────────────────────── */
 .auth-forgot { text-align: center; margin-top: 14px; }
 .auth-field select {
-  width: 100%; padding: 11px 14px;
-  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
-  background: var(--field-bg); color: var(--text); font-size: 14px; outline: none; cursor: pointer;
+  width: 100%; padding: 13px 15px;
+  border: 1px solid var(--a-line2, var(--border)); border-radius: 12px;
+  background: var(--a-field, var(--field-bg)); color: var(--a-text, var(--text)); font-family: inherit; font-size: 14px; outline: none; cursor: pointer;
 }
-.auth-field select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
+.auth-field select:focus { border-color: var(--a-accent, var(--primary)); box-shadow: 0 0 0 3px rgba(52,211,153,0.16); }
+#auth-screen .auth-field select option { background: #0F1729; color: #E6EDF7; }
 .forgot-q {
-  background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.22);
-  border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 16px;
-  font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.5;
+  background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.26);
+  border-radius: 12px; padding: 12px 14px; margin-bottom: 16px;
+  font-size: 14px; font-weight: 600; color: var(--a-text, var(--text)); line-height: 1.5;
 }
 
 /* ─── Today-section: Reading ──────────────────── */
@@ -3674,13 +3695,13 @@ body { background: transparent; }
 .wsum-refuel b { color: var(--text); }
 
 /* ─── Signup: optional password-recovery expander (keeps the form short) ─── */
-.auth-recovery { margin: 2px 0 14px; border: 1px solid var(--border); border-radius: 10px; padding: 0 14px; }
-.auth-recovery summary { cursor: pointer; padding: 12px 2px; font-size: 13.5px; font-weight: 700; color: var(--accent, #7C3AED); list-style: none; }
+.auth-recovery { margin: 2px 0 14px; border: 1px solid var(--a-line, var(--border)); border-radius: 12px; padding: 0 14px; }
+.auth-recovery summary { cursor: pointer; padding: 12px 2px; font-size: 13.5px; font-weight: 700; color: var(--a-accent, #7C3AED); list-style: none; }
 .auth-recovery summary::-webkit-details-marker { display: none; }
-.auth-recovery summary span { color: var(--text-muted); font-weight: 400; }
+.auth-recovery summary span { color: var(--a-muted, var(--text-muted)); font-weight: 400; }
 .auth-recovery[open] { padding-bottom: 10px; }
 .auth-recovery .auth-field { margin-top: 10px; }
-.auth-recovery-note { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-top: 8px; }
+.auth-recovery-note { font-size: 12px; color: var(--a-faint, var(--text-muted)); line-height: 1.5; margin-top: 8px; }
 
 /* ─── First-log welcome banner ─── */
 .gl-welcome { background: linear-gradient(135deg, rgba(16,185,129,.10), rgba(34,211,238,.12)); border: 1px solid rgba(16,185,129,.22);
