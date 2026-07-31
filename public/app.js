@@ -9292,7 +9292,12 @@ function buildDemoData() {
   }
   const incomes = {};
   incomes[today.toISOString().slice(0, 7)] = 4200;
-  const pm = new Date(today); pm.setMonth(pm.getMonth() - 1);
+  // Anchor to the 1st before stepping back a month: setMonth() on the 29th–31st
+  // overflows into a month that has fewer days (June 31 → July 1), which made
+  // "last month" resolve to THIS month and collapsed the two income entries into
+  // one for three days out of every month.
+  const pm = new Date(today.toISOString().slice(0, 7) + '-01T00:00:00Z');
+  pm.setUTCMonth(pm.getUTCMonth() - 1);
   incomes[pm.toISOString().slice(0, 7)] = 3900;
   const weights = []; for (let i = 21; i >= 0; i -= 3) { weights.push({ date: iso(i), kg: 80 - (21 - i) * 0.04 }); }
   return {

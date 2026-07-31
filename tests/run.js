@@ -762,7 +762,10 @@ const _dp = A.getMoneyPeriod();
 ok('getMoneyPeriod daily net', _dp.label === 'day' && _dp.income === 150 && _dp.spent === 20 && _dp.net === 130);
 // Carryover: prior period savings roll into the next period's available money
 const _cm = new Date().toISOString().slice(0, 7);
-const _lm = (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); })();
+// Anchored to the 1st: on the 29th–31st, setMonth(-1) overflows into the
+// following month (June 31 → July 1), so "last month" came back equal to this
+// month and this whole block silently tested nothing. Caught on the 31st.
+const _lm = (() => { const d = new Date(_cm + '-01T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() - 1); return d.toISOString().slice(0, 7); })();
 A.state.data = { profile: { pillars: dp, incomeCadence: 'monthly' }, weeks: [], weights: [],
   incomes: { [_lm]: 1000, [_cm]: 2000 },
   days: [{ date: _lm + '-15', spent: 400 }, { date: new Date().toISOString().split('T')[0], spent: 500 }] };
