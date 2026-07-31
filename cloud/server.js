@@ -445,18 +445,42 @@ app.get('/api/data', requireAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: 'Failed to read data' }); }
 });
 
+// Fields the SERVER owns. The data blob is otherwise the client's to shape, but
+// these decide what the user has paid for — so they're restored from the stored
+// record on every write. Without this, `POST /api/data {profile:{pro:true}}`
+// grants Pro to anyone with an account: subStatus() trusts profile.pro, and this
+// endpoint used to persist whatever arrived. Only /api/admin/grant-pro (owner
+// only) may change them.
+function preserveBillingFields(incoming, stored) {
+  if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) return incoming;
+  const prev = (stored && stored.profile) || {};
+  const prof = (incoming.profile && typeof incoming.profile === 'object' && !Array.isArray(incoming.profile))
+    ? incoming.profile : {};
+  prof.pro = prev.pro === true;
+  // Keep the stored trial; only fall back to the client's value if this account
+  // has no record yet (first write), so a fresh signup doesn't lose its trial.
+  prof.trialEnds = (stored && prev.trialEnds !== undefined) ? prev.trialEnds : (Number(prof.trialEnds) || 0);
+  incoming.profile = prof;
+  return incoming;
+}
 app.post('/api/data', requireAuth, async (req, res) => {
   try {
     const wrapped = req.body && req.body.data && typeof req.body.data === 'object';
     const data = wrapped ? req.body.data : req.body;
+    // The blob must be a plain object — a string/array/number here would be
+    // stored happily and then break every read for that account.
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return res.status(400).json({ error: 'Invalid data payload.' });
+    }
     const clientVersion = wrapped ? req.body.version : undefined;
     const cur = await DB.getData(req.userId);
     const curV = cur ? cur.version : 0;
     if (clientVersion !== undefined && clientVersion !== curV) {
       return res.status(409).json({ error: 'CONFLICT', data: cur ? cur.data : defaultData(), version: curV });
     }
+    const safe = preserveBillingFields(data, cur ? cur.data : null);
     const newV = curV + 1;
-    await DB.saveData(req.userId, data, newV);
+    await DB.saveData(req.userId, safe, newV);
     res.json({ success: true, version: newV });
   } catch (e) { res.status(500).json({ error: 'Failed to save data' }); }
 });
@@ -1300,4 +1324,4 @@ if (require.main === module) {
     .catch(err => { console.error('Startup failed:', err.message); process.exit(1); });
 }
 
-module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner, cleanMeal, cleanPost, resetLocked, recordResetFail, clearResetFails };
+module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner, cleanMeal, cleanPost, resetLocked, recordResetFail, clearResetFails, preserveBillingFields };

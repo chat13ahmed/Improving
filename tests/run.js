@@ -1466,6 +1466,33 @@ A.state.data = _iBase();
     ok('cleanPost: DROPS an over-cap photo', C.cleanPost({ type: 'update', body: 'x', photo: 'data:image/png;base64,' + 'A'.repeat(900000) }).data.photo === undefined);
     ok('cleanPost: a photo-only post survives sanitizing (body can be empty)', (() => { const p = C.cleanPost({ type: 'update', photo: 'data:image/png;base64,QQ==' }); return !!p.data.photo && p.body === ''; })());
     ok('cleanPost: program/meal never carry a link or photo', (() => { const a = C.cleanPost({ type: 'program', title: 'P', link: 'https://x.com', photo: 'data:image/png;base64,QQ==' }); return a.data.link === undefined && a.data.photo === undefined; })());
+    // ── billing fields are server-owned (paywall bypass) ──
+    // subStatus() trusts profile.pro, and /api/data persists the client's blob,
+    // so without this guard any account could POST {profile:{pro:true}}.
+    ok('billing: a client cannot promote itself to Pro', (() => {
+      const out = C.preserveBillingFields({ profile: { pro: true, name: 'X' } }, { profile: { pro: false, trialEnds: 111 } });
+      return out.profile.pro === false;
+    })());
+    ok('billing: a client cannot extend its own trial', (() => {
+      const out = C.preserveBillingFields({ profile: { trialEnds: 9e15 } }, { profile: { pro: false, trialEnds: 111 } });
+      return out.profile.trialEnds === 111;
+    })());
+    ok('billing: an owner-granted Pro survives the user\'s next save', (() => {
+      const out = C.preserveBillingFields({ profile: { pro: false } }, { profile: { pro: true, trialEnds: 222 } });
+      return out.profile.pro === true && out.profile.trialEnds === 222;
+    })());
+    ok('billing: the rest of the blob is untouched', (() => {
+      const out = C.preserveBillingFields({ days: [1, 2], profile: { pro: true, name: 'Alex' } }, { profile: { pro: false, trialEnds: 5 } });
+      return out.days.length === 2 && out.profile.name === 'Alex';
+    })());
+    ok('billing: first-ever save keeps its seeded trial', (() => {
+      const out = C.preserveBillingFields({ profile: { trialEnds: 777 } }, null);
+      return out.profile.trialEnds === 777 && out.profile.pro === false;
+    })());
+    ok('billing: a blob with no profile still gets billing fields', (() => {
+      const out = C.preserveBillingFields({ days: [] }, { profile: { pro: true, trialEnds: 9 } });
+      return out.profile.pro === true && out.profile.trialEnds === 9;
+    })());
     // ── password-reset per-account answer lockout (hardening the recovery flow) ──
     const _ru = 'resetuser-' + Date.now();
     ok('reset lockout: a fresh account is not locked', C.resetLocked(_ru) === false);
