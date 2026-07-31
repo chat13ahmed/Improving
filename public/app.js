@@ -3151,7 +3151,7 @@ function renderFocusCard(thisWeek, lastWeek) {
   return '<div class="focus-card card">' +
     '<div class="focus-header">' +
     '<div><div class="focus-label">Focus This Week</div>' +
-    '<div class="focus-area">' + lowest.icon + ' ' + lowest.name + ' — ' + Math.round(lowest.pct) + '% of goal</div></div>' +
+    '<div class="focus-area">' + escapeHtml(lowest.icon) + ' ' + escapeHtml(lowest.name) + ' — ' + Math.round(lowest.pct) + '% of goal</div></div>' +
     '<div class="focus-bar-wrap"><div class="focus-bar" style="width:' + Math.min(100, lowest.pct) + '%;background:' + color + '"></div></div>' +
     '</div>' +
     '<div class="focus-tip">' + lowest.tip + '</div>' +
@@ -6087,7 +6087,7 @@ function renderDashboard() {
         (net >= sGoal ? ' · goal hit!' : ' · ' + formatCurrency(sGoal - net) + ' to go') + '</div></div>');
     } else if (mp.income > 0 || mp.spent > 0) {
       const net = mp.net;
-      goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>' + pc.icon + ' Net this ' + mp.label + '</span>' +
+      goalRows.push('<div class="sg-item"><div class="sg-item-top"><span>' + escapeHtml(pc.icon) + ' Net this ' + mp.label + '</span>' +
         '<strong style="color:' + (net >= 0 ? 'var(--success)' : 'var(--danger)') + '">' + formatCurrency(net) +
         (mp.income > 0 ? ' · ' + mp.rate + '% saved' : '') + '</strong></div>' +
         '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">' + detail + '</div>' +
@@ -11640,8 +11640,11 @@ async function savePillars() {
   const pillars = {};
   PILLAR_IDS.forEach(id => {
     const enabled = document.querySelector('.pc-row[data-id="' + id + '"] input[type=checkbox]')?.checked !== false;
-    const icon  = document.getElementById('pc-icon-' + id)?.value.trim()  || PILLAR_META[id].defaultIcon;
-    const label = document.getElementById('pc-label-' + id)?.value.trim() || PILLAR_META[id].defaultLabel;
+    // Capped on the way in as well as escaped on the way out: an unbounded
+    // label doesn't just look wrong, it breaks the layout of every card that
+    // renders it. Escaping is still what makes it safe — this is belt and braces.
+    const icon  = (document.getElementById('pc-icon-' + id)?.value.trim()  || PILLAR_META[id].defaultIcon).slice(0, 4);
+    const label = (document.getElementById('pc-label-' + id)?.value.trim() || PILLAR_META[id].defaultLabel).slice(0, 24);
     pillars[id] = { enabled, icon, label };
   });
   if (!Object.values(pillars).some(p => p.enabled)) { showToast('Keep at least one pillar on.', 'error'); return; }
