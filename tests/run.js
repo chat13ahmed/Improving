@@ -1577,6 +1577,26 @@ A.state.data = _iBase();
     const travBody = await trav.text();
     ok('gzip: path traversal cannot leak server source', !/JWT_SECRET|DATABASE_URL|require\(/.test(travBody));
 
+    // ── per-user storage cap on /api/data (disk-exhaustion guard) ──
+    // Sign up over HTTP to get a real session token, then prove a normal save
+    // lands but an oversized blob is rejected with 413 (not silently stored).
+    const suUser = 'capuser-' + Date.now();
+    const suRes = await fetch(base + '/api/signup', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: suUser, password: 'testpw123', email: suUser + '@ex.com' })
+    });
+    const suBody = await suRes.json();
+    ok('data cap: signup issues a session token', suRes.status === 200 && !!suBody.token);
+    const authHdr = { 'content-type': 'application/json', authorization: 'Bearer ' + suBody.token };
+    const saveData = (blob) => fetch(base + '/api/data', { method: 'POST', headers: authHdr, body: JSON.stringify(blob) });
+    const okSave = await saveData({ profile: { name: 'Cap' }, days: [1, 2, 3] });
+    ok('data cap: a normal-sized blob saves (200)', okSave.status === 200);
+    const bigSave = await saveData({ profile: { name: 'Cap' }, junk: 'A'.repeat(2 * 1024 * 1024 + 5000) });
+    ok('data cap: an oversized blob is rejected with 413', bigSave.status === 413);
+    const stillThere = await fetch(base + '/api/data', { headers: authHdr });
+    const stillBody = await stillThere.json();
+    ok('data cap: the rejected save did NOT overwrite good data', stillThere.status === 200 && !stillBody.junk && stillBody.profile.name === 'Cap');
+
     // Node's fetch keeps sockets alive; leaving them open when the suite calls
     // process.exit trips a libuv assertion on Windows. Drop them explicitly, then
     // yield a tick so the handles are fully released before the report exits —

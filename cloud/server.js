@@ -181,6 +181,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '10mb' }));
+const MAX_STORED_BYTES = 2 * 1024 * 1024; // per-user data blob cap (see /api/data)
 // dotfiles: 'allow' so /.well-known/assetlinks.json (Android app verification) is served
 // ── gzip for static assets ───────────────────────────────────────────────
 // The client ships ~1.3MB of JS/CSS uncompressed; gzipped it's under 300KB.
@@ -479,6 +480,14 @@ app.post('/api/data', requireAuth, async (req, res) => {
       return res.status(409).json({ error: 'CONFLICT', data: cur ? cur.data : defaultData(), version: curV });
     }
     const safe = preserveBillingFields(data, cur ? cur.data : null);
+    // Per-user storage budget: each account is one overwritten blob, so cap the
+    // stored size to stop a single user from parking a giant payload on disk.
+    // 2 MB is generous for this app's activity-log JSON, well under the 10 MB
+    // request-parse limit. Measured on the exact object we persist.
+    const storedBytes = Buffer.byteLength(JSON.stringify(safe));
+    if (storedBytes > MAX_STORED_BYTES) {
+      return res.status(413).json({ error: 'Your data is too large to save. Please remove some old entries.' });
+    }
     const newV = curV + 1;
     await DB.saveData(req.userId, safe, newV);
     res.json({ success: true, version: newV });
