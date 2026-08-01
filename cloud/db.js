@@ -74,6 +74,7 @@ function sqliteImpl() {
       )`);
       try { db.exec('ALTER TABLE shared_meals ADD COLUMN ingredients TEXT'); } catch {} // migrate older DBs
       try { db.exec('ALTER TABLE shared_meals ADD COLUMN photo TEXT'); } catch {}
+      try { db.exec("ALTER TABLE shared_meals ADD COLUMN flaggers TEXT DEFAULT '[]'"); } catch {} // per-user report de-dup
       db.exec(`CREATE TABLE IF NOT EXISTS community_posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -81,6 +82,7 @@ function sqliteImpl() {
         data TEXT DEFAULT '{}', likes TEXT DEFAULT '[]', flags INTEGER DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now'))
       )`);
+      try { db.exec("ALTER TABLE community_posts ADD COLUMN flaggers TEXT DEFAULT '[]'"); } catch {} // per-user report de-dup
       // ── Collective-knowledge social layer (groups, notes, likes, replies, flags, notifications) ──
       db.exec(`CREATE TABLE IF NOT EXISTS reading_groups (
         id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
@@ -181,7 +183,14 @@ function sqliteImpl() {
         .map(r => ({ ...r, ingredients: safeJsonArray(r.ingredients) }));
     },
     async incSharedMealUse(id) { db.prepare('UPDATE shared_meals SET uses = uses + 1 WHERE id=?').run(id); },
-    async flagSharedMeal(id) { db.prepare('UPDATE shared_meals SET flags = flags + 1 WHERE id=?').run(id); },
+    async flagSharedMeal(id, userId) {
+      const row = db.prepare('SELECT flaggers FROM shared_meals WHERE id=?').get(id);
+      if (!row) return { count: 0 };
+      const f = safeJsonArray(row.flaggers).map(String);
+      if (f.indexOf(String(userId)) < 0) f.push(String(userId));   // one report per user
+      db.prepare('UPDATE shared_meals SET flaggers=?, flags=? WHERE id=?').run(JSON.stringify(f), f.length, id);
+      return { count: f.length };
+    },
     async deleteSharedMeal(id, userId, force) {
       const r = force ? db.prepare('DELETE FROM shared_meals WHERE id=?').run(id)
                       : db.prepare('DELETE FROM shared_meals WHERE id=? AND user_id=?').run(id, userId);
@@ -210,7 +219,14 @@ function sqliteImpl() {
       db.prepare('UPDATE community_posts SET likes=? WHERE id=?').run(JSON.stringify(likes), id);
       return { liked: i < 0, count: likes.length };
     },
-    async flagPost(id) { db.prepare('UPDATE community_posts SET flags = flags + 1 WHERE id=?').run(id); },
+    async flagPost(id, userId) {
+      const row = db.prepare('SELECT flaggers FROM community_posts WHERE id=?').get(id);
+      if (!row) return { count: 0 };
+      const f = safeJsonArray(row.flaggers).map(String);
+      if (f.indexOf(String(userId)) < 0) f.push(String(userId));   // one report per user
+      db.prepare('UPDATE community_posts SET flaggers=?, flags=? WHERE id=?').run(JSON.stringify(f), f.length, id);
+      return { count: f.length };
+    },
     async deletePost(id, userId, force) {
       const r = force ? db.prepare('DELETE FROM community_posts WHERE id=?').run(id)
                       : db.prepare('DELETE FROM community_posts WHERE id=? AND user_id=?').run(id, userId);
@@ -311,8 +327,10 @@ function pgImpl() {
                servings INTEGER DEFAULT 1, notes TEXT, ingredients TEXT, photo TEXT, uses INTEGER DEFAULT 0, flags INTEGER DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now())`);
       await q('ALTER TABLE shared_meals ADD COLUMN IF NOT EXISTS ingredients TEXT'); // migrate older DBs
       await q('ALTER TABLE shared_meals ADD COLUMN IF NOT EXISTS photo TEXT');
+      await q("ALTER TABLE shared_meals ADD COLUMN IF NOT EXISTS flaggers TEXT DEFAULT '[]'"); // per-user report de-dup
       await q(`CREATE TABLE IF NOT EXISTS community_posts (id BIGSERIAL PRIMARY KEY, user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
                author_name TEXT, type TEXT NOT NULL, title TEXT, body TEXT, data TEXT DEFAULT '{}', likes TEXT DEFAULT '[]', flags INTEGER DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now())`);
+      await q("ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS flaggers TEXT DEFAULT '[]'"); // per-user report de-dup (after its CREATE)
       // ── Collective-knowledge social layer ──
       await q(`CREATE TABLE IF NOT EXISTS reading_groups (id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL,
                owner_id BIGINT REFERENCES users(id) ON DELETE CASCADE, invite_code TEXT UNIQUE, created_at TIMESTAMPTZ DEFAULT now())`);
@@ -381,7 +399,14 @@ function pgImpl() {
       return r.rows.map(x => ({ ...x, ingredients: safeJsonArray(x.ingredients) }));
     },
     async incSharedMealUse(id) { await q('UPDATE shared_meals SET uses = uses + 1 WHERE id=$1', [id]); },
-    async flagSharedMeal(id) { await q('UPDATE shared_meals SET flags = flags + 1 WHERE id=$1', [id]); },
+    async flagSharedMeal(id, userId) {
+      const r0 = await q('SELECT flaggers FROM shared_meals WHERE id=$1', [id]);
+      if (!r0.rowCount) return { count: 0 };
+      const f = safeJsonArray(r0.rows[0].flaggers).map(String);
+      if (f.indexOf(String(userId)) < 0) f.push(String(userId));   // one report per user
+      await q('UPDATE shared_meals SET flaggers=$1, flags=$2 WHERE id=$3', [JSON.stringify(f), f.length, id]);
+      return { count: f.length };
+    },
     async deleteSharedMeal(id, userId, force) {
       const r = force ? await q('DELETE FROM shared_meals WHERE id=$1', [id])
                       : await q('DELETE FROM shared_meals WHERE id=$1 AND user_id=$2', [id, userId]);
@@ -410,7 +435,14 @@ function pgImpl() {
       await q('UPDATE community_posts SET likes=$1 WHERE id=$2', [JSON.stringify(likes), id]);
       return { liked: i < 0, count: likes.length };
     },
-    async flagPost(id) { await q('UPDATE community_posts SET flags = flags + 1 WHERE id=$1', [id]); },
+    async flagPost(id, userId) {
+      const r0 = await q('SELECT flaggers FROM community_posts WHERE id=$1', [id]);
+      if (!r0.rowCount) return { count: 0 };
+      const f = safeJsonArray(r0.rows[0].flaggers).map(String);
+      if (f.indexOf(String(userId)) < 0) f.push(String(userId));   // one report per user
+      await q('UPDATE community_posts SET flaggers=$1, flags=$2 WHERE id=$3', [JSON.stringify(f), f.length, id]);
+      return { count: f.length };
+    },
     async deletePost(id, userId, force) {
       const r = force ? await q('DELETE FROM community_posts WHERE id=$1', [id])
                       : await q('DELETE FROM community_posts WHERE id=$1 AND user_id=$2', [id, userId]);
@@ -517,12 +549,12 @@ module.exports = {
   createSharedMeal: (m) => impl.createSharedMeal(m),
   listSharedMeals: (q) => impl.listSharedMeals(q),
   incSharedMealUse: (i) => impl.incSharedMealUse(i),
-  flagSharedMeal: (i) => impl.flagSharedMeal(i),
+  flagSharedMeal: (i, u) => impl.flagSharedMeal(i, u),
   deleteSharedMeal: (i, u, f) => impl.deleteSharedMeal(i, u, f),
   createPost: (p) => impl.createPost(p),
   listPosts: (t) => impl.listPosts(t),
   togglePostLike: (i, u) => impl.togglePostLike(i, u),
-  flagPost: (i) => impl.flagPost(i),
+  flagPost: (i, u) => impl.flagPost(i, u),
   deletePost: (i, u, f) => impl.deletePost(i, u, f),
   // ── Groups + collective notes (social layer) ──
   createGroup: (g) => impl.createGroup(g),

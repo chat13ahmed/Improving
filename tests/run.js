@@ -1423,8 +1423,12 @@ A.state.data = _iBase();
     ok('DB listSharedMeals search filters by name', (await DBm.listSharedMeals('wrap')).length === 1);
     await DBm.incSharedMealUse(mid); await DBm.incSharedMealUse(mid);
     ok('DB incSharedMealUse counts uses', (await DBm.listSharedMeals('oatmeal'))[0].uses === 2);
-    for (let i = 0; i < 5; i++) await DBm.flagSharedMeal(mid);
-    ok('DB flagged meal (≥5) hidden from feed', (await DBm.listSharedMeals('oatmeal')).length === 0);
+    // flag-spam guard: one malicious user reporting 5× must NOT be able to hide a meal
+    for (let i = 0; i < 5; i++) await DBm.flagSharedMeal(mid, 777);
+    ok('DB one user reporting 5× counts once (meal still visible)', (await DBm.listSharedMeals('oatmeal')).length === 1);
+    // but 5 DISTINCT reporters legitimately hides it
+    for (let u = 1; u <= 5; u++) await DBm.flagSharedMeal(mid, u);
+    ok('DB flagged meal (5 distinct reporters) hidden from feed', (await DBm.listSharedMeals('oatmeal')).length === 0);
     const delMine = await DBm.deleteSharedMeal(mid, 99999, false); // wrong user → no delete
     ok('DB deleteSharedMeal blocks non-author', delMine === false);
     const delForce = await DBm.deleteSharedMeal(mid, id, false); // author → deletes
@@ -1442,8 +1446,12 @@ A.state.data = _iBase();
     ok('DB togglePostLike adds a like', lk1.liked === true && lk1.count === 1);
     const lk2 = await DBm.togglePostLike(pid, id);
     ok('DB togglePostLike removes it again', lk2.liked === false && lk2.count === 0);
-    for (let i = 0; i < 5; i++) await DBm.flagPost(pid);
-    ok('DB flagged post (≥5) hidden from feed', !(await DBm.listPosts('')).some(p => p.id === pid));
+    // flag-spam guard: one malicious user reporting 5× must NOT be able to hide a post
+    for (let i = 0; i < 5; i++) await DBm.flagPost(pid, 777);
+    ok('DB one user reporting 5× counts once (post still visible)', (await DBm.listPosts('')).some(p => p.id === pid));
+    // but 5 DISTINCT reporters legitimately hides it
+    for (let u = 1; u <= 5; u++) await DBm.flagPost(pid, u);
+    ok('DB flagged post (5 distinct reporters) hidden from feed', !(await DBm.listPosts('')).some(p => p.id === pid));
     ok('DB deletePost blocks non-author', (await DBm.deletePost(pid, 99999, false)) === false);
     ok('DB deletePost author removes own', (await DBm.deletePost(pid, id, false)) === true);
     // server-side post sanitizer

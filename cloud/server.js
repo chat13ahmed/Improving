@@ -852,7 +852,7 @@ app.post('/api/community/meals/:id/use', requireAuth, async (req, res) => {
 app.post('/api/community/meals/:id/report', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error: 'bad id' });
-  try { await DB.flagSharedMeal(id); res.json({ success: true }); }
+  try { await DB.flagSharedMeal(id, req.userId); res.json({ success: true }); }
   catch (e) { res.status(500).json({ error: 'failed' }); }
 });
 app.delete('/api/community/meals/:id', requireAuth, async (req, res) => {
@@ -941,7 +941,7 @@ app.post('/api/community/posts/:id/like', requireAuth, async (req, res) => {
 app.post('/api/community/posts/:id/report', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error: 'bad id' });
-  try { await DB.flagPost(id); res.json({ success: true }); }
+  try { await DB.flagPost(id, req.userId); res.json({ success: true }); }
   catch (e) { res.status(500).json({ error: 'failed' }); }
 });
 app.delete('/api/community/posts/:id', requireAuth, async (req, res) => {
