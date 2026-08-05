@@ -7811,6 +7811,16 @@ function businessBriefing() {
       move: 'Either sharpen it (who exactly is it for, and why now?) or shelve it and generate three fresh ones.', cta: "navigate('ideas')", ctaLabel: 'Review ideas →' });
   }
 
+  // MENTOR — focus. Too many "active" bets at once and none gets real energy.
+  const activeIdeas = ideas.filter(i => i.status === 'active');
+  if (activeIdeas.length >= 3) {
+    const best = topIdea(activeIdeas);
+    out.push({ icon: '🧭', expert: 'Mentor — focus', sev: 2, title: activeIdeas.length + ' ideas are all “active” at once',
+      why: 'You’ve got <b>' + activeIdeas.length + '</b> ideas running in parallel. Attention is the one resource you can’t make more of — split across ' + activeIdeas.length + ' bets, none gets the concentrated push that turns an idea into a business. Focus isn’t choosing the best; it’s having the discipline to say no to the rest.',
+      move: 'Pick the ONE to push this month' + (best ? ' — right now that’s <b>' + escapeHtml(best.title) + '</b> (' + ideaScore(best.scores) + '/100)' : '') + ', and move the others to “exploring” so they stop competing for today.',
+      cta: "navigate('ideas')", ctaLabel: 'Prioritise ideas →' });
+  }
+
   // MANAGER — networking cadence vs the weekly goal.
   const netGoal = +prof.weeklyNetworkGoal || 0;
   const dow = new Date(today + 'T00:00:00').getDay();

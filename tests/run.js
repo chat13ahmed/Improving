@@ -1265,6 +1265,24 @@ ok('health briefing: hitting the target reads as "on plan", not a warning',
 A.state.data = _iBase({ contacts: [{ id: 'c1', name: 'Jordan', status: 'warm', dealValue: 9000, followUpDate: _iAgo(3) }] });
 const _bb = A.businessBriefing();
 ok('business briefing: an overdue follow-up is the top call', _bb[0].sev >= 3 && _bb[0].title.toLowerCase().indexOf('overdue') > -1);
+// mentor focus rule (new): 3+ "active" ideas at once → a WIP/focus flag naming the one to push
+A.state.data = _iBase({ ideas: [
+  { id: 'i1', title: 'Alpha', status: 'active', scores: { income: 5, speed: 5, ease: 5, passion: 5 } },
+  { id: 'i2', title: 'Beta', status: 'active', scores: {} },
+  { id: 'i3', title: 'Gamma', status: 'active', scores: {} }
+] });
+const _bbFocus = A.businessBriefing();
+ok('business briefing: 3+ active ideas raises a focus flag',
+  _bbFocus.some(i => (i.expert || '').toLowerCase().indexOf('focus') > -1 && (i.title + i.why).toLowerCase().indexOf('active') > -1));
+ok('business briefing: the focus flag names the strongest idea to push',
+  _bbFocus.some(i => (i.expert || '').toLowerCase().indexOf('focus') > -1 && i.move.indexOf('Alpha') > -1));
+// no false alarm: 2 active ideas is normal, not a focus problem
+A.state.data = _iBase({ ideas: [
+  { id: 'i1', title: 'Alpha', status: 'active', scores: {} },
+  { id: 'i2', title: 'Beta', status: 'active', scores: {} }
+] });
+ok('business briefing: 2 active ideas does NOT trip the focus flag',
+  !A.businessBriefing().some(i => (i.expert || '').toLowerCase().indexOf('focus') > -1));
 A.state.data = _iBase({ books: [], takeaways: [{ id: 't1', text: 'A', createdAt: _iAgo(5) }, { id: 't2', text: 'B', createdAt: _iAgo(6) }] });
 const _kb = A.knowledgeBriefing();
 ok('knowledge briefing: unrevisited lessons surface for retrieval practice',
