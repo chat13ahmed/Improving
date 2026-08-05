@@ -7867,6 +7867,15 @@ function knowledgeBriefing() {
       move: 'Open one now and finish it from memory before you look. That single act of recall is what makes it yours.', cta: "setKnowledgeTab('vocabulary')", ctaLabel: 'Review lessons →' });
   }
 
+  // PROFESSOR — spaced repetition: cards the deck has scheduled as due.
+  // This is the app's strongest learning-science lever, so surface it on time.
+  const vocabDueList = vocabDue(state.data.vocab || [], today);
+  if (vocabDueList.length >= 3) {
+    out.push({ icon: '🎓', expert: 'Professor — spaced repetition', sev: 2, title: vocabDueList.length + ' cards are due for review',
+      why: 'Your deck scheduled these for today on purpose. Spaced repetition — recalling an item just as you’re about to forget it — is the most efficient method memory science has found: every on-time review pushes the next one further out, so the deck shrinks as the knowledge locks in. Miss the due date and that spacing effect is wasted.',
+      move: 'Run the review now — even five minutes clears the backlog while the timing still counts.', cta: "setKnowledgeTab('vocabulary')", ctaLabel: 'Start review →' });
+  }
+
   // PROFESSOR — reading pace → projected finish date.
   if (active && active.totalPages > 0) {
     const readForBook = days.filter(d => d.reading && d.reading.bookId === active.id);

@@ -1287,6 +1287,20 @@ A.state.data = _iBase({ books: [], takeaways: [{ id: 't1', text: 'A', createdAt:
 const _kb = A.knowledgeBriefing();
 ok('knowledge briefing: unrevisited lessons surface for retrieval practice',
   _kb.some(i => (i.title + i.why).toLowerCase().indexOf('revisit') > -1));
+// spaced-repetition rule (new): cards due today surface for review
+A.state.data = _iBase({
+  books: [{ id: 'b1', title: 'Deep Work', status: 'reading' }],
+  vocab: [1, 2, 3].map(n => ({ id: 'v' + n, word: 'w' + n, meaning: 'm' + n }))  // no review set → due now
+});
+ok('knowledge briefing: due spaced-repetition cards surface for review',
+  A.knowledgeBriefing().some(i => (i.expert || '').toLowerCase().indexOf('spaced') > -1 && /due/i.test(i.title)));
+// no false alarm: cards scheduled in the future are NOT nagged today
+A.state.data = _iBase({
+  books: [{ id: 'b1', title: 'Deep Work', status: 'reading' }],
+  vocab: [1, 2, 3].map(n => ({ id: 'v' + n, word: 'w' + n, meaning: 'm' + n, review: { box: 3, due: _iAgo(-30) } }))
+});
+ok('knowledge briefing: cards scheduled for later do NOT nag today',
+  !A.knowledgeBriefing().some(i => (i.expert || '').toLowerCase().indexOf('spaced') > -1));
 ok('briefings: never empty — always give the user something', A.healthBriefing().length > 0 && A.businessBriefing().length > 0 && A.knowledgeBriefing().length > 0);
 
 // ── Cross-hub game plan ──
