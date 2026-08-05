@@ -1510,6 +1510,13 @@ A.state.data = _iBase();
     ok('reset lockout: locked at the 5th wrong answer', C.resetLocked(_ru) === true);
     C.clearResetFails(_ru);
     ok('reset lockout: a correct answer clears the lock', C.resetLocked(_ru) === false);
+    // ── per-account write rate limit on /api/data (complements the size cap) ──
+    const _wu = 'writeuser-' + Date.now();
+    let anyBlockedEarly = false;
+    for (let i = 0; i < 120; i++) { if (C.saveRateLimited(_wu)) anyBlockedEarly = true; }
+    ok('write limit: first 120 saves in a window all pass', anyBlockedEarly === false);
+    ok('write limit: the 121st save in the window is throttled', C.saveRateLimited(_wu) === true);
+    ok('write limit: a different account is unaffected', C.saveRateLimited('other-' + Date.now()) === false);
     // ── account deletion (App Store / Play requirement) — must remove the user AND cascade ──
     const delId = await DBm.createUser({ username: 'todelete', pw_salt: 's', pw_hash: 'h', sec_question: null, sec_salt: null, sec_hash: null });
     await DBm.saveData(delId, { profile: { name: 'Bye' }, days: [1, 2] }, 1);

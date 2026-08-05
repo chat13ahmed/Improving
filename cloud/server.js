@@ -142,6 +142,16 @@ function authRateLimited(ip) {
   arr.push(now); authHits.set(String(ip), arr);
   return arr.length > 12;
 }
+// ── Per-ACCOUNT write limit for /api/data — complements the size cap. Legit
+// use is sparse ("30 seconds a day"), so 120 saves/min is invisible to real
+// users but stops a tight loop from hammering the DB. In-memory, per-process. ──
+const saveHits = new Map();
+function saveRateLimited(userId) {
+  const now = Date.now(), win = 60000, LIMIT = 120;
+  const arr = (saveHits.get(String(userId)) || []).filter(t => now - t < win);
+  if (arr.length >= LIMIT) { saveHits.set(String(userId), arr); return true; }
+  arr.push(now); saveHits.set(String(userId), arr); return false;
+}
 // Per-ACCOUNT lockout for security-question password resets. The IP limiter
 // above stops one machine hammering; this stops a distributed guessing attack
 // from grinding a single account's answer (5 wrong answers → locked 15 min).
@@ -466,6 +476,9 @@ function preserveBillingFields(incoming, stored) {
 }
 app.post('/api/data', requireAuth, async (req, res) => {
   try {
+    if (saveRateLimited(req.userId)) {
+      return res.status(429).json({ error: 'Saving too fast — please wait a moment and try again.' });
+    }
     const wrapped = req.body && req.body.data && typeof req.body.data === 'object';
     const data = wrapped ? req.body.data : req.body;
     // The blob must be a plain object — a string/array/number here would be
@@ -1333,4 +1346,4 @@ if (require.main === module) {
     .catch(err => { console.error('Startup failed:', err.message); process.exit(1); });
 }
 
-module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner, cleanMeal, cleanPost, resetLocked, recordResetFail, clearResetFails, preserveBillingFields };
+module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner, cleanMeal, cleanPost, resetLocked, recordResetFail, clearResetFails, preserveBillingFields, saveRateLimited };
