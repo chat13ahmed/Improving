@@ -1245,6 +1245,23 @@ ok('health briefing: 7 straight training days raises a recovery flag',
   _hb.some(i => i.sev >= 3 && (i.title + i.why).toLowerCase().indexOf('rest') > -1));
 ok('health briefing: push-only month flags the pull imbalance',
   _hb.some(i => (i.title + i.why).toLowerCase().indexOf('pull') > -1));
+// calorie adherence vs the plan (new nutritionist rule): well under target → flag + a concrete make-up amount
+A.state.data = _iBase({
+  profile: { gymDaysPerWeek: 5, nutrition: { age: 30, heightCm: 180, weightKg: 80, sex: 'male', goal: 'maintain', activity: 'moderate' } },
+  days: [0, 1, 2, 3, 4].map(n => ({ date: _iAgo(n), calories: 1500 }))
+});
+const _hbCal = A.healthBriefing();
+ok('health briefing: eating well under the calorie target is flagged',
+  _hbCal.some(i => (i.title + i.why).toLowerCase().indexOf('below your plan') > -1));
+ok('health briefing: the calorie flag names a concrete make-up amount',
+  _hbCal.some(i => i.title.indexOf('below your plan') > -1 && /add ~[\d,]+ cal/i.test(i.move)));
+// eating on plan → a calm, positive nutritionist note (not a false alarm)
+A.state.data = _iBase({
+  profile: { gymDaysPerWeek: 5, nutrition: { age: 30, heightCm: 180, weightKg: 80, sex: 'male', goal: 'maintain', activity: 'moderate' } },
+  days: [0, 1, 2, 3, 4].map(n => ({ date: _iAgo(n), calories: 2759 }))
+});
+ok('health briefing: hitting the target reads as "on plan", not a warning',
+  A.healthBriefing().some(i => i.sev === 0 && i.title.toLowerCase().indexOf('on plan') > -1));
 A.state.data = _iBase({ contacts: [{ id: 'c1', name: 'Jordan', status: 'warm', dealValue: 9000, followUpDate: _iAgo(3) }] });
 const _bb = A.businessBriefing();
 ok('business briefing: an overdue follow-up is the top call', _bb[0].sev >= 3 && _bb[0].title.toLowerCase().indexOf('overdue') > -1);

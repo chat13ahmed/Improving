@@ -7641,6 +7641,31 @@ function healthBriefing() {
     }
   }
 
+  // NUTRITIONIST — calorie adherence vs the plan. The target already bakes in
+  // the goal (cut/maintain/gain), so this is simply "are you eating your plan?"
+  if (nut && nut.calories) {
+    const cDays = win7.filter(d => (d.calories || 0) > 0);
+    if (cDays.length >= 3) {
+      const avgC = Math.round(cDays.reduce((s, d) => s + (d.calories || 0), 0) / cDays.length);
+      const pct = avgC / nut.calories;
+      if (pct < 0.85) {
+        const gap = nut.calories - avgC;
+        out.push({ icon: '🥗', expert: 'Nutritionist — energy', sev: 2, title: 'You’re eating below your plan',
+          why: 'Across your last <b>' + cDays.length + '</b> logged days you’ve averaged <b>' + avgC.toLocaleString() + '</b> against a <b>' + nut.calories.toLocaleString() + '</b> cal target — a ' + Math.round((1 - pct) * 100) + '% shortfall. Chronically under-fuelling quietly saps training quality and recovery, and eventually costs you muscle.',
+          move: 'Add ~' + gap.toLocaleString() + ' cal, mostly around training — a palm of extra carbs and a thumb of fats per meal closes it without feeling stuffed.' });
+      } else if (pct > 1.15) {
+        const over = avgC - nut.calories;
+        out.push({ icon: '🥗', expert: 'Nutritionist — energy', sev: 2, title: 'You’re running over your plan',
+          why: 'You’re averaging <b>' + avgC.toLocaleString() + '</b> against a <b>' + nut.calories.toLocaleString() + '</b> cal target — about ' + Math.round((pct - 1) * 100) + '% over. Small daily surpluses feel like nothing but compound into fat the scale only reveals weeks later.',
+          move: 'Trim ~' + over.toLocaleString() + ' cal: tighten liquid calories and portion the starch. Keep protein exactly where it is.' });
+      } else {
+        out.push({ icon: '🥗', expert: 'Nutritionist — energy', sev: 0, title: 'Calories: on plan',
+          why: 'You’re averaging <b>' + avgC.toLocaleString() + '</b> against your <b>' + nut.calories.toLocaleString() + '</b> cal target — within a few percent. Hitting the right intake, consistently, is what actually makes a plan work.',
+          move: 'Hold this and let the weekly weigh-in confirm the trend before you change anything.' });
+      }
+    }
+  }
+
   // NUTRITIONIST/DOCTOR — rate of weight change (safety + composition).
   const ws = (state.data.weights || []).slice().sort((a, b) => a.date < b.date ? -1 : 1);
   if (ws.length >= 2) {
