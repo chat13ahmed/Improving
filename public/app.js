@@ -996,6 +996,10 @@ function renderAuthScreen(mode) {
     '<div class="auth-links">' +
     '<button type="button" class="btn-link" onclick="startDemo()">See a live demo</button>' +
     '<a class="btn-link" href="about.html">What is Onward? →</a></div>' +
+    // Shown at sign-up because that's the moment consent is actually given.
+    '<div class="legal-links">By continuing you agree to our ' +
+      '<a href="terms.html" target="_blank" rel="noopener">Terms</a> and ' +
+      '<a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</div>' +
     '</div>' +
     '</div></div>';
   document.body.appendChild(screen);
@@ -12773,7 +12777,14 @@ function renderSettingsPage() {
     // Delete account (cloud accounts only) — required by the app stores
     renderDangerCard() +
     '</div>' +
-    '<div style="text-align:center;margin-top:10px"><a class="btn-link" href="about.html" target="_blank" rel="noopener">What is Onward? — the tour &amp; explainer ↗</a></div>';
+    '<div style="text-align:center;margin-top:10px"><a class="btn-link" href="about.html" target="_blank" rel="noopener">What is Onward? — the tour &amp; explainer ↗</a></div>' +
+    // App stores and payment processors both require these to be REACHABLE,
+    // not merely present as files. They were unlinked from anywhere until now.
+    '<div class="legal-links">' +
+      '<a href="terms.html" target="_blank" rel="noopener">Terms of Service</a>' +
+      '<span aria-hidden="true">·</span>' +
+      '<a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>' +
+    '</div>';
 }
 // Permanent account deletion — a store requirement and a genuine user right.
 // Only shown for a signed-in cloud account (local-only mode has no server account).

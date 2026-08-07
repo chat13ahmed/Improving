@@ -6,28 +6,44 @@
   <title>Privacy Policy — Onward</title>
   <meta name="robots" content="index">
   <style>
-    :root { --bg:#F4F6FB; --card:#fff; --text:#1f2937; --muted:#6b7280; --line:#e5e7eb; --accent:#7C3AED; }
+    /* Alpine identity, matching about.html and terms.html: dark by default,
+       light on request. (Was a purple palette from before the app redesign.) */
+    :root{
+      --bg:#0B1120; --surface:#121C31; --line:rgba(255,255,255,.09);
+      --text:#E6EDF7; --muted:#8DA1BF; --accent:#34D399; --accent-deep:#0B7A54;
+      --fserif:Georgia,"Iowan Old Style","Times New Roman",serif;
+      --fsans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    }
+    @media (prefers-color-scheme: light){
+      :root{--bg:#F5F8FC;--surface:#FFFFFF;--line:rgba(11,17,32,.10);
+        --text:#0B1120;--muted:#53637C;--accent:#0E9F6E;}
+    }
     * { box-sizing: border-box; }
-    body { margin:0; background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,-apple-system,sans-serif; line-height:1.6; }
-    .wrap { max-width:760px; margin:0 auto; padding:32px 20px 64px; }
-    .brand { display:flex; align-items:center; gap:10px; margin-bottom:24px; }
-    .brand b { font-size:18px; font-weight:800; }
-    .mark { width:30px; height:30px; border-radius:8px; background:linear-gradient(135deg,#FB923C,#EF4444 45%,#A855F7); }
-    h1 { font-size:28px; margin:0 0 4px; }
-    .updated { color:var(--muted); font-size:14px; margin-bottom:24px; }
-    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px 24px; margin-bottom:16px; }
-    h2 { font-size:18px; margin:0 0 10px; }
-    p, li { font-size:15px; color:#374151; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:var(--fsans); line-height:1.65; -webkit-font-smoothing:antialiased; }
+    .wrap { max-width:760px; margin:0 auto; padding:40px 20px 72px; }
+    .brand { display:flex; align-items:center; gap:10px; margin-bottom:28px; text-decoration:none; color:inherit; }
+    .brand b { font-size:18px; font-weight:800; letter-spacing:-.01em; }
+    .mark { width:30px; height:30px; border-radius:9px; background:linear-gradient(135deg,var(--accent),var(--accent-deep)); }
+    h1 { font-size:30px; margin:0 0 6px; letter-spacing:-.02em; }
+    .thesis { font-family:var(--fserif); font-style:italic; color:var(--muted); font-size:17px; margin:0 0 6px; }
+    .updated { color:var(--muted); font-size:14px; margin-bottom:26px; }
+    .card { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:20px 24px; margin-bottom:14px; }
+    h2 { font-size:17px; margin:0 0 10px; letter-spacing:-.01em; }
+    p, li { font-size:15px; color:var(--text); }
     ul { padding-left:20px; margin:8px 0; }
+    li { margin:5px 0; }
     a { color:var(--accent); }
     .muted { color:var(--muted); font-size:13px; }
-    code { background:#f1f1f4; padding:1px 6px; border-radius:5px; font-size:13px; }
+    code { background:var(--surface); border:1px solid var(--line); padding:1px 6px; border-radius:5px; font-size:13px; }
+    .foot { display:flex; gap:16px; flex-wrap:wrap; margin-top:22px; font-size:14px; }
+    @media (max-width:520px){ h1{font-size:25px} .card{padding:18px} }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="brand"><span class="mark"></span><b>Onward</b></div>
+    <a class="brand" href="./"><span class="mark"></span><b>Onward</b></a>
     <h1>Privacy Policy</h1>
+    <p class="thesis">Private by default: we don't sell your data and we don't run ad trackers.</p>
     <div class="updated">Last updated: 21 June 2026</div>
 
     <div class="card">
@@ -108,6 +124,11 @@
       <p>Questions, or want your data deleted? Email us at <a href="mailto:CONTACT_EMAIL">CONTACT_EMAIL</a>.</p>
     </div>
 
+    <div class="foot">
+      <a href="./terms.html">Terms of Service</a>
+      <a href="./about.html">What is Onward?</a>
+      <a href="./">Back to the app</a>
+    </div>
     <p class="muted">© 2026 Onward. Your life, your data.</p>
   </div>
 </body>

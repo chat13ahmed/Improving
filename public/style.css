@@ -3449,6 +3449,10 @@ body.auth-active .fab-btn { display: none !important; }
 /* the "what is Onward" / demo links under the form */
 .auth-links { margin-top: 12px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
 .auth-links a, .auth-links button { color: var(--a-accent); font-weight: 700; font-size: 13px; }
+/* Terms/Privacy — deliberately quiet: required and reachable, never shouting. */
+.legal-links { margin-top: 14px; text-align: center; font-size: 12px; color: var(--muted); display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; }
+.legal-links a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.legal-links a:hover, .legal-links a:focus-visible { color: var(--primary); }
 
 /* ─── User chip (sidebar footer) ──────────────── */
 .user-chip {
