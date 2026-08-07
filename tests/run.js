@@ -1551,21 +1551,38 @@ A.state.data = _iBase();
       return out.profile.pro === true && out.profile.trialEnds === 9;
     })());
     // ── password-reset per-account answer lockout (hardening the recovery flow) ──
+    // These counters now live in the DATABASE (they used to be in-memory Maps
+    // that a deploy wiped and a second instance couldn't see), so they're async.
     const _ru = 'resetuser-' + Date.now();
-    ok('reset lockout: a fresh account is not locked', C.resetLocked(_ru) === false);
-    C.recordResetFail(_ru); C.recordResetFail(_ru); C.recordResetFail(_ru); C.recordResetFail(_ru);
-    ok('reset lockout: still open after 4 wrong answers', C.resetLocked(_ru) === false);
-    C.recordResetFail(_ru);
-    ok('reset lockout: locked at the 5th wrong answer', C.resetLocked(_ru) === true);
-    C.clearResetFails(_ru);
-    ok('reset lockout: a correct answer clears the lock', C.resetLocked(_ru) === false);
+    ok('reset lockout: a fresh account is not locked', (await C.resetLocked(_ru)) === false);
+    await C.recordResetFail(_ru); await C.recordResetFail(_ru); await C.recordResetFail(_ru); await C.recordResetFail(_ru);
+    ok('reset lockout: still open after 4 wrong answers', (await C.resetLocked(_ru)) === false);
+    await C.recordResetFail(_ru);
+    ok('reset lockout: locked at the 5th wrong answer', (await C.resetLocked(_ru)) === true);
+    ok('reset lockout: CHECKING the lock does not itself count as an attempt',
+      (await C.resetLocked(_ru)) === true && (await DBm.rateCount('reset:' + _ru, 900000)) === 5);
+    await C.clearResetFails(_ru);
+    ok('reset lockout: a correct answer clears the lock', (await C.resetLocked(_ru)) === false);
     // ── per-account write rate limit on /api/data (complements the size cap) ──
     const _wu = 'writeuser-' + Date.now();
     let anyBlockedEarly = false;
-    for (let i = 0; i < 120; i++) { if (C.saveRateLimited(_wu)) anyBlockedEarly = true; }
+    for (let i = 0; i < 120; i++) { if (await C.saveRateLimited(_wu)) anyBlockedEarly = true; }
     ok('write limit: first 120 saves in a window all pass', anyBlockedEarly === false);
-    ok('write limit: the 121st save in the window is throttled', C.saveRateLimited(_wu) === true);
-    ok('write limit: a different account is unaffected', C.saveRateLimited('other-' + Date.now()) === false);
+    ok('write limit: the 121st save in the window is throttled', (await C.saveRateLimited(_wu)) === true);
+    ok('write limit: a different account is unaffected', (await C.saveRateLimited('other-' + Date.now())) === false);
+    // ── the counters are DB-backed: they must outlive a process restart ──
+    // Simulated by reading the stored counter directly, which is exactly what a
+    // second instance (or the same box after a deploy) would see.
+    ok('rate limits: the count is persisted in the database, not process memory',
+      (await DBm.rateCount('save:' + _wu, 60000)) >= 120);
+    ok('rate limits: an expired window resets the counter',
+      (await DBm.rateHit('windowtest-' + Date.now(), 1000, Date.now())) === 1);
+    const _kx = 'expiry-' + Date.now();
+    await DBm.rateHit(_kx, 1000, 1000000);                       // long-past window
+    ok('rate limits: a hit after the window has passed starts a fresh count',
+      (await DBm.rateHit(_kx, 1000, 9000000)) === 1);
+    ok('rate limits: prune removes expired counters',
+      (await (async () => { await DBm.ratePrune(0, 9999999999); return await DBm.rateCount(_kx, 1000, 9000000); })()) === 0);
     // ── account deletion (App Store / Play requirement) — must remove the user AND cascade ──
     const delId = await DBm.createUser({ username: 'todelete', pw_salt: 's', pw_hash: 'h', sec_question: null, sec_salt: null, sec_hash: null });
     await DBm.saveData(delId, { profile: { name: 'Bye' }, days: [1, 2] }, 1);

@@ -83,6 +83,11 @@ function sqliteImpl() {
         created_at TEXT DEFAULT (datetime('now'))
       )`);
       try { db.exec("ALTER TABLE community_posts ADD COLUMN flaggers TEXT DEFAULT '[]'"); } catch {} // per-user report de-dup
+      // Rate limits live in the DB, not process memory, so they survive a deploy
+      // and still hold when more than one instance is running.
+      db.exec(`CREATE TABLE IF NOT EXISTS rate_limits (
+        key TEXT PRIMARY KEY, count INTEGER NOT NULL, window_start INTEGER NOT NULL
+      )`);
       // ── Collective-knowledge social layer (groups, notes, likes, replies, flags, notifications) ──
       db.exec(`CREATE TABLE IF NOT EXISTS reading_groups (
         id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
@@ -144,6 +149,28 @@ function sqliteImpl() {
     // token issued before (logout, password change/reset). null = user is gone.
     async getTokenVersion(id) { const r = db.prepare('SELECT token_version AS tv FROM users WHERE id=?').get(id); return r ? (r.tv || 0) : null; },
     async bumpTokenVersion(id) { db.prepare('UPDATE users SET token_version = COALESCE(token_version,0) + 1 WHERE id=?').run(id); },
+    // ── Rate limiting (fixed window, atomic) ──
+    // One statement does the whole read-modify-write, so two concurrent requests
+    // can't both read "59" and both be allowed through a 60/hour cap.
+    async rateHit(key, windowMs, now) {
+      const t = now || Date.now(), cutoff = t - windowMs;
+      const r = db.prepare(`INSERT INTO rate_limits(key,count,window_start) VALUES(?,1,?)
+        ON CONFLICT(key) DO UPDATE SET
+          count = CASE WHEN rate_limits.window_start <= ? THEN 1 ELSE rate_limits.count + 1 END,
+          window_start = CASE WHEN rate_limits.window_start <= ? THEN ? ELSE rate_limits.window_start END
+        RETURNING count`).get(String(key), t, cutoff, cutoff, t);
+      return (r && r.count) | 0;
+    },
+    async rateCount(key, windowMs, now) {   // peek: never increments
+      const t = now || Date.now();
+      const r = db.prepare('SELECT count, window_start FROM rate_limits WHERE key=?').get(String(key));
+      if (!r || r.window_start <= t - windowMs) return 0;
+      return r.count | 0;
+    },
+    async rateClear(key) { db.prepare('DELETE FROM rate_limits WHERE key=?').run(String(key)); },
+    async ratePrune(olderThanMs, now) {
+      db.prepare('DELETE FROM rate_limits WHERE window_start < ?').run((now || Date.now()) - olderThanMs);
+    },
     async updatePassword(id, salt, hash) { db.prepare('UPDATE users SET pw_salt=?, pw_hash=? WHERE id=?').run(salt, hash, id); },
     async setSecurity(id, q, salt, hash) { db.prepare('UPDATE users SET sec_question=?, sec_salt=?, sec_hash=? WHERE id=?').run(q, salt, hash, id); },
     async getData(userId) { const row = db.prepare('SELECT data, version FROM user_data WHERE user_id=?').get(userId); return row ? { data: ENC.decryptData(JSON.parse(row.data)), version: row.version } : null; },
@@ -331,6 +358,10 @@ function pgImpl() {
       await q(`CREATE TABLE IF NOT EXISTS community_posts (id BIGSERIAL PRIMARY KEY, user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
                author_name TEXT, type TEXT NOT NULL, title TEXT, body TEXT, data TEXT DEFAULT '{}', likes TEXT DEFAULT '[]', flags INTEGER DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now())`);
       await q("ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS flaggers TEXT DEFAULT '[]'"); // per-user report de-dup (after its CREATE)
+      // Rate limits live in the DB, not process memory, so they survive a deploy
+      // and still hold when more than one instance is running.
+      await q(`CREATE TABLE IF NOT EXISTS rate_limits (
+               key TEXT PRIMARY KEY, count INTEGER NOT NULL, window_start BIGINT NOT NULL)`);
       // ── Collective-knowledge social layer ──
       await q(`CREATE TABLE IF NOT EXISTS reading_groups (id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL,
                owner_id BIGINT REFERENCES users(id) ON DELETE CASCADE, invite_code TEXT UNIQUE, created_at TIMESTAMPTZ DEFAULT now())`);
@@ -366,6 +397,28 @@ function pgImpl() {
     async deleteUser(id) { const r = await q('DELETE FROM users WHERE id=$1', [id]); return r.rowCount > 0; },   // cascades via FKs
     async getTokenVersion(id) { const r = await q('SELECT token_version AS tv FROM users WHERE id=$1', [id]); return r.rows[0] ? (r.rows[0].tv || 0) : null; },
     async bumpTokenVersion(id) { await q('UPDATE users SET token_version = COALESCE(token_version,0) + 1 WHERE id=$1', [id]); },
+    // ── Rate limiting (fixed window, atomic) ──
+    // One statement does the whole read-modify-write, so two concurrent requests
+    // can't both read "59" and both be allowed through a 60/hour cap.
+    async rateHit(key, windowMs, now) {
+      const t = now || Date.now(), cutoff = t - windowMs;
+      const r = await q(`INSERT INTO rate_limits(key,count,window_start) VALUES($1,1,$2)
+        ON CONFLICT (key) DO UPDATE SET
+          count = CASE WHEN rate_limits.window_start <= $3 THEN 1 ELSE rate_limits.count + 1 END,
+          window_start = CASE WHEN rate_limits.window_start <= $3 THEN $2 ELSE rate_limits.window_start END
+        RETURNING count`, [String(key), t, cutoff]);
+      return r.rows[0] ? (r.rows[0].count | 0) : 0;
+    },
+    async rateCount(key, windowMs, now) {   // peek: never increments
+      const t = now || Date.now();
+      const r = await q('SELECT count, window_start FROM rate_limits WHERE key=$1', [String(key)]);
+      if (!r.rowCount || Number(r.rows[0].window_start) <= t - windowMs) return 0;
+      return r.rows[0].count | 0;
+    },
+    async rateClear(key) { await q('DELETE FROM rate_limits WHERE key=$1', [String(key)]); },
+    async ratePrune(olderThanMs, now) {
+      await q('DELETE FROM rate_limits WHERE window_start < $1', [(now || Date.now()) - olderThanMs]);
+    },
     async updatePassword(id, salt, hash) { await q('UPDATE users SET pw_salt=$1, pw_hash=$2 WHERE id=$3', [salt, hash, id]); },
     async setSecurity(id, ques, salt, hash) { await q('UPDATE users SET sec_question=$1, sec_salt=$2, sec_hash=$3 WHERE id=$4', [ques, salt, hash, id]); },
     async getData(userId) { const r = await q('SELECT data, version FROM user_data WHERE user_id=$1', [userId]); return r.rowCount ? { data: ENC.decryptData(r.rows[0].data), version: r.rows[0].version } : null; },
@@ -549,6 +602,10 @@ module.exports = {
   createSharedMeal: (m) => impl.createSharedMeal(m),
   listSharedMeals: (q) => impl.listSharedMeals(q),
   incSharedMealUse: (i) => impl.incSharedMealUse(i),
+  rateHit: (k, w, n) => impl.rateHit(k, w, n),
+  rateCount: (k, w, n) => impl.rateCount(k, w, n),
+  rateClear: (k) => impl.rateClear(k),
+  ratePrune: (ms, n) => impl.ratePrune(ms, n),
   flagSharedMeal: (i, u) => impl.flagSharedMeal(i, u),
   deleteSharedMeal: (i, u, f) => impl.deleteSharedMeal(i, u, f),
   createPost: (p) => impl.createPost(p),

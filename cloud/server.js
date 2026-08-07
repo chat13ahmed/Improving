@@ -126,50 +126,45 @@ function getApiKey(req) {
   return fromHeader || process.env.ANTHROPIC_API_KEY || null;   // browser-supplied key, else the server env var
 }
 
-// ── Simple per-IP hourly AI rate limit ──
-const aiHits = new Map();
-function aiAllowed(key) {
-  const now = Date.now(), win = 3600000;
-  const arr = (aiHits.get(key) || []).filter(t => now - t < win);
-  if (arr.length >= AI_HOURLY_LIMIT) { aiHits.set(key, arr); return false; }
-  arr.push(now); aiHits.set(key, arr); return true;
+// ── Rate limits ───────────────────────────────────────────────────────
+// All four counters live in the DATABASE, not process memory. In-memory Maps
+// looked fine on one box but had two real holes: every deploy reset them (so
+// "5 wrong answers → locked" was cleared by a restart), and with two instances
+// each process kept its own count, doubling every published limit. DB.rateHit
+// does the read-modify-write in a single atomic statement, so concurrent
+// requests can't both slip past the same cap.
+const AI_WIN = 3600000;                   // 1 hour
+const AUTH_WIN = 900000, AUTH_MAX = 12;   // 15 min per IP
+const SAVE_WIN = 60000, SAVE_MAX = 120;   // 1 min per account
+const RESET_MAX = 5, RESET_WIN = 900000;  // 5 wrong answers → 15 min lockout
+
+async function aiAllowed(key) {
+  return (await DB.rateHit('ai:' + key, AI_WIN)) <= AI_HOURLY_LIMIT;
 }
-// ── Per-IP rate limit for auth — blunts password brute-forcing & signup spam ──
-const authHits = new Map();
-function authRateLimited(ip) {
-  const now = Date.now(), win = 900000;   // 15 minutes
-  const arr = (authHits.get(String(ip)) || []).filter(t => now - t < win);
-  arr.push(now); authHits.set(String(ip), arr);
-  return arr.length > 12;
+// Blunts password brute-forcing & signup spam.
+async function authRateLimited(ip) {
+  return (await DB.rateHit('auth:' + ip, AUTH_WIN)) > AUTH_MAX;
 }
-// ── Per-ACCOUNT write limit for /api/data — complements the size cap. Legit
-// use is sparse ("30 seconds a day"), so 120 saves/min is invisible to real
-// users but stops a tight loop from hammering the DB. In-memory, per-process. ──
-const saveHits = new Map();
-function saveRateLimited(userId) {
-  const now = Date.now(), win = 60000, LIMIT = 120;
-  const arr = (saveHits.get(String(userId)) || []).filter(t => now - t < win);
-  if (arr.length >= LIMIT) { saveHits.set(String(userId), arr); return true; }
-  arr.push(now); saveHits.set(String(userId), arr); return false;
+// Complements the /api/data size cap: legit use is sparse ("30 seconds a day"),
+// so 120 saves/min is invisible to real users but stops a tight loop.
+async function saveRateLimited(userId) {
+  return (await DB.rateHit('save:' + userId, SAVE_WIN)) > SAVE_MAX;
 }
-// Per-ACCOUNT lockout for security-question password resets. The IP limiter
-// above stops one machine hammering; this stops a distributed guessing attack
-// from grinding a single account's answer (5 wrong answers → locked 15 min).
-// In-memory (like authHits): resets on restart, per-process — noted as a limit.
-const resetFails = new Map();   // userId -> { count, first }
-const RESET_MAX = 5, RESET_WIN = 900000;
-function resetLocked(userId) {
-  const r = resetFails.get(String(userId));
-  if (!r) return false;
-  if (Date.now() - r.first > RESET_WIN) { resetFails.delete(String(userId)); return false; }
-  return r.count >= RESET_MAX;
+// Per-ACCOUNT lockout for security-question resets. The IP limiter stops one
+// machine hammering; this stops a distributed attack grinding one account's
+// answer. resetLocked only PEEKS, so checking never counts as an attempt.
+async function resetLocked(userId) {
+  return (await DB.rateCount('reset:' + userId, RESET_WIN)) >= RESET_MAX;
 }
-function recordResetFail(userId) {
-  const k = String(userId), r = resetFails.get(k);
-  if (!r || Date.now() - r.first > RESET_WIN) resetFails.set(k, { count: 1, first: Date.now() });
-  else r.count++;
-}
-function clearResetFails(userId) { resetFails.delete(String(userId)); }
+async function recordResetFail(userId) { await DB.rateHit('reset:' + userId, RESET_WIN); }
+async function clearResetFails(userId) { await DB.rateClear('reset:' + userId); }
+// Expired counters are dead weight, so sweep them periodically. 2h is safely
+// past the longest window (1h), and unref() means this never holds the process
+// open — important for the test suite and for a clean shutdown.
+const ratePruneTimer = setInterval(() => {
+  DB.ratePrune(2 * 3600000).catch(() => {});
+}, 30 * 60000);
+if (ratePruneTimer.unref) ratePruneTimer.unref();
 
 // ── App ──
 const app = express();
@@ -304,7 +299,7 @@ function isOwner(name) {
 
 // ── Accounts / auth ──
 app.post('/api/signup', async (req, res) => {
-  if (authRateLimited(req.ip)) return res.status(429).json({ error: 'Too many attempts — please wait a few minutes.' });
+  if (await authRateLimited(req.ip)) return res.status(429).json({ error: 'Too many attempts — please wait a few minutes.' });
   try {
     const username = (req.body.username || '').trim();
     const password = req.body.password || '';
@@ -337,7 +332,7 @@ app.post('/api/signup', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-  if (authRateLimited(req.ip)) return res.status(429).json({ error: 'Too many attempts — please wait a few minutes.' });
+  if (await authRateLimited(req.ip)) return res.status(429).json({ error: 'Too many attempts — please wait a few minutes.' });
   try {
     const username = (req.body.username || '').trim();
     const password = req.body.password || '';
@@ -365,7 +360,7 @@ app.get('/api/session', async (req, res) => {
 });
 
 app.post('/api/forgot/question', async (req, res) => {
-  if (authRateLimited(req.ip)) return res.status(429).json({ error: 'Too many attempts — please wait a few minutes.' });
+  if (await authRateLimited(req.ip)) return res.status(429).json({ error: 'Too many attempts — please wait a few minutes.' });
   try {
     const u = await DB.findUserByName((req.body.username || '').trim());
     // Missing account AND account-without-a-question return the SAME response, so
@@ -378,7 +373,7 @@ app.post('/api/forgot/question', async (req, res) => {
 });
 
 app.post('/api/forgot/reset', async (req, res) => {
-  if (authRateLimited(req.ip)) return res.status(429).json({ error: 'Too many attempts — please wait a few minutes.' });
+  if (await authRateLimited(req.ip)) return res.status(429).json({ error: 'Too many attempts — please wait a few minutes.' });
   try {
     const username = (req.body.username || '').trim();
     const answer = req.body.answer || '';
@@ -387,12 +382,12 @@ app.post('/api/forgot/reset', async (req, res) => {
     const u = await DB.findUserByName(username);
     if (!u || !u.sec_question) return res.status(400).json({ error: 'Could not reset that account.' });
     // Stop targeted answer-guessing even from rotating IPs.
-    if (resetLocked(u.id)) return res.status(429).json({ error: 'Too many incorrect answers — try again in 15 minutes.' });
+    if (await resetLocked(u.id)) return res.status(429).json({ error: 'Too many incorrect answers — try again in 15 minutes.' });
     if (!verifyPassword(normalizeAnswer(answer), u.sec_salt, u.sec_hash)) {
-      recordResetFail(u.id);
+      await recordResetFail(u.id);
       return res.status(401).json({ error: 'That answer is incorrect.' });
     }
-    clearResetFails(u.id);   // correct answer wipes the failure counter
+    await clearResetFails(u.id);   // correct answer wipes the failure counter
     const { salt, hash } = hashPassword(newPassword);
     await DB.updatePassword(u.id, salt, hash);
     await DB.bumpTokenVersion(u.id);   // a reset kills every existing session — they log in fresh
@@ -476,7 +471,7 @@ function preserveBillingFields(incoming, stored) {
 }
 app.post('/api/data', requireAuth, async (req, res) => {
   try {
-    if (saveRateLimited(req.userId)) {
+    if (await saveRateLimited(req.userId)) {
       return res.status(429).json({ error: 'Saving too fast — please wait a moment and try again.' });
     }
     const wrapped = req.body && req.body.data && typeof req.body.data === 'object';
@@ -537,9 +532,9 @@ function usingOwnKey(req) {
 // The quota is keyed per ACCOUNT, not per IP: rotating IPs is trivial, while
 // creating accounts is itself IP-rate-limited at signup. Keying on the IP let
 // anyone with a proxy pool spend the whole AI budget without an account.
-function aiGuard(req, res) {
+async function aiGuard(req, res) {
   if (!getApiKey(req)) { res.status(400).json({ error: 'NO_KEY' }); return false; }
-  if (!usingOwnKey(req) && !aiAllowed('u:' + req.userId)) {
+  if (!usingOwnKey(req) && !(await aiAllowed('u:' + req.userId))) {
     res.status(429).json({ error: 'Rate limit reached — try again later.' }); return false;
   }
   return true;
@@ -654,7 +649,7 @@ async function aiStream({ req, system, messages, maxTokens = 1024, onText }) {
 }
 
 app.post('/api/analyze', requireAuth, async (req, res) => {
-  if (!aiGuard(req, res)) return;
+  if (!(await aiGuard(req, res))) return;
   try {
     const analysis = await aiComplete({ req, maxTokens: 2048, system: [{ type: 'text', text: buildSystemPrompt(req.body.data?.profile || {}), cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: buildUserMessage(req.body.data, req.body.question) }] });
     res.json({ analysis });
@@ -662,7 +657,7 @@ app.post('/api/analyze', requireAuth, async (req, res) => {
 });
 
 app.post('/api/analyze-stream', requireAuth, async (req, res) => {
-  if (!aiGuard(req, res)) return;
+  if (!(await aiGuard(req, res))) return;
   res.setHeader('Content-Type', 'text/event-stream'); res.setHeader('Cache-Control', 'no-cache'); res.setHeader('Connection', 'keep-alive'); res.flushHeaders();
   let aborted = false; req.on('close', () => { aborted = true; });
   try {
@@ -693,7 +688,7 @@ When the stages are covered (or the user asks to wrap up), give a structured sum
 Be direct, data-hungry, constructive, plain English — no jargon fluff. Skepticism is your default; never give premature encouragement. The idea under evaluation is provided as JSON — use its title, description, scores and validation notes as context.`;
 
 app.post('/api/chat', requireAuth, async (req, res) => {
-  if (!aiGuard(req, res)) return;
+  if (!(await aiGuard(req, res))) return;
   try {
     const data = req.body.data || {};
     const msgs = (Array.isArray(req.body.messages) ? req.body.messages : [])
@@ -722,7 +717,7 @@ app.post('/api/chat', requireAuth, async (req, res) => {
 });
 
 app.post('/api/estimate-food', requireAuth, async (req, res) => {
-  if (!aiGuard(req, res)) return;
+  if (!(await aiGuard(req, res))) return;
   const description = String(req.body.description || '').trim();
   if (!description) return res.status(400).json({ error: 'Describe the food first.' });
   try {
@@ -737,7 +732,7 @@ Estimate realistic values for the WHOLE described amount. If no quantity is give
 });
 
 app.post('/api/insight', requireAuth, async (req, res) => {
-  if (!aiGuard(req, res)) return;
+  if (!(await aiGuard(req, res))) return;
   try {
     const system = `You are this person's personal life coach. Based on their recent tracking data, write ONE short, specific, motivating insight for today — at most 2 sentences (~45 words). Reference their real numbers or patterns when you can. End with a tiny concrete action if it fits. Output only the insight sentence(s), no markdown or preamble.`;
     const insight = (await aiComplete({ req, maxTokens: 160, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'My recent tracking data:\n\n```json\n' + JSON.stringify(req.body.data, null, 2) + '\n```\n\nGive me today\'s insight.' }] })).trim();
@@ -748,7 +743,7 @@ app.post('/api/insight', requireAuth, async (req, res) => {
 
 // ── Today's Game Plan: concrete next actions (works from day one — fixes cold start) ──
 app.post('/api/plan', requireAuth, async (req, res) => {
-  if (!aiGuard(req, res)) return;
+  if (!(await aiGuard(req, res))) return;
   try {
     const system = `You are this person's personal coach and strategist. From their goals and tracking data, give them a short, concrete GAME PLAN for TODAY — the specific next actions that move them toward their goals.
 Rules:
@@ -764,7 +759,7 @@ Rules:
 
 // ── Patterns: ONE cross-domain connection only a whole-life app could see ──
 app.post('/api/patterns', requireAuth, async (req, res) => {
-  if (!aiGuard(req, res)) return;
+  if (!(await aiGuard(req, res))) return;
   try {
     const system = `You are this person's personal life coach with a rare advantage: you see EVERY area of their life at once — training, income/money, nutrition, weight, reading, networking, habits, mood notes. Find ONE genuine CROSS-DOMAIN connection in their data that a single-purpose app could never see: a way one area appears to affect another.
 Rules:
@@ -781,7 +776,7 @@ Rules:
 
 // ── Weekly Life Review: the Sunday ritual across every pillar ──
 app.post('/api/review', requireAuth, async (req, res) => {
-  if (!aiGuard(req, res)) return;
+  if (!(await aiGuard(req, res))) return;
   try {
     const system = `You are this person's personal chief-of-staff and coach. Write their WEEKLY LIFE REVIEW from their tracking data across every area of life. Make it feel personal and earned — reference their real numbers.
 Use EXACTLY these three short markdown sections and nothing else:
