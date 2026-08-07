@@ -1311,7 +1311,7 @@ function renderUserChip() {
   chip.innerHTML =
     '<div class="user-chip-info"><span class="user-avatar">' + (state.user ? state.user.charAt(0).toUpperCase() : '?') + '</span>' +
     '<span class="user-name">' + escapeHtml(state.user || '') + '</span></div>' +
-    '<button class="user-logout" onclick="logout()" title="Log out"></button>';
+    '<button class="user-logout" onclick="logout()" title="Log out" aria-label="Log out"></button>';
   footer.prepend(chip);
 }
 
@@ -1386,6 +1386,12 @@ function navigate(page) {
   if (['business', 'ideas', 'contacts', 'finances'].includes(page)) document.querySelector('.nav-item[data-page="business"]')?.classList.add('active');
   // Reading lives under the Knowledge hub, so keep that nav item lit on its tab
   if (['knowledge', 'reading'].includes(page)) document.querySelector('.nav-item[data-page="knowledge"]')?.classList.add('active');
+  // A colour change alone doesn't tell a screen reader which page you're on;
+  // aria-current does. Derived from .active so the hub rules above are included.
+  document.querySelectorAll('.nav-item, .bnav-item').forEach(el => {
+    if (el.classList.contains('active')) el.setAttribute('aria-current', 'page');
+    else el.removeAttribute('aria-current');
+  });
   const pages = { dashboard: renderDashboard, log: renderLogEntry, workout: renderWorkout, business: renderBusinessPage, finances: renderFinancesPage, health: renderHealthPage, checklist: renderChecklistPage, contacts: renderContactsPage, ideas: renderIdeasPage, knowledge: renderKnowledgePage, reading: renderReadingPage, community: renderCommunityPage, coach: renderCoachPage, history: renderHistoryPage, settings: renderSettingsPage, admin: renderAdminPage };
   injectFAB();
   (pages[page] || renderDashboard)();
@@ -2243,7 +2249,7 @@ function renderLogNutritionSection(eatenVal) {
     '<div class="food-active-line">Adding to <b id="food-active-meal">' + escapeHtml(activeMealName) + '</b> · pick a meal with “+ Add food” below</div>' +
     '<div class="food-add-row">' +
     '<input type="text" id="food-pick" placeholder="Search a food (e.g. chicken breast)…" autocomplete="off" oninput="onFoodSearch()" onfocus="onFoodSearch()" onblur="setTimeout(hideFoodSuggest, 200)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();document.getElementById(\'food-qty\').focus();}">' +
-    '<input type="number" id="food-qty" min="0" step="1" placeholder="amount" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addFoodToLog();}">' +
+    '<input type="number" id="food-qty" min="0" step="1" placeholder="amount" aria-label="Amount" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addFoodToLog();}">' +
     '<select id="food-unit"><option value="g">grams</option><option value="ml">mL</option><option value="l">litres</option><option value="oz">oz</option><option value="serving">serving(s)</option></select>' +
     '<button type="button" class="btn btn-outline food-add-btn" onclick="addFoodToLog()">+ Add</button>' +
     '<button type="button" class="btn btn-outline food-ai-btn" id="food-ai-btn" onclick="estimateFoodWithAI()" title="Estimate macros with AI for any food">AI</button>' +
@@ -2284,7 +2290,7 @@ function foodItemRow(x) {
     '<div class="fi-name">' + escapeHtml(x.name) + '</div>' +
     '<div class="fi-amt">' + foodAmountLabel(x) + '</div>' +
     '<div class="fi-macros"><b>' + x.kcal + '</b> cal · <b class="mp">' + x.p + 'g</b> · <b class="mc">' + x.c + 'g</b> · <b class="mf">' + x.f + 'g</b></div>' +
-    '<button type="button" class="fi-remove" onclick="removeFoodFromLog(\'' + x.id + '\')" title="Remove">✕</button>' +
+    '<button type="button" class="fi-remove" onclick="removeFoodFromLog(\'' + x.id + '\')" title="Remove" aria-label="Remove this food from the log">✕</button>' +
     '</div>';
 }
 // Render the food log grouped into the meals the user chose (Breakfast, Lunch…),
@@ -2516,13 +2522,13 @@ function mealDraftTotals() {
 function renderIngredientRows() {
   return (state._mealDraft || []).map(x =>
     '<div class="ing-row">' +
-    '<input class="ing-name" type="text" placeholder="Ingredient (e.g. banana)" value="' + escapeAttr(x.name) + '" oninput="updateIng(\'' + x.id + '\',\'name\',this.value)">' +
-    '<input class="ing-amt" type="text" placeholder="amount" value="' + escapeAttr(x.amount) + '" oninput="updateIng(\'' + x.id + '\',\'amount\',this.value)">' +
-    '<input class="ing-m" type="number" min="0" inputmode="numeric" placeholder="cal" value="' + (x.kcal || '') + '" oninput="updateIng(\'' + x.id + '\',\'kcal\',this.value)">' +
-    '<input class="ing-m" type="number" min="0" inputmode="numeric" placeholder="P" value="' + (x.p || '') + '" oninput="updateIng(\'' + x.id + '\',\'p\',this.value)">' +
-    '<input class="ing-m" type="number" min="0" inputmode="numeric" placeholder="C" value="' + (x.c || '') + '" oninput="updateIng(\'' + x.id + '\',\'c\',this.value)">' +
-    '<input class="ing-m" type="number" min="0" inputmode="numeric" placeholder="F" value="' + (x.f || '') + '" oninput="updateIng(\'' + x.id + '\',\'f\',this.value)">' +
-    '<button type="button" class="ing-x" title="Remove ingredient" onclick="removeIng(\'' + x.id + '\')">✕</button>' +
+    '<input class="ing-name" type="text" placeholder="Ingredient (e.g. banana)" aria-label="Ingredient name" value="' + escapeAttr(x.name) + '" oninput="updateIng(\'' + x.id + '\',\'name\',this.value)">' +
+    '<input class="ing-amt" type="text" placeholder="amount" aria-label="Amount" value="' + escapeAttr(x.amount) + '" oninput="updateIng(\'' + x.id + '\',\'amount\',this.value)">' +
+    '<input class="ing-m" type="number" min="0" inputmode="numeric" placeholder="cal" aria-label="Calories" value="' + (x.kcal || '') + '" oninput="updateIng(\'' + x.id + '\',\'kcal\',this.value)">' +
+    '<input class="ing-m" type="number" min="0" inputmode="numeric" placeholder="P" aria-label="Protein in grams" value="' + (x.p || '') + '" oninput="updateIng(\'' + x.id + '\',\'p\',this.value)">' +
+    '<input class="ing-m" type="number" min="0" inputmode="numeric" placeholder="C" aria-label="Carbohydrates in grams" value="' + (x.c || '') + '" oninput="updateIng(\'' + x.id + '\',\'c\',this.value)">' +
+    '<input class="ing-m" type="number" min="0" inputmode="numeric" placeholder="F" aria-label="Fat in grams" value="' + (x.f || '') + '" oninput="updateIng(\'' + x.id + '\',\'f\',this.value)">' +
+    '<button type="button" class="ing-x" title="Remove ingredient" onclick="removeIng(\'' + x.id + '\')" aria-label="Remove ingredient">✕</button>' +
     '</div>').join('');
 }
 function updateIng(id, field, val) {
@@ -2663,7 +2669,7 @@ function openManageMeals() {
       '<div class="comm-macros">' + macroLine(m) + '</div>' + ingredientLines(m) + '</div>' +
       '<div class="comm-actions">' +
       '<button type="button" class="btn btn-outline btn-sm" onclick="shareMyMeal(\'' + m.id + '\')">Share</button>' +
-      '<button type="button" class="comm-x" title="Delete" onclick="deleteMyMeal(\'' + m.id + '\')">✕</button>' +
+      '<button type="button" class="comm-x" title="Delete" onclick="deleteMyMeal(\'' + m.id + '\')" aria-label="Delete my shared meal">✕</button>' +
       '</div></div>').join('') + '</div>'
       : '<p style="color:var(--text-muted);font-size:14px">No saved meals yet.</p>') +
     '<div style="display:flex;gap:10px;justify-content:space-between;margin-top:16px">' +
@@ -2751,7 +2757,7 @@ function renderCommunityList(meals) {
     '<div class="comm-actions">' +
     '<button type="button" class="btn btn-primary btn-sm" onclick="addCommunityMeal(' + m.id + ')">＋ Add</button>' +
     (m.mine
-      ? '<button type="button" class="comm-x" title="Remove" onclick="removeCommunityMeal(' + m.id + ')">✕</button>'
+      ? '<button type="button" class="comm-x" title="Remove" onclick="removeCommunityMeal(' + m.id + ')" aria-label="Remove this meal">✕</button>'
       : '<button type="button" class="comm-x comm-report" title="Report" onclick="reportCommunityMeal(' + m.id + ')">Report</button>') +
     '</div></div>'
   ).join('');
@@ -3235,7 +3241,7 @@ function renderCoachInsightCard() {
   else body = '<div class="di-loading"><div class="spinner"></div><span>Reading your data…</span></div>';
   return '<div class="card insight-daily">' +
     '<div class="di-head"><span class="di-icon"></span><span class="di-title">Your Daily Coach Insight</span>' +
-    '<button class="di-refresh" onclick="fetchCoachInsight(true)" title="New insight">↻</button></div>' +
+    '<button class="di-refresh" onclick="fetchCoachInsight(true)" title="New insight" aria-label="Get a new insight">↻</button></div>' +
     '<div class="di-body" id="di-body">' + body + '</div></div>';
 }
 
@@ -3279,7 +3285,7 @@ function renderGamePlanCard() {
     : '<div class="di-loading"><div class="spinner"></div><span>Building today\'s plan…</span></div>';
   return '<div class="card insight-daily plan-card">' +
     '<div class="di-head"><span class="di-icon"></span><span class="di-title">Today\'s Game Plan</span>' +
-    '<button class="di-refresh" onclick="fetchGamePlan(true)" title="New plan">↻</button></div>' +
+    '<button class="di-refresh" onclick="fetchGamePlan(true)" title="New plan" aria-label="Get a new game plan">↻</button></div>' +
     '<div class="di-body" id="plan-body">' + body + '</div></div>';
 }
 // Auto-generate once per day (cached in data.gamePlan)
@@ -3335,7 +3341,7 @@ function renderPatternsCard() {
   }
   return '<div class="card insight-daily patterns-card">' +
     '<div class="di-head"><span class="di-icon"></span><span class="di-title">Patterns — what connects in your life</span>' +
-    (days.length >= PATTERNS_MIN_DAYS ? '<button class="di-refresh" onclick="fetchPatterns(true)" title="Find a new pattern">↻</button>' : '') +
+    (days.length >= PATTERNS_MIN_DAYS ? '<button class="di-refresh" onclick="fetchPatterns(true)" title="Find a new pattern" aria-label="Find a new pattern">↻</button>' : '') +
     '</div><div class="di-body" id="pat-body">' + body + '</div></div>';
 }
 // Auto-generate at most every few days (cached in data.patternInsight) to control AI cost
@@ -5057,7 +5063,7 @@ function renderMuscleOverlay(name, group) {
   const sec = mm.secondary.map(id => chip(id, 'mm-sec')).join('');
   const a = JSON.stringify(name).replace(/"/g, '&quot;'), b = JSON.stringify(group).replace(/"/g, '&quot;');
   return '<div class="mm-overlay" onclick="if(event.target===this)closeMuscleMap()"><div class="mm-card">' +
-    '<div class="mm-head"><div class="mm-title">' + escapeHtml(name) + '</div><button type="button" class="mm-close" onclick="closeMuscleMap()">✕</button></div>' +
+    '<div class="mm-head"><div class="mm-title">' + escapeHtml(name) + '</div><button type="button" class="mm-close" onclick="closeMuscleMap()" aria-label="Close muscle map">✕</button></div>' +
     muscleMapSVG(mm.primary, mm.secondary) +
     '<div class="mm-legend">' +
     (prim ? '<div class="mm-leg-row"><span class="mm-leg-label mm-prim-label">Primary</span><div class="mm-chips">' + prim + '</div></div>' : '') +
@@ -5465,7 +5471,7 @@ function openWorkoutPlanner() {
   sheet.id = 'wplan-sheet';
   sheet.className = 'wplan-overlay';
   sheet.innerHTML = '<div class="wplan-card">' +
-    '<div class="wplan-head"><div class="wplan-title">Plan your next workout</div><button type="button" class="wplan-close" onclick="closeWorkoutPlanner()">✕</button></div>' +
+    '<div class="wplan-head"><div class="wplan-title">Plan your next workout</div><button type="button" class="wplan-close" onclick="closeWorkoutPlanner()" aria-label="Close workout planner">✕</button></div>' +
     '<div class="wplan-sub">Pick it now so it\'s loaded and ready when you get to the gym.</div>' +
     (goal ? '<div class="wplan-goal">' + s.label + ' · aim ' + s.sets + ' · ' + s.reps + '</div>' : '') +
     '<div class="wplan-list">' + programSections().map(sec =>
@@ -5537,7 +5543,7 @@ function renderWorkout() {
       '<div class="wo-set' + (s.pr ? ' wo-set-pr-row' : '') + '"><span class="wo-set-n">' + (j + 1) + '</span>' +
       '<span class="wo-set-v">' + (timed ? formatClock(s.secs || 0) : ((s.reps || 0) + ' reps' + (s.weight ? ' × ' + s.weight + ' ' + unit : ''))) + '</span>' +
       (s.pr ? '<span class="wo-set-pr">🏔️ PR</span>' : '') +
-      '<button type="button" class="wo-set-del" onclick="woRemoveSet(' + i + ',' + j + ')" title="Remove set">✕</button></div>').join('');
+      '<button type="button" class="wo-set-del" onclick="woRemoveSet(' + i + ',' + j + ')" title="Remove set" aria-label="Remove set">✕</button></div>').join('');
     const exA = JSON.stringify(ex.name).replace(/"/g, '&quot;'), exB = JSON.stringify(ex.muscle || '').replace(/"/g, '&quot;');
     const lastSecs = last && last.secs ? last.secs : 0;
     const addRow = timed
@@ -5573,7 +5579,7 @@ function renderWorkout() {
       (ex.muscle ? '<div class="wo-ex-muscle">' + escapeHtml(ex.muscle) + (timed ? ' · timed' : '') + '</div>' : '') + '</div>' +
       '<div class="wo-ex-acts">' +
       '<button type="button" class="wo-ex-info" onclick="showMuscleMap(' + exA + ',' + exB + ')" title="Muscles worked">' + BODY_ICON + '</button>' +
-      '<button type="button" class="wo-ex-del" onclick="woRemoveExercise(' + i + ')" title="Remove exercise">✕</button></div></div>' +
+      '<button type="button" class="wo-ex-del" onclick="woRemoveExercise(' + i + ')" title="Remove exercise" aria-label="Remove exercise">✕</button></div></div>' +
       lastLine +
       (setRows ? '<div class="wo-sets">' + setRows + '</div>' : '<div class="wo-sets-empty">' + (timed ? 'No sets yet — log your time below.' : 'No sets yet — log your first below.') + '</div>') +
       addRow + '</div>';
@@ -5591,7 +5597,7 @@ function renderWorkout() {
 
   const lib = (state._lib && state._lib.open)
     ? '<div class="wo-lib-overlay" onclick="if(event.target===this)closeLibrary()"><div class="wo-lib">' +
-      '<div class="wo-lib-head"><input id="wo-lib-search" class="wo-lib-search" placeholder="Search all exercises…" oninput="woLibSearch()" value="' + escapeAttr(state._lib.q || '') + '"><button type="button" class="wo-lib-close" onclick="closeLibrary()">✕</button></div>' +
+      '<div class="wo-lib-head"><input id="wo-lib-search" class="wo-lib-search" placeholder="Search all exercises…" oninput="woLibSearch()" value="' + escapeAttr(state._lib.q || '') + '"><button type="button" class="wo-lib-close" onclick="closeLibrary()" aria-label="Close exercise library">✕</button></div>' +
       '<div class="wo-lib-list" id="wo-lib-list">' + renderLibBody() + '</div>' +
       '</div></div>'
     : '';
@@ -7348,9 +7354,9 @@ function renderIdeaDetail(id) {
     '<textarea class="idw-ta" placeholder="Describe the idea in a line or two…" onchange="setIdeaField(\'' + id + '\',\'description\',this.value)">' + escapeHtml(idea.description || '') + '</textarea>' +
     '<div class="idw-pc">' +
     '<div class="pc-col"><div class="pc-h pc-pros-h">👍 Pros</div>' + pcList(idea.pros, 'Pro') +
-    '<div class="pc-add"><input id="pro-input-' + id + '" placeholder="Add a pro…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addIdeaPro(\'' + id + '\');}"><button type="button" onclick="addIdeaPro(\'' + id + '\')">+</button></div></div>' +
+    '<div class="pc-add"><input id="pro-input-' + id + '" placeholder="Add a pro…" aria-label="Add a pro" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addIdeaPro(\'' + id + '\');}"><button type="button" onclick="addIdeaPro(\'' + id + '\')" aria-label="Add pro">+</button></div></div>' +
     '<div class="pc-col"><div class="pc-h pc-cons-h">👎 Cons</div>' + pcList(idea.cons, 'Con') +
-    '<div class="pc-add"><input id="con-input-' + id + '" placeholder="Add a con…" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addIdeaCon(\'' + id + '\');}"><button type="button" onclick="addIdeaCon(\'' + id + '\')">+</button></div></div>' +
+    '<div class="pc-add"><input id="con-input-' + id + '" placeholder="Add a con…" aria-label="Add a con" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addIdeaCon(\'' + id + '\');}"><button type="button" onclick="addIdeaCon(\'' + id + '\')" aria-label="Add con">+</button></div></div>' +
     '</div>' +
     (() => {
       const list = idea.checklist || [], cp = ideaTaskProgress(list);
@@ -7361,7 +7367,7 @@ function renderIdeaDetail(id) {
           '<button type="button" class="clx-box" onclick="toggleIdeaTask(\'' + id + '\',\'' + t.id + '\')">' + (t.done ? '✓' : '') + '</button>' +
           '<span class="clx-text">' + escapeHtml(t.text) + '</span>' +
           '<button type="button" class="clx-del" onclick="removeIdeaTask(\'' + id + '\',\'' + t.id + '\')" aria-label="Remove">✕</button></div>').join('') + '</div>' : '') +
-        '<div class="pc-add"><input id="task-input-' + id + '" placeholder="Add a task — e.g. Call 3 gyms" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addIdeaTask(\'' + id + '\');}"><button type="button" onclick="addIdeaTask(\'' + id + '\')">+</button></div>';
+        '<div class="pc-add"><input id="task-input-' + id + '" placeholder="Add a task — e.g. Call 3 gyms" aria-label="Add a task" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addIdeaTask(\'' + id + '\');}"><button type="button" onclick="addIdeaTask(\'' + id + '\')" aria-label="Add task">+</button></div>';
     })() +
     (idea.nextStep ? '<div class="idw-sec-h">Next step</div><div class="idea-next">→ ' + escapeHtml(idea.nextStep) + '</div>' : '') +
     '<div class="idw-sec-h">Notes</div>' +
@@ -7438,7 +7444,7 @@ function renderIdeaValidate(idea) {
   return '<div class="modal-box iv-box">' +
     '<div class="iv-head"><div><h3 class="card-title" style="margin-bottom:2px">Validate: ' + escapeHtml(idea.title) + '</h3>' +
     '<p class="card-sub" style="margin-bottom:0">The Lean Startup way — test the risky guesses before you build.</p></div>' +
-    '<button type="button" class="mm-close" onclick="closeIdeaValidate()">✕</button></div>' +
+    '<button type="button" class="mm-close" onclick="closeIdeaValidate()" aria-label="Close idea validation">✕</button></div>' +
     '<div class="iv-stage"><span class="iv-badge iv-' + st.key + '">' + st.label + '</span><span class="iv-bar"><i style="width:' + st.pct + '%"></i></span></div>' +
     '<div class="iv-sec">1 · Get out of the building</div>' +
     ta('customer', 'Who exactly is the customer?', 'Be specific — “new members in their first month”, not “everyone”.', 'e.g. New gym members who want fast results', 2) +
@@ -7514,7 +7520,7 @@ function renderIdeaCoach() {
   o.innerHTML = '<div class="modal-box ic-box">' +
     '<div class="iv-head"><div><h3 class="card-title" style="margin-bottom:2px">Validation coach 🎯</h3>' +
     '<p class="card-sub" style="margin-bottom:0">' + escapeHtml(idea.title || 'Your idea') + '</p></div>' +
-    '<button type="button" class="mm-close" onclick="closeIdeaCoach()">✕</button></div>' +
+    '<button type="button" class="mm-close" onclick="closeIdeaCoach()" aria-label="Close idea coach">✕</button></div>' +
     '<div id="ic-thread" class="coach-thread ic-thread">' + renderIdeaCoachThread() + '</div>' +
     '<div class="coach-input-row"><textarea id="ic-input" rows="1" placeholder="Answer honestly…" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();sendIdeaChat();}"></textarea>' +
     '<button type="button" class="btn btn-primary" onclick="sendIdeaChat()">Send</button></div>' +
@@ -8416,11 +8422,11 @@ function initFinanceCharts(f) {
 function finDebtRowHtml(d) {
   d = d || {};
   return '<div class="fin-debt-row">' +
-    '<input type="text" class="fd-name" placeholder="Name" value="' + escapeAttr(d.name || '') + '">' +
-    '<input type="number" class="fd-bal" inputmode="decimal" step="any" placeholder="Balance" value="' + (d.balance || '') + '">' +
-    '<input type="number" class="fd-apr" inputmode="decimal" step="any" placeholder="APR%" value="' + (d.apr || '') + '">' +
-    '<input type="number" class="fd-pay" inputmode="decimal" step="any" placeholder="$/mo" value="' + (d.payment || '') + '">' +
-    '<button type="button" class="fin-debt-x" onclick="this.closest(\'.fin-debt-row\').remove()">✕</button></div>';
+    '<input type="text" class="fd-name" placeholder="Name" aria-label="Debt name" value="' + escapeAttr(d.name || '') + '">' +
+    '<input type="number" class="fd-bal" inputmode="decimal" step="any" placeholder="Balance" aria-label="Balance owed" value="' + (d.balance || '') + '">' +
+    '<input type="number" class="fd-apr" inputmode="decimal" step="any" placeholder="APR%" aria-label="Interest rate, annual percentage" value="' + (d.apr || '') + '">' +
+    '<input type="number" class="fd-pay" inputmode="decimal" step="any" placeholder="$/mo" aria-label="Monthly payment" value="' + (d.payment || '') + '">' +
+    '<button type="button" class="fin-debt-x" onclick="this.closest(\'.fin-debt-row\').remove()" aria-label="Remove this debt">✕</button></div>';
 }
 function finAddDebtRow() { document.getElementById('fin-debts')?.insertAdjacentHTML('beforeend', finDebtRowHtml({})); }
 function closeFinanceEditor() { document.getElementById('fin-modal')?.remove(); }
@@ -9797,7 +9803,7 @@ function renderVocabCard() {
         '<div class="vocab-top"><span class="vocab-word">' + escapeHtml(w.word) + '</span>' +
         (w.book ? '<span class="vocab-bk">' + escapeHtml(w.book) + '</span>' : '') +
         (w.page ? '<span class="vocab-pg">p.' + escapeHtml(String(w.page)) + '</span>' : '') +
-        '<button class="vocab-x" title="Remove" onclick="deleteVocabWord(\'' + w.id + '\')">✕</button></div>' +
+        '<button class="vocab-x" title="Remove" onclick="deleteVocabWord(\'' + w.id + '\')" aria-label="Remove word">✕</button></div>' +
         (w.meaning ? '<div class="vocab-mean">' + escapeHtml(w.meaning) + '</div>' : '') +
         (hasCtx ? '<div class="vocab-context">“' + escapeHtml(w.context.trim()) + '”</div>' : '') +
         (hasS
@@ -10094,7 +10100,7 @@ function renderChaptersCard() {
     ? '<div class="chap-list">' + chapters.map((c, i) =>
         '<div class="chap-item"><span class="chap-num">' + (i + 1) + '</span>' +
         '<span class="chap-name">' + escapeHtml(c) + '</span>' +
-        '<button class="chap-x" title="Remove" onclick="deleteChapter(' + i + ')">✕</button></div>').join('') + '</div>'
+        '<button class="chap-x" title="Remove" onclick="deleteChapter(' + i + ')" aria-label="Remove chapter">✕</button></div>').join('') + '</div>'
     : '<div class="my-meals-empty">No chapters yet — add them so your notes organize themselves by chapter.</div>';
   return '<div class="card chap-card">' +
     '<h3 class="card-title">Chapters — ' + escapeHtml(book.title) + '</h3>' +
@@ -10767,7 +10773,7 @@ function renderTakeawaysCard() {
           ? '<span class="tk-book">' + escapeHtml(t.book) + '</span>'
           : '<span class="tk-book tk-book-none">General</span>') +
         (t.seenAt ? '<span class="tk-seen">revisited ' + fmtDate(t.seenAt) + '</span>' : '') +
-        '<button class="tk-x" title="Remove" onclick="deleteTakeaway(\'' + t.id + '\')">✕</button>' +
+        '<button class="tk-x" title="Remove" onclick="deleteTakeaway(\'' + t.id + '\')" aria-label="Remove takeaway">✕</button>' +
         '</div></div>').join('') + '</div>'
     : '<div class="my-meals-empty">No lessons saved yet — capture one idea worth keeping from your book.</div>';
   return '<div class="card tk-card">' +
@@ -11650,7 +11656,7 @@ function pillarCustomizerCard() {
     const pc = pillar(id);
     const meta = PILLAR_META[id];
     return '<div class="pc-row' + (pc.enabled ? '' : ' pc-off') + '" data-id="' + id + '">' +
-      '<label class="pc-toggle"><input type="checkbox" ' + (pc.enabled ? 'checked' : '') + ' onchange="togglePillarRow(\'' + id + '\', this.checked)"><span class="pc-slider"></span></label>' +
+      '<label class="pc-toggle"><input type="checkbox" aria-label="Track this area" ' + (pc.enabled ? 'checked' : '') + ' onchange="togglePillarRow(\'' + id + '\', this.checked)"><span class="pc-slider"></span></label>' +
       '<input type="text" class="pc-icon-input" id="pc-icon-' + id + '" value="' + escapeHtml(pc.icon) + '" maxlength="2" title="Emoji / icon">' +
       '<input type="text" class="pc-label-input" id="pc-label-' + id + '" value="' + escapeHtml(pc.label) + '" placeholder="Name">' +
       '<span class="pc-type">' + meta.measures + '</span>' +
@@ -12490,7 +12496,7 @@ function renderNudgeCard() {
   return '<div class="card">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
     '<h3 class="card-title" style="margin-bottom:0">Daily streak nudge</h3>' +
-    '<label class="pc-toggle"><input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="toggleDailyNudge()"><span class="pc-slider"></span></label></div>' +
+    '<label class="pc-toggle"><input type="checkbox" aria-label="Daily streak nudge" ' + (on ? 'checked' : '') + ' onchange="toggleDailyNudge()"><span class="pc-slider"></span></label></div>' +
     '<p class="card-sub">If you haven\'t logged by this time, we\'ll send one friendly push to your phone — so you never break your streak.</p>' +
     '<div class="rem-add"><label style="align-self:center;color:var(--text-muted);font-size:14px;white-space:nowrap">Remind me at</label>' +
     '<select id="nudge-hour" onchange="setNudgeHour(this.value)"' + (on ? '' : ' disabled') + '>' + opts + '</select></div>' +
@@ -12498,12 +12504,12 @@ function renderNudgeCard() {
     '<div style="height:1px;background:var(--border);margin:16px 0"></div>' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
     '<h3 class="card-title" style="margin-bottom:0">Protein reminder</h3>' +
-    '<label class="pc-toggle"><input type="checkbox" ' + (proteinOn ? 'checked' : '') + ' onchange="toggleProteinNudge()"><span class="pc-slider"></span></label></div>' +
+    '<label class="pc-toggle"><input type="checkbox" aria-label="Protein reminder" ' + (proteinOn ? 'checked' : '') + ' onchange="toggleProteinNudge()"><span class="pc-slider"></span></label></div>' +
     '<p class="card-sub">Logged food but came up short on protein? Around your reminder time we\'ll let you know there\'s still time for a shake — so you hit your target. (Needs nutrition set up.)</p>' +
     '<div style="height:1px;background:var(--border);margin:16px 0"></div>' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
     '<h3 class="card-title" style="margin-bottom:0">Daily motivation ⛰️</h3>' +
-    '<label class="pc-toggle"><input type="checkbox" ' + (motivationOn ? 'checked' : '') + ' onchange="toggleMotivation()"><span class="pc-slider"></span></label></div>' +
+    '<label class="pc-toggle"><input type="checkbox" aria-label="Motivational messages" ' + (motivationOn ? 'checked' : '') + ' onchange="toggleMotivation()"><span class="pc-slider"></span></label></div>' +
     '<p class="card-sub">A short hit of motivation every morning — one line to get you moving. Goes out whether or not you\'ve logged. No streak required.</p>' +
     '<div class="rem-add"><label style="align-self:center;color:var(--text-muted);font-size:14px;white-space:nowrap">Send at</label>' +
     '<select id="motivation-hour" onchange="setMotivationHour(this.value)"' + (motivationOn ? '' : ' disabled') + '>' + mopts + '</select></div>' +
@@ -12511,7 +12517,7 @@ function renderNudgeCard() {
       '<div style="height:1px;background:var(--border);margin:16px 0"></div>' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
       '<h3 class="card-title" style="margin-bottom:0">Plan tomorrow\'s workout 🏋️</h3>' +
-      '<label class="pc-toggle"><input type="checkbox" ' + (planOn ? 'checked' : '') + ' onchange="togglePlanNudge()"><span class="pc-slider"></span></label></div>' +
+      '<label class="pc-toggle"><input type="checkbox" aria-label="Weekly plan nudge" ' + (planOn ? 'checked' : '') + ' onchange="togglePlanNudge()"><span class="pc-slider"></span></label></div>' +
       '<p class="card-sub" style="margin-bottom:0">In the evening, if you haven\'t picked your next session, we\'ll nudge you to plan it — so it\'s loaded and ready when you get to the gym.</p>'
       : '') +
     '</div>';
@@ -12601,8 +12607,8 @@ function renderChecklistPage() {
     ? reminders.map(r => '<div class="rem-row' + (r.enabled ? '' : ' rem-off') + '">' +
         '<span class="rem-time">' + escapeHtml(r.time) + '</span>' +
         '<span class="rem-label">' + escapeHtml(r.label) + (r.date ? ' <span class="rem-when">' + fmtDateShort(r.date) + '</span>' : '') + '</span>' +
-        '<label class="pc-toggle"><input type="checkbox" ' + (r.enabled ? 'checked' : '') + ' onchange="toggleReminder(\'' + r.id + '\')"><span class="pc-slider"></span></label>' +
-        '<button type="button" class="chk-del" onclick="deleteReminder(\'' + r.id + '\')" title="Remove">✕</button>' +
+        '<label class="pc-toggle"><input type="checkbox" aria-label="Enable this reminder" ' + (r.enabled ? 'checked' : '') + ' onchange="toggleReminder(\'' + r.id + '\')"><span class="pc-slider"></span></label>' +
+        '<button type="button" class="chk-del" onclick="deleteReminder(\'' + r.id + '\')" title="Remove" aria-label="Remove reminder">✕</button>' +
         '</div>').join('')
     : '<div class="chk-empty">No reminders yet — add one below.</div>';
 
@@ -12656,7 +12662,7 @@ function renderAppearanceCard() {
     '<div style="height:1px;background:var(--border);margin:16px 0"></div>' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
     '<h3 class="card-title" style="margin-bottom:0">3D background</h3>' +
-    '<label class="pc-toggle"><input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="setBg3d(this.checked)"><span class="pc-slider"></span></label></div>' +
+    '<label class="pc-toggle"><input type="checkbox" aria-label="Animated background" ' + (on ? 'checked' : '') + ' onchange="setBg3d(this.checked)"><span class="pc-slider"></span></label></div>' +
     '<p class="card-sub" style="margin-bottom:0">A gentle, animated mountain scene with floating particles drifts behind your screens and follows your cursor or phone tilt. Turn it off for a flat background. Set per device; movement is reduced automatically if your system prefers less motion.</p>' +
     '</div>';
 }
@@ -13179,6 +13185,18 @@ function showToast(msg, type) {
   document.body.appendChild(t);
   requestAnimationFrame(() => t.classList.add('visible'));
   setTimeout(() => { t.classList.remove('visible'); setTimeout(() => t.remove(), 300); }, 3200);
+  announce(msg, type === 'error');
+}
+// Speak a message to screen readers via the persistent regions in index.html.
+// A toast is a purely visual cue; without this, every save, failure and
+// confirmation is silent for anyone using a reader. Errors go to the assertive
+// region so they interrupt; everything else waits its turn.
+function announce(msg, assertive) {
+  const el = document.getElementById(assertive ? 'sr-alert' : 'sr-live');
+  if (!el || !msg) return;
+  // Re-setting identical text isn't re-announced, so clear first.
+  el.textContent = '';
+  setTimeout(() => { el.textContent = String(msg); }, 60);
 }
 
 // ─────────────────────────────────────────────────────────────

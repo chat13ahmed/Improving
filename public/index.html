@@ -25,11 +25,17 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
-  <link rel="stylesheet" href="style.css?v=196">
+  <link rel="stylesheet" href="style.css?v=198">
   <script src="vendor/chart.umd.min.js"></script>
   <script src="vendor/marked.min.js"></script>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <!-- Screen-reader announcements. These must already exist in the DOM for a
+       reader to announce changes, so they live here rather than being created
+       alongside each message. polite = saves/confirmations, assertive = errors. -->
+  <div id="sr-live" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div id="sr-alert" class="sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
   <aside class="sidebar">
     <div class="sidebar-brand">
       <span class="brand-icon"></span>
@@ -38,7 +44,7 @@
         <div class="brand-sub">Life Progress</div>
       </div>
     </div>
-    <nav class="sidebar-nav">
+    <nav class="sidebar-nav" aria-label="Main navigation">
       <a href="#" class="nav-item active" data-page="dashboard">
         <span class="nav-icon"></span><span>Dashboard</span>
       </a>
@@ -91,7 +97,7 @@
     </div>
   </main>
 
-  <nav class="bottom-nav" id="bottom-nav">
+  <nav class="bottom-nav" id="bottom-nav" aria-label="Primary navigation">
     <a href="#" class="bnav-item" data-page="dashboard">
       <span class="bnav-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 9.5V21h5v-6h4v6h5V9.5"/></svg></span>
       <span>Home</span>
@@ -110,7 +116,7 @@
     </button>
   </nav>
 
-  <script src="app.js?v=223"></script>
+  <script src="app.js?v=224"></script>
   <script>
     if ('serviceWorker' in navigator) {
       // updateViaCache:'none' — always revalidate sw.js itself, so a new deploy's

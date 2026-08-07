@@ -43,6 +43,11 @@ jobs:
       - name: Verify SQLite/Postgres schema parity
         run: node tests/schema-parity.js
 
+      # app.js builds markup from string templates, so nothing catches a missing
+      # label. These guards keep unnamed controls from creeping back in.
+      - name: Verify accessibility guards
+        run: node tests/a11y.js
+
       # Guard the deploy target too: cloud/ is what Render actually installs
       # (Root Directory = cloud), so a broken manifest there breaks production
       # even when the tests above pass.
