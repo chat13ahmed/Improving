@@ -32,6 +32,11 @@ jobs:
       - name: Run test suite
         run: node tests/run.js
 
+      # A silently-broken backup tool is worse than none, so prove the
+      # dump → wipe → restore round-trip on every commit.
+      - name: Verify backup/restore round-trip
+        run: node tests/backup.js
+
       # Guard the deploy target too: cloud/ is what Render actually installs
       # (Root Directory = cloud), so a broken manifest there breaks production
       # even when the tests above pass.
