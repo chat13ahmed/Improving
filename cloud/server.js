@@ -527,9 +527,21 @@ app.post('/api/admin/grant-pro', requireAuth, async (req, res) => {
 });
 app.post('/api/settings', (req, res) => res.json({ success: true }));
 
+// Does this request carry the caller's OWN provider key? Then the spend is
+// theirs, not ours, and it must not be metered against the shared budget.
+function usingOwnKey(req) {
+  const h = req && req.headers && req.headers['x-api-key'];
+  return !!(h && String(h).trim());
+}
+// Every AI route is behind requireAuth, so req.userId is always set here.
+// The quota is keyed per ACCOUNT, not per IP: rotating IPs is trivial, while
+// creating accounts is itself IP-rate-limited at signup. Keying on the IP let
+// anyone with a proxy pool spend the whole AI budget without an account.
 function aiGuard(req, res) {
   if (!getApiKey(req)) { res.status(400).json({ error: 'NO_KEY' }); return false; }
-  if (!aiAllowed(req.ip || 'anon')) { res.status(429).json({ error: 'Rate limit reached — try again later.' }); return false; }
+  if (!usingOwnKey(req) && !aiAllowed('u:' + req.userId)) {
+    res.status(429).json({ error: 'Rate limit reached — try again later.' }); return false;
+  }
   return true;
 }
 
@@ -641,7 +653,7 @@ async function aiStream({ req, system, messages, maxTokens = 1024, onText }) {
   if (text) onText(text);
 }
 
-app.post('/api/analyze', async (req, res) => {
+app.post('/api/analyze', requireAuth, async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
     const analysis = await aiComplete({ req, maxTokens: 2048, system: [{ type: 'text', text: buildSystemPrompt(req.body.data?.profile || {}), cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: buildUserMessage(req.body.data, req.body.question) }] });
@@ -649,7 +661,7 @@ app.post('/api/analyze', async (req, res) => {
   } catch (e) { res.status(e.status || 500).json({ error: e.message || 'Analysis failed' }); }
 });
 
-app.post('/api/analyze-stream', async (req, res) => {
+app.post('/api/analyze-stream', requireAuth, async (req, res) => {
   if (!aiGuard(req, res)) return;
   res.setHeader('Content-Type', 'text/event-stream'); res.setHeader('Cache-Control', 'no-cache'); res.setHeader('Connection', 'keep-alive'); res.flushHeaders();
   let aborted = false; req.on('close', () => { aborted = true; });
@@ -680,7 +692,7 @@ When the stages are covered (or the user asks to wrap up), give a structured sum
 
 Be direct, data-hungry, constructive, plain English — no jargon fluff. Skepticism is your default; never give premature encouragement. The idea under evaluation is provided as JSON — use its title, description, scores and validation notes as context.`;
 
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat', requireAuth, async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
     const data = req.body.data || {};
@@ -709,7 +721,7 @@ app.post('/api/chat', async (req, res) => {
   } catch (e) { res.status(e.status || 500).json({ error: e.message || 'Coach is unavailable right now.' }); }
 });
 
-app.post('/api/estimate-food', async (req, res) => {
+app.post('/api/estimate-food', requireAuth, async (req, res) => {
   if (!aiGuard(req, res)) return;
   const description = String(req.body.description || '').trim();
   if (!description) return res.status(400).json({ error: 'Describe the food first.' });
@@ -724,7 +736,7 @@ Estimate realistic values for the WHOLE described amount. If no quantity is give
   } catch (e) { res.status(e.status || 500).json({ error: e.message || 'Estimate failed' }); }
 });
 
-app.post('/api/insight', async (req, res) => {
+app.post('/api/insight', requireAuth, async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
     const system = `You are this person's personal life coach. Based on their recent tracking data, write ONE short, specific, motivating insight for today — at most 2 sentences (~45 words). Reference their real numbers or patterns when you can. End with a tiny concrete action if it fits. Output only the insight sentence(s), no markdown or preamble.`;
@@ -735,7 +747,7 @@ app.post('/api/insight', async (req, res) => {
 });
 
 // ── Today's Game Plan: concrete next actions (works from day one — fixes cold start) ──
-app.post('/api/plan', async (req, res) => {
+app.post('/api/plan', requireAuth, async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
     const system = `You are this person's personal coach and strategist. From their goals and tracking data, give them a short, concrete GAME PLAN for TODAY — the specific next actions that move them toward their goals.
@@ -751,7 +763,7 @@ Rules:
 });
 
 // ── Patterns: ONE cross-domain connection only a whole-life app could see ──
-app.post('/api/patterns', async (req, res) => {
+app.post('/api/patterns', requireAuth, async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
     const system = `You are this person's personal life coach with a rare advantage: you see EVERY area of their life at once — training, income/money, nutrition, weight, reading, networking, habits, mood notes. Find ONE genuine CROSS-DOMAIN connection in their data that a single-purpose app could never see: a way one area appears to affect another.
@@ -768,7 +780,7 @@ Rules:
 });
 
 // ── Weekly Life Review: the Sunday ritual across every pillar ──
-app.post('/api/review', async (req, res) => {
+app.post('/api/review', requireAuth, async (req, res) => {
   if (!aiGuard(req, res)) return;
   try {
     const system = `You are this person's personal chief-of-staff and coach. Write their WEEKLY LIFE REVIEW from their tracking data across every area of life. Make it feel personal and earned — reference their real numbers.

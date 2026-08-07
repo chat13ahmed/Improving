@@ -1653,6 +1653,30 @@ A.state.data = _iBase();
     const stillBody = await stillThere.json();
     ok('data cap: the rejected save did NOT overwrite good data', stillThere.status === 200 && !stillBody.junk && stillBody.profile.name === 'Cap');
 
+    // ── AI endpoints must require an account (cost-exhaustion guard) ──
+    // Every one of these bills OUR provider key. Before requireAuth, a stranger
+    // with a proxy pool could spend the whole AI budget with no account at all.
+    const AI_ROUTES = ['/api/analyze', '/api/analyze-stream', '/api/chat', '/api/estimate-food',
+                       '/api/insight', '/api/plan', '/api/patterns', '/api/review'];
+    const anonCodes = [];
+    for (const p of AI_ROUTES) {
+      const r = await fetch(base + p, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: 'hi' }], data: {} })
+      });
+      anonCodes.push(p + ':' + r.status);
+    }
+    ok('AI auth: every AI endpoint rejects an anonymous caller with 401',
+      anonCodes.every(s => s.endsWith(':401')), anonCodes.join(' '));
+    // …and the guard did not simply break them: an AUTHENTICATED caller gets past
+    // requireAuth and reaches aiGuard, which answers NO_KEY (400) with no key set.
+    const authedAi = await fetch(base + '/api/chat', {
+      method: 'POST', headers: authHdr,
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'hi' }], data: {} })
+    });
+    ok('AI auth: an authenticated caller passes auth and reaches the AI guard',
+      authedAi.status !== 401, 'got ' + authedAi.status);
+
     // Node's fetch keeps sockets alive; leaving them open when the suite calls
     // process.exit trips a libuv assertion on Windows. Drop them explicitly, then
     // yield a tick so the handles are fully released before the report exits —
