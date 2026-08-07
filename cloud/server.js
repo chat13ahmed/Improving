@@ -566,7 +566,7 @@ function getAIConfig(req) {
   if (provider === 'gemini') provider = 'google';
   if (provider === 'claude') provider = 'anthropic';
   if (!['anthropic', 'openai', 'google'].includes(provider)) provider = 'openai';   // "other" == OpenAI-compatible
-  const DEF = { anthropic: 'claude-sonnet-4-6', openai: 'gpt-4o-mini', google: 'gemini-1.5-flash' };
+  const DEF = { anthropic: 'claude-sonnet-5', openai: 'gpt-4o-mini', google: 'gemini-1.5-flash' };
   const model = String(h['x-ai-model'] || process.env.AI_MODEL || '').trim() || DEF[provider];
   const base = String(h['x-ai-base'] || process.env.AI_BASE_URL || '').trim().replace(/\/+$/, '');
   return { key, provider, model, base };
@@ -1358,4 +1358,4 @@ if (require.main === module) {
     .catch(err => { console.error('Startup failed:', err.message); process.exit(1); });
 }
 
-module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner, cleanMeal, cleanPost, resetLocked, recordResetFail, clearResetFails, preserveBillingFields, saveRateLimited };
+module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner, cleanMeal, cleanPost, resetLocked, recordResetFail, clearResetFails, preserveBillingFields, saveRateLimited, getAIConfig };

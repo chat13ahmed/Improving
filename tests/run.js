@@ -1653,6 +1653,13 @@ A.state.data = _iBase();
     const stillBody = await stillThere.json();
     ok('data cap: the rejected save did NOT overwrite good data', stillThere.status === 200 && !stillBody.junk && stillBody.profile.name === 'Cap');
 
+    // ── AI provider defaults: pin the model so it can't silently go stale ──
+    const cfgA = C.getAIConfig({ headers: { 'x-api-key': 'sk-ant-test' } });
+    ok('AI model: Anthropic default is a current Claude 5 model',
+      cfgA.provider === 'anthropic' && cfgA.model === 'claude-sonnet-5', cfgA.provider + '/' + cfgA.model);
+    const cfgH = C.getAIConfig({ headers: { 'x-api-key': 'sk-ant-test', 'x-ai-model': 'claude-opus-5' } });
+    ok('AI model: an explicit x-ai-model header still overrides the default', cfgH.model === 'claude-opus-5');
+
     // ── AI endpoints must require an account (cost-exhaustion guard) ──
     // Every one of these bills OUR provider key. Before requireAuth, a stranger
     // with a proxy pool could spend the whole AI budget with no account at all.
