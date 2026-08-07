@@ -1,0 +1,43 @@
+name: tests
+
+# Runs the full Onward suite (786 assertions) on every push and PR, so a
+# regression is caught here instead of on Render after a deploy.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:      # lets you re-run it by hand from the Actions tab
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 24 matches local dev. The suite uses the built-in node:sqlite for
+      # its real database round-trips, which needs a modern Node.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # Only the two runtime deps (express, @anthropic-ai/sdk) are needed —
+      # --omit=dev skips Electron, which is ~100MB and irrelevant to the tests.
+      - name: Install dependencies
+        run: npm install --omit=dev
+
+      # The suite boots the real Express app on an ephemeral port and does live
+      # HTTP + DB round-trips, so no extra services are required.
+      - name: Run test suite
+        run: node tests/run.js
+
+      # Guard the deploy target too: cloud/ is what Render actually installs
+      # (Root Directory = cloud), so a broken manifest there breaks production
+      # even when the tests above pass.
+      - name: Verify the deployed backend's manifest and syntax
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('cloud/package.json','utf8'))"
+          node --check cloud/server.js
+          node --check cloud/db.js
+          node --check public/app.js
