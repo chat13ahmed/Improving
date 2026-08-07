@@ -1670,6 +1670,46 @@ A.state.data = _iBase();
     const stillBody = await stillThere.json();
     ok('data cap: the rejected save did NOT overwrite good data', stillThere.status === 200 && !stillBody.junk && stillBody.profile.name === 'Cap');
 
+    // ── Error log: failures must be recorded, and GROUPED not flooded ──
+    // Same singleton the running server uses, so these assertions see its writes.
+    const DBm = require(path.join(__dirname, '..', 'cloud', 'db.js'));
+    await DBm.clearErrors();
+    await DBm.logError({ sig: 'route|GET /api/x|boom', kind: 'route', route: 'GET /api/x', message: 'boom', stack: 'at foo', userId: null });
+    ok('errors: a logged error is stored', (await DBm.errorCount()) === 1);
+    await DBm.logError({ sig: 'route|GET /api/x|boom', kind: 'route', route: 'GET /api/x', message: 'boom', stack: 'at foo' });
+    await DBm.logError({ sig: 'route|GET /api/x|boom', kind: 'route', route: 'GET /api/x', message: 'boom', stack: 'at foo' });
+    ok('errors: repeats GROUP into one row instead of flooding', (await DBm.errorCount()) === 1);
+    const grouped = (await DBm.listErrors(10))[0];
+    ok('errors: the group counts every occurrence', grouped.count === 3, 'count=' + grouped.count);
+    ok('errors: the group keeps route, message and stack', grouped.route === 'GET /api/x' && grouped.message === 'boom' && /at foo/.test(grouped.stack || ''));
+    // Explicit timestamps: logging twice in the same millisecond would otherwise
+    // make "newest first" a coin flip rather than a real assertion.
+    const _tNew = Date.now() + 5000;
+    await DBm.logError({ sig: 'route|GET /api/y|other', kind: 'route', route: 'GET /api/y', message: 'other', at: _tNew });
+    ok('errors: a different failure is its own group', (await DBm.errorCount()) === 2);
+    ok('errors: newest group is listed first', (await DBm.listErrors(10))[0].message === 'other');
+    await DBm.pruneErrors(0, _tNew + 1000);
+    ok('errors: prune clears out old groups', (await DBm.errorCount()) === 0);
+
+    // The error log is owner-only: a normal account must not read stacks.
+    const errRes = await fetch(base + '/api/admin/errors', { headers: authHdr });
+    ok('errors: a non-owner account cannot read the error log', errRes.status === 403, 'got ' + errRes.status);
+    const errAnon = await fetch(base + '/api/admin/errors');
+    ok('errors: an anonymous caller cannot read the error log', errAnon.status === 401, 'got ' + errAnon.status);
+    // Client crash reporting also requires an account (no anonymous writes).
+    const cerrAnon = await fetch(base + '/api/client-error', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: 'x' })
+    });
+    ok('errors: client crash reporting requires an account', cerrAnon.status === 401, 'got ' + cerrAnon.status);
+    await DBm.clearErrors();
+    const cerrAuthed = await fetch(base + '/api/client-error', {
+      method: 'POST', headers: authHdr, body: JSON.stringify({ message: 'TypeError: x is not a function', stack: 'at render' })
+    });
+    ok('errors: an authenticated client crash IS recorded', cerrAuthed.status === 200 && (await DBm.errorCount()) === 1);
+    ok('errors: the client crash is tagged as a client error',
+      (await DBm.listErrors(5))[0].kind === 'client');
+    await DBm.clearErrors();
+
     // ── AI provider defaults: pin the model so it can't silently go stale ──
     const cfgA = C.getAIConfig({ headers: { 'x-api-key': 'sk-ant-test' } });
     ok('AI model: Anthropic default is a current Claude 5 model',

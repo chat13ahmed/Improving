@@ -88,6 +88,13 @@ function sqliteImpl() {
       db.exec(`CREATE TABLE IF NOT EXISTS rate_limits (
         key TEXT PRIMARY KEY, count INTEGER NOT NULL, window_start INTEGER NOT NULL
       )`);
+      // Errors, GROUPED by signature rather than one row per occurrence — a
+      // failing loop would otherwise flood the table and bury everything else.
+      db.exec(`CREATE TABLE IF NOT EXISTS error_log (
+        sig TEXT PRIMARY KEY, kind TEXT NOT NULL, route TEXT, message TEXT,
+        stack TEXT, user_id INTEGER, count INTEGER NOT NULL DEFAULT 1,
+        first_at INTEGER NOT NULL, last_at INTEGER NOT NULL
+      )`);
       // ── Collective-knowledge social layer (groups, notes, likes, replies, flags, notifications) ──
       db.exec(`CREATE TABLE IF NOT EXISTS reading_groups (
         id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
@@ -170,6 +177,24 @@ function sqliteImpl() {
     async rateClear(key) { db.prepare('DELETE FROM rate_limits WHERE key=?').run(String(key)); },
     async ratePrune(olderThanMs, now) {
       db.prepare('DELETE FROM rate_limits WHERE window_start < ?').run((now || Date.now()) - olderThanMs);
+    },
+    // ── Error log (grouped by signature) ──
+    async logError(e) {
+      const t = e.at || Date.now();
+      db.prepare(`INSERT INTO error_log(sig,kind,route,message,stack,user_id,count,first_at,last_at)
+        VALUES(?,?,?,?,?,?,1,?,?)
+        ON CONFLICT(sig) DO UPDATE SET
+          count = error_log.count + 1, last_at = ?, stack = COALESCE(excluded.stack, error_log.stack)`)
+        .run(e.sig, e.kind, e.route || null, e.message || null, e.stack || null,
+             e.userId != null ? Number(e.userId) : null, t, t, t);
+    },
+    async listErrors(limit) {
+      return db.prepare('SELECT * FROM error_log ORDER BY last_at DESC LIMIT ?').all(Math.min(200, limit || 50));
+    },
+    async errorCount() { return db.prepare('SELECT COUNT(*) AS n FROM error_log').get().n | 0; },
+    async clearErrors() { db.prepare('DELETE FROM error_log').run(); },
+    async pruneErrors(olderThanMs, now) {
+      db.prepare('DELETE FROM error_log WHERE last_at < ?').run((now || Date.now()) - olderThanMs);
     },
     async updatePassword(id, salt, hash) { db.prepare('UPDATE users SET pw_salt=?, pw_hash=? WHERE id=?').run(salt, hash, id); },
     async setSecurity(id, q, salt, hash) { db.prepare('UPDATE users SET sec_question=?, sec_salt=?, sec_hash=? WHERE id=?').run(q, salt, hash, id); },
@@ -362,6 +387,12 @@ function pgImpl() {
       // and still hold when more than one instance is running.
       await q(`CREATE TABLE IF NOT EXISTS rate_limits (
                key TEXT PRIMARY KEY, count INTEGER NOT NULL, window_start BIGINT NOT NULL)`);
+      // Errors, GROUPED by signature rather than one row per occurrence — a
+      // failing loop would otherwise flood the table and bury everything else.
+      await q(`CREATE TABLE IF NOT EXISTS error_log (
+               sig TEXT PRIMARY KEY, kind TEXT NOT NULL, route TEXT, message TEXT,
+               stack TEXT, user_id BIGINT, count INTEGER NOT NULL DEFAULT 1,
+               first_at BIGINT NOT NULL, last_at BIGINT NOT NULL)`);
       // ── Collective-knowledge social layer ──
       await q(`CREATE TABLE IF NOT EXISTS reading_groups (id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL,
                owner_id BIGINT REFERENCES users(id) ON DELETE CASCADE, invite_code TEXT UNIQUE, created_at TIMESTAMPTZ DEFAULT now())`);
@@ -418,6 +449,25 @@ function pgImpl() {
     async rateClear(key) { await q('DELETE FROM rate_limits WHERE key=$1', [String(key)]); },
     async ratePrune(olderThanMs, now) {
       await q('DELETE FROM rate_limits WHERE window_start < $1', [(now || Date.now()) - olderThanMs]);
+    },
+    // ── Error log (grouped by signature) ──
+    async logError(e) {
+      const t = e.at || Date.now();
+      await q(`INSERT INTO error_log(sig,kind,route,message,stack,user_id,count,first_at,last_at)
+        VALUES($1,$2,$3,$4,$5,$6,1,$7,$7)
+        ON CONFLICT (sig) DO UPDATE SET
+          count = error_log.count + 1, last_at = $7, stack = COALESCE(EXCLUDED.stack, error_log.stack)`,
+        [e.sig, e.kind, e.route || null, e.message || null, e.stack || null,
+         e.userId != null ? Number(e.userId) : null, t]);
+    },
+    async listErrors(limit) {
+      const r = await q('SELECT * FROM error_log ORDER BY last_at DESC LIMIT $1', [Math.min(200, limit || 50)]);
+      return r.rows;
+    },
+    async errorCount() { const r = await q('SELECT COUNT(*) AS n FROM error_log'); return Number(r.rows[0].n) | 0; },
+    async clearErrors() { await q('DELETE FROM error_log'); },
+    async pruneErrors(olderThanMs, now) {
+      await q('DELETE FROM error_log WHERE last_at < $1', [(now || Date.now()) - olderThanMs]);
     },
     async updatePassword(id, salt, hash) { await q('UPDATE users SET pw_salt=$1, pw_hash=$2 WHERE id=$3', [salt, hash, id]); },
     async setSecurity(id, ques, salt, hash) { await q('UPDATE users SET sec_question=$1, sec_salt=$2, sec_hash=$3 WHERE id=$4', [ques, salt, hash, id]); },
@@ -606,6 +656,11 @@ module.exports = {
   rateCount: (k, w, n) => impl.rateCount(k, w, n),
   rateClear: (k) => impl.rateClear(k),
   ratePrune: (ms, n) => impl.ratePrune(ms, n),
+  logError: (e) => impl.logError(e),
+  listErrors: (l) => impl.listErrors(l),
+  errorCount: () => impl.errorCount(),
+  clearErrors: () => impl.clearErrors(),
+  pruneErrors: (ms, n) => impl.pruneErrors(ms, n),
   flagSharedMeal: (i, u) => impl.flagSharedMeal(i, u),
   deleteSharedMeal: (i, u, f) => impl.deleteSharedMeal(i, u, f),
   createPost: (p) => impl.createPost(p),

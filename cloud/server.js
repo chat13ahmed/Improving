@@ -163,8 +163,31 @@ async function clearResetFails(userId) { await DB.rateClear('reset:' + userId); 
 // open — important for the test suite and for a clean shutdown.
 const ratePruneTimer = setInterval(() => {
   DB.ratePrune(2 * 3600000).catch(() => {});
+  DB.pruneErrors(30 * 86400000).catch(() => {});   // keep a month of errors
 }, 30 * 60000);
 if (ratePruneTimer.unref) ratePruneTimer.unref();
+
+// ── Error logging ─────────────────────────────────────────────────────
+// 36 catch blocks used to return 500 and throw the reason away, so a failure in
+// production was invisible: no stack, no count, no idea it happened. Errors are
+// grouped by signature (kind+route+message) so a hot failing loop increments one
+// row instead of flooding the table.
+//
+// This must NEVER throw or reject: it runs inside catch blocks, and a logger
+// that fails would turn a handled 500 into an unhandled crash.
+function logError(kind, err, req) {
+  try {
+    const e = err || {};
+    const message = String(e.message || e || 'unknown').slice(0, 500);
+    const route = req ? String((req.method || '') + ' ' + (req.path || req.url || '')).slice(0, 200) : null;
+    const stack = e.stack ? String(e.stack).slice(0, 4000) : null;
+    // Strip digits from the signature so /api/posts/1 and /api/posts/2 group.
+    const sig = (kind + '|' + (route || '-') + '|' + message).replace(/\d+/g, 'N').slice(0, 300);
+    console.error('[' + kind + '] ' + (route || '') + ' — ' + message);
+    const p = DB.logError({ sig, kind, route, message, stack, userId: req && req.userId });
+    if (p && p.catch) p.catch(() => {});
+  } catch (_) { /* logging must never break the caller */ }
+}
 
 // ── App ──
 const app = express();
@@ -340,7 +363,7 @@ app.post('/api/login', async (req, res) => {
     if (!u || !verifyPassword(password, u.pw_salt, u.pw_hash)) return res.status(401).json({ error: 'Wrong username or password.' });
     if (!(await DB.getData(u.id))) await DB.saveData(u.id, defaultData(), 1);
     issueSession(req, res, u, { hasSecurity: !!u.sec_question });
-  } catch (e) { res.status(500).json({ error: 'Login failed' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Login failed' }); }
 });
 
 // Logout now actually revokes the session: bumping the token version invalidates
@@ -369,7 +392,7 @@ app.post('/api/forgot/question', async (req, res) => {
     // rate limit above is what stops that being farmed at scale.
     if (!u || !u.sec_question) return res.status(404).json({ error: 'No security-question reset is available for that account.' });
     res.json({ question: u.sec_question });
-  } catch (e) { res.status(500).json({ error: 'Error' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Error' }); }
 });
 
 app.post('/api/forgot/reset', async (req, res) => {
@@ -392,7 +415,7 @@ app.post('/api/forgot/reset', async (req, res) => {
     await DB.updatePassword(u.id, salt, hash);
     await DB.bumpTokenVersion(u.id);   // a reset kills every existing session — they log in fresh
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: 'Error' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Error' }); }
 });
 
 app.post('/api/change-password', requireAuth, async (req, res) => {
@@ -408,7 +431,7 @@ app.post('/api/change-password', requireAuth, async (req, res) => {
     await DB.bumpTokenVersion(u.id);
     const tv = await DB.getTokenVersion(u.id);
     issueSession(req, res, { id: u.id, username: u.username, token_version: tv }, { success: true });
-  } catch (e) { res.status(500).json({ error: 'Error' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Error' }); }
 });
 
 // Permanently delete the signed-in user's account and ALL their data. Required
@@ -423,7 +446,7 @@ app.delete('/api/account', requireAuth, async (req, res) => {
     const ok = await DB.deleteUser(u.id);
     if (!ok) return res.status(500).json({ error: 'Could not delete the account.' });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: 'Could not delete the account.' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Could not delete the account.' }); }
 });
 
 app.post('/api/set-security', requireAuth, async (req, res) => {
@@ -437,7 +460,7 @@ app.post('/api/set-security', requireAuth, async (req, res) => {
     const s = hashPassword(normalizeAnswer(ans));
     await DB.setSecurity(u.id, ques, s.salt, s.hash);
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: 'Error' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Error' }); }
 });
 
 // ── Per-account data (auth required). Backward compatible (raw object) AND
@@ -448,7 +471,7 @@ app.get('/api/data', requireAuth, async (req, res) => {
     if (!d) { await DB.saveData(req.userId, defaultData(), 1); return res.json(defaultData()); }
     res.set('X-Data-Version', String(d.version));
     res.json(d.data);
-  } catch (e) { res.status(500).json({ error: 'Failed to read data' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Failed to read data' }); }
 });
 
 // Fields the SERVER owns. The data blob is otherwise the client's to shape, but
@@ -499,7 +522,7 @@ app.post('/api/data', requireAuth, async (req, res) => {
     const newV = curV + 1;
     await DB.saveData(req.userId, safe, newV);
     res.json({ success: true, version: newV });
-  } catch (e) { res.status(500).json({ error: 'Failed to save data' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Failed to save data' }); }
 });
 
 // ── AI (server-side key, rate-limited; no user key required) ──
@@ -518,7 +541,7 @@ app.post('/api/admin/grant-pro', requireAuth, async (req, res) => {
     d.data.profile.pro = req.body.pro !== false;
     await DB.saveData(u.id, d.data, d.version + 1);
     res.json({ success: true, username: u.username, pro: d.data.profile.pro });
-  } catch (e) { res.status(500).json({ error: 'Failed to update.' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Failed to update.' }); }
 });
 app.post('/api/settings', (req, res) => res.json({ success: true }));
 
@@ -799,7 +822,7 @@ app.post('/api/push/subscribe', requireAuth, async (req, res) => {
     if (!sub || !sub.endpoint) return res.status(400).json({ error: 'Bad subscription' });
     await DB.savePushSub(req.userId, sub);
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: 'Could not save subscription' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Could not save subscription' }); }
 });
 
 app.post('/api/push/test', requireAuth, async (req, res) => {
@@ -809,7 +832,7 @@ app.post('/api/push/test', requireAuth, async (req, res) => {
     let sent = 0;
     for (const s of subs) { try { await push.sendPush(s.sub, { title: 'Test notification', body: 'Push is working — see you every day!', url: './' }); sent++; } catch (e) {} }
     res.json({ sent });
-  } catch (e) { res.status(500).json({ error: 'Send failed' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Send failed' }); }
 });
 
 // ── Community Meals (user-shared, copyable; deliberately NOT merged into the
@@ -860,7 +883,7 @@ app.get('/api/community/meals', requireAuth, async (req, res) => {
       photo: m.photo || '', uses: m.uses || 0, author: m.author_name || 'Someone',
       mine: String(m.user_id) === String(req.userId)
     })) });
-  } catch (e) { res.status(500).json({ error: 'Could not load community meals' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Could not load community meals' }); }
 });
 app.post('/api/community/meals', requireAuth, async (req, res) => {
   try {
@@ -870,19 +893,19 @@ app.post('/api/community/meals', requireAuth, async (req, res) => {
     const author = String(req.body.author || req.username || '').trim().slice(0, 40);
     const id = await DB.createSharedMeal({ user_id: req.userId, author_name: author, ...m });
     res.json({ success: true, id });
-  } catch (e) { res.status(500).json({ error: 'Could not share meal' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Could not share meal' }); }
 });
 app.post('/api/community/meals/:id/use', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error: 'bad id' });
   try { await DB.incSharedMealUse(id); res.json({ success: true }); }
-  catch (e) { res.status(500).json({ error: 'failed' }); }
+  catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.post('/api/community/meals/:id/report', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error: 'bad id' });
   try { await DB.flagSharedMeal(id, req.userId); res.json({ success: true }); }
-  catch (e) { res.status(500).json({ error: 'failed' }); }
+  catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.delete('/api/community/meals/:id', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
@@ -891,7 +914,7 @@ app.delete('/api/community/meals/:id', requireAuth, async (req, res) => {
     const ok = await DB.deleteSharedMeal(id, req.userId, isOwner(req.username));
     if (!ok) return res.status(403).json({ error: 'Not allowed.' });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: 'failed' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 
 // ── Community feed: thoughts / training programs / meals ──────────────
@@ -950,7 +973,7 @@ app.get('/api/community/posts', requireAuth, async (req, res) => {
       likeCount: (p.likes || []).length, likedByMe: (p.likes || []).map(String).includes(me),
       mine: String(p.user_id) === me
     })) });
-  } catch (e) { res.status(500).json({ error: 'Could not load the community feed' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Could not load the community feed' }); }
 });
 app.post('/api/community/posts', requireAuth, async (req, res) => {
   try {
@@ -959,19 +982,19 @@ app.post('/api/community/posts', requireAuth, async (req, res) => {
     const author = String(req.body.author || req.username || '').trim().slice(0, 40);
     const id = await DB.createPost({ user_id: req.userId, author_name: author, ...p });
     res.json({ success: true, id });
-  } catch (e) { res.status(500).json({ error: 'Could not post' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Could not post' }); }
 });
 app.post('/api/community/posts/:id/like', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error: 'bad id' });
   try { const r = await DB.togglePostLike(id, req.userId); if (!r) return res.status(404).json({ error: 'not found' }); res.json({ success: true, ...r }); }
-  catch (e) { res.status(500).json({ error: 'failed' }); }
+  catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.post('/api/community/posts/:id/report', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error: 'bad id' });
   try { await DB.flagPost(id, req.userId); res.json({ success: true }); }
-  catch (e) { res.status(500).json({ error: 'failed' }); }
+  catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.delete('/api/community/posts/:id', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
@@ -980,7 +1003,7 @@ app.delete('/api/community/posts/:id', requireAuth, async (req, res) => {
     const ok = await DB.deletePost(id, req.userId, isOwner(req.username));
     if (!ok) return res.status(403).json({ error: 'Not allowed.' });
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: 'failed' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 
 // ── Reading groups + collective notes (upvotes · threaded replies · confusion flags) ──
@@ -1015,19 +1038,19 @@ app.post('/api/groups', requireAuth, async (req, res) => {
     const invite = crypto.randomBytes(5).toString('hex');
     const id = await DB.createGroup({ name, owner_id: req.userId, invite_code: invite });   // creator becomes owner + member
     res.status(201).json({ id, name, invite_code: invite });
-  } catch (e) { res.status(500).json({ error: 'failed' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.post('/api/groups/:id/join', requireAuth, async (req, res) => {
   const groupId = parseInt(req.params.id, 10);
   if (!groupId) return res.status(400).json({ error: 'bad id' });
   try { await DB.addGroupMember(groupId, req.userId, 'member'); res.json({ success: true }); }
-  catch (e) { res.status(500).json({ error: 'failed' }); }
+  catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.post('/api/groups/:id/notify', requireAuth, async (req, res) => {   // toggle notify_enabled
   const groupId = parseInt(req.params.id, 10);
   if (!groupId) return res.status(400).json({ error: 'bad id' });
   try { await DB.setNotifyEnabled(groupId, req.userId, req.body.enabled !== false); res.json({ success: true }); }
-  catch (e) { res.status(500).json({ error: 'failed' }); }
+  catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.get('/api/groups/:id/notes', requireAuth, async (req, res) => {
   const groupId = parseInt(req.params.id, 10);
@@ -1035,7 +1058,7 @@ app.get('/api/groups/:id/notes', requireAuth, async (req, res) => {
   try {
     if (!(await DB.getMembership(groupId, req.userId))) return res.status(403).json({ error: 'Not a group member.' });
     res.json(await DB.listGroupNotes(groupId));
-  } catch (e) { res.status(500).json({ error: 'failed' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 
 app.post('/api/notes', requireAuth, async (req, res) => {
@@ -1051,7 +1074,7 @@ app.post('/api/notes', requireAuth, async (req, res) => {
       quote: String(req.body.quote || '').trim() || null, body
     });
     res.status(201).json({ id });
-  } catch (e) { res.status(500).json({ error: 'failed' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.post('/api/notes/:id/like', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
@@ -1060,13 +1083,13 @@ app.post('/api/notes/:id/like', requireAuth, async (req, res) => {
     if (!(await DB.getNote(id))) return res.status(404).json({ error: 'not found' });
     const r = await DB.toggleNoteLike(id, req.userId);
     res.json({ success: true, liked: r.liked, upvoteCount: r.count });
-  } catch (e) { res.status(500).json({ error: 'failed' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.get('/api/notes/:id/replies', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error: 'bad id' });
   try { res.json(nestReplies(await DB.listReplies(id))); }
-  catch (e) { res.status(500).json({ error: 'failed' }); }
+  catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.post('/api/notes/:id/replies', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
@@ -1077,7 +1100,7 @@ app.post('/api/notes/:id/replies', requireAuth, async (req, res) => {
     if (!(await DB.getNote(id))) return res.status(404).json({ error: 'not found' });
     const replyId = await DB.createReply({ note_id: id, parent_id: parseInt(req.body.parentId, 10) || null, user_id: req.userId, author_name: req.username, body });
     res.status(201).json({ id: replyId });
-  } catch (e) { res.status(500).json({ error: 'failed' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 // Confusion flag → distinct-user count; at 3, mark needs_clarification and notify the group once.
 app.post('/api/notes/:id/confuse', requireAuth, async (req, res) => {
@@ -1093,19 +1116,19 @@ app.post('/api/notes/:id/confuse', requireAuth, async (req, res) => {
       }, req.userId);
     }
     res.json({ success: true, confusionCount: r.count, needsClarification: r.count >= 3 });
-  } catch (e) { res.status(500).json({ error: 'failed' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 
 // In-app notifications (badge on page load — polling, no sockets)
 app.get('/api/notifications', requireAuth, async (req, res) => {
-  try { res.json(await DB.listNotifications(req.userId, 30)); } catch (e) { res.status(500).json({ error: 'failed' }); }
+  try { res.json(await DB.listNotifications(req.userId, 30)); } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.get('/api/notifications/count', requireAuth, async (req, res) => {
-  try { res.json({ unread: await DB.unreadCount(req.userId) }); } catch (e) { res.status(500).json({ error: 'failed' }); }
+  try { res.json({ unread: await DB.unreadCount(req.userId) }); } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.post('/api/notifications/read', requireAuth, async (req, res) => {
   try { await DB.markNotificationsRead(req.userId, Array.isArray(req.body.ids) ? req.body.ids : null); res.json({ success: true }); }
-  catch (e) { res.status(500).json({ error: 'failed' }); }
+  catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 
 // Owner-only: how many devices a broadcast would reach.
@@ -1159,6 +1182,35 @@ app.delete('/api/admin/feedback/:id', requireAuth, async (req, res) => {
 });
 
 // Owner-only: live usage numbers (how many people use it & how active they are).
+// Owner-only: read the error log. Stacks can contain internals, so this is
+// gated exactly like the other admin routes.
+app.get('/api/admin/errors', requireAuth, async (req, res) => {
+  if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });
+  try {
+    const rows = await DB.listErrors(Number(req.query.limit) || 50);
+    res.json({ errors: rows, total: await DB.errorCount() });
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
+});
+app.post('/api/admin/errors/clear', requireAuth, async (req, res) => {
+  if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });
+  try { await DB.clearErrors(); res.json({ success: true }); }
+  catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
+});
+// Client-side crashes (the white-screen kind) are the failures users actually
+// notice, and the server never sees them. requireAuth + a per-account quota so
+// this can't be used as an anonymous write endpoint — the same mistake the AI
+// routes had.
+app.post('/api/client-error', requireAuth, async (req, res) => {
+  try {
+    if (await DB.rateHit('cerr:' + req.userId, 3600000) > 30) return res.json({ ok: true, throttled: true });
+    const b = req.body || {};
+    logError('client', {
+      message: String(b.message || 'client error').slice(0, 500),
+      stack: [b.source, b.stack].filter(Boolean).join('\n').slice(0, 4000)
+    }, req);
+    res.json({ ok: true });
+  } catch (e) { res.json({ ok: false }); }   // reporting must never surface an error
+});
 app.get('/api/admin/stats', requireAuth, async (req, res) => {
   if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });
   try {
@@ -1221,7 +1273,7 @@ app.get('/api/admin/stats', requireAuth, async (req, res) => {
       signups, pillars, features,
       recent: rows.slice(0, 25)
     });
-  } catch (e) { res.status(500).json({ error: 'Stats failed' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Stats failed' }); }
 });
 
 // Owner-only: push a custom notification to every subscribed device.
@@ -1239,7 +1291,7 @@ app.post('/api/admin/broadcast', requireAuth, async (req, res) => {
       catch (e) { failed++; if (e && (e.statusCode === 404 || e.statusCode === 410)) { try { await DB.deletePushSub(s.sub.endpoint); } catch {} } }
     }
     res.json({ sent, failed, devices: subs.length });
-  } catch (e) { res.status(500).json({ error: 'Broadcast failed' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Broadcast failed' }); }
 });
 
 // Called by an external cron (e.g. cron-job.org) every minute. Sends due reminders.
@@ -1341,11 +1393,32 @@ app.post('/api/cron/tick', async (req, res) => {
       if (changed) await DB.saveDataMeta(uid, data, d.version);
     }
     res.json({ sent });
-  } catch (e) { res.status(500).json({ error: 'cron failed' }); }
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'cron failed' }); }
 });
 
 // SPA fallback → serve the client for any non-API route
 app.get(/^(?!\/api\/).*/, (req, res) => res.sendFile(path.join(CLIENT_DIR, 'index.html')));
+
+// ── Catch-all error handler (must be LAST, and must take 4 args) ──────
+// Anything thrown synchronously in a handler, or passed to next(err), lands
+// here instead of dying silently. Express only treats a middleware as an error
+// handler if it declares all four parameters, so `next` stays even though it's
+// unused. Never leak a stack to the client.
+app.use((err, req, res, next) => {   // eslint-disable-line no-unused-vars
+  logError('unhandled', err, req);
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'Something went wrong on our side.' });
+});
+
+// A rejected promise with no catch, or a truly uncaught throw, would otherwise
+// vanish (or kill the process with nothing recorded). Log first, then let an
+// uncaught exception exit — Render restarts us, and continuing after one leaves
+// the process in an unknown state.
+process.on('unhandledRejection', (reason) => logError('unhandledRejection', reason, null));
+process.on('uncaughtException', (err) => {
+  logError('uncaughtException', err, null);
+  setTimeout(() => process.exit(1), 250);   // give the DB write a moment to land
+});
 
 if (require.main === module) {
   DB.init()

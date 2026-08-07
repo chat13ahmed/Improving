@@ -12930,9 +12930,53 @@ async function loadAdminConsole() {
     const j = await fetch('/api/admin/stats', { headers: authHeaders() }).then(r => r.json());
     if (!j || j.error) throw new Error(j && j.error);
     renderAdminConsole(j);
+    loadAdminErrors();   // appended after the stats so a failure here can't hide them
   } catch {
     if (body) body.innerHTML = '<div class="card"><p class="card-sub">Couldn\'t load your numbers — check your connection and hit Refresh.</p></div>';
   }
+}
+// Health panel: what's actually breaking in production. Grouped, newest first,
+// with an occurrence count — one row that says "×47" is the signal you want,
+// not 47 rows. Silence here is the good outcome.
+async function loadAdminErrors() {
+  const body = document.getElementById('adm-body');
+  if (!body) return;
+  let host = document.getElementById('adm-errors');
+  if (!host) { host = document.createElement('div'); host.id = 'adm-errors'; body.appendChild(host); }
+  host.innerHTML = '<div class="di-loading"><div class="spinner"></div><span>Checking for errors…</span></div>';
+  try {
+    const j = await fetch('/api/admin/errors?limit=40', { headers: authHeaders() }).then(r => r.json());
+    const rows = (j && j.errors) || [];
+    if (!rows.length) {
+      host.innerHTML = admSection('Errors', 'Nothing has failed recently — this is the boring, good state.',
+        '<p class="card-sub">No errors recorded. 🎉</p>');
+      return;
+    }
+    const fmt = (ms) => { const d = new Date(Number(ms)); return isNaN(d) ? '—' : d.toLocaleString(); };
+    host.innerHTML = admSection('Errors', rows.length + ' distinct problem' + (rows.length === 1 ? '' : 's') + ' — most recent first. Each row groups every occurrence.',
+      '<div class="adm-err-list">' + rows.map(r =>
+        '<div class="adm-err">' +
+          '<div class="adm-err-top">' +
+            '<span class="adm-err-kind adm-err-' + escapeAttr(String(r.kind || 'route')) + '">' + escapeHtml(String(r.kind || 'route')) + '</span>' +
+            '<span class="adm-err-count">×' + (Number(r.count) || 1) + '</span>' +
+            '<span class="adm-err-when">' + escapeHtml(fmt(r.last_at)) + '</span>' +
+          '</div>' +
+          '<div class="adm-err-msg">' + escapeHtml(String(r.message || '')) + '</div>' +
+          (r.route ? '<div class="adm-err-route">' + escapeHtml(String(r.route)) + '</div>' : '') +
+          (r.stack ? '<details class="adm-err-stack"><summary>Stack</summary><pre>' + escapeHtml(String(r.stack)) + '</pre></details>' : '') +
+        '</div>').join('') + '</div>' +
+      '<button type="button" class="btn btn-outline btn-sm" style="margin-top:12px" onclick="clearAdminErrors()">Clear the error log</button>');
+  } catch {
+    host.innerHTML = admSection('Errors', '', '<p class="card-sub">Couldn\'t load the error log.</p>');
+  }
+}
+async function clearAdminErrors() {
+  if (!(await uiConfirm({ title: 'Clear the error log?', message: 'This removes every recorded error. It only clears the log — it does not fix anything.', okText: 'Clear it' }))) return;
+  try {
+    await fetch('/api/admin/errors/clear', { method: 'POST', headers: authHeaders() });
+    showToast('Error log cleared', 'success');
+    loadAdminErrors();
+  } catch { showToast('Could not clear the log', 'error'); }
 }
 function admSection(title, sub, inner) {
   return '<div class="card adm-card"><div class="adm-card-head"><h3 class="card-title" style="margin-bottom:0">' + title + '</h3>' +
@@ -13362,6 +13406,34 @@ function setTheme(pref) {
   if (bg3dEnabled() && typeof buildScene3d === 'function') { document.getElementById('scene3d')?.remove(); buildScene3d(); } // recolour the 3D scene
   if (state && state.page === 'settings') renderSettingsPage();
   showToast('Theme set to ' + (pref === 'system' ? 'Auto' : pref[0].toUpperCase() + pref.slice(1)), 'success');
+}
+
+// ── Crash reporting ──────────────────────────────────────────────────
+// A thrown error in this SPA can leave a half-rendered or blank screen, and the
+// server never hears about it. Report it so failures are visible instead of
+// silently costing a user their session. Deliberately quiet: no user-facing
+// noise, capped per session, and it never reports when signed out (the endpoint
+// requires auth, so an anonymous POST would just 401 in a loop).
+let _errReports = 0;
+function reportClientError(message, source, stack) {
+  if (_errReports >= 5) return;              // don't spam on a render loop
+  if (!state || !state.user) return;         // endpoint requires an account
+  _errReports++;
+  try {
+    fetch('/api/client-error', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ message: String(message || '').slice(0, 500), source: String(source || ''), stack: String(stack || '').slice(0, 4000) })
+    }).catch(() => {});
+  } catch (e) { /* never let reporting throw */ }
+}
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('error', (ev) => {
+    reportClientError(ev.message, (ev.filename || '') + ':' + (ev.lineno || 0), ev.error && ev.error.stack);
+  });
+  window.addEventListener('unhandledrejection', (ev) => {
+    const r = ev.reason;
+    reportClientError((r && r.message) || String(r), 'unhandledrejection', r && r.stack);
+  });
 }
 
 init();

@@ -63,6 +63,11 @@ html { background: var(--bg); }
   --warning-bg: rgba(245,158,11,0.1);
   --danger:     #DC2626;
   --danger-bg:  rgba(220,38,38,0.1);
+  /* Text-safe variants (same idea as the pillar -ink colours above): the fills
+     are tuned for backgrounds, and as small text on this ground --warning is
+     only 1.9:1 and --danger 4.47:1 — both under the 4.5 minimum. */
+  --danger-ink:  #B91C1C;   /* 5.98:1 on --bg */
+  --warning-ink: #92400E;   /* 6.56:1 on --bg */
 
   /* ── Data (pillar identity) ──
      -color = the fill: charts, dots, bars, chip backgrounds.
@@ -175,6 +180,8 @@ html { background: var(--bg); }
   --warning-bg: rgba(251,191,36,0.12);
   --danger:     #F87171;
   --danger-bg:  rgba(248,113,113,0.12);
+  --danger-ink:  #F87171;   /* 6.81:1 on the dark ground */
+  --warning-ink: #FBBF24;   /* 11.28:1 — the fills already read well here */
   --gym-ink:     #F9A8D4;
   --food-ink:    #FDBA74;
   --network-ink: #93C5FD;
@@ -3449,6 +3456,32 @@ body.auth-active .fab-btn { display: none !important; }
 /* the "what is Onward" / demo links under the form */
 .auth-links { margin-top: 12px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
 .auth-links a, .auth-links button { color: var(--a-accent); font-weight: 700; font-size: 13px; }
+/* ── Admin: error log ────────────────────────────────────────────────
+   Monospace for the message and stack — these are read for exact strings,
+   not prose, so the proportional UI font actively hurts here. */
+.adm-err-list { display: flex; flex-direction: column; gap: 10px; }
+.adm-err { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg); }
+.adm-err-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.adm-err-kind { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+  padding: 2px 7px; border-radius: 999px; background: var(--surface2, var(--bg)); border: 1px solid var(--line); }
+/* Theme-aware INK tokens, not the fills and not raw hexes. Measured: a fixed
+   #DC2626 is 3.9:1 on the dark ground, and the amber fill is 1.9:1 on the light
+   one — both fail. No tint behind them, since tinting shifts the effective
+   ground and made light mode worse. */
+.adm-err-unhandled, .adm-err-uncaughtException,
+.adm-err-unhandledRejection { color: var(--danger-ink); border-color: var(--danger-ink); }
+.adm-err-client { color: var(--warning-ink); border-color: var(--warning-ink); }
+.adm-err-count { font-size: 12px; font-weight: 800; color: var(--text); }
+.adm-err-when { font-size: 12px; color: var(--muted); margin-left: auto; }
+.adm-err-msg { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px; line-height: 1.5; word-break: break-word; color: var(--text); }
+.adm-err-route { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.adm-err-stack { margin-top: 8px; }
+.adm-err-stack summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+.adm-err-stack pre { margin: 6px 0 0; padding: 8px 10px; overflow-x: auto; max-height: 220px;
+  background: var(--surface2, var(--bg)); border: 1px solid var(--line); border-radius: 8px;
+  font-size: 11.5px; line-height: 1.5; white-space: pre; }
+
 /* ── Accessibility utilities ─────────────────────────────────────────
    .sr-only hides content visually while keeping it in the accessibility
    tree. It must NOT use display:none or visibility:hidden — both remove
