@@ -3459,6 +3459,21 @@ body.auth-active .fab-btn { display: none !important; }
 /* the "what is Onward" / demo links under the form */
 .auth-links { margin-top: 12px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
 .auth-links a, .auth-links button { color: var(--a-accent); font-weight: 700; font-size: 13px; }
+/* ── Admin: AI spend leaderboard ─────────────────────────────────────
+   A bar per account, so a single dominant consumer is obvious at a glance
+   rather than something you have to compute from a column of numbers. */
+.adm-ai-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.adm-ai-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.adm-ai-rank { width: 18px; text-align: right; color: var(--muted); font-weight: 700; flex: none; }
+.adm-ai-name { min-width: 96px; max-width: 160px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adm-ai-bar { flex: 1 1 60px; height: 8px; border-radius: 4px; background: var(--surface2, var(--line)); overflow: hidden; min-width: 40px; }
+.adm-ai-bar i { display: block; height: 100%; background: var(--primary-solid, var(--primary)); }
+.adm-ai-num { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
+@media (max-width: 560px) {
+  .adm-ai-row { flex-wrap: wrap; }
+  .adm-ai-num { width: 100%; padding-left: 28px; }
+}
+
 /* ── Streak recovery ─────────────────────────────────────────────────
    Deliberately warm, not alarming: a broken streak is a nudge to return, not
    an error state. Amber accent rather than red, and no heavy fill. */

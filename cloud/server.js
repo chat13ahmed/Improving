@@ -596,6 +596,27 @@ function openaiMessages(system, messages) {
 }
 
 // One-shot completion → returns the assistant's text.
+// Each provider reports token usage under a different shape, so normalise before
+// recording. Only calls billed to OUR key are counted — a caller using their own
+// key is spending their own money, matching how the quota works.
+function usageFrom(provider, j) {
+  if (!j) return null;
+  if (provider === 'anthropic' && j.usage) return { in: j.usage.input_tokens | 0, out: j.usage.output_tokens | 0 };
+  if (provider === 'google' && j.usageMetadata) return { in: j.usageMetadata.promptTokenCount | 0, out: j.usageMetadata.candidatesTokenCount | 0 };
+  if (j.usage) return { in: j.usage.prompt_tokens | 0, out: j.usage.completion_tokens | 0 };   // OpenAI-compatible
+  return null;
+}
+// Never let accounting break a working AI response.
+function noteAIUsage(req, provider, j) {
+  try {
+    if (!req || !req.userId || usingOwnKey(req)) return;
+    const u = usageFrom(provider, j);
+    if (!u) return;
+    const day = new Date().toISOString().slice(0, 10);
+    const p = DB.recordAIUsage(req.userId, day, u.in, u.out);
+    if (p && p.catch) p.catch(() => {});
+  } catch (_) { /* telemetry must never surface */ }
+}
 async function aiComplete({ req, system, messages, maxTokens = 1024 }) {
   const { key, provider, model, base } = getAIConfig(req);
   if (provider === 'anthropic') {
@@ -606,6 +627,7 @@ async function aiComplete({ req, system, messages, maxTokens = 1024 }) {
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new AIError(r.status, (j.error && j.error.message) || 'AI request failed');
+    noteAIUsage(req, 'anthropic', j);
     return (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
   }
   if (provider === 'google') {
@@ -614,6 +636,7 @@ async function aiComplete({ req, system, messages, maxTokens = 1024 }) {
     const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ system_instruction: { parts: [{ text: sysToText(system) }] }, contents, generationConfig: { maxOutputTokens: maxTokens } }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new AIError(r.status, (j.error && j.error.message) || 'AI request failed');
+    noteAIUsage(req, 'google', j);
     const cand = j.candidates && j.candidates[0];
     return (((cand && cand.content && cand.content.parts) || []).map(p => p.text || '').join('')).trim();
   }
@@ -624,6 +647,7 @@ async function aiComplete({ req, system, messages, maxTokens = 1024 }) {
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new AIError(r.status, (j.error && j.error.message) || 'AI request failed');
+  noteAIUsage(req, 'openai', j);
   return ((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '').trim();
 }
 
@@ -1363,6 +1387,9 @@ app.get('/api/admin/stats', requireAuth, async (req, res) => {
       const d = new Date(Date.now() - i * DAY).toISOString().slice(0, 10);
       signups.push({ date: d, count: created.filter(x => x === d).length });
     }
+    // AI spend over the last 30 days, aggregated in SQL (cheap — one small table).
+    const aiSince = new Date(Date.now() - 30 * DAY).toISOString().slice(0, 10);
+    const [aiTotals, aiTop] = await Promise.all([DB.aiUsageTotals(aiSince), DB.aiTopUsers(aiSince, 10)]);
     const priceLabel = process.env.PRICE_LABEL || '$7.99/mo';
     const monthlyPrice = parseFloat((priceLabel.match(/[\d.]+/) || ['0'])[0]) || 0;
     res.json(adminStatsCache.set({
@@ -1377,7 +1404,10 @@ app.get('/api/admin/stats', requireAuth, async (req, res) => {
       new7: users.filter(u => createdWithin(u.created_at, 7)).length,
       new30: users.filter(u => createdWithin(u.created_at, 30)).length,
       signups, pillars, features,
-      recent: rows.slice(0, 25)
+      recent: rows.slice(0, 25),
+      // Who is actually costing money. Without this a heavy user quietly erodes
+      // margin and the first sign is the provider bill.
+      ai: { since: aiSince, totals: aiTotals, top: aiTop }
     }));
   } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Stats failed' }); }
 });
@@ -1544,4 +1574,4 @@ if (require.main === module) {
     .catch(err => { console.error('Startup failed:', err.message); process.exit(1); });
 }
 
-module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner, cleanMeal, cleanPost, resetLocked, recordResetFail, clearResetFails, preserveBillingFields, saveRateLimited, getAIConfig };
+module.exports = { app, defaultData, normalizeAnswer, hashPassword, verifyPassword, signJwt, verifyJwt, buildSystemPrompt, parseFoodEstimate, isOwner, cleanMeal, cleanPost, resetLocked, recordResetFail, clearResetFails, preserveBillingFields, saveRateLimited, getAIConfig, usageFrom };

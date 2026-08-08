@@ -13013,11 +13013,48 @@ async function loadAdminConsole() {
     const j = await fetch('/api/admin/stats', { headers: authHeaders() }).then(r => r.json());
     if (!j || j.error) throw new Error(j && j.error);
     renderAdminConsole(j);
+    renderAdminAiCost(j);
     loadAdminErrors();   // appended after the stats so a failure here can't hide them
   } catch {
     if (body) body.innerHTML = '<div class="card"><p class="card-sub">Couldn\'t load your numbers — check your connection and hit Refresh.</p></div>';
   }
 }
+// AI spend panel: which accounts are actually costing money. Without this the
+// first sign of a margin problem is the provider's invoice.
+function renderAdminAiCost(j) {
+  const body = document.getElementById('adm-body');
+  const ai = j && j.ai;
+  if (!body || !ai) return;
+  let host = document.getElementById('adm-ai');
+  if (!host) { host = document.createElement('div'); host.id = 'adm-ai'; body.appendChild(host); }
+  const t = ai.totals || {};
+  const tok = (t.in_tokens || 0) + (t.out_tokens || 0);
+  const n = (x) => (Number(x) || 0).toLocaleString();
+  if (!t.calls) {
+    host.innerHTML = admSection('AI spend · last 30 days',
+      'Nothing recorded yet — either no one has used the coach, or everyone is using their own key.',
+      '<p class="card-sub">No AI calls billed to your key.</p>');
+    return;
+  }
+  host.innerHTML = admSection('AI spend · last 30 days',
+    n(t.calls) + ' calls from ' + n(t.users) + ' account' + (t.users === 1 ? '' : 's') + ' · ' + n(tok) + ' tokens total. Only calls billed to YOUR key are counted.',
+    // admMini takes (label, value) in that order.
+    '<div class="adm-mini">' +
+      admMini('calls', n(t.calls)) + admMini('input tokens', n(t.in_tokens)) +
+      admMini('output tokens', n(t.out_tokens)) + admMini('accounts', n(t.users)) +
+    '</div>' +
+    '<div class="adm-ai-list">' + (ai.top || []).map((r, i) => {
+      const rt = (Number(r.in_tokens) || 0) + (Number(r.out_tokens) || 0);
+      const pct = tok ? Math.round(rt / tok * 100) : 0;
+      return '<div class="adm-ai-row">' +
+        '<span class="adm-ai-rank">' + (i + 1) + '</span>' +
+        '<span class="adm-ai-name">' + escapeHtml(String(r.username || ('user ' + r.user_id))) + '</span>' +
+        '<span class="adm-ai-bar"><i style="width:' + pct + '%"></i></span>' +
+        '<span class="adm-ai-num">' + n(rt) + ' tok · ' + n(r.calls) + ' calls</span>' +
+        '</div>';
+    }).join('') + '</div>');
+}
+
 // Health panel: what's actually breaking in production. Grouped, newest first,
 // with an occurrence count — one row that says "×47" is the signal you want,
 // not 47 rows. Silence here is the good outcome.

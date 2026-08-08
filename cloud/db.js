@@ -95,6 +95,13 @@ function sqliteImpl() {
         stack TEXT, user_id INTEGER, count INTEGER NOT NULL DEFAULT 1,
         first_at INTEGER NOT NULL, last_at INTEGER NOT NULL
       )`);
+      // AI spend per user per day. Rolled up rather than one row per call, so it
+      // stays small; per-day so a sudden spike is visible rather than averaged away.
+      db.exec(`CREATE TABLE IF NOT EXISTS ai_usage (
+        user_id INTEGER NOT NULL, day TEXT NOT NULL, calls INTEGER NOT NULL DEFAULT 0,
+        in_tokens INTEGER NOT NULL DEFAULT 0, out_tokens INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (user_id, day)
+      )`);
       // ── Collective-knowledge social layer (groups, notes, likes, replies, flags, notifications) ──
       db.exec(`CREATE TABLE IF NOT EXISTS reading_groups (
         id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
@@ -195,6 +202,27 @@ function sqliteImpl() {
     async clearErrors() { db.prepare('DELETE FROM error_log').run(); },
     async pruneErrors(olderThanMs, now) {
       db.prepare('DELETE FROM error_log WHERE last_at < ?').run((now || Date.now()) - olderThanMs);
+    },
+    // ── AI usage (per user, per day) ──
+    async recordAIUsage(userId, day, inTok, outTok) {
+      db.prepare(`INSERT INTO ai_usage(user_id,day,calls,in_tokens,out_tokens) VALUES(?,?,1,?,?)
+        ON CONFLICT(user_id,day) DO UPDATE SET
+          calls = ai_usage.calls + 1,
+          in_tokens = ai_usage.in_tokens + ?, out_tokens = ai_usage.out_tokens + ?`)
+        .run(Number(userId), String(day), inTok | 0, outTok | 0, inTok | 0, outTok | 0);
+    },
+    async aiUsageTotals(sinceDay) {
+      return db.prepare(`SELECT COALESCE(SUM(calls),0) AS calls, COALESCE(SUM(in_tokens),0) AS in_tokens,
+        COALESCE(SUM(out_tokens),0) AS out_tokens, COUNT(DISTINCT user_id) AS users
+        FROM ai_usage WHERE day >= ?`).get(String(sinceDay || ''));
+    },
+    async aiTopUsers(sinceDay, limit) {
+      return db.prepare(`SELECT u.username, a.user_id, SUM(a.calls) AS calls,
+        SUM(a.in_tokens) AS in_tokens, SUM(a.out_tokens) AS out_tokens
+        FROM ai_usage a LEFT JOIN users u ON u.id = a.user_id
+        WHERE a.day >= ? GROUP BY a.user_id, u.username
+        ORDER BY (SUM(a.in_tokens) + SUM(a.out_tokens)) DESC LIMIT ?`)
+        .all(String(sinceDay || ''), Math.min(50, limit || 10));
     },
     async updatePassword(id, salt, hash) { db.prepare('UPDATE users SET pw_salt=?, pw_hash=? WHERE id=?').run(salt, hash, id); },
     async setSecurity(id, q, salt, hash) { db.prepare('UPDATE users SET sec_question=?, sec_salt=?, sec_hash=? WHERE id=?').run(q, salt, hash, id); },
@@ -404,6 +432,12 @@ function pgImpl() {
                sig TEXT PRIMARY KEY, kind TEXT NOT NULL, route TEXT, message TEXT,
                stack TEXT, user_id BIGINT, count INTEGER NOT NULL DEFAULT 1,
                first_at BIGINT NOT NULL, last_at BIGINT NOT NULL)`);
+      // AI spend per user per day. Rolled up rather than one row per call, so it
+      // stays small; per-day so a sudden spike is visible rather than averaged away.
+      await q(`CREATE TABLE IF NOT EXISTS ai_usage (
+               user_id BIGINT NOT NULL, day TEXT NOT NULL, calls INTEGER NOT NULL DEFAULT 0,
+               in_tokens INTEGER NOT NULL DEFAULT 0, out_tokens INTEGER NOT NULL DEFAULT 0,
+               PRIMARY KEY (user_id, day))`);
       // ── Collective-knowledge social layer ──
       await q(`CREATE TABLE IF NOT EXISTS reading_groups (id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL,
                owner_id BIGINT REFERENCES users(id) ON DELETE CASCADE, invite_code TEXT UNIQUE, created_at TIMESTAMPTZ DEFAULT now())`);
@@ -479,6 +513,30 @@ function pgImpl() {
     async clearErrors() { await q('DELETE FROM error_log'); },
     async pruneErrors(olderThanMs, now) {
       await q('DELETE FROM error_log WHERE last_at < $1', [(now || Date.now()) - olderThanMs]);
+    },
+    // ── AI usage (per user, per day) ──
+    async recordAIUsage(userId, day, inTok, outTok) {
+      await q(`INSERT INTO ai_usage(user_id,day,calls,in_tokens,out_tokens) VALUES($1,$2,1,$3,$4)
+        ON CONFLICT (user_id,day) DO UPDATE SET
+          calls = ai_usage.calls + 1,
+          in_tokens = ai_usage.in_tokens + $3, out_tokens = ai_usage.out_tokens + $4`,
+        [Number(userId), String(day), inTok | 0, outTok | 0]);
+    },
+    async aiUsageTotals(sinceDay) {
+      const r = await q(`SELECT COALESCE(SUM(calls),0) AS calls, COALESCE(SUM(in_tokens),0) AS in_tokens,
+        COALESCE(SUM(out_tokens),0) AS out_tokens, COUNT(DISTINCT user_id) AS users
+        FROM ai_usage WHERE day >= $1`, [String(sinceDay || '')]);
+      const x = r.rows[0] || {};
+      return { calls: Number(x.calls) || 0, in_tokens: Number(x.in_tokens) || 0, out_tokens: Number(x.out_tokens) || 0, users: Number(x.users) || 0 };
+    },
+    async aiTopUsers(sinceDay, limit) {
+      const r = await q(`SELECT u.username, a.user_id, SUM(a.calls) AS calls,
+        SUM(a.in_tokens) AS in_tokens, SUM(a.out_tokens) AS out_tokens
+        FROM ai_usage a LEFT JOIN users u ON u.id = a.user_id
+        WHERE a.day >= $1 GROUP BY a.user_id, u.username
+        ORDER BY (SUM(a.in_tokens) + SUM(a.out_tokens)) DESC LIMIT $2`,
+        [String(sinceDay || ''), Math.min(50, limit || 10)]);
+      return r.rows.map(x => ({ username: x.username, user_id: x.user_id, calls: Number(x.calls) || 0, in_tokens: Number(x.in_tokens) || 0, out_tokens: Number(x.out_tokens) || 0 }));
     },
     async updatePassword(id, salt, hash) { await q('UPDATE users SET pw_salt=$1, pw_hash=$2 WHERE id=$3', [salt, hash, id]); },
     async setSecurity(id, ques, salt, hash) { await q('UPDATE users SET sec_question=$1, sec_salt=$2, sec_hash=$3 WHERE id=$4', [ques, salt, hash, id]); },
@@ -684,6 +742,9 @@ module.exports = {
   errorCount: () => impl.errorCount(),
   clearErrors: () => impl.clearErrors(),
   pruneErrors: (ms, n) => impl.pruneErrors(ms, n),
+  recordAIUsage: (u, d, i, o) => impl.recordAIUsage(u, d, i, o),
+  aiUsageTotals: (s) => impl.aiUsageTotals(s),
+  aiTopUsers: (s, l) => impl.aiTopUsers(s, l),
   flagSharedMeal: (i, u) => impl.flagSharedMeal(i, u),
   deleteSharedMeal: (i, u, f) => impl.deleteSharedMeal(i, u, f),
   createPost: (p) => impl.createPost(p),

@@ -1839,6 +1839,33 @@ A.state.data = _iBase();
       (await DBm.listErrors(5))[0].kind === 'client');
     await DBm.clearErrors();
 
+    // ── AI cost telemetry: who is expensive must be answerable ──
+    const _d1 = '2026-08-01', _d2 = '2026-08-02';
+    await DBm.recordAIUsage(9001, _d1, 100, 50);
+    await DBm.recordAIUsage(9001, _d1, 200, 80);      // same user+day → rolls up
+    await DBm.recordAIUsage(9002, _d2, 10, 5);
+    const tot = await DBm.aiUsageTotals('2026-08-01');
+    ok('ai usage: calls are counted', tot.calls === 3, 'calls=' + tot.calls);
+    ok('ai usage: tokens are summed', tot.in_tokens === 310 && tot.out_tokens === 135,
+      tot.in_tokens + '/' + tot.out_tokens);
+    ok('ai usage: distinct users counted', tot.users === 2, 'users=' + tot.users);
+    ok('ai usage: same user+day rolls into ONE row, not one per call',
+      (await DBm.aiTopUsers('2026-08-01', 10)).filter(r => String(r.user_id) === '9001').length === 1);
+    const top = await DBm.aiTopUsers('2026-08-01', 10);
+    ok('ai usage: the heaviest user ranks first', String(top[0].user_id) === '9001',
+      'first=' + top[0].user_id);
+    ok('ai usage: a later window excludes older days',
+      (await DBm.aiUsageTotals('2026-08-02')).calls === 1);
+    // usageFrom() must read all three providers' shapes
+    ok('ai usage: reads the Anthropic usage shape',
+      (() => { const u = C.usageFrom('anthropic', { usage: { input_tokens: 7, output_tokens: 3 } }); return u && u.in === 7 && u.out === 3; })());
+    ok('ai usage: reads the OpenAI usage shape',
+      (() => { const u = C.usageFrom('openai', { usage: { prompt_tokens: 11, completion_tokens: 4 } }); return u && u.in === 11 && u.out === 4; })());
+    ok('ai usage: reads the Google usage shape',
+      (() => { const u = C.usageFrom('google', { usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 2 } }); return u && u.in === 5 && u.out === 2; })());
+    ok('ai usage: a response with no usage block is ignored, not zero-recorded',
+      C.usageFrom('anthropic', {}) === null);
+
     // ── AI provider defaults: pin the model so it can't silently go stale ──
     const cfgA = C.getAIConfig({ headers: { 'x-api-key': 'sk-ant-test' } });
     ok('AI model: Anthropic default is a current Claude 5 model',
