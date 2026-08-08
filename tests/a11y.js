@@ -76,7 +76,28 @@ for (const [ph, why] of [['"P"', 'protein'], ['"C"', 'carbs'], ['"F"', 'fat'], [
 const bareToggle = /<label class="pc-toggle"><input type="checkbox"(?![^>]*aria-label)/.test(app);
 ok('toggle switches have an accessible name', !bareToggle);
 
+// ── Launch blockers in shipped pages ─────────────────────────────────
+// A missing contact address fails app-store review, and it's invisible unless
+// someone actually reads the page. Reported as a WARNING rather than a failure:
+// only the owner can choose which address to publish, so failing the build would
+// block every unrelated push on a decision the build can't make.
+const warnings = [];
+for (const page of ['terms.html', 'privacy.html']) {
+  const html = fs.readFileSync(path.join(APP, 'public', page), 'utf8');
+  if (/CONTACT_EMAIL/.test(html)) {
+    warnings.push(page + ' still contains the literal CONTACT_EMAIL placeholder');
+  } else if (!/mailto:[^"'>\s@]+@[^"'>\s.]+\.[a-z]{2,}/i.test(html)) {
+    warnings.push(page + ' has no valid mailto: contact address');
+  }
+}
+
 console.log('');
+if (warnings.length) {
+  console.log('⚠️  ' + warnings.length + ' launch blocker' + (warnings.length === 1 ? '' : 's') + ' (not a build failure — needs an owner decision):');
+  warnings.forEach(w => console.log('   • ' + w));
+  console.log('   App-store review rejects a policy page with no working contact address.');
+  console.log('');
+}
 if (failures.length) {
   console.log('❌ ' + failures.length + ' failed, ' + pass + ' passed:\n');
   failures.forEach(f => console.log('   ✗ ' + f));

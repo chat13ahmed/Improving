@@ -3175,6 +3175,26 @@ function updateNavBadges() {
     if (count > 0) { badge.textContent = count; badge.style.display = 'inline-flex'; }
     else { badge.style.display = 'none'; }
   }
+  updateErrorBadge();
+}
+// Owner-only: surface the error count on the Admin nav item. An error panel you
+// have to remember to open is not monitoring — this makes a new failure visible
+// on the next page load without pulling in an external alerting service.
+async function updateErrorBadge() {
+  if (!state.isOwner) return;
+  const nav = document.querySelector('.nav-item[data-page="admin"]');
+  if (!nav) return;
+  try {
+    const j = await fetch('/api/admin/errors?limit=1', { headers: authHeaders() }).then(r => r.json());
+    const n = (j && j.total) | 0;
+    let b = nav.querySelector('.nav-badge');
+    if (!n) { if (b) b.style.display = 'none'; return; }
+    if (!b) { b = document.createElement('span'); b.className = 'nav-badge nav-badge-error'; nav.appendChild(b); }
+    b.textContent = n > 99 ? '99+' : n;
+    b.title = n + ' distinct error' + (n === 1 ? '' : 's') + ' recorded';
+    b.setAttribute('aria-label', n + ' recorded error' + (n === 1 ? '' : 's'));
+    b.style.display = 'inline-flex';
+  } catch (e) { /* never let the badge break navigation */ }
 }
 
 function getFollowUpCount() {

@@ -1077,6 +1077,9 @@ body {
   background: var(--danger); color: #fff;
   font-size: 11px; font-weight: 700; margin-left: auto; padding: 0 5px;
 }
+/* --danger is a LIGHT red in dark mode, so white on it measures 2.77:1 and
+   fails AA. Dark text on that same fill is 6.81:1. */
+[data-theme="dark"] .nav-badge { color: #0B1120; }
 
 /* ─── Reminder Banner ─────────────────────────── */
 .reminder-banner {
