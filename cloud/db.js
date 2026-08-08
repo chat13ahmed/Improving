@@ -221,6 +221,14 @@ function sqliteImpl() {
     async allPushSubs() { return db.prepare('SELECT user_id, sub FROM push_subscriptions').all().map(r => ({ user_id: r.user_id, sub: JSON.parse(r.sub) })); },
     async allUsers() { return db.prepare('SELECT id, username, created_at FROM users').all(); },
     async allUserData() { return db.prepare('SELECT user_id, data FROM user_data').all().map(r => ({ user_id: r.user_id, data: ENC.decryptData(JSON.parse(r.data)) })); },
+    // Paged variant. allUserData() decrypts EVERY blob into one array, so admin
+    // stats held the whole database in memory at once; this keeps peak memory to
+    // one page. Ordered by user_id so paging is stable while rows change.
+    async userDataPage(limit, offset) {
+      return db.prepare('SELECT user_id, data FROM user_data ORDER BY user_id LIMIT ? OFFSET ?')
+        .all(Math.max(1, limit | 0), Math.max(0, offset | 0))
+        .map(r => ({ user_id: r.user_id, data: ENC.decryptData(JSON.parse(r.data)) }));
+    },
     // ── Community meals ──
     async createSharedMeal(m) {
       const r = db.prepare('INSERT INTO shared_meals(user_id,author_name,name,kcal,p,c,f,servings,notes,ingredients,photo) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
@@ -491,6 +499,14 @@ function pgImpl() {
     async allPushSubs() { const r = await q('SELECT user_id, sub FROM push_subscriptions', []); return r.rows.map(x => ({ user_id: x.user_id, sub: x.sub })); },
     async allUsers() { const r = await q('SELECT id, username, created_at FROM users', []); return r.rows; },
     async allUserData() { const r = await q('SELECT user_id, data FROM user_data', []); return r.rows.map(x => ({ user_id: x.user_id, data: ENC.decryptData(x.data) })); },
+    // Paged variant. allUserData() decrypts EVERY blob into one array, so admin
+    // stats held the whole database in memory at once; this keeps peak memory to
+    // one page. Ordered by user_id so paging is stable while rows change.
+    async userDataPage(limit, offset) {
+      const r = await q('SELECT user_id, data FROM user_data ORDER BY user_id LIMIT $1 OFFSET $2',
+        [Math.max(1, limit | 0), Math.max(0, offset | 0)]);
+      return r.rows.map(x => ({ user_id: x.user_id, data: ENC.decryptData(x.data) }));
+    },
     // ── Community meals ──
     async createSharedMeal(m) {
       const r = await q('INSERT INTO shared_meals(user_id,author_name,name,kcal,p,c,f,servings,notes,ingredients,photo) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id',
@@ -655,6 +671,7 @@ module.exports = {
   allPushSubs: () => impl.allPushSubs(),
   allUsers: () => impl.allUsers(),
   allUserData: () => impl.allUserData(),
+  userDataPage: (l, o) => impl.userDataPage(l, o),
   createSharedMeal: (m) => impl.createSharedMeal(m),
   listSharedMeals: (q) => impl.listSharedMeals(q),
   incSharedMealUse: (i) => impl.incSharedMealUse(i),

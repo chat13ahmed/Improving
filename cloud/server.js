@@ -1251,6 +1251,20 @@ app.delete('/api/admin/feedback/:id', requireAuth, async (req, res) => {
 });
 
 // Owner-only: live usage numbers (how many people use it & how active they are).
+// Admin stats must walk every user's blob (the data model is one JSON blob per
+// account, so these numbers can't come from SQL aggregates). That's O(users) per
+// call, so hold the result briefly — hitting Refresh shouldn't re-scan the
+// database. Short TTL: the owner wants current numbers, not stale ones.
+const adminStatsCache = (() => {
+  let at = 0, payload = null;
+  const TTL = 60000;
+  return {
+    get() { return payload && Date.now() - at < TTL ? payload : null; },
+    set(p) { at = Date.now(); payload = p; return p; },
+    clear() { payload = null; }
+  };
+})();
+
 // Owner-only: read the error log. Stacks can contain internals, so this is
 // gated exactly like the other admin routes.
 app.get('/api/admin/errors', requireAuth, async (req, res) => {
@@ -1283,8 +1297,12 @@ app.post('/api/client-error', requireAuth, async (req, res) => {
 app.get('/api/admin/stats', requireAuth, async (req, res) => {
   if (!isOwner(req.username)) return res.status(403).json({ error: 'Not allowed.' });
   try {
-    const [users, dataRows, subs] = await Promise.all([DB.allUsers(), DB.allUserData(), DB.allPushSubs()]);
-    const byId = {}; dataRows.forEach(r => { byId[String(r.user_id)] = r.data || {}; });
+    const cached = adminStatsCache.get();
+    if (cached) return res.json(cached);
+    // User ROWS are small (id, username, created_at) so loading them all is fine.
+    // The BLOBS are not: allUserData() decrypted every one into a single array,
+    // which is what would exhaust memory. They're streamed a page at a time below.
+    const [users, subs] = await Promise.all([DB.allUsers(), DB.allPushSubs()]);
     const DAY = 86400000;
     const today = new Date().toISOString().split('T')[0];
     const dayWithin = (ds, n) => { if (!ds) return false; const t = Date.parse(ds + 'T00:00:00Z'); return !isNaN(t) && Date.now() - t < n * DAY && Date.now() - t > -DAY; };
@@ -1295,8 +1313,12 @@ app.get('/api/admin/stats', requireAuth, async (req, res) => {
     const pillars = { gym: 0, food: 0, networking: 0, money: 0, reading: 0 };
     const features = { books: 0, ideas: 0, contacts: 0, vocab: 0, takeaways: 0 };
     const has = (v) => Array.isArray(v) && v.length > 0;
-    const rows = users.map(u => {
-      const d0 = byId[String(u.id)] || {};
+    const rows = [];
+    const userById = new Map(users.map(u => [String(u.id), u]));
+    const seen = new Set();
+    // One user's contribution to the aggregates. Called once per user as their
+    // blob streams past, so no blob is retained after it's been counted.
+    const tally = (u, d0) => {
       const prof = d0.profile || {};
       const days = Array.isArray(d0.days) ? d0.days : [];
       const dates = days.map(d => d && d.date).filter(Boolean);
@@ -1317,8 +1339,23 @@ app.get('/api/admin/stats', requireAuth, async (req, res) => {
       if (has(d0.takeaways)) features.takeaways++;
       const ageDays = u.created_at ? (Date.now() - Date.parse(dstr(u.created_at) + 'T00:00:00Z')) / DAY : 0;
       if (ageDays >= 7 && ageDays <= 30) { cohort++; if (week > 0) retained++; }
-      return { username: u.username, days: days.length, last: dates.sort().slice(-1)[0] || null, pro: prof.pro === true, joined: dstr(u.created_at) || null };
-    });
+      rows.push({ username: u.username, days: days.length, last: dates.sort().slice(-1)[0] || null, pro: prof.pro === true, joined: dstr(u.created_at) || null });
+    };
+    // Stream the blobs in pages so peak memory stays at one page, not the whole DB.
+    const PAGE = 200;
+    for (let off = 0; ; off += PAGE) {
+      const page = await DB.userDataPage(PAGE, off);
+      for (const r of page) {
+        const u = userById.get(String(r.user_id));
+        if (!u) continue;                       // orphan row; cascade should prevent this
+        seen.add(String(r.user_id));
+        tally(u, r.data || {});
+      }
+      if (page.length < PAGE) break;
+    }
+    // Accounts that have never saved have no user_data row, so they never appear
+    // in a page — count them too or the totals silently disagree with totalUsers.
+    for (const u of users) if (!seen.has(String(u.id))) tally(u, {});
     rows.sort((a, b) => String(b.last || '').localeCompare(String(a.last || '')) || b.days - a.days);
     const created = users.map(u => dstr(u.created_at));
     const signups = [];                                            // last 14 days, for the growth chart
@@ -1328,7 +1365,7 @@ app.get('/api/admin/stats', requireAuth, async (req, res) => {
     }
     const priceLabel = process.env.PRICE_LABEL || '$7.99/mo';
     const monthlyPrice = parseFloat((priceLabel.match(/[\d.]+/) || ['0'])[0]) || 0;
-    res.json({
+    res.json(adminStatsCache.set({
       totalUsers: users.length, loggedToday, active7, active30, totalDays,
       avgDays: users.length ? +(totalDays / users.length).toFixed(1) : 0,
       avgDaysWeek: active7 ? +(weekDaysSum / active7).toFixed(1) : 0,   // avg days/week among weekly-active users
@@ -1341,7 +1378,7 @@ app.get('/api/admin/stats', requireAuth, async (req, res) => {
       new30: users.filter(u => createdWithin(u.created_at, 30)).length,
       signups, pillars, features,
       recent: rows.slice(0, 25)
-    });
+    }));
   } catch (e) { logError('route', e, req); res.status(500).json({ error: 'Stats failed' }); }
 });
 
@@ -1372,8 +1409,17 @@ app.post('/api/cron/tick', async (req, res) => {
     const allSubs = await DB.allPushSubs();
     const byUser = {};
     allSubs.forEach(s => { (byUser[s.user_id] = byUser[s.user_id] || []).push(s.sub); });
-    let sent = 0;
+    let sent = 0, scanned = 0, ranOut = false;
+    // Blobs are fetched one user at a time, so memory is bounded — but the total
+    // walk is O(subscribed users) and a long one would hit the platform's request
+    // timeout and be killed mid-way with nothing reported. Stop early and say so.
+    // Cursor state isn't persisted, so a truncated run repeats the same prefix
+    // next tick; raise CRON_BUDGET_MS or tick more often if that starts biting.
+    const budgetMs = Number(process.env.CRON_BUDGET_MS || 20000);
+    const startedAt = Date.now();
     for (const uid of Object.keys(byUser)) {
+      if (Date.now() - startedAt > budgetMs) { ranOut = true; break; }
+      scanned++;
       const d = await DB.getData(uid);
       if (!d || !d.data) continue;
       const data = d.data;
@@ -1461,7 +1507,10 @@ app.post('/api/cron/tick', async (req, res) => {
       // Never bumps the version, so it can't clobber user data or force client conflicts.
       if (changed) await DB.saveDataMeta(uid, data, d.version);
     }
-    res.json({ sent });
+    if (ranOut) {
+      logError('cron-budget', new Error('tick hit its ' + budgetMs + 'ms budget after ' + scanned + '/' + Object.keys(byUser).length + ' users'), req);
+    }
+    res.json({ sent, scanned, total: Object.keys(byUser).length, truncated: ranOut });
   } catch (e) { logError('route', e, req); res.status(500).json({ error: 'cron failed' }); }
 });
 
