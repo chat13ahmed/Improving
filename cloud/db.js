@@ -296,6 +296,9 @@ function sqliteImpl() {
       } catch (e) { db.exec('ROLLBACK'); throw e; }
     },
     async addGroupMember(groupId, userId, role) { db.prepare('INSERT OR IGNORE INTO group_members(group_id,user_id,role) VALUES(?,?,?)').run(groupId, userId, role || 'member'); },
+    // Look a group up by its invite code. The code is what makes a group private:
+    // without checking it, sequential group ids let anyone self-join.
+    async getGroup(id) { return db.prepare('SELECT id,name,owner_id,invite_code,created_at FROM reading_groups WHERE id=?').get(id) || null; },
     async getMembership(groupId, userId) { return db.prepare('SELECT group_id,user_id,role,notify_enabled FROM group_members WHERE group_id=? AND user_id=?').get(groupId, userId) || null; },
     async groupMembers(groupId) { return db.prepare('SELECT user_id, role, notify_enabled FROM group_members WHERE group_id=?').all(groupId); },
     async setNotifyEnabled(groupId, userId, enabled) { db.prepare('UPDATE group_members SET notify_enabled=? WHERE group_id=? AND user_id=?').run(enabled ? 1 : 0, groupId, userId); },
@@ -564,6 +567,9 @@ function pgImpl() {
       } catch (e) { await client.query('ROLLBACK'); throw e; } finally { client.release(); }
     },
     async addGroupMember(groupId, userId, role) { await q("INSERT INTO group_members(group_id,user_id,role) VALUES($1,$2,$3) ON CONFLICT DO NOTHING", [groupId, userId, role || 'member']); },
+    // Look a group up by its invite code. The code is what makes a group private:
+    // without checking it, sequential group ids let anyone self-join.
+    async getGroup(id) { const r = await q('SELECT id,name,owner_id,invite_code,created_at FROM reading_groups WHERE id=$1', [id]); return r.rows[0] || null; },
     async getMembership(groupId, userId) { const r = await q('SELECT group_id,user_id,role,notify_enabled FROM group_members WHERE group_id=$1 AND user_id=$2', [groupId, userId]); return r.rows[0] || null; },
     async groupMembers(groupId) { const r = await q('SELECT user_id, role, notify_enabled FROM group_members WHERE group_id=$1', [groupId]); return r.rows; },
     async setNotifyEnabled(groupId, userId, enabled) { await q('UPDATE group_members SET notify_enabled=$1 WHERE group_id=$2 AND user_id=$3', [!!enabled, groupId, userId]); },
@@ -671,6 +677,7 @@ module.exports = {
   // ── Groups + collective notes (social layer) ──
   createGroup: (g) => impl.createGroup(g),
   addGroupMember: (g, u, r) => impl.addGroupMember(g, u, r),
+  getGroup: (i) => impl.getGroup(i),
   getMembership: (g, u) => impl.getMembership(g, u),
   groupMembers: (g) => impl.groupMembers(g),
   setNotifyEnabled: (g, u, e) => impl.setNotifyEnabled(g, u, e),

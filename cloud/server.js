@@ -1031,6 +1031,31 @@ function nestReplies(rows) {
   return roots;
 }
 
+// ── Group / note access control ───────────────────────────────────────
+// A note is only reachable by someone who can see the group it lives in. Before
+// this, the membership gate existed on GET /api/groups/:id/notes and POST
+// /api/notes but was missing from every note SUBroute, so replies, likes and
+// confusion flags on a private note were open to any signed-in stranger.
+//
+// Denial is 404, not 403: a 403 would confirm the note exists, turning
+// sequential ids into an enumeration oracle for private groups.
+async function noteAccess(noteId, userId) {
+  const note = await DB.getNote(noteId);
+  if (!note) return { error: 404 };
+  if (note.group_id == null) {
+    // No group = a personal note. Only its author may touch it.
+    return String(note.user_id) === String(userId) ? { note } : { error: 404 };
+  }
+  if (!(await DB.getMembership(note.group_id, userId))) return { error: 404 };
+  return { note };
+}
+// Constant-time compare so the invite code can't be recovered byte by byte.
+function sameSecret(a, b) {
+  const A = Buffer.from(String(a || ''), 'utf8'), B = Buffer.from(String(b || ''), 'utf8');
+  if (A.length === 0 || A.length !== B.length) return false;
+  try { return crypto.timingSafeEqual(A, B); } catch { return false; }
+}
+
 app.post('/api/groups', requireAuth, async (req, res) => {
   const name = String(req.body.name || '').trim().slice(0, 80);
   if (!name) return res.status(400).json({ error: 'Group name required.' });
@@ -1040,17 +1065,38 @@ app.post('/api/groups', requireAuth, async (req, res) => {
     res.status(201).json({ id, name, invite_code: invite });
   } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
+// Joining REQUIRES the group's invite code. Without this check the code was
+// generated, handed to the creator, and then never verified — so anyone could
+// walk sequential ids (POST /api/groups/1/join, /2/join, …) into every private
+// group on the platform and read its notes.
 app.post('/api/groups/:id/join', requireAuth, async (req, res) => {
   const groupId = parseInt(req.params.id, 10);
+  const invite = String(req.body.invite || req.body.inviteCode || '').trim();
   if (!groupId) return res.status(400).json({ error: 'bad id' });
-  try { await DB.addGroupMember(groupId, req.userId, 'member'); res.json({ success: true }); }
-  catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
+  if (!invite) return res.status(400).json({ error: 'An invite code is required to join.' });
+  try {
+    // Rate-limited per account: the code is short, so cap guessing attempts.
+    if (await DB.rateHit('join:' + req.userId, 900000) > 20) {
+      return res.status(429).json({ error: 'Too many attempts — please wait a few minutes.' });
+    }
+    const g = await DB.getGroup(groupId);
+    // Same reply whether the group is missing or the code is wrong, so this
+    // can't be used to discover which group ids exist.
+    if (!g || !sameSecret(invite, g.invite_code)) {
+      return res.status(403).json({ error: 'That invite code is not valid.' });
+    }
+    await DB.addGroupMember(groupId, req.userId, 'member');
+    res.json({ success: true, id: g.id, name: g.name });
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.post('/api/groups/:id/notify', requireAuth, async (req, res) => {   // toggle notify_enabled
   const groupId = parseInt(req.params.id, 10);
   if (!groupId) return res.status(400).json({ error: 'bad id' });
-  try { await DB.setNotifyEnabled(groupId, req.userId, req.body.enabled !== false); res.json({ success: true }); }
-  catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
+  try {
+    if (!(await DB.getMembership(groupId, req.userId))) return res.status(403).json({ error: 'Not a group member.' });
+    await DB.setNotifyEnabled(groupId, req.userId, req.body.enabled !== false);
+    res.json({ success: true });
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.get('/api/groups/:id/notes', requireAuth, async (req, res) => {
   const groupId = parseInt(req.params.id, 10);
@@ -1080,7 +1126,8 @@ app.post('/api/notes/:id/like', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error: 'bad id' });
   try {
-    if (!(await DB.getNote(id))) return res.status(404).json({ error: 'not found' });
+    const a = await noteAccess(id, req.userId);
+    if (a.error) return res.status(a.error).json({ error: 'not found' });
     const r = await DB.toggleNoteLike(id, req.userId);
     res.json({ success: true, liked: r.liked, upvoteCount: r.count });
   } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
@@ -1088,8 +1135,13 @@ app.post('/api/notes/:id/like', requireAuth, async (req, res) => {
 app.get('/api/notes/:id/replies', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error: 'bad id' });
-  try { res.json(nestReplies(await DB.listReplies(id))); }
-  catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
+  try {
+    // Had NO check at all: a stranger could read a private group's whole
+    // discussion just by walking note ids.
+    const a = await noteAccess(id, req.userId);
+    if (a.error) return res.status(a.error).json({ error: 'not found' });
+    res.json(nestReplies(await DB.listReplies(id)));
+  } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 app.post('/api/notes/:id/replies', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
@@ -1097,7 +1149,8 @@ app.post('/api/notes/:id/replies', requireAuth, async (req, res) => {
   if (!id) return res.status(400).json({ error: 'bad id' });
   if (!body) return res.status(400).json({ error: 'Reply body required.' });
   try {
-    if (!(await DB.getNote(id))) return res.status(404).json({ error: 'not found' });
+    const a = await noteAccess(id, req.userId);
+    if (a.error) return res.status(a.error).json({ error: 'not found' });
     const replyId = await DB.createReply({ note_id: id, parent_id: parseInt(req.body.parentId, 10) || null, user_id: req.userId, author_name: req.username, body });
     res.status(201).json({ id: replyId });
   } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
@@ -1107,6 +1160,10 @@ app.post('/api/notes/:id/confuse', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error: 'bad id' });
   try {
+    // Unguarded, this let an outsider push a note to 3 confusion flags and so
+    // fire a notification to every member of a group they weren't part of.
+    const a = await noteAccess(id, req.userId);
+    if (a.error) return res.status(a.error).json({ error: 'not found' });
     const r = await DB.confuseNote(id, req.userId);
     if (!r) return res.status(404).json({ error: 'not found' });
     if (r.tripped && r.groupId) {

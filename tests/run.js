@@ -6,6 +6,10 @@
  * then loads the exported server helpers. No browser or network required.
  */
 'use strict';
+// Pin the signing secret BEFORE cloud/server.js is required, so tests can mint
+// their own tokens for fixture users. Without it the server generates a random
+// secret per boot and nothing can sign a matching token.
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-only-secret-not-used-in-production-0123456789';
 const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
@@ -1669,6 +1673,64 @@ A.state.data = _iBase();
     const stillThere = await fetch(base + '/api/data', { headers: authHdr });
     const stillBody = await stillThere.json();
     ok('data cap: the rejected save did NOT overwrite good data', stillThere.status === 200 && !stillBody.junk && stillBody.profile.name === 'Cap');
+
+    // ── Private reading groups: outsiders must not reach group content ──
+    // The membership gate existed on GET /api/groups/:id/notes and POST /api/notes
+    // but was missing from every note SUBroute, and join never checked the invite
+    // code — so sequential ids let anyone walk into any private group.
+    const DBg = require(path.join(__dirname, '..', 'cloud', 'db.js'));
+    const mkUser = async (name) => {
+      const id = await DBg.createUser({ username: name, email: name + '@ex.com', pw_salt: 's', pw_hash: 'h', sec_question: null, sec_salt: null, sec_hash: null });
+      return { id, h: { 'content-type': 'application/json', authorization: 'Bearer ' + C.signJwt({ sub: id, username: name, tv: 0 }, process.env.JWT_SECRET) } };
+    };
+    const _sfx = Date.now();
+    const gOwner = await mkUser('gowner-' + _sfx);
+    const gMember = await mkUser('gmember-' + _sfx);
+    const gOutsider = await mkUser('goutsider-' + _sfx);
+    const grp = await (await fetch(base + '/api/groups', { method: 'POST', headers: gOwner.h, body: JSON.stringify({ name: 'Private club' }) })).json();
+    const gNote = await (await fetch(base + '/api/notes', { method: 'POST', headers: gOwner.h, body: JSON.stringify({ groupId: grp.id, body: 'private note' }) })).json();
+    ok('groups: creating a group returns an invite code', !!grp.id && !!grp.invite_code);
+
+    // joining requires the code
+    const joinNoCode = await fetch(base + '/api/groups/' + grp.id + '/join', { method: 'POST', headers: gOutsider.h, body: '{}' });
+    ok('groups: joining WITHOUT an invite code is refused', joinNoCode.status === 400, 'got ' + joinNoCode.status);
+    const joinBadCode = await fetch(base + '/api/groups/' + grp.id + '/join', { method: 'POST', headers: gOutsider.h, body: JSON.stringify({ invite: 'deadbeef00' }) });
+    ok('groups: joining with a WRONG invite code is refused', joinBadCode.status === 403, 'got ' + joinBadCode.status);
+    const joinGood = await fetch(base + '/api/groups/' + grp.id + '/join', { method: 'POST', headers: gMember.h, body: JSON.stringify({ invite: grp.invite_code }) });
+    ok('groups: joining with the CORRECT invite code works', joinGood.status === 200, 'got ' + joinGood.status);
+
+    // every note subroute is gated, and denial is 404 (not 403) so ids can't be probed
+    const outsiderHits = [];
+    for (const [method, p] of [['GET', '/replies'], ['POST', '/replies'], ['POST', '/like'], ['POST', '/confuse']]) {
+      const r = await fetch(base + '/api/notes/' + gNote.id + p, {
+        method, headers: gOutsider.h, body: method === 'POST' ? JSON.stringify({ body: 'intrusion' }) : undefined
+      });
+      outsiderHits.push(method + p + ':' + r.status);
+    }
+    ok('groups: an outsider is blocked from EVERY note subroute',
+      outsiderHits.every(s => s.endsWith(':404')), outsiderHits.join(' '));
+    ok('groups: the outsider\'s reply was NOT stored', (await DBg.listReplies(gNote.id)).length === 0);
+    const outsiderNotes = await fetch(base + '/api/groups/' + grp.id + '/notes', { headers: gOutsider.h });
+    ok('groups: an outsider cannot list the group notes', outsiderNotes.status === 403, 'got ' + outsiderNotes.status);
+    const outsiderNotify = await fetch(base + '/api/groups/' + grp.id + '/notify', { method: 'POST', headers: gOutsider.h, body: '{}' });
+    ok('groups: an outsider cannot toggle group notifications', outsiderNotify.status === 403, 'got ' + outsiderNotify.status);
+
+    // …and the legitimate member flow still works (a fix that breaks the feature is not a fix)
+    const memberOk = [];
+    memberOk.push((await fetch(base + '/api/groups/' + grp.id + '/notes', { headers: gMember.h })).status);
+    memberOk.push((await fetch(base + '/api/notes/' + gNote.id + '/replies', { method: 'POST', headers: gMember.h, body: JSON.stringify({ body: 'real reply' }) })).status);
+    memberOk.push((await fetch(base + '/api/notes/' + gNote.id + '/replies', { headers: gMember.h })).status);
+    memberOk.push((await fetch(base + '/api/notes/' + gNote.id + '/like', { method: 'POST', headers: gMember.h, body: '{}' })).status);
+    memberOk.push((await fetch(base + '/api/notes/' + gNote.id + '/confuse', { method: 'POST', headers: gMember.h, body: '{}' })).status);
+    ok('groups: a real member can still read, reply, like and flag',
+      memberOk.join(',') === '200,201,200,200,200', memberOk.join(','));
+
+    // a personal note (no group) stays private to its author
+    const pNote = await (await fetch(base + '/api/notes', { method: 'POST', headers: gOwner.h, body: JSON.stringify({ body: 'personal' }) })).json();
+    ok('groups: the author can reach their own personal note',
+      (await fetch(base + '/api/notes/' + pNote.id + '/replies', { headers: gOwner.h })).status === 200);
+    ok('groups: nobody else can reach a personal note',
+      (await fetch(base + '/api/notes/' + pNote.id + '/replies', { headers: gMember.h })).status === 404);
 
     // ── Error log: failures must be recorded, and GROUPED not flooded ──
     // Same singleton the running server uses, so these assertions see its writes.
