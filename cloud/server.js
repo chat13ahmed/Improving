@@ -1107,17 +1107,26 @@ app.get('/api/groups/:id/notes', requireAuth, async (req, res) => {
   } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
 });
 
+// Length caps mirror the community post limits (cleanPost: title 120 / body
+// 4000). Without them these fields were bounded only by the 10MB body parser,
+// and unlike /api/data — one row per user, overwritten — every note INSERTs a
+// new row. Measured before the cap: 49MB written by one account in ~1 second,
+// against 1GB of total free-tier database capacity.
+const NOTE_MAX = 4000, QUOTE_MAX = 1000, REPLY_MAX = 2000;
 app.post('/api/notes', requireAuth, async (req, res) => {
   const groupId = parseInt(req.body.groupId, 10) || null;
-  const body = String(req.body.body || req.body.text || '').trim();
+  const body = String(req.body.body || req.body.text || '').trim().slice(0, NOTE_MAX);
   if (!body) return res.status(400).json({ error: 'Note text required.' });
   try {
+    if (await DB.rateHit('note:' + req.userId, 3600000) > 120) {
+      return res.status(429).json({ error: 'You\'re adding notes very quickly — take a breath and try again shortly.' });
+    }
     if (groupId && !(await DB.getMembership(groupId, req.userId))) return res.status(403).json({ error: 'Not a group member.' });
     const id = await DB.createNote({
       user_id: req.userId, author_name: req.username, group_id: groupId,
       book_id: parseInt(req.body.bookId, 10) || null,
       page: Number.isInteger(req.body.page) ? req.body.page : null,
-      quote: String(req.body.quote || '').trim() || null, body
+      quote: String(req.body.quote || '').trim().slice(0, QUOTE_MAX) || null, body
     });
     res.status(201).json({ id });
   } catch (e) { logError('route', e, req); res.status(500).json({ error: 'failed' }); }
@@ -1145,10 +1154,13 @@ app.get('/api/notes/:id/replies', requireAuth, async (req, res) => {
 });
 app.post('/api/notes/:id/replies', requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const body = String(req.body.body || '').trim();
+  const body = String(req.body.body || '').trim().slice(0, REPLY_MAX);
   if (!id) return res.status(400).json({ error: 'bad id' });
   if (!body) return res.status(400).json({ error: 'Reply body required.' });
   try {
+    if (await DB.rateHit('reply:' + req.userId, 3600000) > 200) {
+      return res.status(429).json({ error: 'You\'re replying very quickly — please slow down a moment.' });
+    }
     const a = await noteAccess(id, req.userId);
     if (a.error) return res.status(a.error).json({ error: 'not found' });
     const replyId = await DB.createReply({ note_id: id, parent_id: parseInt(req.body.parentId, 10) || null, user_id: req.userId, author_name: req.username, body });

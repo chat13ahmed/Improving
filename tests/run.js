@@ -1725,6 +1725,26 @@ A.state.data = _iBase();
     ok('groups: a real member can still read, reply, like and flag',
       memberOk.join(',') === '200,201,200,200,200', memberOk.join(','));
 
+    // ── Note/reply fields must be CAPPED (they weren't) ──
+    // /api/data is one row per user, overwritten. Notes INSERT forever, so an
+    // uncapped body was a storage-exhaustion vector: measured 49MB from one
+    // account in ~1s against 1GB of free-tier capacity.
+    const huge = await (await fetch(base + '/api/notes', {
+      method: 'POST', headers: gOwner.h,
+      body: JSON.stringify({ groupId: grp.id, body: 'A'.repeat(50000), quote: 'B'.repeat(50000) })
+    })).json();
+    const hugeRow = await DBg.getNote(huge.id);
+    ok('notes: an oversized note body is truncated, not stored whole',
+      hugeRow.body.length === 4000, 'stored ' + hugeRow.body.length);
+    ok('notes: an oversized quote is truncated too',
+      (hugeRow.quote || '').length === 1000, 'stored ' + (hugeRow.quote || '').length);
+    const hugeReply = await (await fetch(base + '/api/notes/' + gNote.id + '/replies', {
+      method: 'POST', headers: gOwner.h, body: JSON.stringify({ body: 'C'.repeat(50000) })
+    })).json();
+    const replyRow = (await DBg.listReplies(gNote.id)).find(x => String(x.id) === String(hugeReply.id));
+    ok('notes: an oversized reply body is truncated', replyRow && replyRow.body.length === 2000,
+      replyRow ? 'stored ' + replyRow.body.length : 'reply missing');
+
     // a personal note (no group) stays private to its author
     const pNote = await (await fetch(base + '/api/notes', { method: 'POST', headers: gOwner.h, body: JSON.stringify({ body: 'personal' }) })).json();
     ok('groups: the author can reach their own personal note',
