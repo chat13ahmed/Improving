@@ -22,10 +22,10 @@ jobs:
         with:
           node-version: '24'
 
-      # Only the two runtime deps (express, @anthropic-ai/sdk) are needed —
-      # --omit=dev skips Electron, which is ~100MB and irrelevant to the tests.
+      # npm ci installs exactly what package-lock.json pins, so CI tests the same
+      # versions production runs. --omit=dev skips Electron (~100MB, irrelevant here).
       - name: Install dependencies
-        run: npm install --omit=dev
+        run: npm ci --omit=dev
 
       # The suite boots the real Express app on an ephemeral port and does live
       # HTTP + DB round-trips, so no extra services are required.

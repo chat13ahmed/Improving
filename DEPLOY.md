@@ -12,7 +12,7 @@ Render → your Web Service → **Settings**:
 | Setting | Value | Why |
 |---|---|---|
 | **Root Directory** | `cloud` | Uses `cloud/package.json` (has `pg` + `web-push`, `start: node server.js`). `../public` still resolves for the static site. |
-| **Build Command** | `npm install` | |
+| **Build Command** | `npm ci` | Installs the exact versions in `cloud/package-lock.json`. `npm install` would let a new minor release of express/pg/web-push land on a deploy you didn't test. |
 | **Start Command** | `npm start` | |
 
 ## 2. Database (required — without it, data is wiped on every deploy)
