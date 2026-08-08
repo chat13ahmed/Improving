@@ -3480,6 +3480,26 @@ function freezeToUse(dateSet, frozenSet, freezes, today) {
 function freezeAward(streak, lastAward) {
   return streak > 0 && streak % 7 === 0 && streak !== lastAward;
 }
+// Did a real streak just END? Losing a chain silently — counter back to 0, no
+// acknowledgement — is the moment people quit for good. Detecting it lets the app
+// say something instead of pretending it didn't happen. (testable)
+//
+// Returns { broken, missed } or null. Deliberate thresholds:
+//  • silent if today is already logged — there's nothing to recover from
+//  • silent under a 3-day chain: a one-day blip shouldn't be given a funeral
+//  • silent past 14 missed days: that's a dormant account, not a fresh break,
+//    and "you lost your streak" two months later is just a poke in the eye
+function streakBreak(dateSet, frozenSet, today) {
+  const has = k => dateSet.has(k) || frozenSet.has(k);
+  if (has(today)) return null;
+  let missed = 0, cur = _isoShift(today, -1);
+  while (!has(cur) && missed <= 14) { missed++; cur = _isoShift(cur, -1); }
+  if (missed === 0 || missed > 14) return null;
+  let broken = 0, c = cur;
+  while (has(c)) { broken++; c = _isoShift(c, -1); }
+  if (broken < 3) return null;
+  return { broken, missed };
+}
 const STREAK_FREEZE_CAP = 2;
 function ensureStreakData() {
   const p = state.data.profile = state.data.profile || {};
@@ -3506,6 +3526,48 @@ function awardStreakFreeze() {
   if (p.freezes < STREAK_FREEZE_CAP) { p.freezes++; showToast('🧊 Streak freeze earned! One skipped day won\'t break your chain.', 'success'); }
   saveData();
 }
+// ── Streak recovery ──────────────────────────────────────────────────
+// The moment a chain breaks is when people quit, so it gets a deliberate
+// response instead of a counter silently showing 0. Three choices, all on
+// purpose: name the loss plainly (pretending it didn't happen is patronising),
+// point at evidence they can already do it, and make the next step trivially
+// small. No guilt, no "you failed" — the streak is not the point, returning is.
+function currentStreakBreak() {
+  const p = state.data.profile || {};
+  const dateSet = new Set((state.data.days || []).map(d => d.date));
+  const frozenSet = new Set(Array.isArray(p.frozen) ? p.frozen : []);
+  return streakBreak(dateSet, frozenSet, todayStr());
+}
+function renderStreakRecoveryCard() {
+  const b = currentStreakBreak();
+  if (!b) return '';
+  const p = state.data.profile || {};
+  if (p._recoveryDismissed === todayStr()) return '';   // dismissed today
+  const best = bestStreak();
+  const totalDays = (state.data.days || []).length;
+  const dayWord = b.missed === 1 ? 'day' : 'days';
+  return '<div class="card recovery-card">' +
+    '<div class="recovery-top"><span class="recovery-ico" aria-hidden="true">🏔️</span>' +
+    '<h3 class="card-title" style="margin-bottom:0">Your ' + b.broken + '-day streak ended</h3></div>' +
+    '<p class="card-sub">You missed ' + b.missed + ' ' + dayWord + '. That happens to everyone who does this long enough — ' +
+      'and it says nothing about whether you can keep going. ' +
+      'You have logged <b>' + totalDays + ' day' + (totalDays === 1 ? '' : 's') + '</b> in total' +
+      (best > b.broken ? ' and your record is <b>' + best + ' days</b>' : '') +
+      ', so the habit is already real.</p>' +
+    '<p class="card-sub"><b>One log today starts the next chain.</b> It takes about 30 seconds — ' +
+      'you do not need to make up the days you missed.</p>' +
+    '<div class="recovery-actions">' +
+      '<button type="button" class="btn btn-primary" onclick="dismissRecovery(true)">Log today →</button>' +
+      '<button type="button" class="btn btn-outline" onclick="dismissRecovery(false)">Not now</button>' +
+    '</div></div>';
+}
+function dismissRecovery(goLog) {
+  state.data.profile = state.data.profile || {};
+  state.data.profile._recoveryDismissed = todayStr();
+  saveData();
+  if (goLog) navigate('log'); else renderDashboard();
+}
+
 // ── One-tap shareable week card (the growth loop) ──
 // Consecutive days logged up to today (frozen days count), today or through yesterday.
 function loggingStreak() {
@@ -6202,6 +6264,7 @@ function renderDashboard() {
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="openWeekRecap()">Week recap</button>' : '') +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">Share</button>' : '') +
     '</div></div>' +
+    renderStreakRecoveryCard() +
     gBanners +
     (hasDays ? renderGamePlanCard() : '') +
     gContext +

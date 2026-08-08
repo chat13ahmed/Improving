@@ -3459,6 +3459,15 @@ body.auth-active .fab-btn { display: none !important; }
 /* the "what is Onward" / demo links under the form */
 .auth-links { margin-top: 12px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
 .auth-links a, .auth-links button { color: var(--a-accent); font-weight: 700; font-size: 13px; }
+/* ── Streak recovery ─────────────────────────────────────────────────
+   Deliberately warm, not alarming: a broken streak is a nudge to return, not
+   an error state. Amber accent rather than red, and no heavy fill. */
+.recovery-card { border-left: 3px solid var(--warning); }
+.recovery-top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.recovery-ico { font-size: 22px; line-height: 1; }
+.recovery-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+@media (max-width: 520px) { .recovery-actions .btn { flex: 1 1 auto; } }
+
 /* ── Admin: error log ────────────────────────────────────────────────
    Monospace for the message and stack — these are read for exact strings,
    not prose, so the proportional UI font actively hurts here. */

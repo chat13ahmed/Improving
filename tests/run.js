@@ -62,7 +62,7 @@ function loadApp(fieldValues) {
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
-    ' loggingStreak, bestStreak, computeStreak, freezeToUse, freezeAward, weekStoryData, weekStorySlides, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
+    ' loggingStreak, bestStreak, computeStreak, freezeToUse, freezeAward, streakBreak, currentStreakBreak, renderStreakRecoveryCard, weekStoryData, weekStorySlides, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
@@ -686,6 +686,53 @@ ok('freezeAward: earned at 14', A.freezeAward(14, 7) === true);
 ok('freezeAward: not at 8', A.freezeAward(8, 7) === false);
 ok('freezeAward: not re-earned at the same streak length', A.freezeAward(7, 7) === false);
 ok('freezeAward: nothing at streak 0', A.freezeAward(0, 0) === false);
+// ── streakBreak: the churn moment. Must fire on a real loss and stay quiet otherwise ──
+const _sbToday = '2026-08-20';
+const _sbSet = (arr) => new Set(arr);
+// A 5-day chain ending 08-18, today 08-20. `missed` is 1, not 2: only 08-19 was
+// missed — today isn't a missed day until it's over.
+ok('streakBreak: a broken 5-day chain is detected with the right day count',
+  (() => { const r = A.streakBreak(_sbSet(['2026-08-18','2026-08-17','2026-08-16','2026-08-15','2026-08-14']), _sbSet([]), _sbToday);
+    return r && r.broken === 5 && r.missed === 1; })());
+ok('streakBreak: two missed days are counted as two',
+  (() => { const r = A.streakBreak(_sbSet(['2026-08-17','2026-08-16','2026-08-15']), _sbSet([]), _sbToday);
+    return r && r.broken === 3 && r.missed === 2; })());
+ok('streakBreak: silent when today is already logged',
+  A.streakBreak(_sbSet([_sbToday,'2026-08-18','2026-08-17','2026-08-16']), _sbSet([]), _sbToday) === null);
+ok('streakBreak: silent when yesterday was logged (streak alive)',
+  A.streakBreak(_sbSet(['2026-08-19','2026-08-18','2026-08-17']), _sbSet([]), _sbToday) === null);
+ok('streakBreak: silent for a chain shorter than 3 days (no funeral for a blip)',
+  A.streakBreak(_sbSet(['2026-08-18','2026-08-17']), _sbSet([]), _sbToday) === null);
+ok('streakBreak: silent for a long-dormant account (no poke two months later)',
+  A.streakBreak(_sbSet(['2026-06-01','2026-05-31','2026-05-30','2026-05-29']), _sbSet([]), _sbToday) === null);
+ok('streakBreak: a frozen day counts toward the broken chain',
+  (() => { const r = A.streakBreak(_sbSet(['2026-08-18','2026-08-16','2026-08-15']), _sbSet(['2026-08-17']), _sbToday);
+    return r && r.broken === 4; })());
+// ── the recovery card itself: fires, says the right things, and can be dismissed ──
+const _rcToday = A.todayStr();
+const _rcShift = (n) => { const x = new Date(_rcToday + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+const _rcBase = (over) => Object.assign({
+  profile: { pillars: dp }, days: [], weeks: [], weights: [], books: [], vocab: [],
+  takeaways: [], library: [], ideas: [], contacts: [], finance: {}
+}, over || {});
+A.state.data = _rcBase({ days: [2, 3, 4, 5, 6, 7].map(n => ({ date: _rcShift(-n) })) });
+const _rcBreak = A.currentStreakBreak();
+ok('recovery: a 6-day chain broken 2 days ago is detected live',
+  _rcBreak && _rcBreak.broken === 6 && _rcBreak.missed === 1, JSON.stringify(_rcBreak));
+const _rcHtml = A.renderStreakRecoveryCard();
+ok('recovery: the card renders', _rcHtml.length > 0);
+ok('recovery: it names the streak that ended', /6-day streak ended/.test(_rcHtml));
+ok('recovery: it points at evidence the habit is real (total days logged)', /6 days<\/b> in total/.test(_rcHtml));
+ok('recovery: it makes the next step small and explicit', /One log today starts the next chain/.test(_rcHtml) && /30 seconds/.test(_rcHtml));
+ok('recovery: it explicitly removes the pressure to catch up', /do not need to make up the days/.test(_rcHtml));
+ok('recovery: it offers a log action and a decline', /dismissRecovery\(true\)/.test(_rcHtml) && /dismissRecovery\(false\)/.test(_rcHtml));
+ok('recovery: no shame language', !/fail|lost|broke your|shame|disappoint/i.test(_rcHtml.replace(/streak ended/g, '')));
+// dismissing for the day hides it
+A.state.data.profile._recoveryDismissed = _rcToday;
+ok('recovery: dismissing hides the card for the rest of the day', A.renderStreakRecoveryCard() === '');
+// an active streak never sees it
+A.state.data = _rcBase({ days: [0, 1, 2, 3].map(n => ({ date: _rcShift(-n) })) });
+ok('recovery: someone with an active streak never sees the card', A.renderStreakRecoveryCard() === '');
 // loggingStreak honours frozen days end-to-end
 A.state.data = { profile: { pillars: dp, frozen: [_sd1] }, weeks: [], weights: [], days: [{ date: _sd2 }, { date: _sd0 }] };
 eq('loggingStreak: a stored frozen day keeps the chain at 3', A.loggingStreak(), 3);
