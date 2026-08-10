@@ -3497,6 +3497,15 @@ body.auth-active .fab-btn { display: none !important; }
   .adm-ai-num { width: 100%; padding-left: 28px; }
 }
 
+/* ── Growth stage chip (beside the streak number) ─────────────────────
+   Reads as a quiet status line, not a second headline — the number stays the
+   hero, this tells you what it means. */
+.streak-grow { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; margin-top: 6px; }
+.streak-grow-ico { font-size: 15px; line-height: 1; }
+.streak-grow-name { font-size: 13px; font-weight: 800; color: var(--primary); }
+.streak-grow-next { font-size: 11.5px; color: var(--muted); }
+@media (max-width: 420px) { .streak-grow-next { width: 100%; } }
+
 /* ── Streak recovery ─────────────────────────────────────────────────
    Deliberately warm, not alarming: a broken streak is a nudge to return, not
    an error state. Amber accent rather than red, and no heavy fill. */

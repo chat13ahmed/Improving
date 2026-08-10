@@ -62,7 +62,7 @@ function loadApp(fieldValues) {
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
-    ' loggingStreak, bestStreak, computeStreak, freezeToUse, freezeAward, streakBreak, currentStreakBreak, renderStreakRecoveryCard, weekStoryData, weekStorySlides, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
+    ' loggingStreak, bestStreak, computeStreak, freezeToUse, freezeAward, streakBreak, growthStage, currentStreakBreak, renderStreakRecoveryCard, weekStoryData, weekStorySlides, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
@@ -721,12 +721,27 @@ ok('recovery: a 6-day chain broken 2 days ago is detected live',
   _rcBreak && _rcBreak.broken === 6 && _rcBreak.missed === 1, JSON.stringify(_rcBreak));
 const _rcHtml = A.renderStreakRecoveryCard();
 ok('recovery: the card renders', _rcHtml.length > 0);
-ok('recovery: it names the streak that ended', /6-day streak ended/.test(_rcHtml));
+ok('recovery: it names the streak that lapsed', /6-day streak needs water/.test(_rcHtml));
 ok('recovery: it points at evidence the habit is real (total days logged)', /6 days<\/b> in total/.test(_rcHtml));
-ok('recovery: it makes the next step small and explicit', /One log today starts the next chain/.test(_rcHtml) && /30 seconds/.test(_rcHtml));
+ok('recovery: it makes the next step small and explicit', /it starts growing again/.test(_rcHtml) && /30 seconds/.test(_rcHtml));
 ok('recovery: it explicitly removes the pressure to catch up', /do not need to make up the days/.test(_rcHtml));
+ok('recovery: it reassures that nothing logged was destroyed', /nothing you built is gone/i.test(_rcHtml));
 ok('recovery: it offers a log action and a decline', /dismissRecovery\(true\)/.test(_rcHtml) && /dismissRecovery\(false\)/.test(_rcHtml));
-ok('recovery: no shame language', !/fail|lost|broke your|shame|disappoint/i.test(_rcHtml.replace(/streak ended/g, '')));
+ok('recovery: no shame language', !/fail|lost|broke your|shame|disappoint/i.test(_rcHtml));
+// ── growth stages: a number resets to zero, a growing thing can be watered ──
+eq('growth: nothing logged yet → ready to plant', A.growthStage(0).name, 'Ready to plant');
+eq('growth: day 1 already shows something alive', A.growthStage(1).name, 'Planted');
+eq('growth: 3 days sprouts', A.growthStage(3).name, 'Sprouting');
+eq('growth: a full week is Growing', A.growthStage(7).name, 'Growing');
+eq('growth: 30 days is Rooted', A.growthStage(30).name, 'Rooted');
+eq('growth: 100 days is the final stage', A.growthStage(100).name, 'Flourishing');
+ok('growth: mid-stage keeps the lower stage (day 5 is still Sprouting)', A.growthStage(5).name === 'Sprouting');
+ok('growth: it names the next stage and the days to reach it',
+  A.growthStage(3).next === 'Growing' && A.growthStage(3).toNext === 4);
+ok('growth: the final stage has no "next" to chase', A.growthStage(500).next === null && A.growthStage(500).pct === 100);
+ok('growth: progress through a stage is a sane 0–100', [0, 1, 4, 10, 20, 60].every(n => { const p = A.growthStage(n).pct; return p >= 0 && p <= 100; }));
+ok('growth: a negative or junk streak degrades to the first stage',
+  A.growthStage(-5).name === 'Ready to plant' && A.growthStage(undefined).name === 'Ready to plant');
 // dismissing for the day hides it
 A.state.data.profile._recoveryDismissed = _rcToday;
 ok('recovery: dismissing hides the card for the rest of the day', A.renderStreakRecoveryCard() === '');

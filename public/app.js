@@ -3553,18 +3553,21 @@ function renderStreakRecoveryCard() {
   const best = bestStreak();
   const totalDays = (state.data.days || []).length;
   const dayWord = b.missed === 1 ? 'day' : 'days';
+  // Growth framing, not summit framing. A missed summit is a failure; an unwatered
+  // plant is just thirsty. Same facts, and the second one gets people back.
   return '<div class="card recovery-card">' +
-    '<div class="recovery-top"><span class="recovery-ico" aria-hidden="true">🏔️</span>' +
-    '<h3 class="card-title" style="margin-bottom:0">Your ' + b.broken + '-day streak ended</h3></div>' +
-    '<p class="card-sub">You missed ' + b.missed + ' ' + dayWord + '. That happens to everyone who does this long enough — ' +
-      'and it says nothing about whether you can keep going. ' +
-      'You have logged <b>' + totalDays + ' day' + (totalDays === 1 ? '' : 's') + '</b> in total' +
-      (best > b.broken ? ' and your record is <b>' + best + ' days</b>' : '') +
-      ', so the habit is already real.</p>' +
-    '<p class="card-sub"><b>One log today starts the next chain.</b> It takes about 30 seconds — ' +
-      'you do not need to make up the days you missed.</p>' +
+    '<div class="recovery-top"><span class="recovery-ico" aria-hidden="true">🌱</span>' +
+    '<h3 class="card-title" style="margin-bottom:0">Your ' + b.broken + '-day streak needs water</h3></div>' +
+    '<p class="card-sub">You missed ' + b.missed + ' ' + dayWord + ', so the count restarts — but ' +
+      '<b>nothing you built is gone</b>. Everything you logged is still there, and ' +
+      'so is the habit underneath it. ' +
+      'You have checked in <b>' + totalDays + ' day' + (totalDays === 1 ? '' : 's') + '</b> in total' +
+      (best > b.broken ? ' and grown a <b>' + best + '-day</b> run before' : '') +
+      '. This happens to everyone who keeps at something long enough.</p>' +
+    '<p class="card-sub"><b>One check-in today and it starts growing again.</b> About 30 seconds — ' +
+      'and you do not need to make up the days you missed.</p>' +
     '<div class="recovery-actions">' +
-      '<button type="button" class="btn btn-primary" onclick="dismissRecovery(true)">Log today →</button>' +
+      '<button type="button" class="btn btn-primary" onclick="dismissRecovery(true)">Check in today →</button>' +
       '<button type="button" class="btn btn-outline" onclick="dismissRecovery(false)">Not now</button>' +
     '</div></div>';
 }
@@ -3596,6 +3599,33 @@ function bestStreak() {
   }
   return best;
 }
+// ── Growth stages ────────────────────────────────────────────────────
+// A bare number resets to 0 and reads as a verdict. A growing thing reads as
+// accumulated investment — and, unlike a summit, it can be watered back to life.
+// That difference matters most at the moment people quit: a broken chain.
+// Stages are deliberately front-loaded (day 1 already shows something alive) so
+// the first check-in is rewarded, not just the seventh. (testable)
+const GROWTH_STAGES = [
+  { min: 0,  icon: '🌱', name: 'Ready to plant', blurb: 'Check in today and something starts growing.' },
+  { min: 1,  icon: '🌱', name: 'Planted',        blurb: 'It’s in the ground. Water it tomorrow.' },
+  { min: 3,  icon: '🌿', name: 'Sprouting',      blurb: 'Three days in — roots are taking hold.' },
+  { min: 7,  icon: '🍃', name: 'Growing',        blurb: 'A full week. This is what tending looks like.' },
+  { min: 14, icon: '🌾', name: 'Established',    blurb: 'Two weeks. It survives a bad day now.' },
+  { min: 30, icon: '🌳', name: 'Rooted',         blurb: 'A month. This isn’t motivation any more — it’s habit.' },
+  { min: 100, icon: '🏞️', name: 'Flourishing',   blurb: 'A hundred days. You built something that lasts.' }
+];
+function growthStage(streak) {
+  const n = Math.max(0, streak | 0);
+  let cur = GROWTH_STAGES[0], next = null;
+  for (const s of GROWTH_STAGES) { if (n >= s.min) cur = s; else { next = s; break; } }
+  return {
+    icon: cur.icon, name: cur.name, blurb: cur.blurb,
+    next: next ? next.name : null,
+    toNext: next ? next.min - n : 0,
+    // How far through the current stage, for a progress ring (0–100).
+    pct: next ? Math.round((n - cur.min) / (next.min - cur.min) * 100) : 100
+  };
+}
 // Prominent streak card — the 'don't break the chain' pressure (resets the count, never the data)
 function renderStreakCard() {
   const days = state.data.days || [];
@@ -3618,10 +3648,19 @@ function renderStreakCard() {
   const storyBtn = days.length >= 2
     ? '<button type="button" class="streak-story" onclick="openWeekStory()">✨ Your week in review</button>'
     : '';
+  // The stage sits beside the number rather than replacing it: the count is the
+  // fact, the stage is what the count MEANS. Losing 12 days hurts less when what
+  // you see is a rooted plant that needs water, not a counter about to hit zero.
+  const g = growthStage(cur);
+  const grow = '<div class="streak-grow" title="' + escapeAttr(g.blurb) + '">' +
+      '<span class="streak-grow-ico" aria-hidden="true">' + g.icon + '</span>' +
+      '<span class="streak-grow-name">' + escapeHtml(g.name) + '</span>' +
+      (g.next ? '<span class="streak-grow-next">' + g.toNext + ' more day' + (g.toNext === 1 ? '' : 's') + ' → ' + escapeHtml(g.next) + '</span>' : '') +
+    '</div>';
   return '<div class="card streak-card' + (urgent ? ' streak-urgent' : '') + '">' +
     '<div class="streak-flame"></div>' +
     '<div class="streak-main"><div class="streak-num">' + cur + '</div><div class="streak-unit">day' + (cur === 1 ? '' : 's') + ' streak</div></div>' +
-    '<div class="streak-msg">' + msg + (best > 0 ? '<div class="streak-best">Best: ' + best + ' day' + (best === 1 ? '' : 's') + '</div>' : '') + freezeChip + storyBtn + '</div>' +
+    '<div class="streak-msg">' + msg + grow + (best > 0 ? '<div class="streak-best">Best: ' + best + ' day' + (best === 1 ? '' : 's') + '</div>' : '') + freezeChip + storyBtn + '</div>' +
     '</div>';
 }
 function weekShareStats() {
