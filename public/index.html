@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
-  <link rel="stylesheet" href="style.css?v=204">
+  <link rel="stylesheet" href="style.css?v=205">
   <script src="vendor/chart.umd.min.js"></script>
   <script src="vendor/marked.min.js"></script>
 </head>
@@ -44,40 +44,57 @@
         <div class="brand-sub">Life Progress</div>
       </div>
     </div>
+    <!-- Grouped into three tiers. Eleven flat items sat at identical weight, so
+         "Settings" competed with the core daily action and every visit meant
+         re-reading the whole list. Groups let you jump to a section instead.
+         The middle group is exactly the set the focus-area gating can hide, so
+         it collapses cleanly for someone tracking only one part of their life.
+         Labels are aria-hidden and the group carries aria-label, so a screen
+         reader hears the grouping once rather than twice. -->
     <nav class="sidebar-nav" aria-label="Main navigation">
-      <a href="#" class="nav-item active" data-page="dashboard">
-        <span class="nav-icon"></span><span>Home</span>
-      </a>
-      <a href="#" class="nav-item" data-page="log">
-        <span class="nav-icon"></span><span>Check In</span>
-      </a>
-      <a href="#" class="nav-item" data-page="checklist">
-        <span class="nav-icon"></span><span>Checklist</span>
-      </a>
-      <a href="#" class="nav-item" data-page="health">
-        <span class="nav-icon"></span><span>Health</span>
-      </a>
-      <a href="#" class="nav-item" data-page="business">
-        <span class="nav-icon"></span><span>Business</span><span class="nav-badge" id="business-badge" style="display:none"></span>
-      </a>
-      <a href="#" class="nav-item" data-page="knowledge">
-        <span class="nav-icon"></span><span>Knowledge</span>
-      </a>
-      <a href="#" class="nav-item" data-page="community">
-        <span class="nav-icon"></span><span>Community</span>
-      </a>
-      <a href="#" class="nav-item" data-page="coach">
-        <span class="nav-icon"></span><span>AI Coach</span>
-      </a>
-      <a href="#" class="nav-item" data-page="history">
-        <span class="nav-icon"></span><span>Progress</span>
-      </a>
-      <a href="#" class="nav-item" data-page="settings">
-        <span class="nav-icon"></span><span>Settings</span>
-      </a>
-      <a href="#" class="nav-item nav-admin" data-page="admin" style="display:none">
-        <span class="nav-icon"></span><span>Admin</span>
-      </a>
+      <div class="nav-group" role="group" aria-label="Daily">
+        <div class="nav-group-label" aria-hidden="true">Daily</div>
+        <a href="#" class="nav-item active" data-page="dashboard">
+          <span class="nav-icon"></span><span>Home</span>
+        </a>
+        <!-- The action the whole product depends on — given visual priority. -->
+        <a href="#" class="nav-item nav-item-primary" data-page="log">
+          <span class="nav-icon"></span><span>Check In</span>
+        </a>
+        <a href="#" class="nav-item" data-page="checklist">
+          <span class="nav-icon"></span><span>Checklist</span>
+        </a>
+        <a href="#" class="nav-item" data-page="coach">
+          <span class="nav-icon"></span><span>Coach</span>
+        </a>
+      </div>
+      <div class="nav-group" role="group" aria-label="Your areas" data-group="hubs">
+        <div class="nav-group-label" aria-hidden="true">Your areas</div>
+        <a href="#" class="nav-item" data-page="health">
+          <span class="nav-icon"></span><span>Health</span>
+        </a>
+        <a href="#" class="nav-item" data-page="business">
+          <span class="nav-icon"></span><span>Business</span><span class="nav-badge" id="business-badge" style="display:none"></span>
+        </a>
+        <a href="#" class="nav-item" data-page="knowledge">
+          <span class="nav-icon"></span><span>Knowledge</span>
+        </a>
+      </div>
+      <div class="nav-group" role="group" aria-label="More">
+        <div class="nav-group-label" aria-hidden="true">More</div>
+        <a href="#" class="nav-item" data-page="community">
+          <span class="nav-icon"></span><span>Community</span>
+        </a>
+        <a href="#" class="nav-item" data-page="history">
+          <span class="nav-icon"></span><span>Progress</span>
+        </a>
+        <a href="#" class="nav-item" data-page="settings">
+          <span class="nav-icon"></span><span>Settings</span>
+        </a>
+        <a href="#" class="nav-item nav-admin" data-page="admin" style="display:none">
+          <span class="nav-icon"></span><span>Admin</span>
+        </a>
+      </div>
     </nav>
     <div class="sidebar-footer"></div>
   </aside>
@@ -116,7 +133,7 @@
     </button>
   </nav>
 
-  <script src="app.js?v=230"></script>
+  <script src="app.js?v=231"></script>
   <script>
     if ('serviceWorker' in navigator) {
       // updateViaCache:'none' — always revalidate sw.js itself, so a new deploy's

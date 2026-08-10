@@ -268,7 +268,27 @@ body {
 .brand-title { font-size: 15px; font-weight: 800; color: var(--text); line-height: 1.2; letter-spacing: -0.3px; }
 .brand-sub { font-size: 10px; color: var(--text-muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 1.5px; }
 
-.sidebar-nav { flex: 1; padding: 16px 12px; display: flex; flex-direction: column; gap: 3px; }
+.sidebar-nav { flex: 1; padding: 16px 12px; display: flex; flex-direction: column; gap: 3px; overflow-y: auto; }
+/* ── Grouped navigation ───────────────────────────────────────────────
+   Items stay 3px apart inside a group; groups get real air between them so
+   the eye lands on a section first and scans three or four items, not eleven. */
+.nav-group { display: flex; flex-direction: column; gap: 3px; }
+.nav-group + .nav-group { margin-top: 14px; }
+.nav-group-label {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--faint, var(--muted)); padding: 0 10px 5px;
+}
+/* A group whose every item is hidden by the focus-area gating collapses,
+   label included — set from applyNavVisibility(). */
+.nav-group[hidden] { display: none; }
+/* Check In is the action the product depends on, so it reads as the primary
+   destination — a tinted rail and an accent icon, not a heavy button that would
+   shout over the active-page state. */
+.nav-item-primary { box-shadow: inset 2px 0 0 var(--primary-solid, var(--primary)); }
+.nav-item-primary .nav-icon { color: var(--primary-solid, var(--primary)); }
+.nav-item-primary.active { box-shadow: none; }
+[data-theme="dark"] .nav-item-primary { box-shadow: inset 2px 0 0 var(--primary); }
+[data-theme="dark"] .nav-item-primary .nav-icon { color: var(--primary); }
 /* Line icons (currentColor → theme + active state aware) */
 .nav-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 20px; }
 .nav-icon svg { width: 18px; height: 18px; display: block; }

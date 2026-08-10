@@ -1332,6 +1332,13 @@ function applyNavVisibility() {
   });
   const adminNav = document.querySelector('.nav-item[data-page="admin"]');   // owner-only console
   if (adminNav) adminNav.style.display = state.isOwner ? '' : 'none';
+  // A section heading with nothing under it is worse than no heading, so a group
+  // whose every item is hidden disappears entirely. Matters for someone tracking
+  // one part of their life: all three hubs off should leave no orphan "Your areas".
+  document.querySelectorAll('.sidebar-nav .nav-group').forEach(g => {
+    const anyVisible = [...g.querySelectorAll('.nav-item')].some(el => el.style.display !== 'none');
+    g.hidden = !anyVisible;
+  });
   // If we're sitting on a hub that just got hidden, fall back to the dashboard.
   if (HUB_PILLARS[state.page] && !hubEnabled(state.page)) navigate('dashboard');
 }
