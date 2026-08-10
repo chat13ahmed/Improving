@@ -760,9 +760,20 @@ ok('pendingShareMilestone suppressed once that milestone is seen', (() => { A.st
     { date: d0, gym: { done: true }, reading: { pages: 20 }, networking: { count: 2 } }
   ] };
   const sd = A.weekStoryData();
-  ok('weekStoryData: counts days logged this week', sd.daysLogged === 2);
-  ok('weekStoryData: only enabled pillars appear in the stats', sd.stats.every(s => ['Gym', 'Reading', 'Networking'].includes(s.label)) && sd.stats.length >= 1);
-  ok('weekStoryData: reading pages summed for the week', (sd.stats.find(s => s.label === 'Reading') || {}).value === 50);
+  // Expectations are DERIVED, not hardcoded: when today is the first day of the
+  // week, yesterday belongs to the previous week and is correctly excluded. The
+  // old fixed values (2 days / 50 pages) failed one day in seven — silently, since
+  // CI only noticed on whichever weekday it happened to run.
+  const _wkStart = A.getWeekStart(d0);
+  const _inWeek = [{ d: d1, pages: 30 }, { d: d0, pages: 20 }].filter(x => x.d >= _wkStart);
+  const _expDays = _inWeek.length;
+  const _expPages = _inWeek.reduce((n, x) => n + x.pages, 0);
+  ok('weekStoryData: counts days logged this week', sd.daysLogged === _expDays,
+    'got ' + sd.daysLogged + ' expected ' + _expDays + ' (week starts ' + _wkStart + ')');
+  ok('weekStoryData: only enabled pillars appear in the stats', sd.stats.every(s => ['Training', 'Reading', 'Networking'].includes(s.label)) && sd.stats.length >= 1,
+    sd.stats.map(s => s.label).join(','));
+  ok('weekStoryData: reading pages summed for the week', (sd.stats.find(s => s.label === 'Reading') || {}).value === _expPages,
+    'expected ' + _expPages);
   ok('weekStoryData: goals % is a 0–100 number with a label + colour', typeof sd.goalsPct === 'number' && sd.goalsPct >= 0 && sd.goalsPct <= 100 && !!sd.goalsLabel && /^#/.test(sd.goalsColor));
   const slides = A.weekStorySlides(sd);
   ok('weekStorySlides: always has an intro and a final share slide', slides.length >= 3 && slides[0].html.indexOf('Your week in review') > -1 && slides[slides.length - 1].last === true);

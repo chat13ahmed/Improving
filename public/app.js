@@ -80,7 +80,7 @@ const SECURITY_QUESTIONS = [
 //   reading    → reading  "Pages + summary, with a book tracker"
 // ─────────────────────────────────────────────────────────────
 const PILLAR_META = {
-  gym:        { type: 'boolean', cls: 'gym',     defaultLabel: 'Gym',        defaultIcon: '', goalKey: 'gymDaysPerWeek',   measures: 'Did you do it? — builds a daily streak' },
+  gym:        { type: 'boolean', cls: 'gym',     defaultLabel: 'Training',        defaultIcon: '', goalKey: 'gymDaysPerWeek',   measures: 'Did you do it? — builds a daily streak' },
   food:       { type: 'rating',  cls: 'food',    defaultLabel: 'Food',       defaultIcon: '', goalKey: null,               measures: 'Quality rating from 1 to 5' },
   networking: { type: 'count',   cls: 'network', defaultLabel: 'Networking', defaultIcon: '', goalKey: 'weeklyNetworkGoal', measures: 'How many today? — a daily count' },
   money:      { type: 'amount',  cls: 'money',   defaultLabel: 'Income',     defaultIcon: '', goalKey: 'weeklyIncomeGoal', measures: 'A dollar amount + what you did' },
@@ -92,7 +92,7 @@ const PILLAR_PRESETS = {
   sales: {
     name: 'Sales Hustler', desc: 'Gym · Food · Networking · Income · Reading',
     pillars: {
-      gym:        { enabled: true, label: 'Gym',        icon: '' },
+      gym:        { enabled: true, label: 'Training',        icon: '' },
       food:       { enabled: true, label: 'Food',       icon: '' },
       networking: { enabled: true, label: 'Networking', icon: '' },
       money:      { enabled: true, label: 'Income',     icon: '' },
@@ -6221,7 +6221,7 @@ function renderDashboard() {
     '<div class="score-right">' +
     '<div class="score-label">' + scoreLabel + '</div>' +
     '<div class="score-sub">of your weekly goals reached, across ' + onCount + ' active pillar' + (onCount === 1 ? '' : 's') + '</div>' +
-    '<button class="btn btn-outline" style="margin-top:12px;padding:7px 14px;font-size:13px" onclick="navigate(\'log\')">Log Today</button>' +
+    '<button class="btn btn-outline" style="margin-top:12px;padding:7px 14px;font-size:13px" onclick="navigate(\'log\')">Check In</button>' +
     '</div>' +
     '<div class="score-goals">' +
     goalRows.join('') +
@@ -6258,7 +6258,7 @@ function renderDashboard() {
   document.getElementById('main').innerHTML =
     renderMountainHero() +
     '<div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">' +
-    '<div><h2 class="page-title">Dashboard</h2>' +
+    '<div><h2 class="page-title">Your week</h2>' +
     '<p class="page-sub">Week of ' + formatWeekRange(getWeekStart(todayStr())) + '</p></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="openWeekRecap()">Week recap</button>' : '') +
@@ -6828,7 +6828,7 @@ function renderLogToday(editDay) {
 
   // Boolean ("did you do it?") pillar — uses the gym slot
   const gymP = pillar('gym');
-  const gymIsDefault = gymP.label === 'Gym';
+  const gymIsDefault = gymP.label === 'Training';
 
   const gymToggle =
     '<div class="gym-toggle">' +
@@ -6866,7 +6866,7 @@ function renderLogToday(editDay) {
 
   document.getElementById('main').innerHTML =
     '<div class="page-header">' +
-    '<h2 class="page-title">' + (isEditing ? 'Edit Day' : 'Log Today') + '</h2>' +
+    '<h2 class="page-title">' + (isEditing ? 'Edit Day' : 'Check In') + '</h2>' +
     '<p class="page-sub">' + (isEditing ? 'Update this entry' : 'Share everything about your day — takes about 2 minutes') + '</p>' +
     '</div>' +
     editBanner + prevNoteBanner +
@@ -8954,7 +8954,7 @@ function renderHistoryPage() {
   const view = state._historyView || 'list';
 
   document.getElementById('main').innerHTML =
-    '<div class="page-header"><h2 class="page-title">History</h2>' +
+    '<div class="page-header"><h2 class="page-title">Progress</h2>' +
     '<p class="page-sub">All your logged days</p></div>' +
     summaryHtml +
     '<div class="dash-section">All entries</div>' +
@@ -9559,7 +9559,7 @@ function showQuickLog() {
   const streak = getGymStreak();
 
   const gymP = pillar('gym'), foodP = pillar('food'), netP = pillar('networking'), moneyP = pillar('money'), readP = pillar('reading');
-  const gymIsDefault = gymP.label === 'Gym';
+  const gymIsDefault = gymP.label === 'Training';
 
   // Pre-fill from recent history ONLY for a fresh day (so editing keeps real values)
   const dflt = existing ? null : recentDefaults();
@@ -10230,7 +10230,7 @@ function setKnowledgeTab(t) { state._knowledgeTab = t; renderKnowledgePage(); }
 // ═══════════════════════════════════════════════════════════════
 const LIBRARY_TYPES = [
   { key: 'person', label: 'Person', icon: '👤' },
-  { key: 'history', label: 'History', icon: '🏛️' },
+  { key: 'history', label: 'Progress', icon: '🏛️' },
   { key: 'theory', label: 'Theory', icon: '🧠' },
   { key: 'concept', label: 'Concept', icon: '💡' },
   { key: 'quote', label: 'Quote', icon: '❝' },
@@ -12276,7 +12276,7 @@ function exportDaysCSV() {
     d.food && d.food.rating || '', d.networking && d.networking.count || '', d.money && d.money.activities || '', d.spent || '',
     d.reading && d.reading.pages || '', d.reading && d.reading.summary || '', d.water || '', d.calories || '', d.notes || ''
   ].map(esc).join(','));
-  downloadFile('business-escalate-log-' + todayStr() + '.csv', header.join(',') + '\n' + rows.join('\n'), 'text/csv');
+  downloadFile('onward-log-' + todayStr() + '.csv', header.join(',') + '\n' + rows.join('\n'), 'text/csv');
   showToast('Daily log CSV downloaded ', 'success');
 }
 
@@ -13143,7 +13143,7 @@ function renderAdminConsole(j) {
   const P = j.pillars || {}, F = j.features || {};
   const adoption = admSection('Feature adoption', 'What people actually turn on and use',
     '<div class="adm-sub-label">Pillars enabled</div>' +
-    barRow('Gym', P.gym || 0, 'var(--gym-color)') + barRow('Nutrition', P.food || 0, 'var(--food-color)') +
+    barRow('Training', P.gym || 0, 'var(--gym-color)') + barRow('Nutrition', P.food || 0, 'var(--food-color)') +
     barRow('Networking', P.networking || 0, 'var(--network-color)') + barRow('Money', P.money || 0, 'var(--money-color)') +
     barRow('Reading', P.reading || 0, 'var(--read-color)') +
     '<div class="adm-sub-label" style="margin-top:16px">Modules used</div>' +

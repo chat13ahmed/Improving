@@ -2278,7 +2278,10 @@ body.wo-fullscreen .bottom-nav { display: none !important; }   /* workout is an 
     padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); box-shadow: 0 -2px 14px rgba(15,23,42,0.07); }
   .bnav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
     background: none; border: none; cursor: pointer; padding: 7px 4px; border-radius: 12px;
-    font-size: 11px; font-weight: 700; color: var(--text-muted); text-decoration: none; transition: background .15s, color .15s; }
+    font-size: 11px; font-weight: 700; color: var(--text-muted); text-decoration: none; transition: background .15s, color .15s;
+    /* A two-word label ("Check In") must never wrap — it would make one tab
+       taller than its neighbours and knock the whole bar out of alignment. */
+    white-space: nowrap; }
   .bnav-item.active { color: var(--primary); background: rgba(52,211,153,0.10); }
   .bnav-ico { display: flex; }
   .bnav-ico svg { width: 23px; height: 23px; display: block; }
