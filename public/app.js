@@ -4292,7 +4292,7 @@ function dailyQuests() {
       sub: done ? stats.networkCount + ' connections this week.' : Math.max(0, goal - stats.networkCount) + ' left for the week. One message counts.',
       done,
       action: 'navigate(\'contacts\')',
-      cta: 'Contacts'
+      cta: 'Network'
     });
   }
 
@@ -8155,7 +8155,7 @@ function renderHealthNutrition(nut, td, eatenCal, eatenP) {
 // ─────────────────────────────────────────────────────────────
 function businessTabs(active) {
   const tab = (id, target, label) => '<button type="button" class="biz-tab' + (active === id ? ' on' : '') + '" onclick="navigate(\'' + target + '\')">' + label + '</button>';
-  return '<div class="biz-tabs">' + tab('overview', 'business', 'Overview') + tab('finances', 'finances', 'Finances') + tab('ideas', 'ideas', 'Ideas') + tab('contacts', 'contacts', 'Contacts') + '</div>';
+  return '<div class="biz-tabs">' + tab('overview', 'business', 'Overview') + tab('finances', 'finances', 'Finances') + tab('ideas', 'ideas', 'Ideas') + tab('contacts', 'contacts', 'Network') + '</div>';
 }
 function renderBusinessPage() {
   updateNavBadges();
@@ -8729,7 +8729,7 @@ function renderContactsPage() {
   const dueCount = all.filter(c => openC(c) && c.followUpDate && c.followUpDate <= today).length;
   const statsBar = all.length > 0
     ? '<div class="contacts-stats">' +
-      '<div class="cs-item"><span>Contacts</span><strong>' + all.length + '</strong></div>' +
+      '<div class="cs-item"><span>Network</span><strong>' + all.length + '</strong></div>' +
       '<div class="cs-item"><span>Due now</span><strong style="color:' + (dueCount > 0 ? 'var(--danger)' : 'var(--success)') + '">' + dueCount + '</strong></div>' +
       '<div class="cs-item" title="Total value of all live deals"><span>Pipeline</span><strong>$' + pv.open.toLocaleString() + '</strong></div>' +
       '<div class="cs-item" title="Deal values weighted by how likely each stage is to close"><span>Expected</span><strong style="color:var(--accent)">$' + pv.weighted.toLocaleString() + '</strong></div>' +
@@ -8773,7 +8773,7 @@ function renderContactsPage() {
     '</form></div>';
 
   document.getElementById('main').innerHTML =
-    '<div class="page-header"><h2 class="page-title">Contacts</h2>' +
+    '<div class="page-header"><h2 class="page-title">Network</h2>' +
     '<p class="page-sub">Your network is your pipeline. Nurture it — never let a warm lead go cold.</p></div>' +
     businessTabs('contacts') +
     statsBar + renderDealPlaybookCard() + searchBar + addForm +
@@ -13148,7 +13148,7 @@ function renderAdminConsole(j) {
     barRow('Reading', P.reading || 0, 'var(--read-color)') +
     '<div class="adm-sub-label" style="margin-top:16px">Modules used</div>' +
     barRow('Books', F.books || 0, 'var(--read-color)') + barRow('Business ideas', F.ideas || 0, 'var(--primary)') +
-    barRow('Contacts', F.contacts || 0, 'var(--network-color)') + barRow('Vocabulary', F.vocab || 0, 'var(--read-color)') +
+    barRow('Network', F.contacts || 0, 'var(--network-color)') + barRow('Vocabulary', F.vocab || 0, 'var(--read-color)') +
     barRow('Key takeaways', F.takeaways || 0, 'var(--accent)'));
 
   const money = admSection('Revenue & reach', 'Estimated from Pro members × your price',
