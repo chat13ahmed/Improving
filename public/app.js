@@ -6299,7 +6299,12 @@ function renderDashboard() {
   const gBanners = renderNeverMissTwice() + renderReminderBanner() + renderTrialBanner();
   const gContext = renderWhyCard() + renderSetupCard() + renderNextStep();
   const gGoals   = renderGoalCard() + scoreHtml;
-  const gridCards = renderNextWorkoutCard() + renderChecklistCard() + renderStreakCard() + focusHtml;
+  // The streak used to be the THIRD card inside this grid, which is itself the
+  // last section — measured 1,500px down the page, several screens on a phone.
+  // It's the retention driver ("don't break the chain") and now carries the
+  // growth stage, so it belongs above the fold, not buried. Pulled out and
+  // promoted below; .streak-card is a flex row, so it works full-width too.
+  const gridCards = renderNextWorkoutCard() + renderChecklistCard() + focusHtml;
   const gGrid    = gridCards.trim() ? '<div class="dash-grid">' + gridCards + '</div>' : '';
   document.getElementById('main').innerHTML =
     renderMountainHero() +
@@ -6310,7 +6315,10 @@ function renderDashboard() {
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="openWeekRecap()">Week recap</button>' : '') +
     (hasDays ? '<button class="btn btn-outline btn-sm" onclick="shareMyWeek()">Share</button>' : '') +
     '</div></div>' +
+    // Order follows what someone opening a "30 seconds a day" app actually asks:
+    // 1. did I break something?  2. how am I doing?  3. what do I do now?
     renderStreakRecoveryCard() +
+    (hasDays ? renderStreakCard() : '') +
     gBanners +
     (hasDays ? renderGamePlanCard() : '') +
     gContext +

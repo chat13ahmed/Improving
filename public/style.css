@@ -3499,11 +3499,16 @@ body.auth-active .fab-btn { display: none !important; }
 
 /* ── Growth stage chip (beside the streak number) ─────────────────────
    Reads as a quiet status line, not a second headline — the number stays the
-   hero, this tells you what it means. */
+   hero, this tells you what it means.
+   Measured on the streak card's own tinted ground (15% #f97316): NO single
+   colour clears 4.5:1 in both themes — light needs a dark orange, dark needs a
+   light one. The green this started as was 2.61:1 in dark mode, i.e. failing.
+   So it's a theme-aware pair, same convention as the pillar -ink colours. */
 .streak-grow { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; margin-top: 6px; }
 .streak-grow-ico { font-size: 15px; line-height: 1; }
-.streak-grow-name { font-size: 13px; font-weight: 800; color: var(--primary); }
+.streak-grow-name { font-size: 13px; font-weight: 800; color: #9A3412; }   /* 6.27:1 on the light card */
 .streak-grow-next { font-size: 11.5px; color: var(--muted); }
+[data-theme="dark"] .streak-grow-name { color: #FB923C; }                  /* 6.16:1 on the dark card */
 @media (max-width: 420px) { .streak-grow-next { width: 100%; } }
 
 /* ── Streak recovery ─────────────────────────────────────────────────
