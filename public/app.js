@@ -3481,7 +3481,13 @@ function renderStreakCard() {
     '</div>';
   return '<div class="card streak-card' + (urgent ? ' streak-urgent' : '') + '">' +
     '<div class="streak-flame"></div>' +
-    '<div class="streak-main"><div class="streak-num">' + cur + '</div><div class="streak-unit">day' + (cur === 1 ? '' : 's') + ' streak</div></div>' +
+    // The ring fills as you move through the current growth stage, so the number
+    // sits inside visible progress rather than floating on its own.
+    '<div class="streak-ring" style="--stage-pct:' + g.pct + '" role="img" aria-label="' +
+      escapeAttr(cur + ' day streak — ' + g.name + (g.next ? ', ' + g.toNext + ' days to ' + g.next : '')) + '">' +
+      '<span class="streak-ring-arc" aria-hidden="true"></span>' +
+      '<span class="streak-ring-num">' + cur + '</span>' +
+    '</div>' +
     '<div class="streak-msg">' + msg + grow + (best > 0 ? '<div class="streak-best">Best: ' + best + ' day' + (best === 1 ? '' : 's') + '</div>' : '') + freezeChip + storyBtn + '</div>' +
     '</div>';
 }
@@ -6142,7 +6148,12 @@ function renderDashboard() {
     renderStreakRecoveryCard() +
     (hasDays ? renderStreakCard() : '') +
     gBanners +
-    (hasDays ? renderGamePlanCard() : '') +
+    // One clear answer, then the hubs as a count. renderGamePlanCard() listed
+    // every area's top call at equal weight, which is three answers competing
+    // rather than one decision.
+    (hasDays ? renderOneMoveCard() : '') +
+    (hasDays ? renderAreasCard() : '') +
+    (hasDays ? renderWeekStrip() : '') +
     gContext +
     sec('Your goals', gGoals) +
     renderPillarNav() +
@@ -7922,6 +7933,89 @@ function renderGamePlanCard() {
     '<div class="plan-head"><span class="plan-eyebrow">🧭 This week’s game plan</span>' +
     '<span class="plan-sub">' + sub + '</span></div>' +
     '<div class="plan-rows">' + body + '</div></div>';
+}
+
+// ── Today's one move + Your areas ────────────────────────────────────
+// The dashboard used to answer "what should I do now?" FOUR times — game plan,
+// next step, focus card, why card. Four answers to one question means none of
+// them lands. These two cards replace all four: the single most urgent call
+// gets the whole stage, and everything else collapses to a count per hub.
+// Both read from weeklyGamePlan(), so there's no new data layer — just a
+// better shape for what the briefing engines already produce.
+function renderOneMoveCard() {
+  const rows = weeklyGamePlan();
+  if (!rows.length) return '';
+  const top = rows[0];
+  const calm = (top.sev || 0) === 0;   // everything on track — say so, don't invent urgency
+  return '<div class="card onemove-card' + (calm ? ' onemove-calm' : '') + '">' +
+    '<div class="onemove-eyebrow"><span class="onemove-dot" aria-hidden="true"></span>' +
+      (calm ? 'ALL AREAS ON TRACK' : 'TODAY’S ONE MOVE') + '</div>' +
+    '<h3 class="onemove-title">' + escapeHtml(top.title) + '</h3>' +
+    '<p class="onemove-why">' + escapeHtml(stripTags(top.move)) + '</p>' +
+    '<button type="button" class="btn btn-primary onemove-cta" onclick="navigate(\'' + top.page + '\')">' +
+      (calm ? 'Open ' + escapeHtml(top.page) : 'Do this now') + ' <span aria-hidden="true">→</span></button>' +
+    '</div>';
+}
+// The briefing text carries a little inline markup (<b>, <i>); strip it so the
+// summary line stays one clean sentence rather than showing tags.
+function stripTags(s) { return String(s || '').replace(/<[^>]*>/g, ''); }
+
+function renderAreasCard() {
+  // Count from the FULL briefing arrays, not weeklyGamePlan() — that returns
+  // only each hub's top item, so every row would read "1 call" regardless of
+  // how much actually needs attention. The count is the whole point of the row.
+  const areas = [
+    { page: 'health',    label: 'Health',    cls: 'health', on: isPillarOn('gym') || isPillarOn('food'), items: healthBriefing() },
+    { page: 'business',  label: 'Business',  cls: 'biz',    on: true,                                    items: businessBriefing() },
+    { page: 'knowledge', label: 'Knowledge', cls: 'know',   on: isPillarOn('reading'),                   items: knowledgeBriefing() }
+  ].filter(a => a.on);
+  if (!areas.length) return '';
+  const body = areas.map(a => {
+    const calls = a.items.filter(i => (i.sev || 0) >= 2).length;
+    const urgent = a.items.some(i => (i.sev || 0) >= 3);
+    const badge = calls === 0 ? 'On track' : calls + ' call' + (calls === 1 ? '' : 's');
+    const tone = urgent ? 'urgent' : calls > 0 ? 'warn' : 'ok';
+    return '<button type="button" class="areas-row" onclick="navigate(\'' + a.page + '\')">' +
+      '<span class="areas-ico areas-ico-' + a.cls + '" aria-hidden="true">' + areaIconSVG(a.page) + '</span>' +
+      '<span class="areas-name">' + escapeHtml(a.label) + '</span>' +
+      '<span class="areas-badge areas-' + tone + '">' + badge + '</span>' +
+      '<span class="areas-chev" aria-hidden="true">›</span>' +
+      '</button>';
+  }).join('');
+  return '<div class="card areas-card">' +
+    '<div class="areas-head">YOUR AREAS</div>' + body + '</div>';
+}
+// Line icons rather than emoji: emoji render differently on every platform and
+// read as cheap at this size.
+function areaIconSVG(page) {
+  const P = {
+    health:    '<path d="M9 15.4C9 15.4 2.2 11.1 2.2 6.7 2.2 4.4 3.9 2.9 5.9 2.9 7.2 2.9 8.4 3.6 9 4.7 9.6 3.6 10.8 2.9 12.1 2.9 14.1 2.9 15.8 4.4 15.8 6.7 15.8 11.1 9 15.4 9 15.4Z"/>',
+    business:  '<path d="M2.2 6.2h13.6V15H2.2z"/><path d="M6.6 6.2V3.4h4.8v2.8"/>',
+    knowledge: '<path d="M9 4.6C6.9 3 4.4 3 2.2 3.6V14c2.2-.6 4.7-.6 6.8 1"/><path d="M9 4.6c2.1-1.6 4.6-1.6 6.8-1V14c-2.2-.6-4.7-.6-6.8 1"/>'
+  };
+  return '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (P[page] || P.knowledge) + '</svg>';
+}
+// Seven pills, not one bar: each day is a discrete act, so "I missed two" is
+// legible at a glance in a way a percentage never is.
+function renderWeekStrip() {
+  const days = state.data.days || [];
+  const ws = getWeekStart(todayStr());
+  const logged = new Set(days.filter(d => d.date >= ws).map(d => d.date));
+  const pills = [];
+  for (let i = 0; i < 7; i++) {
+    const d = _isoShift(ws, i);
+    const on = logged.has(d);
+    const future = d > todayStr();
+    pills.push('<span class="wk-pill' + (on ? ' wk-on' : future ? ' wk-future' : '') + '"></span>');
+  }
+  const n = logged.size;
+  return '<div class="card wk-card">' +
+    '<div class="wk-head"><span class="wk-label">THIS WEEK</span>' +
+      '<span class="wk-count">' + n + ' of 7 days</span></div>' +
+    '<div class="wk-strip">' + pills.join('') + '</div>' +
+    '<div class="wk-foot"><span>' + Math.round(n / 7 * 100) + '% of the week logged</span>' +
+      '<button type="button" class="btn-link wk-recap" onclick="openWeekRecap()">Week recap →</button></div>' +
+    '</div>';
 }
 
 // ─────────────────────────────────────────────────────────────

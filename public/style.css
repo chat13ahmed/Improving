@@ -3533,6 +3533,90 @@ body.auth-active .fab-btn { display: none !important; }
   .adm-ai-num { width: 100%; padding-left: 28px; }
 }
 
+/* ── Dashboard v2 ─────────────────────────────────────────────────────
+   Implements the Figma proposal. The point is hierarchy: ONE card carries the
+   decision, the rest report state quietly. */
+
+/* The hero was 190px minimum — most of a phone screen for a greeting. The
+   mountain art stays (it's the brand) but it stops owning the first screen. */
+.mtn-hero { min-height: 136px !important; }
+@media (max-width: 560px) { .mtn-hero { min-height: 124px !important; } }
+
+/* Today's one move — the only elevated card on the page, so the eye lands here
+   first without needing colour or size shouting. */
+.onemove-card {
+  border: none;
+  box-shadow: 0 8px 22px -4px rgba(11,43,31,.14), 0 2px 6px rgba(11,43,31,.06);
+  padding: 18px;
+}
+.onemove-eyebrow {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 10px; font-weight: 900; letter-spacing: .1em;
+  color: var(--primary); margin-bottom: 10px;
+}
+.onemove-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); flex: none; }
+.onemove-title {
+  font-size: 21px; font-weight: 800; letter-spacing: -.02em; line-height: 1.22;
+  color: var(--text); margin: 0 0 10px;
+}
+.onemove-why { font-size: 13px; line-height: 1.48; color: var(--muted); margin: 0 0 14px; }
+.onemove-cta { width: 100%; justify-content: center; padding: 13px 18px; font-size: 14px; border-radius: 12px; }
+/* Nothing urgent: keep the shape, drop the emphasis. Manufacturing urgency when
+   everything is fine trains people to ignore the card. */
+.onemove-calm { box-shadow: 0 2px 8px rgba(11,43,31,.05); }
+.onemove-calm .onemove-title { font-size: 18px; }
+@media (max-width: 420px) { .onemove-title { font-size: 19px; } }
+
+/* Your areas — triage. Detail lives in the hub, not here. */
+.areas-card { padding: 14px 16px 6px; }
+.areas-head { font-size: 10px; font-weight: 900; letter-spacing: .1em; color: var(--faint, var(--muted)); margin-bottom: 2px; }
+.areas-row {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 11px 0; background: none; border: none; cursor: pointer; text-align: left;
+  border-top: 1px solid var(--line);
+}
+.areas-row:first-of-type { border-top: none; }
+.areas-ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none; }
+.areas-ico svg { width: 18px; height: 18px; }
+.areas-ico-health { background: rgba(220,38,38,.10); color: var(--danger-ink); }
+.areas-ico-biz    { background: rgba(245,158,11,.13); color: var(--warning-ink); }
+.areas-ico-know   { background: rgba(14,159,110,.11); color: var(--primary); }
+.areas-name { flex: 1; font-size: 14.5px; font-weight: 700; color: var(--text); }
+.areas-badge { font-size: 11.5px; font-weight: 800; }
+.areas-urgent { color: var(--danger-ink); }
+.areas-warn   { color: var(--warning-ink); }
+.areas-ok     { color: var(--primary); }
+.areas-chev { color: var(--faint, var(--muted)); font-size: 18px; line-height: 1; flex: none; }
+
+/* This week — seven discrete days, deliberately the quietest card. */
+.wk-card { padding: 14px 16px; }
+.wk-head { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.wk-label { flex: 1; font-size: 10px; font-weight: 900; letter-spacing: .1em; color: var(--faint, var(--muted)); }
+.wk-count { font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.wk-strip { display: flex; gap: 5px; }
+.wk-pill { flex: 1; height: 7px; border-radius: 999px; background: var(--line); }
+.wk-pill.wk-on { background: var(--primary); }
+.wk-pill.wk-future { opacity: .5; }
+.wk-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; font-size: 12px; color: var(--muted); }
+.wk-recap { font-weight: 700; }
+
+/* Streak ring — shows progress through the CURRENT growth stage, so the number
+   reads as accumulated investment rather than a counter waiting to reset.
+   The hole is MASKED rather than covered by a matching colour: .card is
+   var(--card) in light but a translucent color-mix in dark, so no fixed hole
+   colour could ever match both. A mask needs no colour at all. */
+.streak-ring { position: relative; width: 62px; height: 62px; flex: none; display: grid; place-items: center; }
+.streak-ring-arc {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(var(--streak-arc, #EA6A0C) calc(var(--stage-pct, 0) * 1%), var(--line) 0);
+  -webkit-mask: radial-gradient(farthest-side, #0000 calc(100% - 5px), #000 calc(100% - 5px));
+          mask: radial-gradient(farthest-side, #0000 calc(100% - 5px), #000 calc(100% - 5px));
+}
+.streak-ring-num {
+  position: relative; font-size: 22px; font-weight: 900; letter-spacing: -.03em;
+  color: var(--streak-arc, #EA6A0C);
+}
+
 /* ── Growth stage chip (beside the streak number) ─────────────────────
    Reads as a quiet status line, not a second headline — the number stays the
    hero, this tells you what it means.
