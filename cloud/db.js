@@ -29,7 +29,22 @@ async function init() {
 
 // ── SQLite (local, zero dependencies — requires Node 22.5+) ──
 function sqliteImpl() {
-  const { DatabaseSync } = require('node:sqlite');
+  // node:sqlite only exists on Node 22.5+. Without this guard a hosted deploy
+  // that is missing DATABASE_URL dies with a bare "Cannot find module
+  // 'node:sqlite'" — which says nothing about the actual problem (no database
+  // configured) and reads like the code is broken. Name the real cause.
+  let DatabaseSync;
+  try { ({ DatabaseSync } = require('node:sqlite')); }
+  catch (e) {
+    throw new Error(
+      'No DATABASE_URL is set, so the server tried to fall back to local SQLite — but this ' +
+      'Node build has no node:sqlite (needs 22.5+, running ' + process.version + ').\n' +
+      '  • Deploying? Set DATABASE_URL to your Postgres connection string (DEPLOY.md step 2). ' +
+      'A hosted deploy should always use Postgres — the SQLite fallback is for local dev and ' +
+      'its file does not survive a redeploy.\n' +
+      '  • Running locally? Upgrade Node to 22.5 or newer.'
+    );
+  }
   const file = process.env.SQLITE_FILE || path.join(__dirname, 'data.db');
   const db = new DatabaseSync(file);
   try { db.exec('PRAGMA journal_mode = WAL;'); } catch {}

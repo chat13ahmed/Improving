@@ -13,6 +13,7 @@ Render → your Web Service → **Settings**:
 |---|---|---|
 | **Root Directory** | `cloud` | Uses `cloud/package.json` (has `pg` + `web-push`, `start: node server.js`). `../public` still resolves for the static site. |
 | **Build Command** | `npm ci` | Installs the exact versions in `cloud/package-lock.json`. `npm install` would let a new minor release of express/pg/web-push land on a deploy you didn't test. |
+| **Node version** | 22 (automatic) | Pinned by `cloud/.node-version`. Don't lower it: the local-dev database uses `node:sqlite`, which only exists on Node 22.5+. On an older Node a deploy that is *also* missing `DATABASE_URL` dies at boot. |
 | **Start Command** | `npm start` | |
 
 ## 2. Database (required — without it, data is wiped on every deploy)
@@ -68,6 +69,20 @@ CRON_SECRET       = <only if you add a Render Cron Job that pings /api/cron/tick
 ```
 
 Do **not** set `PORT`, `HOST`, `CLIENT_DIR`, `PGSSL`, or `SQLITE_FILE` — Render provides the port and the defaults are correct.
+
+## 3b. If the deploy fails — read the log first
+Render → your service → **Logs**. The message tells you which of these it is:
+
+| Log says | What it means | Fix |
+|---|---|---|
+| `No DATABASE_URL is set…` | The service booted with no database configured. | Do step 2, then add `DATABASE_URL` in step 3. |
+| `Cannot find module 'node:sqlite'` | Old Node **and** no `DATABASE_URL`. | Both of the above; `cloud/.node-version` should prevent the Node half. |
+| `Cannot find module 'pg'` / `'web-push'` | **Root Directory isn't `cloud`** — it installed the desktop `package.json` instead. | Set Root Directory to `cloud` (step 1). |
+| `npm ci` errors about the lockfile | `cloud/package-lock.json` is out of sync with `cloud/package.json`. | Run `npm install` in `cloud/` locally and commit the updated lockfile. |
+| Port binding / no open ports | Something set `PORT`. | Remove it — Render provides the port. |
+| Builds, then restarts forever | Usually a throw during `DB.init()`; the real reason is the line above the restart. | Read that line. |
+
+The single most common cause is **Root Directory not set to `cloud`** — that's what makes `pg` and `web-push` unavailable even though they're declared.
 
 ## 4. Verify after redeploy
 - Log in, trigger a redeploy → still logged in ⇒ `JWT_SECRET` took.
