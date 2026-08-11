@@ -3482,6 +3482,42 @@ body.auth-active .fab-btn { display: none !important; }
 /* the "what is Onward" / demo links under the form */
 .auth-links { margin-top: 12px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
 .auth-links a, .auth-links button { color: var(--a-accent); font-weight: 700; font-size: 13px; }
+/* ── Physical press feedback ──────────────────────────────────────────
+   --ease-spring: cubic-bezier(.34,1.4,.5,1) was defined in the design system
+   and used NOWHERE. It's the curve that makes a control feel physical: on
+   RELEASE the transform overshoots slightly past its resting size instead of
+   easing flatly back. That overshoot is the whole difference between "a button
+   changed size" and "a button responded".
+
+   Only `transform` gets the spring — overshooting a colour or a shadow looks
+   like a glitch. The colour properties keep a plain ease-out.
+
+   This also replaces `transition: all 0.15s` on .btn: `all` animates every
+   animatable property, including layout ones, which is both wasteful and a
+   source of surprise transitions. */
+.btn, .fab-btn, .bnav-item, .nav-item, .meal-chip, .recent-chip, .gym-btn, .rating-btn, .pnav-pill {
+  transition:
+    background      var(--dur-fast) var(--ease-out),
+    border-color    var(--dur-fast) var(--ease-out),
+    color           var(--dur-fast) var(--ease-out),
+    box-shadow      var(--dur-fast) var(--ease-out),
+    opacity         var(--dur-fast) var(--ease-out),
+    transform       var(--dur-base) var(--ease-spring);
+}
+/* Most controls already had a 0.97 press (see the grouped rules further up,
+   including .nav-item and .fab-btn) — what they lacked was the spring on the
+   way back out. Only the PRIMARY action needs a new value: a deeper press, so
+   it reads as the heaviest control on the page. */
+.nav-item-primary:active,
+.bnav-item[data-page="log"]:active { transform: scale(0.95); }
+/* Honour a reduced-motion preference explicitly: no scaling at all, so nothing
+   moves for someone who asked for stillness. The global block already zeroes
+   durations; this removes the transform itself. */
+@media (prefers-reduced-motion: reduce) {
+  .btn:active:not(:disabled), .nav-item:active, .nav-item-primary:active,
+  .bnav-item:active, .bnav-item[data-page="log"]:active, .fab-btn:active { transform: none; }
+}
+
 /* ── Admin: AI spend leaderboard ─────────────────────────────────────
    A bar per account, so a single dominant consumer is obvious at a glance
    rather than something you have to compute from a column of numbers. */
