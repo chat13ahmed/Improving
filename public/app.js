@@ -3254,96 +3254,15 @@ function renderRecentNotesCard() {
     '</div>';
 }
 
-// ── Proactive daily AI insight (only shown when an API key is set) ──
-function renderCoachInsightCard() {
-  if (!state.hasApiKey) return '';
-  const today = todayStr();
-  const cached = state.data.coachInsight;
-  let body;
-  if (state.data.days.length === 0) {
-    body = '<div class="di-empty">Log your first day and I\'ll start sharing a personalized insight here each morning.</div>';
-    return '<div class="card insight-daily"><div class="di-head"><span class="di-icon"></span><span class="di-title">Your Daily Coach Insight</span></div><div class="di-body" id="di-body">' + body + '</div></div>';
-  }
-  if (cached && cached.date === today && cached.text) body = '<div class="di-text">' + escapeHtml(cached.text) + '</div>';
-  else body = '<div class="di-loading"><div class="spinner"></div><span>Reading your data…</span></div>';
-  return '<div class="card insight-daily">' +
-    '<div class="di-head"><span class="di-icon"></span><span class="di-title">Your Daily Coach Insight</span>' +
-    '<button class="di-refresh" onclick="fetchCoachInsight(true)" title="New insight" aria-label="Get a new insight">↻</button></div>' +
-    '<div class="di-body" id="di-body">' + body + '</div></div>';
-}
 
-// Auto-generate once per day (cached in data.coachInsight); skips if already done
-function maybeGenerateInsight() {
-  if (!state.hasApiKey || state.data.days.length === 0) return;
-  const c = state.data.coachInsight;
-  if (c && c.date === todayStr() && c.text) return;
-  return fetchCoachInsight(false);
-}
 
-async function fetchCoachInsight(force) {
-  if (state._insightLoading) return;
-  if (!state.hasApiKey) { showToast('Connect an AI key in Settings first.', 'error'); return; }
-  state._insightLoading = true;
-  const setBody = (html) => { const b = document.getElementById('di-body'); if (b) b.innerHTML = html; };
-  if (force) setBody('<div class="di-loading"><div class="spinner"></div><span>Thinking…</span></div>');
-  try {
-    const r = await fetch('/api/insight', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ data: enrichedData() }) });
-    const j = await r.json();
-    if (!r.ok || !j.insight) {
-      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect an AI key in Settings to get daily insights.' : 'Couldn\'t generate — tap ↻ to retry.') + '</div>');
-      return;
-    }
-    state.data.coachInsight = { date: todayStr(), text: j.insight };
-    await saveData();
-    setBody('<div class="di-text">' + escapeHtml(j.insight) + '</div>');
-  } catch {
-    setBody('<div class="di-empty">Connection error — tap ↻ to retry.</div>');
-  } finally {
-    state._insightLoading = false;
-  }
-}
 
-// ── Today's Game Plan: the coach tells you what to DO (works from day one) ──
-function renderGamePlanCard() {
-  if (!state.hasApiKey) return '';
-  const cached = state.data.gamePlan;
-  const body = (cached && cached.date === todayStr() && cached.text)
-    ? '<div class="di-text plan-text">' + renderMarkdown(cached.text) + '</div>'
-    : '<div class="di-loading"><div class="spinner"></div><span>Building today\'s plan…</span></div>';
-  return '<div class="card insight-daily plan-card">' +
-    '<div class="di-head"><span class="di-icon"></span><span class="di-title">Today\'s Game Plan</span>' +
-    '<button class="di-refresh" onclick="fetchGamePlan(true)" title="New plan" aria-label="Get a new game plan">↻</button></div>' +
-    '<div class="di-body" id="plan-body">' + body + '</div></div>';
-}
-// Auto-generate once per day (cached in data.gamePlan)
-function maybeGeneratePlan() {
-  if (!state.hasApiKey) return;
-  const c = state.data.gamePlan;
-  if (c && c.date === todayStr() && c.text) return;
-  return fetchGamePlan(false);
-}
-async function fetchGamePlan(force) {
-  if (state._planLoading) return;
-  if (!state.hasApiKey) { showToast('Connect an AI key in Settings first.', 'error'); return; }
-  state._planLoading = true;
-  const setBody = (html) => { const b = document.getElementById('plan-body'); if (b) b.innerHTML = html; };
-  if (force) setBody('<div class="di-loading"><div class="spinner"></div><span>Thinking…</span></div>');
-  try {
-    const r = await fetch('/api/plan', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ data: enrichedData() }) });
-    const j = await r.json();
-    if (!r.ok || !j.plan) {
-      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect an AI key in Settings to get your plan.' : 'Couldn\'t build it — tap ↻ to retry.') + '</div>');
-      return;
-    }
-    state.data.gamePlan = { date: todayStr(), text: j.plan };
-    await saveData();
-    setBody('<div class="di-text plan-text">' + renderMarkdown(j.plan) + '</div>');
-  } catch {
-    setBody('<div class="di-empty">Connection error — tap ↻ to retry.</div>');
-  } finally {
-    state._planLoading = false;
-  }
-}
+
+
+
+
+
+
 
 // ── Patterns: the signature feature — one cross-pillar connection a day ──
 const PATTERNS_MIN_DAYS = 3;
@@ -3353,109 +3272,12 @@ function daysSince(dateStr) {
   const t = Date.parse(dateStr + 'T00:00:00');
   return isNaN(t) ? Infinity : (Date.now() - t) / 86400000;
 }
-function renderPatternsCard() {
-  if (!state.hasApiKey) return '';
-  const days = state.data.days || [];
-  if (days.length === 0) return '';
-  const cached = state.data.patternInsight;
-  let body;
-  if (cached && cached.text) {
-    body = '<div class="di-text">' + escapeHtml(cached.text) + '</div>';
-  } else if (days.length < PATTERNS_MIN_DAYS) {
-    body = '<div class="di-empty">Log a few days and I\'ll start spotting connections across your pillars — like how your training affects your income.</div>';
-  } else {
-    body = '<div class="di-loading"><div class="spinner"></div><span>Connecting the dots across your life…</span></div>';
-  }
-  return '<div class="card insight-daily patterns-card">' +
-    '<div class="di-head"><span class="di-icon"></span><span class="di-title">Patterns — what connects in your life</span>' +
-    (days.length >= PATTERNS_MIN_DAYS ? '<button class="di-refresh" onclick="fetchPatterns(true)" title="Find a new pattern" aria-label="Find a new pattern">↻</button>' : '') +
-    '</div><div class="di-body" id="pat-body">' + body + '</div></div>';
-}
-// Auto-generate at most every few days (cached in data.patternInsight) to control AI cost
-function maybeGeneratePatterns() {
-  if (!state.hasApiKey || (state.data.days || []).length < PATTERNS_MIN_DAYS) return;
-  const c = state.data.patternInsight;
-  if (c && c.text && daysSince(c.date) < PATTERNS_REFRESH_DAYS) return;
-  return fetchPatterns(false);
-}
-async function fetchPatterns(force) {
-  if (state._patLoading) return;
-  if (!state.hasApiKey) { showToast('Connect an AI key in Settings first.', 'error'); return; }
-  state._patLoading = true;
-  const setBody = (html) => { const b = document.getElementById('pat-body'); if (b) b.innerHTML = html; };
-  if (force) setBody('<div class="di-loading"><div class="spinner"></div><span>Finding a connection…</span></div>');
-  try {
-    const r = await fetch('/api/patterns', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ data: enrichedData() }) });
-    const j = await r.json();
-    if (!r.ok || !j.pattern) {
-      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect an AI key in Settings to unlock Patterns.' : 'Couldn\'t find one — tap ↻ to retry.') + '</div>');
-      return;
-    }
-    state.data.patternInsight = { date: todayStr(), text: j.pattern };
-    await saveData();
-    setBody('<div class="di-text">' + escapeHtml(j.pattern) + '</div>');
-  } catch {
-    setBody('<div class="di-empty">Connection error — tap ↻ to retry.</div>');
-  } finally {
-    state._patLoading = false;
-  }
-}
 
-// ── Weekly Life Review: the Sunday ritual ──
-function renderReviewCard() {
-  const days = state.data.days || [];
-  if (!days.length) return '';
-  // No AI key (e.g. live before keys are set): still offer the client-side recap.
-  if (!state.hasApiKey) {
-    return '<div class="card review-card">' +
-      '<div class="di-head"><span class="di-icon"></span><span class="di-title">Weekly Recap</span>' +
-      '<button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="shareMyWeek()">Share</button></div>' +
-      '<div class="di-body"><p class="review-sub">Your week across every pillar — goals hit, the votes you cast, and your balance.</p>' +
-      '<button class="btn btn-primary" onclick="openWeekRecap()">Open week recap</button></div></div>';
-  }
-  if (days.length < PATTERNS_MIN_DAYS) return '';
-  const wkStart = getWeekStart(todayStr());
-  const saved = state.data.weeklyReview;
-  const hasThisWeek = saved && saved.weekStart === wkStart && saved.text;
-  const isSunday = new Date().getDay() === 0;
-  let body;
-  if (hasThisWeek) {
-    body = '<div class="review-text">' + renderMarkdown(saved.text) + '</div>' +
-      '<button class="btn btn-outline btn-sm" onclick="fetchReview(true)">↻ Regenerate</button>';
-  } else {
-    body = '<div class="review-cta"><p class="review-sub">' +
-      (isSunday ? 'It\'s review day. See your week decoded across every pillar — wins, the one pattern that mattered, and your focus for next week.'
-                : 'Get your week decoded across every pillar: your wins, the one pattern that mattered, and your single focus for next week.') +
-      '</p><button class="btn btn-primary" onclick="fetchReview(true)">Generate this week\'s review</button></div>';
-  }
-  return '<div class="card review-card' + (isSunday && !hasThisWeek ? ' review-due' : '') + '">' +
-    '<div class="di-head"><span class="di-icon"></span><span class="di-title">Weekly Story Recap</span>' +
-    '<button class="btn btn-outline btn-sm" style="margin-left:auto" onclick="shareMyWeek()">Share</button></div>' +
-    '<div class="di-body" id="rev-body">' + body + '</div></div>';
-}
-async function fetchReview() {
-  if (state._revLoading) return;
-  if (!state.hasApiKey) { showToast('Connect an AI key in Settings first.', 'error'); return; }
-  state._revLoading = true;
-  const setBody = (html) => { const b = document.getElementById('rev-body'); if (b) b.innerHTML = html; };
-  setBody('<div class="di-loading"><div class="spinner"></div><span>Reviewing your whole week…</span></div>');
-  try {
-    const r = await fetch('/api/review', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ data: enrichedData(), weekLabel: formatWeekRange(getWeekStart(todayStr())) }) });
-    const j = await r.json();
-    if (!r.ok || !j.review) {
-      setBody('<div class="di-empty">' + (j.error === 'NO_KEY' ? 'Connect an AI key in Settings to unlock this.' : 'Couldn\'t generate — try again.') + '</div>');
-      return;
-    }
-    state.data.weeklyReview = { weekStart: getWeekStart(todayStr()), text: j.review };
-    await saveData();
-    setBody('<div class="review-text">' + renderMarkdown(j.review) + '</div>' +
-      '<button class="btn btn-outline btn-sm" onclick="fetchReview(true)">↻ Regenerate</button>');
-  } catch {
-    setBody('<div class="di-empty">Connection error — try again.</div>');
-  } finally {
-    state._revLoading = false;
-  }
-}
+
+
+
+
+
 
 // ── Streak protection (freezes) ──
 // A freeze is earned every 7-day streak (cap 2) and auto-bridges ONE missed day
