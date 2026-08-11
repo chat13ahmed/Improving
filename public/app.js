@@ -8924,8 +8924,9 @@ function renderHistoryPage() {
   const view = state._historyView || 'list';
 
   document.getElementById('main').innerHTML =
-    '<div class="page-header"><h2 class="page-title">Progress</h2>' +
-    '<p class="page-sub">All your logged days</p></div>' +
+    '<div class="page-header"><h2 class="page-title">Your climb</h2>' +
+    '<p class="page-sub">Every day you logged, as terrain</p></div>' +
+    renderTerrainCard() +
     summaryHtml +
     '<div class="dash-section">All entries</div>' +
     '<div class="view-toggle-row">' +
@@ -8941,6 +8942,39 @@ function renderHistoryPage() {
         '</div>' +
         '<div id="history-table-wrap">' + renderHistoryRows(sorted) + '</div>' +
         '</div>');
+  // Boot the GPU view after the markup exists. If WebGL is unavailable or the
+  // user prefers reduced motion, initTerrain returns false and we swap in a
+  // plain message — the flat summary and charts below still carry the data, so
+  // nobody loses information for lacking a GPU.
+  setTimeout(() => {
+    const cv = document.getElementById('terrain-canvas');
+    if (!cv) return;
+    if (!initTerrain(cv)) {
+      const host = document.getElementById('terrain-stage');
+      if (host) host.classList.add('terrain-off');
+    }
+  }, 30);
+}
+// The terrain card: dark stage inside the light page, because depth and
+// atmospheric falloff only read against a dark ground.
+function renderTerrainCard() {
+  if (!(state.data.days || []).length) return '';
+  const legend = TERRAIN_PILLARS.slice().reverse().map(p =>
+    '<span class="tr-key"><i style="background:rgb(' +
+      p.rgb.map(v => Math.round(v * 255)).join(',') + ')"></i>' + escapeHtml(p.label) + '</span>').join('');
+  const best = Math.max(0, ...(state.data.days || []).map(d =>
+    TERRAIN_PILLARS.reduce((s, p) => s + terrainHeight(d, p.id), 0) / TERRAIN_PILLARS.length));
+  return '<div class="card terrain-card">' +
+    '<div id="terrain-stage" class="terrain-stage">' +
+      '<canvas id="terrain-canvas" class="terrain-canvas" ' +
+        'aria-label="A three-dimensional landscape of your last 30 days. Each ridge is one area of your life; height is how hard you went that day."></canvas>' +
+      '<div class="tr-cap">LAST 30 DAYS</div>' +
+      '<div class="tr-peak">Best day · ' + Math.round(best * 100) + '%</div>' +
+      '<div class="tr-hint">drag to orbit</div>' +
+      '<p class="tr-fallback">Your numbers are all below — this device can’t show the 3D view.</p>' +
+    '</div>' +
+    '<div class="tr-legend">' + legend + '</div>' +
+    '</div>';
 }
 
 function renderHistoryRows(days) {
@@ -13341,6 +13375,185 @@ function announce(msg, assertive) {
 // ─────────────────────────────────────────────────────────────
 function bg3dEnabled() {
   try { return localStorage.getItem('be_bg3d') !== 'off'; } catch { return true; } // default ON
+}
+
+// ── 3D terrain: your logged days as a mountain range ─────────────────
+// The Progress page's centrepiece. X = time, Z = your five pillars, Y = how
+// hard you went that day. Consistent effort forms a ridge; gaps form valleys —
+// so for an app about climbing, the data IS the mountain.
+//
+// Written against raw WebGL rather than Three.js on purpose: the CSP is
+// `script-src 'self'`, so a CDN is impossible and Three.js would have to be
+// vendored into the repo (~600KB). A purpose-built height-field renderer is
+// about 2% of that and needs no third-party file. Same outcome, 1/50th the cost.
+const TERRAIN_PILLARS = [
+  { id: 'reading',    label: 'Reading',   rgb: [0.13, 0.83, 0.93] },
+  { id: 'networking', label: 'Network',   rgb: [0.38, 0.65, 0.98] },
+  { id: 'money',      label: 'Money',     rgb: [0.65, 0.55, 0.98] },
+  { id: 'food',       label: 'Nutrition', rgb: [0.98, 0.75, 0.14] },
+  { id: 'gym',        label: 'Training',  rgb: [0.20, 0.83, 0.60] }
+];
+// How hard a given day was, per pillar, normalised 0..1. Pure so it's testable
+// without a GPU. (testable)
+function terrainHeight(day, pillar) {
+  if (!day) return 0;
+  switch (pillar) {
+    case 'gym':        return day.gym && day.gym.done ? 1 : 0;
+    case 'food':       return Math.max(0, Math.min(1, ((day.food && day.food.rating) || 0) / 5));
+    case 'money':      return Math.max(0, Math.min(1, (Number(day.income) || 0) > 0 ? 1 : 0));
+    case 'networking': return Math.max(0, Math.min(1, ((day.networking && day.networking.count) || 0) / 3));
+    case 'reading':    return Math.max(0, Math.min(1, ((day.reading && day.reading.pages) || 0) / 30));
+    default:           return 0;
+  }
+}
+// Build a cols x 5 height field from the most recent `cols` days. (testable)
+function terrainGrid(days, cols) {
+  const n = Math.max(2, cols | 0 || 30);
+  const byDate = {};
+  (days || []).forEach(d => { if (d && d.date) byDate[d.date] = d; });
+  const today = todayStr();
+  const grid = [];
+  for (let c = 0; c < n; c++) {
+    const date = _isoShift(today, -(n - 1 - c));
+    const day = byDate[date];
+    grid.push(TERRAIN_PILLARS.map(p => terrainHeight(day, p.id)));
+  }
+  return { cols: n, rows: TERRAIN_PILLARS.length, grid };
+}
+
+// ── Minimal matrix helpers (column-major, as WebGL expects) ──
+function _m4mul(a, b) {
+  const o = new Float32Array(16);
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
+    o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+  }
+  return o;
+}
+function _m4perspective(fovy, aspect, near, far) {
+  const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+  return new Float32Array([f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0]);
+}
+function _m4lookAt(eye, ctr, up) {
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const norm = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const z = norm(sub(eye, ctr)), x = norm(cross(up, z)), y = cross(z, x);
+  return new Float32Array([
+    x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0,
+    -dot(x, eye), -dot(y, eye), -dot(z, eye), 1
+  ]);
+}
+
+// Boot the terrain on a canvas. Returns false when WebGL isn't available or the
+// user asked for reduced motion — the caller then keeps the flat charts.
+function initTerrain(canvas) {
+  if (!canvas || typeof WebGLRenderingContext === 'undefined') return false;
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+  } catch (e) {}
+  const gl = canvas.getContext('webgl', { antialias: true, alpha: true });
+  if (!gl) return false;
+
+  const VS = 'attribute vec3 aPos;attribute vec3 aCol;uniform mat4 uMVP;varying vec3 vCol;varying float vFog;' +
+    'void main(){vec4 p=uMVP*vec4(aPos,1.0);gl_Position=p;vCol=aCol;vFog=clamp((aPos.z+1.6)/3.2,0.0,1.0);}';
+  const FS = 'precision mediump float;varying vec3 vCol;varying float vFog;uniform vec3 uFog;' +
+    'void main(){gl_FragColor=vec4(mix(uFog,vCol,vFog),1.0);}';
+  const sh = (type, src) => {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) || 'shader');
+    return s;
+  };
+  let prog;
+  try {
+    prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS));
+    gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) || 'link');
+  } catch (e) { return false; }
+  gl.useProgram(prog);
+
+  const { cols, rows, grid } = terrainGrid(state.data.days, 30);
+  const pos = [], col = [];
+  const X = (c) => (c / (cols - 1) - 0.5) * 3.4;
+  const Z = (r) => (r / (rows - 1) - 0.5) * 1.9;
+  const Y = (h) => h * 0.62;
+  // Two triangles per cell, coloured by the pillar row and lifted by intensity.
+  for (let r = 0; r < rows - 1; r++) {
+    for (let c = 0; c < cols - 1; c++) {
+      const quad = [[c, r], [c + 1, r], [c + 1, r + 1], [c, r], [c + 1, r + 1], [c, r + 1]];
+      quad.forEach(([qc, qr]) => {
+        const h = grid[qc][qr];
+        pos.push(X(qc), Y(h), Z(qr));
+        const base = TERRAIN_PILLARS[qr].rgb;
+        const lift = 0.35 + h * 0.65;                 // darker in the valleys
+        col.push(base[0] * lift, base[1] * lift, base[2] * lift);
+      });
+    }
+  }
+  const buf = (data, loc, size) => {
+    const b = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+    const l = gl.getAttribLocation(prog, loc);
+    gl.enableVertexAttribArray(l);
+    gl.vertexAttribPointer(l, size, gl.FLOAT, false, 0, 0);
+  };
+  buf(pos, 'aPos', 3);
+  buf(col, 'aCol', 3);
+  const uMVP = gl.getUniformLocation(prog, 'uMVP');
+  const uFog = gl.getUniformLocation(prog, 'uFog');
+  const verts = pos.length / 3;
+
+  gl.enable(gl.DEPTH_TEST);
+  // Orbit state. Drag to turn; it drifts on its own when untouched, so the
+  // depth is legible without the user discovering the interaction first.
+  let yaw = -0.55, pitch = 0.52, dragging = false, lastX = 0, lastY = 0, idle = 0;
+  const onDown = (x, y) => { dragging = true; lastX = x; lastY = y; idle = 0; };
+  const onMove = (x, y) => {
+    if (!dragging) return;
+    yaw += (x - lastX) * 0.008;
+    pitch = Math.max(0.12, Math.min(1.15, pitch + (y - lastY) * 0.005));
+    lastX = x; lastY = y; idle = 0;
+  };
+  canvas.addEventListener('pointerdown', e => { onDown(e.clientX, e.clientY); canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', e => onMove(e.clientX, e.clientY));
+  canvas.addEventListener('pointerup', () => { dragging = false; });
+  canvas.addEventListener('pointercancel', () => { dragging = false; });
+
+  // One frame, drawn on demand. Split out from the loop so init can paint
+  // immediately: requestAnimationFrame is throttled to zero while a page is
+  // hidden, so a loop-only renderer leaves an unsized blank canvas until the
+  // tab is focused. Verified: visibilityState 'hidden' → 0 rAF callbacks.
+  const frame = () => {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.max(1, Math.round(canvas.clientWidth * dpr));
+    const h = Math.max(1, Math.round(canvas.clientHeight * dpr));
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    gl.viewport(0, 0, w, h);
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    if (!dragging) { idle++; if (idle > 90) yaw += 0.0016; }
+    const r = 3.5;
+    const eye = [Math.sin(yaw) * r * Math.cos(pitch), Math.sin(pitch) * r, Math.cos(yaw) * r * Math.cos(pitch)];
+    const mvp = _m4mul(_m4perspective(0.85, w / h, 0.1, 20), _m4lookAt(eye, [0, 0.1, 0], [0, 1, 0]));
+    gl.uniformMatrix4fv(uMVP, false, mvp);
+    gl.uniform3fv(uFog, dark ? [0.043, 0.067, 0.125] : [0.086, 0.13, 0.22]);
+    gl.drawArrays(gl.TRIANGLES, 0, verts);
+  };
+  // The canvas is destroyed whenever the page re-renders, so isConnected is also
+  // the teardown signal: no listener bookkeeping, no leaked frame loop.
+  const loop = () => {
+    if (!canvas.isConnected) return;
+    frame();
+    requestAnimationFrame(loop);
+  };
+  frame();                 // paint now, so there's never a blank beat
+  requestAnimationFrame(loop);
+  return true;
 }
 function buildScene3d() {
   if (typeof document === 'undefined' || !document.body) return;   // headless/test guard

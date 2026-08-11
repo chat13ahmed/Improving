@@ -3533,6 +3533,33 @@ body.auth-active .fab-btn { display: none !important; }
   .adm-ai-num { width: 100%; padding-left: 28px; }
 }
 
+/* ── 3D terrain (Progress page) ───────────────────────────────────────
+   The one place in the app that inverts to dark: depth, glow and atmospheric
+   falloff simply don't read against a light ground. */
+.terrain-card { padding: 0; overflow: hidden; }
+.terrain-stage {
+  position: relative; height: 260px; border-radius: var(--radius) var(--radius) 0 0; overflow: hidden;
+  background: linear-gradient(160deg, #0B1120 0%, #102138 58%, #16304F 100%);
+}
+.terrain-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.terrain-canvas:active { cursor: grabbing; }
+.tr-cap { position: absolute; top: 14px; left: 16px; font-size: 9.5px; font-weight: 900; letter-spacing: .12em; color: #7FE3C4; }
+.tr-peak { position: absolute; top: 30px; left: 16px; font-size: 12px; font-weight: 800; color: #fff; }
+.tr-hint {
+  position: absolute; right: 14px; bottom: 12px; font-size: 10px; font-weight: 700; color: #fff;
+  background: rgba(255,255,255,.13); padding: 5px 10px; border-radius: 999px; pointer-events: none;
+}
+/* Shown only when WebGL is unavailable or motion is reduced. */
+.tr-fallback { display: none; position: absolute; inset: 0; margin: 0; align-items: center; justify-content: center;
+  text-align: center; padding: 0 28px; font-size: 13px; line-height: 1.5; color: #C7D6E8; }
+.terrain-off .terrain-canvas { display: none; }
+.terrain-off .tr-hint, .terrain-off .tr-peak { display: none; }
+.terrain-off .tr-fallback { display: flex; }
+.tr-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 12px 16px 14px; }
+.tr-key { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--muted); }
+.tr-key i { width: 10px; height: 4px; border-radius: 999px; flex: none; }
+@media (max-width: 480px) { .terrain-stage { height: 224px; } }
+
 /* ── Dashboard v2 ─────────────────────────────────────────────────────
    Implements the Figma proposal. The point is hierarchy: ONE card carries the
    decision, the rest report state quietly. */

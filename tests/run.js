@@ -62,7 +62,7 @@ function loadApp(fieldValues) {
     ' defaultPillars, pillar, isPillarOn, enabledPillars, getLevel, computeXP, displayToKg, kgToDisplay, upsertWeight,' +
     ' recentDefaults, getRecentFoods, getWeeklyScore, getWeekStats, lastNoteEntry, renderPrevNoteBanner,' +
     ' reminderDue, isChecked, checklistProgress, ensureChecklistData,' +
-    ' loggingStreak, bestStreak, computeStreak, freezeToUse, freezeAward, streakBreak, growthStage, currentStreakBreak, renderStreakRecoveryCard, weekStoryData, weekStorySlides, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
+    ' loggingStreak, bestStreak, computeStreak, freezeToUse, freezeAward, streakBreak, growthStage, terrainHeight, terrainGrid, currentStreakBreak, renderStreakRecoveryCard, weekStoryData, weekStorySlides, weekShareStats, weekGoalRows, pendingShareMilestone, getWeekStats, getWeekStart, daysSince,' +
     ' getMoneyPeriod, periodKeyFor, setPeriodIncome, periodSpending, getCarryover, getMoneyCircle, buildDemoData, subStatus,' +
     ' workoutTotals, searchExercises, formatClock, topMuscle, normalizeLibMuscle, isTimedExercise, EXERCISE_LIBRARY,' +
     ' ideaScore, ideaRated, ideaScoreLabel, topIdea, IDEA_DIMS, validationStage, ideaTaskProgress, stageProbability, pipelineValue, isGoingCold, daysBetween,' +
@@ -1379,6 +1379,34 @@ A.state.data = _iBase({
 ok('knowledge briefing: cards scheduled for later do NOT nag today',
   !A.knowledgeBriefing().some(i => (i.expert || '').toLowerCase().indexOf('spaced') > -1));
 ok('briefings: never empty — always give the user something', A.healthBriefing().length > 0 && A.businessBriefing().length > 0 && A.knowledgeBriefing().length > 0);
+
+// ── 3D terrain height field — the data behind the GPU view ──
+// The renderer needs a GPU, but the data shaping is pure, so it's tested here.
+eq('terrain: a missing day is flat', A.terrainHeight(undefined, 'gym'), 0);
+eq('terrain: a completed workout is a full peak', A.terrainHeight({ gym: { done: true } }, 'gym'), 1);
+eq('terrain: an unlogged workout is a valley', A.terrainHeight({ gym: { done: false } }, 'gym'), 0);
+eq('terrain: food rating scales 0..1 off a 5-point scale', A.terrainHeight({ food: { rating: 4 } }, 'food'), 0.8);
+eq('terrain: reading pages cap at the 30-page ceiling', A.terrainHeight({ reading: { pages: 90 } }, 'reading'), 1);
+eq('terrain: partial reading scales', A.terrainHeight({ reading: { pages: 15 } }, 'reading'), 0.5);
+eq('terrain: networking scales off 3 contacts', A.terrainHeight({ networking: { count: 3 } }, 'networking'), 1);
+ok('terrain: every pillar is clamped to 0..1 even with junk input',
+  ['gym', 'food', 'money', 'networking', 'reading'].every(p => {
+    const v = A.terrainHeight({ food: { rating: 999 }, reading: { pages: -5 }, networking: { count: 99 }, income: -3 }, p);
+    return v >= 0 && v <= 1;
+  }));
+ok('terrain: an unknown pillar is flat, not NaN', A.terrainHeight({ gym: { done: true } }, 'nope') === 0);
+// The grid must always be the right shape — the renderer indexes it directly.
+const _tg = A.terrainGrid([{ date: A.todayStr(), gym: { done: true } }], 30);
+eq('terrain grid: 30 columns requested, 30 returned', _tg.cols, 30);
+eq('terrain grid: one row per pillar', _tg.rows, 5);
+ok('terrain grid: every column has a value for every pillar',
+  _tg.grid.length === 30 && _tg.grid.every(col => col.length === 5 && col.every(v => typeof v === 'number')));
+ok('terrain grid: today lands in the LAST column (time runs left to right)',
+  _tg.grid[29][4] === 1 && _tg.grid[0][4] === 0);
+ok('terrain grid: an empty history is a flat plain, not an error',
+  (() => { const g = A.terrainGrid([], 12); return g.cols === 12 && g.grid.every(c => c.every(v => v === 0)); })());
+ok('terrain grid: a silly column count is clamped to something drawable',
+  A.terrainGrid([], 0).cols >= 2 && A.terrainGrid([], 1).cols >= 2);
 
 // ── Cross-hub game plan ──
 A.state.data = _iBase({ contacts: [{ id: 'c1', name: 'Jordan', status: 'warm', followUpDate: _iAgo(4) }] });
