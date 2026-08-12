@@ -11,6 +11,7 @@ sessions.json
 cloud/data.db
 cloud/data.db-shm
 cloud/data.db-wal
+cloud/backups/
 .env
 RENDER_SETUP.FILLED.md
 *.secrets.md
