@@ -12487,8 +12487,11 @@ function renderAdaptCard(nut) {
       ? '<div class="ad-next">Log your meals too and this switches from estimating your burn to measuring it.</div>'
       : '';
 
+  // The cap bounds how far the target can sit from the formula, and it is
+  // recomputed from a 21-day trend rather than on a weekly timer — so the copy
+  // must not promise a "next week" adjustment that no scheduler performs.
   const railNote = a.railHit
-    ? '<div class="ad-next">Capped at ' + ADAPT.maxStepKcal + ' cal for one week — big jumps backfire. It’ll keep closing the gap each week.</div>'
+    ? '<div class="ad-next">Held to a ' + ADAPT.maxStepKcal + ' cal change for now — big jumps backfire. It keeps closing the gap as your trend updates.</div>'
     : '';
 
   return '<div class="card adapt-card ad-' + tier.tone + '">' +
