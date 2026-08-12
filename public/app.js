@@ -2670,10 +2670,13 @@ function renderLogNutritionSection(eatenVal) {
     '<div class="nut-target-line">' +
     '<span><b>Target:</b> ' + nut.calories.toLocaleString() + ' cal · ' +
     '<b class="mp">' + nut.protein.g + 'g</b> P · <b class="mc">' + nut.carbs.g + 'g</b> C · <b class="mf">' + nut.fat.g + 'g</b> F · ' +
-    nut.meals.count + ' meals (~' + nut.meals.calories.toLocaleString() + ' cal each)</span>' +
+    // Said "~X cal each" while the meal plan below showed lunch deliberately
+    // bigger — two different answers to the same question, on one screen.
+    nut.meals.count + ' meals</span>' +
     '<button type="button" class="btn-link" onclick="navigate(\'settings\')">Edit</button>' +
     '</div>' +
-    renderMealPlan(nut) +
+    // The full meal-by-meal plan lives on Health → Nutrition. This page is the
+    // 30-second check-in; reference material here just slows the logging down.
     renderMealFocus(nut) +
 
     // Food logger
@@ -6209,27 +6212,6 @@ function renderLifeWeb() {
     '<div class="lw-legend"><span class="lw-key"><span class="lw-dot lw-pos"></span>rise together</span><span class="lw-key"><span class="lw-dot lw-neg"></span>trade off</span></div>' +
     '</div>';
 }
-// The picture's 7-day dots — this week at a glance (filled = logged, ring = today).
-function renderWeekStrip() {
-  if (!state.data || !state.data.days) return '';
-  const start = getWeekStart(todayStr());
-  const today = todayStr();
-  const logged = new Set((state.data.days || []).map(d => d.date));
-  const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  const base = new Date(start + 'T00:00:00');
-  let dots = '', count = 0;
-  for (let i = 0; i < 7; i++) {
-    const dt = new Date(base); dt.setDate(base.getDate() + i);
-    const ds = dt.toISOString().split('T')[0];
-    const done = logged.has(ds);
-    if (done && ds <= today) count++;
-    const cls = 'wk-dot' + (done ? ' wk-done' : '') + (ds === today ? ' wk-today' : '') + (ds > today ? ' wk-future' : '');
-    dots += '<div class="wk-day"><span class="' + cls + '"></span><span class="wk-lbl">' + labels[i] + '</span></div>';
-  }
-  return '<div class="card wk-card">' +
-    '<div class="wk-head"><span class="wk-title">This week</span><span class="wk-count">' + count + ' / 7 logged</span></div>' +
-    '<div class="wk-strip">' + dots + '</div></div>';
-}
 // The picture's compact pillar row — your focus areas, one tap to log.
 function renderPillarNav() {
   const ids = PILLAR_IDS.filter(id => isPillarOn(id));
@@ -6579,7 +6561,11 @@ function renderDashboard() {
     // rather than one decision.
     (hasDays ? renderOneMoveCard() : '') +
     (hasDays ? renderAreasCard() : '') +
-    (hasDays ? renderWeekStrip() : '') +
+    // The week strip card used to sit here and said the same thing three times over:
+    // its seven pills duplicated the hero's seven day-dots, its "3 of 7 days"
+    // duplicated the hero's "3 / 7", and its "Week recap →" duplicated the button in
+    // the page header two lines above. The hero version wins — it carries the day
+    // letters, so you can see WHICH days you missed, not just how many.
     gContext +
     sec('Your goals', gGoals) +
     renderPillarNav() +
@@ -8421,28 +8407,10 @@ function areaIconSVG(page) {
   };
   return '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (P[page] || P.knowledge) + '</svg>';
 }
-// Seven pills, not one bar: each day is a discrete act, so "I missed two" is
-// legible at a glance in a way a percentage never is.
-function renderWeekStrip() {
-  const days = state.data.days || [];
-  const ws = getWeekStart(todayStr());
-  const logged = new Set(days.filter(d => d.date >= ws).map(d => d.date));
-  const pills = [];
-  for (let i = 0; i < 7; i++) {
-    const d = _isoShift(ws, i);
-    const on = logged.has(d);
-    const future = d > todayStr();
-    pills.push('<span class="wk-pill' + (on ? ' wk-on' : future ? ' wk-future' : '') + '"></span>');
-  }
-  const n = logged.size;
-  return '<div class="card wk-card">' +
-    '<div class="wk-head"><span class="wk-label">THIS WEEK</span>' +
-      '<span class="wk-count">' + n + ' of 7 days</span></div>' +
-    '<div class="wk-strip">' + pills.join('') + '</div>' +
-    '<div class="wk-foot"><span>' + Math.round(n / 7 * 100) + '% of the week logged</span>' +
-      '<button type="button" class="btn-link wk-recap" onclick="openWeekRecap()">Week recap →</button></div>' +
-    '</div>';
-}
+// renderWeekStrip lived here. It was removed rather than kept unused: the mountain
+// hero already renders the same seven days with their day letters, so this card was
+// the third copy of the same fact on one screen. `git show` it if the day-letters
+// hero ever moves elsewhere and a standalone strip is wanted again.
 
 // ─────────────────────────────────────────────────────────────
 // HEALTH HUB — training + nutrition + body, in one smart place
@@ -8511,7 +8479,9 @@ function renderHealthOverview(nut, gymDays, gymGoal, streak, eatenCal, eatenP, w
     statRingCard({ label: 'Weight', value: (wDisp != null ? wDisp : 0), decimal: (wDisp != null && wDisp % 1 !== 0) ? 1 : 0, suffix: ' ' + wUnit, pct: null,
       color: 'var(--money-color)', icon: '⚖️', sub: wDelta || (wDisp != null ? 'latest weigh-in' : 'log your weight'), onclick: "setHealthTab('nutrition')" }) +
     '</div>' +
-    renderFuelCard() +
+    // The Training × Nutrition card used to render here AND on the Nutrition tab —
+    // the same card twice, one tap apart. It belongs with the food detail, so this
+    // tab stays a summary: four rings, each tapping through to where the depth is.
     '<button type="button" class="wo-add" style="margin-top:4px" onclick="openWorkout(\'health\')">🏋️ Track a workout — sets, reps & rest timer</button>';
 }
 function renderHealthTraining(gymDays, gymGoal, streak) {
@@ -12526,19 +12496,15 @@ function renderNutritionResults(nut) {
     '<div class="macro-name">' + name + '</div>' +
     '<div class="macro-meta">' + m.pct + '% · ' + m.cal + ' cal</div>' +
     '</div>';
-  // Per-meal plan
+  // This page had its OWN meal list, built on the even-split fallback — it told
+  // you every meal was "about X cal each" while renderMealPlan() on Health →
+  // Nutrition showed lunch deliberately larger. Two implementations of one idea,
+  // giving different answers. Settings now confirms the daily totals and links to
+  // the single real plan.
   const m = nut.meals;
-  const mealRows = m.labels.map(lbl =>
-    '<div class="meal-row">' +
-    '<div class="meal-name">' + lbl + '</div>' +
-    '<div class="meal-cal">' + m.calories.toLocaleString() + ' cal</div>' +
-    '<div class="meal-macros"><b class="mp">' + m.protein + 'g</b> · <b class="mc">' + m.carbs + 'g</b> · <b class="mf">' + m.fat + 'g</b></div>' +
-    '</div>'
-  ).join('');
-  const mealPlan = '<div class="meal-plan">' +
-    '<div class="meal-plan-head">Split into ' + m.count + ' meals — about <strong>' + m.calories.toLocaleString() + ' cal</strong> each</div>' +
-    '<div class="meal-list">' + mealRows + '</div>' +
-    '<div class="meal-legend"><b class="mp">P</b> protein · <b class="mc">C</b> carbs · <b class="mf">F</b> fat &nbsp;(per meal)</div>' +
+  const mealPlan = '<div class="nut-meal-link">' +
+    'Split across <strong>' + m.count + ' meals</strong> — lunch largest, breakfast lighter.' +
+    '<button type="button" class="btn-link" onclick="navigate(\'health\');setHealthTab(\'nutrition\')">See my meal plan →</button>' +
     '</div>';
 
   return '<div class="nutrition-results">' +
@@ -13265,10 +13231,15 @@ function renderChecklistPage() {
     '<p class="page-sub">Your daily must-dos and nudges to stay on track</p></div>' +
     '<div class="dash-grid">' +
     '<div class="card">' +
+    // The card-level total and bar only mean something once there are several
+    // lists. With one list they restated the list's own "1/3" and its own bar
+    // immediately below — two progress bars for the same three items.
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
     '<h3 class="card-title" style="margin-bottom:0">Today\'s Checklist</h3>' +
-    '<span style="font-size:13px;color:var(--text-muted)">' + prog.done + '/' + prog.total + ' done</span></div>' +
-    '<div class="chk-progress"><div style="width:' + pct + '%"></div></div>' +
+    (groups.length > 1
+      ? '<span style="font-size:13px;color:var(--text-muted)">' + prog.done + '/' + prog.total + ' done</span>'
+      : '') + '</div>' +
+    (groups.length > 1 ? '<div class="chk-progress"><div style="width:' + pct + '%"></div></div>' : '') +
     '<div class="chk-groups">' + checklistRows + '</div>' +
     '<div class="chk-add chk-add-group"><input type="text" id="chk-new-group" placeholder="New list name (e.g. Morning routine)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addCheckGroup()}">' +
     '<button type="button" class="btn btn-outline" onclick="addCheckGroup()">+ New list</button></div>' +

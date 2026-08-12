@@ -276,7 +276,7 @@ body {
 .nav-group + .nav-group { margin-top: 14px; }
 .nav-group-label {
   font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
-  color: var(--faint, var(--muted)); padding: 0 10px 5px;
+  color: var(--text-muted); padding: 0 10px 5px;
 }
 /* A group whose every item is hidden by the focus-area gating collapses,
    label included — set from applyNavVisibility(). */
@@ -2233,7 +2233,7 @@ body {
   .page-header { margin-bottom: 16px; }
   .card { padding: 18px; margin-bottom: 14px; border-radius: 12px; }
   .mtn-hero { margin-bottom: 14px; }
-  .climb-head, .quest-top, .wk-head { gap: 10px; }
+  .climb-head, .quest-top { gap: 10px; }
   .community-box, .modal-box { max-height: calc(100dvh - 34px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
   .cf-row, .food-add-row, .rem-add, .chk-add, .backup-btns { flex-direction: column; }
   .cf-row .cf-input, .food-add-row input, .food-add-row select, .food-add-row button, .rem-add input, .rem-add button, .chk-add input, .chk-add button { width: 100%; min-width: 0; }
@@ -2586,19 +2586,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 }
 .meal-plan-head { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 12px; }
 .meal-plan-head strong { color: var(--success); }
-.meal-list { display: flex; flex-direction: column; gap: 8px; }
-.meal-row {
-  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
-  padding: 10px 14px; border-radius: var(--radius-sm);
-  background: var(--surface); border: 1px solid var(--border);
-}
-.meal-name { font-size: 13px; font-weight: 700; color: var(--text); }
-.meal-cal { font-size: 14px; font-weight: 800; color: var(--success); white-space: nowrap; }
-.meal-macros { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
-.meal-macros b.mp, .meal-legend b.mp { color: var(--success); }
-.meal-macros b.mc, .meal-legend b.mc { color: var(--accent); }
-.meal-macros b.mf, .meal-legend b.mf { color: #A78BFA; }
-.meal-legend { font-size: 11px; color: var(--text-muted); margin-top: 10px; }
+/* .meal-list/.meal-row/.meal-name/.meal-cal/.meal-macros/.meal-legend removed with
+   the duplicate even-split meal list that used to render in Settings. The live
+   plan uses .meal-plan-grid / .meal-plan-card below. */
 
 /* ─── Log: Nutrition section + calories eaten ─── */
 .nut-section { border-color: rgba(16,185,129,0.35); }
@@ -3203,18 +3193,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .loading-mtn { line-height: 0; margin-bottom: 4px; }
 .empty-icon.empty-mtn { font-size: 0; max-width: 220px; width: 100%; margin: 0 auto 12px; line-height: 0; }
 
-/* Home, as in the mockup — week dots + compact pillar row */
-.wk-card { padding: 14px 16px; }
-.wk-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.wk-title { font-weight: 700; font-size: 14px; color: var(--text); }
-.wk-count { font-size: 12px; color: var(--text-muted); font-weight: 600; }
-.wk-strip { display: flex; justify-content: space-between; gap: 6px; }
-.wk-day { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-.wk-dot { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--border); box-sizing: border-box; }
-.wk-dot.wk-done { background: var(--gym-color, #16a34a); border-color: var(--gym-color, #16a34a); }
-.wk-dot.wk-today { border-color: var(--accent); border-width: 2px; }
-.wk-dot.wk-future { opacity: 0.45; }
-.wk-lbl { font-size: 11px; color: var(--text-muted); font-weight: 600; }
 .pnav { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
 .pnav-pill { flex: 1; min-width: 70px; text-align: center; padding: 10px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer; transition: border-color 0.15s; }
 .pnav-pill:hover { border-color: var(--accent); }
@@ -3593,11 +3571,11 @@ body.auth-active .fab-btn { display: none !important; }
    rather than something you have to compute from a column of numbers. */
 .adm-ai-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .adm-ai-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
-.adm-ai-rank { width: 18px; text-align: right; color: var(--muted); font-weight: 700; flex: none; }
+.adm-ai-rank { width: 18px; text-align: right; color: var(--text-muted); font-weight: 700; flex: none; }
 .adm-ai-name { min-width: 96px; max-width: 160px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.adm-ai-bar { flex: 1 1 60px; height: 8px; border-radius: 4px; background: var(--surface2, var(--line)); overflow: hidden; min-width: 40px; }
+.adm-ai-bar { flex: 1 1 60px; height: 8px; border-radius: 4px; background: var(--card-2); overflow: hidden; min-width: 40px; }
 .adm-ai-bar i { display: block; height: 100%; background: var(--primary-solid, var(--primary)); }
-.adm-ai-num { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
+.adm-ai-num { color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
 @media (max-width: 560px) {
   .adm-ai-row { flex-wrap: wrap; }
   .adm-ai-num { width: 100%; padding-left: 28px; }
@@ -3626,7 +3604,7 @@ body.auth-active .fab-btn { display: none !important; }
 .terrain-off .tr-hint, .terrain-off .tr-peak { display: none; }
 .terrain-off .tr-fallback { display: flex; }
 .tr-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 12px 16px 14px; }
-.tr-key { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--muted); }
+.tr-key { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: var(--text-muted); }
 .tr-key i { width: 10px; height: 4px; border-radius: 999px; flex: none; }
 @media (max-width: 480px) { .terrain-stage { height: 224px; } }
 
@@ -3656,7 +3634,7 @@ body.auth-active .fab-btn { display: none !important; }
   font-size: 21px; font-weight: 800; letter-spacing: -.02em; line-height: 1.22;
   color: var(--text); margin: 0 0 10px;
 }
-.onemove-why { font-size: 13px; line-height: 1.48; color: var(--muted); margin: 0 0 14px; }
+.onemove-why { font-size: 13px; line-height: 1.48; color: var(--text-muted); margin: 0 0 14px; }
 .onemove-cta { width: 100%; justify-content: center; padding: 13px 18px; font-size: 14px; border-radius: 12px; }
 /* Nothing urgent: keep the shape, drop the emphasis. Manufacturing urgency when
    everything is fine trains people to ignore the card. */
@@ -3666,11 +3644,11 @@ body.auth-active .fab-btn { display: none !important; }
 
 /* Your areas — triage. Detail lives in the hub, not here. */
 .areas-card { padding: 14px 16px 6px; }
-.areas-head { font-size: 10px; font-weight: 900; letter-spacing: .1em; color: var(--faint, var(--muted)); margin-bottom: 2px; }
+.areas-head { font-size: 10px; font-weight: 900; letter-spacing: .1em; color: var(--text-muted); margin-bottom: 2px; }
 .areas-row {
   display: flex; align-items: center; gap: 12px; width: 100%;
   padding: 11px 0; background: none; border: none; cursor: pointer; text-align: left;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--border);
 }
 .areas-row:first-of-type { border-top: none; }
 .areas-ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none; }
@@ -3683,19 +3661,11 @@ body.auth-active .fab-btn { display: none !important; }
 .areas-urgent { color: var(--danger-ink); }
 .areas-warn   { color: var(--warning-ink); }
 .areas-ok     { color: var(--primary); }
-.areas-chev { color: var(--faint, var(--muted)); font-size: 18px; line-height: 1; flex: none; }
+.areas-chev { color: var(--text-muted); font-size: 18px; line-height: 1; flex: none; }
 
 /* This week — seven discrete days, deliberately the quietest card. */
-.wk-card { padding: 14px 16px; }
-.wk-head { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
-.wk-label { flex: 1; font-size: 10px; font-weight: 900; letter-spacing: .1em; color: var(--faint, var(--muted)); }
-.wk-count { font-size: 11.5px; font-weight: 700; color: var(--muted); }
-.wk-strip { display: flex; gap: 5px; }
-.wk-pill { flex: 1; height: 7px; border-radius: 999px; background: var(--line); }
-.wk-pill.wk-on { background: var(--primary); }
-.wk-pill.wk-future { opacity: .5; }
-.wk-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; font-size: 12px; color: var(--muted); }
-.wk-recap { font-weight: 700; }
+/* The .wk-* block was removed with renderWeekStrip — the mountain hero renders
+   the week instead, using its own .mtn-wk-* classes. */
 
 /* Streak ring — shows progress through the CURRENT growth stage, so the number
    reads as accumulated investment rather than a counter waiting to reset.
@@ -3705,7 +3675,7 @@ body.auth-active .fab-btn { display: none !important; }
 .streak-ring { position: relative; width: 62px; height: 62px; flex: none; display: grid; place-items: center; }
 .streak-ring-arc {
   position: absolute; inset: 0; border-radius: 50%;
-  background: conic-gradient(var(--streak-arc, #EA6A0C) calc(var(--stage-pct, 0) * 1%), var(--line) 0);
+  background: conic-gradient(var(--streak-arc, #EA6A0C) calc(var(--stage-pct, 0) * 1%), var(--border) 0);
   -webkit-mask: radial-gradient(farthest-side, #0000 calc(100% - 5px), #000 calc(100% - 5px));
           mask: radial-gradient(farthest-side, #0000 calc(100% - 5px), #000 calc(100% - 5px));
 }
@@ -3724,7 +3694,7 @@ body.auth-active .fab-btn { display: none !important; }
 .streak-grow { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; margin-top: 6px; }
 .streak-grow-ico { font-size: 15px; line-height: 1; }
 .streak-grow-name { font-size: 13px; font-weight: 800; color: #9A3412; }   /* 6.27:1 on the light card */
-.streak-grow-next { font-size: 11.5px; color: var(--muted); }
+.streak-grow-next { font-size: 11.5px; color: var(--text-muted); }
 [data-theme="dark"] .streak-grow-name { color: #FB923C; }                  /* 6.16:1 on the dark card */
 @media (max-width: 420px) { .streak-grow-next { width: 100%; } }
 
@@ -3741,10 +3711,10 @@ body.auth-active .fab-btn { display: none !important; }
    Monospace for the message and stack — these are read for exact strings,
    not prose, so the proportional UI font actively hurts here. */
 .adm-err-list { display: flex; flex-direction: column; gap: 10px; }
-.adm-err { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg); }
+.adm-err { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--bg); }
 .adm-err-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 .adm-err-kind { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
-  padding: 2px 7px; border-radius: 999px; background: var(--surface2, var(--bg)); border: 1px solid var(--line); }
+  padding: 2px 7px; border-radius: 999px; background: var(--card-2); border: 1px solid var(--border); }
 /* Theme-aware INK tokens, not the fills and not raw hexes. Measured: a fixed
    #DC2626 is 3.9:1 on the dark ground, and the amber fill is 1.9:1 on the light
    one — both fail. No tint behind them, since tinting shifts the effective
@@ -3753,14 +3723,14 @@ body.auth-active .fab-btn { display: none !important; }
 .adm-err-unhandledRejection { color: var(--danger-ink); border-color: var(--danger-ink); }
 .adm-err-client { color: var(--warning-ink); border-color: var(--warning-ink); }
 .adm-err-count { font-size: 12px; font-weight: 800; color: var(--text); }
-.adm-err-when { font-size: 12px; color: var(--muted); margin-left: auto; }
+.adm-err-when { font-size: 12px; color: var(--text-muted); margin-left: auto; }
 .adm-err-msg { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12.5px; line-height: 1.5; word-break: break-word; color: var(--text); }
-.adm-err-route { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.adm-err-route { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 .adm-err-stack { margin-top: 8px; }
-.adm-err-stack summary { cursor: pointer; font-size: 12px; color: var(--muted); }
+.adm-err-stack summary { cursor: pointer; font-size: 12px; color: var(--text-muted); }
 .adm-err-stack pre { margin: 6px 0 0; padding: 8px 10px; overflow-x: auto; max-height: 220px;
-  background: var(--surface2, var(--bg)); border: 1px solid var(--line); border-radius: 8px;
+  background: var(--card-2); border: 1px solid var(--border); border-radius: 8px;
   font-size: 11.5px; line-height: 1.5; white-space: pre; }
 
 /* ── Accessibility utilities ─────────────────────────────────────────
@@ -3786,8 +3756,8 @@ body.auth-active .fab-btn { display: none !important; }
 }
 
 /* Terms/Privacy — deliberately quiet: required and reachable, never shouting. */
-.legal-links { margin-top: 14px; text-align: center; font-size: 12px; color: var(--muted); display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; }
-.legal-links a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.legal-links { margin-top: 14px; text-align: center; font-size: 12px; color: var(--text-muted); display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; }
+.legal-links a { color: var(--text-muted); text-decoration: underline; text-underline-offset: 2px; }
 .legal-links a:hover, .legal-links a:focus-visible { color: var(--primary); }
 
 /* ─── User chip (sidebar footer) ──────────────── */
@@ -4485,3 +4455,12 @@ body:has(#preview-banner) .wo-rest { bottom: calc(78px + env(safe-area-inset-bot
    list matches the reset picker — same interaction, same hit target. */
 .nut-screen { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 4px; }
 .nut-screen-sub { font-size: 12.5px; line-height: 1.5; color: var(--text-muted); margin: 0 0 10px; }
+
+/* Settings now points at the one real meal plan instead of rendering a second,
+   contradictory copy of it. */
+.nut-meal-link {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+  background: var(--card-2); border-radius: 10px; padding: 11px 13px; margin-top: 12px;
+  font-size: 13.5px; line-height: 1.5; color: var(--text-muted);
+}
