@@ -71,7 +71,8 @@ function loadApp(fieldValues) {
     ' knowledgeQuizPool, groupProgress, allCheckItems, healthBriefing, businessBriefing, knowledgeBriefing, weeklyGamePlan, libFilter,' +
     ' MUSCLE_PARTS, exercisePart, partMeta, exercisesByPart, libraryCount, PROGRAM_GROUPS, programSections, programPartLabel,' +
     ' safeUrl, linkHost, libGroups, hubEnabled, HUB_PILLARS, dayXp, dayCompleteStats, getLevel,' +
-    ' RESET_AREAS, clearPillarData, isDayEmpty });';
+    ' RESET_AREAS, clearPillarData, isDayEmpty,' +
+    ' ADAPT, targetWeeklyRate, weightTrend, avgIntake, estimateTDEE, adaptiveTarget, nutritionPlan });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -1408,6 +1409,144 @@ ok('terrain grid: an empty history is a flat plain, not an error',
   (() => { const g = A.terrainGrid([], 12); return g.cols === 12 && g.grid.every(c => c.every(v => v === 0)); })());
 ok('terrain grid: a silly column count is clamped to something drawable',
   A.terrainGrid([], 0).cols >= 2 && A.terrainGrid([], 1).cols >= 2);
+
+// ── Adaptive nutrition — the weight log drives the calorie target ──
+// This tells people how much to eat. Every branch is pinned, and the safety
+// rails are tested by trying to breach them.
+const _anDay = (n) => { const d = new Date(Date.UTC(2026, 3, 1)); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const _anToday = _anDay(30);
+// A clean 21-day run of weigh-ins losing 0.5 kg/week from 90kg.
+const _anWeights = (perWeek, start, n, everyN) => {
+  const out = []; const step = everyN || 3;
+  for (let i = 0; i <= n; i += step) out.push({ id: 'w' + i, date: _anDay(30 - n + i), kg: +(start + (perWeek / 7) * i).toFixed(2) });
+  return out;
+};
+const _anDays = (cal, n) => {
+  const out = []; for (let i = 0; i <= (n || 20); i++) out.push({ id: 'd' + i, date: _anDay(30 - (n || 20) + i), calories: cal });
+  return out;
+};
+const _anProfile = (goal) => ({ nutrition: { age: 30, sex: 'male', heightCm: 180, weightKg: 95, activity: 'moderate', goal: goal || 'lose', strategy: 'muscle', mealsPerDay: 4 } });
+
+// Bodyweight-scaled goal rates: a percentage, not a flat half-kilo for everyone.
+ok('target rate: losing is negative, gaining positive, maintaining zero',
+  A.targetWeeklyRate('lose', 90) < 0 && A.targetWeeklyRate('gain', 90) > 0 && A.targetWeeklyRate('maintain', 90) === 0);
+ok('target rate: a heavier person gets a larger absolute loss target',
+  Math.abs(A.targetWeeklyRate('lose', 120)) > Math.abs(A.targetWeeklyRate('lose', 60)));
+ok('target rate: loss never exceeds 1kg/wk however heavy you are',
+  Math.abs(A.targetWeeklyRate('lose', 300)) <= 1.0);
+ok('target rate: a very light person still gets a usable floor',
+  Math.abs(A.targetWeeklyRate('lose', 40)) >= 0.25);
+eq('target rate: no weight means no target', A.targetWeeklyRate('lose', 0), 0);
+
+// Trend detection.
+const _tr = A.weightTrend(_anWeights(-0.5, 90, 21), _anToday);
+ok('trend: detects a 0.5kg/wk loss from a clean run', Math.abs(_tr.kgPerWeek - (-0.5)) < 0.06);
+ok('trend: is confident with 8 readings over 21 days', _tr.confident);
+ok('trend: current weight is a 7-day average, not the newest reading',
+  _tr.current !== _tr.latest && _tr.current > 0);
+ok('trend: two readings a day apart is NOT confident',
+  !A.weightTrend([{ date: _anDay(29), kg: 90 }, { date: _anDay(30), kg: 89 }], _anToday).confident);
+eq('trend: no weigh-ins is handled, not crashed', A.weightTrend([], _anToday).readings, 0);
+eq('trend: a single reading gives no slope', A.weightTrend([{ date: _anDay(30), kg: 90 }], _anToday).kgPerWeek, 0);
+ok('trend: a single reading still reports a current weight',
+  A.weightTrend([{ date: _anDay(30), kg: 90 }], _anToday).current === 90);
+ok('trend: readings older than the lookback are ignored',
+  A.weightTrend([{ date: _anDay(-200), kg: 130 }].concat(_anWeights(-0.5, 90, 21)), _anToday).current < 95);
+ok('trend: garbage weigh-ins are filtered out',
+  A.weightTrend([{ date: 'nope', kg: 'x' }, { date: _anDay(30), kg: 0 }, { date: _anDay(28), kg: -5 }], _anToday).readings === 0);
+ok('trend: gaining weight reads as a positive rate',
+  A.weightTrend(_anWeights(0.3, 80, 21), _anToday).kgPerWeek > 0.2);
+
+// Intake averaging — unlogged days must not read as fasting.
+const _in = A.avgIntake(_anDays(2200, 20).concat([{ date: _anDay(30), calories: 0 }]), _anToday);
+eq('intake: a zero-calorie (unlogged) day is skipped, not averaged in', _in.avg, 2200);
+ok('intake: counts only days inside the lookback', A.avgIntake(_anDays(2200, 60), _anToday).days <= 22);
+eq('intake: no food logs is zero days, not NaN', A.avgIntake([], _anToday).days, 0);
+
+// TDEE from energy balance: ate 2,200 and lost 0.5kg/wk => burned ~2,750.
+const _td = A.estimateTDEE(2800, { days: 20, avg: 2200 }, { kgPerWeek: -0.5, confident: true });
+eq('TDEE: measured from intake + weight change', _td.source, 'measured');
+ok('TDEE: ate 2200 losing 0.5kg/wk reads as ~2750 burn', Math.abs(_td.tdee - 2750) <= 30);
+eq('TDEE: falls back to the formula without enough food logs',
+  A.estimateTDEE(2800, { days: 3, avg: 2200 }, { kgPerWeek: -0.5, confident: true }).source, 'formula');
+eq('TDEE: falls back to the formula without a confident trend',
+  A.estimateTDEE(2800, { days: 20, avg: 2200 }, { kgPerWeek: -0.5, confident: false }).source, 'formula');
+// Under-reporting guard: claiming 900 cal/day while holding weight would imply an
+// absurd burn, so the estimate is clamped toward the formula.
+const _tdBad = A.estimateTDEE(2800, { days: 20, avg: 900 }, { kgPerWeek: 0, confident: true });
+ok('TDEE: wildly under-reported intake is clamped, not believed',
+  _tdBad.clamped && _tdBad.tdee >= Math.round(2800 * 0.6));
+
+// The three tiers.
+const _pLose = A.nutritionPlan(_anProfile('lose'), _anWeights(-0.5, 90, 21), _anDays(2200, 20), _anToday);
+eq('plan: with weight + food logs the tier is "measured"', _pLose.adapt.tier, 'measured');
+ok('plan: uses the LOGGED weight, not the stale onboarding number',
+  _pLose.weightKg < 95 && _pLose.weightIsLogged);
+ok('plan: a measured plan reports a measured TDEE', _pLose.adapt.tdeeSource === 'measured');
+ok('plan: losing at target keeps the target near maintenance-minus-deficit',
+  _pLose.calories > 1200 && _pLose.calories < _pLose.adapt.tdee);
+
+const _pStart = A.nutritionPlan(_anProfile('lose'), [], [], _anToday);
+eq('plan: no weigh-ins yet means the "starting" tier', _pStart.adapt.tier, 'starting');
+eq('plan: the starting tier never adjusts calories', _pStart.adapt.deltaKcal, 0);
+ok('plan: the starting tier says what to do next', /log your weight/i.test(_pStart.adapt.reason));
+ok('plan: with no weigh-ins it falls back to the profile weight', _pStart.weightKg === 95 && !_pStart.weightIsLogged);
+
+const _pCorr = A.nutritionPlan(_anProfile('lose'), _anWeights(-0.5, 90, 21), [], _anToday);
+eq('plan: weigh-ins but no food logs means the "corrected" tier', _pCorr.adapt.tier, 'corrected');
+
+// Direction is the thing that must never be wrong.
+const _pStall = A.nutritionPlan(_anProfile('lose'), _anWeights(0, 90, 21), [], _anToday);
+ok('plan: stalled on a loss goal CUTS calories', _pStall.adapt.deltaKcal < 0);
+// A stall is the commonest reason to read this card, so it must not say "Trending 0".
+ok('plan: a flat trend reads as "holding flat", not "Trending 0 kg/wk"',
+  /holding flat/i.test(_pStall.adapt.reason) && !/trending 0/i.test(_pStall.adapt.reason));
+const _pFast = A.nutritionPlan(_anProfile('lose'), _anWeights(-1.4, 90, 21), [], _anToday);
+ok('plan: losing dangerously fast ADDS calories back', _pFast.adapt.deltaKcal > 0);
+const _pGainStall = A.nutritionPlan(_anProfile('gain'), _anWeights(0, 80, 21), [], _anToday);
+ok('plan: stalled on a muscle-gain goal ADDS calories', _pGainStall.adapt.deltaKcal > 0);
+const _pGainFast = A.nutritionPlan(_anProfile('gain'), _anWeights(1.2, 80, 21), [], _anToday);
+ok('plan: gaining too fast (mostly fat) CUTS calories', _pGainFast.adapt.deltaKcal < 0);
+const _pMaintDrift = A.nutritionPlan(_anProfile('maintain'), _anWeights(0.6, 80, 21), [], _anToday);
+ok('plan: drifting up while maintaining CUTS calories', _pMaintDrift.adapt.deltaKcal < 0);
+
+// The deadband: close enough is left alone, so people aren't chasing the scale.
+const _pOn = A.nutritionPlan(_anProfile('lose'), _anWeights(-0.63, 90, 21), [], _anToday);
+ok('plan: hitting the goal rate leaves the target alone', _pOn.adapt.onTrack && _pOn.adapt.deltaKcal === 0);
+ok('plan: an on-track plan says so plainly', /on track/i.test(_pOn.adapt.reason));
+// Succeeding but with a measured burn: the number may still shift, and the copy
+// must read as a refinement rather than scolding someone who is doing it right.
+const _pOnMeasured = A.nutritionPlan(_anProfile('lose'), _anWeights(-0.6, 90, 21), _anDays(2200, 20), _anToday);
+ok('plan: on track + measured burn still refines the target', _pOnMeasured.adapt.onTrack);
+ok('plan: a refinement never reads as "cut" when you are on track',
+  /on track/i.test(_pOnMeasured.adapt.reason) && !/\bcut\b/i.test(_pOnMeasured.adapt.reason));
+
+// Safety rails, tested by trying to break them.
+ok('rails: one weekly correction can never exceed maxStepKcal',
+  Math.abs(A.nutritionPlan(_anProfile('lose'), _anWeights(3.5, 90, 21), [], _anToday).adapt.deltaKcal) <= A.ADAPT.maxStepKcal);
+ok('rails: the target never drifts past maxDriftPct from the formula',
+  (() => { const p = A.nutritionPlan(_anProfile('lose'), _anWeights(3.5, 90, 21), [], _anToday);
+    return Math.abs(p.adapt.deltaKcal) <= Math.round(p.adapt.baseline * A.ADAPT.maxDriftPct); })());
+ok('rails: a breached rail is flagged, not hidden',
+  A.nutritionPlan(_anProfile('lose'), _anWeights(3.5, 90, 21), [], _anToday).adapt.railHit === true);
+ok('rails: calories never fall below the 1200 floor',
+  A.nutritionPlan({ nutrition: { age: 70, sex: 'female', heightCm: 150, weightKg: 45, activity: 'sedentary', goal: 'lose', strategy: 'balanced', mealsPerDay: 3 } },
+    _anWeights(0, 45, 21), [], _anToday).calories >= 1200);
+
+// Macros must follow the adapted calories and the live weight.
+ok('macros: protein is set from the CURRENT weight, not the onboarding weight',
+  (() => { const heavy = A.nutritionPlan(_anProfile('gain'), _anWeights(0, 110, 21), [], _anToday);
+    const light = A.nutritionPlan(_anProfile('gain'), _anWeights(0, 70, 21), [], _anToday);
+    return heavy.protein.g > light.protein.g; })());
+ok('macros: the split still adds up to the adapted calorie total',
+  (() => { const p = _pStall; const sum = p.protein.cal + p.carbs.cal + p.fat.cal;
+    return Math.abs(sum - p.calories) <= 12; })());
+eq('plan: no nutrition profile returns null rather than guessing', A.nutritionPlan({}, [], [], _anToday), null);
+// The formula path must be untouched — every existing caller depends on it.
+ok('computeNutrition without an override is unchanged',
+  A.computeNutrition({ age: 30, sex: 'male', heightCm: 180, weightKg: 90, activity: 'moderate', goal: 'lose', strategy: 'muscle', mealsPerDay: 4 }).calories > 1200);
+eq('computeNutrition honours an explicit calorie override',
+  A.computeNutrition({ age: 30, sex: 'male', heightCm: 180, weightKg: 90, activity: 'moderate', goal: 'lose', strategy: 'muscle', mealsPerDay: 4 }, 2000).calories, 2000);
 
 // ── Data reset — clearing one area must not touch the others ──
 // This backs the Settings "Reset my data" button. Health and business live in

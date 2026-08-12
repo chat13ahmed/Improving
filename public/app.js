@@ -2101,7 +2101,11 @@ function mealNowHint(now) {
 }
 
 // Compute calories (Mifflin-St Jeor BMR → TDEE → goal) and a macro split.
-function computeNutrition(n) {
+// `calorieOverride` lets the adaptive layer (nutritionPlan) supply a calorie
+// number derived from real weight + intake history while reusing the macro split
+// below. Keeping one implementation of the macro maths means the adaptive target
+// and the formula target can never disagree about how to divide a calorie total.
+function computeNutrition(n, calorieOverride) {
   if (!n) return null;
   const age = +n.age, heightCm = +n.heightCm, weightKg = +n.weightKg;
   if (!age || !heightCm || !weightKg || !n.sex) return null;
@@ -2114,6 +2118,7 @@ function computeNutrition(n) {
   const bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + (sex === 'female' ? -161 : 5);
   const tdee = bmr * ACTIVITY_FACTORS[activity].mult;
   let calories = Math.round(tdee * (1 + NUTRITION_GOALS[goal].adj));
+  if (calorieOverride > 0) calories = Math.round(calorieOverride);
   if (calories < 1200) calories = 1200; // safety floor
 
   let protein, carbs, fat;
@@ -2149,7 +2154,212 @@ function computeNutrition(n) {
   return { bmr: Math.round(bmr), tdee: Math.round(tdee), calories, protein, carbs, fat, goal, strategy, activity, meals };
 }
 
-function getNutrition() { return computeNutrition(state.data.profile?.nutrition); }
+// ─────────────────────────────────────────────────────────────
+// ADAPTIVE NUTRITION — the weight log drives the diet
+// ─────────────────────────────────────────────────────────────
+// The formula above is only a starting guess. Two people the same height, weight
+// and age can differ by 400+ kcal/day in what they actually burn, so a target
+// that never moves is wrong for most people from day one. Everything here reads
+// the weight log and the food log and corrects the guess with what really
+// happened. It is deliberately stateless — the target is always a pure function
+// of (profile, weights, days, today), so there is no stored adjustment to go
+// stale, double-apply, or need a migration.
+const ADAPT = {
+  window: 7,            // days averaged into "current weight"
+  lookback: 21,         // how far back the trend is measured
+  minReadings: 4,       // fewer than this and a slope is meaningless
+  minSpanDays: 10,      // two weigh-ins a day apart say nothing about a week
+  minIntakeDays: 10,    // intake days needed before we trust an energy-balance TDEE
+  kcalPerKg: 7700,      // energy in a kg of body mass
+  maxStepKcal: 400,     // largest single weekly correction
+  maxDriftPct: 0.25,    // never stray further than this from the formula
+  tdeeSanityPct: 0.40,  // guard against under-reported intake skewing the estimate
+  floorKcal: 1200
+};
+
+const _dayMs = (d) => Date.parse(String(d) + 'T00:00:00Z');
+
+// Target rate of change, scaled to bodyweight. Half a kilo a week is gentle for
+// someone at 120kg and aggressive at 55kg, so a percentage holds across sizes.
+// Losing faster than ~1%/week starts costing muscle; gaining faster than ~0.5%
+// is mostly fat.
+function targetWeeklyRate(goal, weightKg) {
+  const w = +weightKg || 0;
+  if (!w) return 0;
+  if (goal === 'lose') return -Math.min(1.0, Math.max(0.25, w * 0.0070));
+  if (goal === 'gain') return  Math.min(0.50, Math.max(0.10, w * 0.0025));
+  return 0;
+}
+
+// Least-squares slope over the recent weigh-ins. Regression beats differencing
+// two weekly averages because weigh-ins are always irregular: every reading
+// contributes, instead of only the ones that happen to land inside two windows.
+// `current` is a 7-day average, never a single reading — bodyweight swings 1–2kg
+// on water and glycogen alone, and feeding that noise into BMR would make the
+// target jitter daily.
+function weightTrend(weights, today, lookbackDays) {
+  const end = _dayMs(today || todayStr());
+  const look = lookbackDays || ADAPT.lookback;
+  const pts = (weights || [])
+    .filter(w => w && w.date && isFinite(+w.kg) && +w.kg > 0)
+    .map(w => ({ ms: _dayMs(w.date), kg: +w.kg }))
+    .filter(p => isFinite(p.ms) && p.ms <= end && (end - p.ms) / 86400000 <= look)
+    .sort((a, b) => a.ms - b.ms);
+
+  const out = { readings: pts.length, spanDays: 0, kgPerWeek: 0, current: 0, latest: 0, confident: false };
+  if (!pts.length) return out;
+
+  out.latest = pts[pts.length - 1].kg;
+  const recent = pts.filter(p => (end - p.ms) / 86400000 < ADAPT.window);
+  out.current = recent.length
+    ? Math.round((recent.reduce((s, p) => s + p.kg, 0) / recent.length) * 100) / 100
+    : out.latest;
+
+  out.spanDays = Math.round((pts[pts.length - 1].ms - pts[0].ms) / 86400000);
+  if (pts.length < 2 || out.spanDays < 1) return out;
+
+  const xs = pts.map(p => (p.ms - pts[0].ms) / 86400000);
+  const n = pts.length;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = pts.reduce((s, p) => s + p.kg, 0) / n;
+  let num = 0, den = 0;
+  for (let i = 0; i < n; i++) { num += (xs[i] - mx) * (pts[i].kg - my); den += (xs[i] - mx) * (xs[i] - mx); }
+  out.kgPerWeek = den ? Math.round((num / den) * 7 * 1000) / 1000 : 0;
+  out.confident = n >= ADAPT.minReadings && out.spanDays >= ADAPT.minSpanDays;
+  return out;
+}
+
+// Average calories actually eaten over the trend window. Days with no food
+// logged are skipped rather than counted as zero — a blank day means "didn't
+// log", and treating it as a fast would drag the estimate hundreds low.
+function avgIntake(days, today, lookbackDays) {
+  const end = _dayMs(today || todayStr());
+  const look = lookbackDays || ADAPT.lookback;
+  const vals = (days || [])
+    .filter(d => d && d.date && +d.calories > 0)
+    .filter(d => { const ms = _dayMs(d.date); return isFinite(ms) && ms <= end && (end - ms) / 86400000 <= look; })
+    .map(d => +d.calories);
+  return { days: vals.length, avg: vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0 };
+}
+
+// Energy balance, run backwards. If you ate 2,000/day and lost 0.5kg/week, you
+// burned about 2,550 — no formula needed, your own body did the measuring.
+// Clamped against the formula estimate because under-reporting intake is
+// extremely common and would otherwise produce a confidently wrong TDEE.
+function estimateTDEE(formulaTDEE, intake, trend) {
+  const f = Math.round(+formulaTDEE || 0);
+  if (!f || !intake || intake.days < ADAPT.minIntakeDays || !trend || !trend.confident) {
+    return { tdee: f, source: 'formula', clamped: false };
+  }
+  const raw = Math.round(intake.avg - (trend.kgPerWeek * ADAPT.kcalPerKg / 7));
+  const lo = Math.round(f * (1 - ADAPT.tdeeSanityPct));
+  const hi = Math.round(f * (1 + ADAPT.tdeeSanityPct));
+  const tdee = Math.max(lo, Math.min(hi, raw));
+  return { tdee, source: 'measured', clamped: tdee !== raw, raw };
+}
+
+// The whole point: turn "what your body is doing" into "what to eat tomorrow".
+// Three tiers, so it degrades honestly instead of pretending to know things.
+//   measured — enough weigh-ins AND food logs: target = your real burn + goal offset
+//   corrected — enough weigh-ins, thin food logs: nudge the formula by how far
+//               off the observed rate is
+//   starting  — not enough data yet: formula, but at your CURRENT weight
+function adaptiveTarget(nut, trend, intake, goal) {
+  const base = Math.round((nut && nut.calories) || 0);
+  const weightKg = (trend && trend.current) || 0;
+  const target = targetWeeklyRate(goal, weightKg);
+  const res = {
+    calories: base, baseline: base, deltaKcal: 0, tier: 'starting',
+    targetRate: target, actualRate: (trend && trend.kgPerWeek) || 0,
+    tdee: (nut && nut.tdee) || 0, tdeeSource: 'formula', onTrack: null, reason: ''
+  };
+  if (!base) return res;
+
+  if (!trend || !trend.confident) {
+    res.reason = trend && trend.readings
+      ? 'Weigh in a few more times — ' + trend.readings + ' reading' + (trend.readings === 1 ? '' : 's') +
+        ' over ' + trend.spanDays + ' day' + (trend.spanDays === 1 ? '' : 's') + ' can’t show a trend yet.'
+      : 'Log your weight a few times and this target starts tuning itself.';
+    return res;
+  }
+
+  const est = estimateTDEE((nut && nut.tdee) || 0, intake, trend);
+  res.tdee = est.tdee; res.tdeeSource = est.source; res.tdeeClamped = est.clamped;
+
+  // Inside the deadband the scale is just noise; moving the target here would
+  // only teach people to chase it.
+  const tol = goal === 'maintain' ? 0.20 : Math.max(0.10, Math.abs(target) * 0.30);
+  res.onTrack = Math.abs(target - res.actualRate) <= tol;
+
+  if (est.source === 'measured') {
+    res.tier = 'measured';
+    res.calories = Math.round(est.tdee + (target * ADAPT.kcalPerKg / 7));
+  } else {
+    res.tier = 'corrected';
+    if (res.onTrack) res.calories = base;
+    else res.calories = base + Math.round((target - res.actualRate) * ADAPT.kcalPerKg / 7);
+  }
+
+  // Rails: one correction can't lurch more than maxStepKcal, the result can't
+  // stray more than maxDriftPct from the formula, and nothing goes below the floor.
+  const step = res.calories - base;
+  res.calories = base + Math.max(-ADAPT.maxStepKcal, Math.min(ADAPT.maxStepKcal, step));
+  const drift = Math.round(base * ADAPT.maxDriftPct);
+  res.calories = Math.max(base - drift, Math.min(base + drift, res.calories));
+  res.calories = Math.max(ADAPT.floorKcal, res.calories);
+  res.deltaKcal = res.calories - base;
+  res.railHit = res.calories !== base + step;
+
+  // Typographic minus, and a flat trend gets words rather than "Trending 0 kg/wk"
+  // — a stall is the single most common reason someone reads this card.
+  const rate = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + (Math.round(Math.abs(v) * 100) / 100) + ' kg/wk';
+  const flat = Math.abs(res.actualRate) < 0.05;
+  const trendPhrase = flat ? 'Weight holding flat' : 'Trending ' + rate(res.actualRate);
+  // On-track can still shift the number: once the burn is measured it beats the
+  // formula, so the target gets refined even when the rate is already right.
+  // Saying "cut 105 cal" to someone who is succeeding would read as a telling-off.
+  if (res.onTrack) {
+    res.reason = (flat ? 'Holding steady' : 'On track at ' + rate(res.actualRate)) + '. ' + (res.deltaKcal
+      ? 'Refined by ' + (res.deltaKcal > 0 ? '+' : '−') + Math.abs(res.deltaKcal) + ' cal/day now your real burn is known.'
+      : 'Holding your target steady.');
+  } else if (res.deltaKcal > 0) {
+    res.reason = trendPhrase + ' against a ' + rate(target) + ' goal — added ' + res.deltaKcal + ' cal/day.';
+  } else if (res.deltaKcal < 0) {
+    res.reason = trendPhrase + ' against a ' + rate(target) + ' goal — cut ' + Math.abs(res.deltaKcal) + ' cal/day.';
+  } else {
+    res.reason = trendPhrase + ' — target unchanged.';
+  }
+  return res;
+}
+
+// The single entry point: profile + weight log + food log -> today's plan.
+function nutritionPlan(profile, weights, days, today) {
+  const n = profile && profile.nutrition;
+  if (!n) return null;
+  const trend = weightTrend(weights, today);
+  // A logged weight always beats the number typed at onboarding — that one is
+  // stale the moment the body changes, which is the entire bug being fixed here.
+  const liveWeight = trend.current || +n.weightKg || 0;
+  const baseline = computeNutrition(Object.assign({}, n, { weightKg: liveWeight }));
+  if (!baseline) return null;
+  const goal = NUTRITION_GOALS[n.goal] ? n.goal : 'maintain';
+  const intake = avgIntake(days, today);
+  const adapt = adaptiveTarget(baseline, trend, intake, goal);
+  // Recompute macros at the adapted calorie total, and at the live weight, so
+  // protein-by-bodyweight tracks the body you have now.
+  const plan = computeNutrition(Object.assign({}, n, { weightKg: liveWeight }), adapt.calories);
+  plan.adapt = adapt;
+  plan.trend = trend;
+  plan.intake = intake;
+  plan.weightKg = liveWeight;
+  plan.weightIsLogged = !!trend.current;
+  return plan;
+}
+
+function getNutrition() {
+  const d = state.data || {};
+  return nutritionPlan(d.profile, d.weights, d.days);
+}
 
 // ── Gym × Nutrition: does your eating match your training? (pure + testable) ──
 function fuelStatus(ctx) {
@@ -8210,7 +8420,9 @@ function renderHealthNutrition(nut, td, eatenCal, eatenP) {
   // The two trend charts are peers — side by side on desktop
   const trendA = renderNutritionWeekCard(), trendB = renderWeightTrend();
   const trends = (trendA && trendB) ? '<div class="dash-grid">' + trendA + trendB + '</div>' : trendA + trendB;
-  return today + renderHydrationStrip(getWeekStats()) + renderFuelCard() + renderMealPlan(nut) + trends;
+  // The adapt card sits directly under the targets it explains: what to eat, then
+  // why that number, then everything else.
+  return today + renderAdaptCard(nut) + renderHydrationStrip(getWeekStats()) + renderFuelCard() + renderMealPlan(nut) + trends;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -12216,7 +12428,74 @@ function renderNutritionResults(nut) {
     macro('mf', 'Fat', nut.fat) +
     '</div>' +
     mealPlan +
-    '<div class="nut-disclaimer">Estimated with the Mifflin-St Jeor formula. Use it as a starting point and adjust to how your body responds.</div>' +
+    // Once there's a weight trend the app is no longer quoting a formula at you,
+    // so saying "adjust it yourself" would be both wrong and a wasted feature.
+    '<div class="nut-disclaimer">' + (nut.adapt && nut.adapt.tier === 'measured'
+      ? 'Started from the Mifflin-St Jeor formula, now measured from your own weight trend and food logs — it re-tunes itself as your body changes.'
+      : nut.adapt && nut.adapt.tier === 'corrected'
+        ? 'Started from the Mifflin-St Jeor formula and adjusted to how your weight is actually moving. Log your meals too and it will measure your burn directly.'
+        : 'Estimated with the Mifflin-St Jeor formula — a starting point. Log your weight for a couple of weeks and it starts tuning itself to you.') +
+    '</div>' +
+    '</div>';
+}
+
+// Shows WHY today's target is what it is. A number that silently changes feels
+// arbitrary and gets ignored — the trust comes from seeing your own weight trend
+// drive it. Three tiers so it never overclaims: "starting" admits it's a guess,
+// "corrected" is nudging a formula, "measured" is your own energy balance.
+function renderAdaptCard(nut) {
+  const a = nut && nut.adapt;
+  if (!a) return '';
+  const t = nut.trend || {};
+  const unit = weightUnitPref();
+  const rateDisp = (kgPerWeek) => {
+    const v = unit === 'lbs' ? kgPerWeek / LBS_TO_KG : kgPerWeek;
+    return (v > 0 ? '+' : v < 0 ? '−' : '') + (Math.round(Math.abs(v) * 10) / 10) + ' ' + (unit === 'lbs' ? 'lb' : 'kg') + '/wk';
+  };
+  const wDisp = (kg) => Math.round(kgToDisplay(kg) * 10) / 10 + ' ' + (unit === 'lbs' ? 'lb' : 'kg');
+
+  const TIERS = {
+    starting: { badge: 'Tuning up', tone: 'idle' },
+    corrected: { badge: 'Adjusting to you', tone: 'live' },
+    measured: { badge: 'Measured from your data', tone: 'live' }
+  };
+  const tier = TIERS[a.tier] || TIERS.starting;
+
+  const cell = (label, value, sub) =>
+    '<div class="ad-cell"><div class="ad-val">' + value + '</div>' +
+    '<div class="ad-lbl">' + label + '</div>' +
+    (sub ? '<div class="ad-sub">' + sub + '</div>' : '') + '</div>';
+
+  const stats = a.tier === 'starting'
+    ? cell('Weight on file', wDisp(nut.weightKg), nut.weightIsLogged ? 'from your log' : 'from setup') +
+      cell('Weigh-ins', String(t.readings || 0), 'need ' + ADAPT.minReadings + '+')
+    : cell('Weight now', wDisp(t.current || nut.weightKg), t.readings + ' weigh-ins') +
+      cell('Your trend', rateDisp(a.actualRate), 'goal ' + rateDisp(a.targetRate)) +
+      cell(a.tdeeSource === 'measured' ? 'Your real burn' : 'Est. burn',
+           a.tdee.toLocaleString(), a.tdeeSource === 'measured' ? 'from intake + weight' : 'formula estimate');
+
+  const delta = a.deltaKcal
+    ? '<div class="ad-delta ' + (a.deltaKcal > 0 ? 'ad-up' : 'ad-down') + '">' +
+      (a.deltaKcal > 0 ? '↑ +' : '↓ −') + Math.abs(a.deltaKcal) + ' cal/day' +
+      '<span>' + a.baseline.toLocaleString() + ' → ' + a.calories.toLocaleString() + '</span></div>'
+    : '';
+
+  // Each tier gets a concrete next step, so there's always something to do.
+  const nextStep = a.tier === 'starting'
+    ? '<button type="button" class="btn btn-outline ad-cta" onclick="navigate(\'log\')">Log my weight</button>'
+    : a.tier === 'corrected'
+      ? '<div class="ad-next">Log your meals too and this switches from estimating your burn to measuring it.</div>'
+      : '';
+
+  const railNote = a.railHit
+    ? '<div class="ad-next">Capped at ' + ADAPT.maxStepKcal + ' cal for one week — big jumps backfire. It’ll keep closing the gap each week.</div>'
+    : '';
+
+  return '<div class="card adapt-card ad-' + tier.tone + '">' +
+    '<div class="ad-badge">⚖️ Weight → Diet · ' + tier.badge + '</div>' +
+    '<div class="ad-reason">' + a.reason + '</div>' +
+    '<div class="ad-grid">' + stats + '</div>' +
+    delta + nextStep + railNote +
     '</div>';
 }
 

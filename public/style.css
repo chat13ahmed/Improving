@@ -2913,6 +2913,38 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .da-actions { display: flex; gap: 10px; margin-top: 8px; }
 .da-actions .btn { flex: 1; }
 
+/* Adaptive nutrition card — explains why today's calorie target is what it is.
+   The tinted left edge marks it as a "the app is reasoning" card rather than raw
+   data, matching how .fuel-card reads on the same page. */
+.adapt-card { border-left: 3px solid var(--food-color); }
+.adapt-card.ad-idle { border-left-color: var(--border-bright); }
+.ad-badge {
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px;
+  color: var(--food-ink); margin-bottom: 8px;
+}
+.ad-idle .ad-badge { color: var(--text-muted); }
+.ad-reason { font-size: 15px; font-weight: 700; line-height: 1.45; color: var(--text); margin-bottom: 14px; }
+/* auto-fit means 2 cells fill the row on the "starting" tier and 3 on the others,
+   without a second breakpoint. */
+.ad-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px; margin-bottom: 12px;
+}
+.ad-cell { background: var(--card-2); border-radius: 10px; padding: 10px 12px; }
+.ad-val { font-size: 18px; font-weight: 800; color: var(--text); line-height: 1.2; }
+.ad-lbl { font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-top: 3px; }
+.ad-sub { font-size: 10.5px; color: var(--text-muted); opacity: 0.8; margin-top: 2px; }
+.ad-delta {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 9px 12px; border-radius: 10px;
+  font-size: 14px; font-weight: 800;
+}
+.ad-delta span { font-size: 12px; font-weight: 600; opacity: 0.85; }
+.ad-delta.ad-up { background: var(--success-bg); color: var(--success); }
+.ad-delta.ad-down { background: var(--danger-bg); color: var(--danger-ink); }
+.ad-next { font-size: 12.5px; line-height: 1.5; color: var(--text-muted); margin-top: 10px; }
+.ad-cta { margin-top: 10px; }
+
 /* Reset-my-data picker. Rows are full-width labels so the whole strip is a hit
    target, not just the 16px box — this gets used on a phone, one-handed. */
 .rs-area {
