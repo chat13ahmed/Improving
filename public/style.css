@@ -2913,6 +2913,26 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .da-actions { display: flex; gap: 10px; margin-top: 8px; }
 .da-actions .btn { flex: 1; }
 
+/* Reset-my-data picker. Rows are full-width labels so the whole strip is a hit
+   target, not just the 16px box — this gets used on a phone, one-handed. */
+.rs-area {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px; margin-bottom: 6px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--card-2); cursor: pointer;
+  font-size: 14.5px; font-weight: 600; color: var(--text);
+}
+.rs-area:hover { border-color: var(--accent); }
+.rs-area input { width: 17px; height: 17px; accent-color: var(--danger); cursor: pointer; flex: none; }
+/* Live count of what's about to go. --danger-bg/--danger-ink are a designed pair,
+   so the text stays AA-legible in both themes. */
+.rs-preview {
+  margin: 10px 0 16px; padding: 10px 12px;
+  border-radius: 10px; background: var(--danger-bg);
+  font-size: 13px; line-height: 1.5; font-weight: 600;
+  color: var(--danger-ink); min-height: 40px;
+}
+
 /* Connection of the Week — the cross-pillar "wow" card */
 .conn-card { border: 1px solid var(--accent); background: var(--tint-1); }
 .conn-tag { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: var(--accent); margin-bottom: 8px; }

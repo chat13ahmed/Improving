@@ -70,7 +70,8 @@ function loadApp(fieldValues) {
     ' todayStr, weeklyTrainingSplit, lastExercisePerformance, exerciseBestWeightEver, dealPlay, dealPlayPriority, ideaNextMove,' +
     ' knowledgeQuizPool, groupProgress, allCheckItems, healthBriefing, businessBriefing, knowledgeBriefing, weeklyGamePlan, libFilter,' +
     ' MUSCLE_PARTS, exercisePart, partMeta, exercisesByPart, libraryCount, PROGRAM_GROUPS, programSections, programPartLabel,' +
-    ' safeUrl, linkHost, libGroups, hubEnabled, HUB_PILLARS, dayXp, dayCompleteStats, getLevel });';
+    ' safeUrl, linkHost, libGroups, hubEnabled, HUB_PILLARS, dayXp, dayCompleteStats, getLevel,' +
+    ' RESET_AREAS, clearPillarData, isDayEmpty });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -1407,6 +1408,95 @@ ok('terrain grid: an empty history is a flat plain, not an error',
   (() => { const g = A.terrainGrid([], 12); return g.cols === 12 && g.grid.every(c => c.every(v => v === 0)); })());
 ok('terrain grid: a silly column count is clamped to something drawable',
   A.terrainGrid([], 0).cols >= 2 && A.terrainGrid([], 1).cols >= 2);
+
+// ── Data reset — clearing one area must not touch the others ──
+// This backs the Settings "Reset my data" button. Health and business live in
+// the SAME day record, so a bug here silently destroys the wrong pillar.
+const _rsDay = () => ({
+  id: 'd1', date: '2026-04-05', notes: 'felt good',
+  gym: { done: true, muscleGroup: 'Chest', duration: 45, notes: 'heavy' },
+  food: { rating: 4, notes: 'clean' }, water: 2.5, calories: 2400,
+  eaten: { protein: 140, carbs: 250, fat: 70 },
+  foodLog: [{ id: 'f1', name: 'Egg', grams: 100 }],
+  money: { activities: 'sent proposals', income: 300 },
+  networking: { count: 3, notes: 'met Marcus' }, spent: 40,
+  reading: { pages: 25, bookId: 'b1', bookTitle: 'Rich Dad Poor Dad', summary: 'assets' }
+});
+const _rsData = () => ({
+  profile: { weeklyIncomeGoal: 1200, weeklyReadGoal: 100, nutrition: { age: 28, weightKg: 80 } },
+  days: [_rsDay()], weights: [{ id: 'w1', kg: 84 }], weeks: [{ id: 'k1', income: 1073 }],
+  ideas: [{ id: 'i1', title: 'referrals' }], contacts: [{ id: 'c1', name: 'Marcus' }],
+  books: [{ id: 'b1', title: 'Rich Dad Poor Dad' }]
+});
+
+const _rsH = A.clearPillarData(_rsData(), { health: true });
+eq('reset health: gym is blanked', _rsH.data.days[0].gym.done, false);
+eq('reset health: gym muscle group cleared', _rsH.data.days[0].gym.muscleGroup, '');
+eq('reset health: food rating cleared', _rsH.data.days[0].food.rating, 0);
+eq('reset health: water cleared', _rsH.data.days[0].water, 0);
+eq('reset health: calories cleared', _rsH.data.days[0].calories, 0);
+eq('reset health: weigh-ins dropped', _rsH.data.weights.length, 0);
+// The whole point of the split — business and reading must survive untouched.
+eq('reset health leaves business income alone', _rsH.data.days[0].money.income, 300);
+eq('reset health leaves networking alone', _rsH.data.days[0].networking.count, 3);
+eq('reset health leaves reading pages alone', _rsH.data.days[0].reading.pages, 25);
+eq('reset health leaves books alone', _rsH.data.books.length, 1);
+eq('reset health leaves the day note alone', _rsH.data.days[0].notes, 'felt good');
+
+const _rsB = A.clearPillarData(_rsData(), { business: true });
+eq('reset business: income cleared', _rsB.data.days[0].money.income, 0);
+eq('reset business: activities cleared', _rsB.data.days[0].money.activities, '');
+eq('reset business: networking count cleared', _rsB.data.days[0].networking.count, 0);
+eq('reset business: weekly income totals dropped', _rsB.data.weeks.length, 0);
+eq('reset business: ideas dropped', _rsB.data.ideas.length, 0);
+eq('reset business: contacts dropped', _rsB.data.contacts.length, 0);
+eq('reset business leaves the workout alone', _rsB.data.days[0].gym.done, true);
+eq('reset business leaves calories alone', _rsB.data.days[0].calories, 2400);
+eq('reset business leaves reading alone', _rsB.data.days[0].reading.pages, 25);
+
+// The exact combination asked for here: wipe health + business, keep reading.
+const _rsHB = A.clearPillarData(_rsData(), { health: true, business: true });
+ok('reset health+business: reading survives intact',
+  _rsHB.data.days[0].reading.pages === 25 && _rsHB.data.books.length === 1);
+ok('reset health+business: every health and business field is empty',
+  _rsHB.data.days[0].gym.done === false && _rsHB.data.days[0].calories === 0 &&
+  _rsHB.data.days[0].money.income === 0 && _rsHB.data.days[0].networking.count === 0 &&
+  _rsHB.data.weights.length === 0 && _rsHB.data.weeks.length === 0 &&
+  _rsHB.data.ideas.length === 0 && _rsHB.data.contacts.length === 0);
+eq('reset health+business: the day record itself is kept', _rsHB.data.days.length, 1);
+
+// Settings are not logged history — a reset must not wipe goals or body stats,
+// or you get forced back through onboarding every time you start over.
+eq('reset keeps the income goal', _rsHB.data.profile.weeklyIncomeGoal, 1200);
+eq('reset keeps the nutrition profile', _rsHB.data.profile.nutrition.age, 28);
+
+// Purity: the caller must be able to preview a reset without committing it.
+const _rsOrig = _rsData();
+A.clearPillarData(_rsOrig, { health: true, business: true, reading: true });
+ok('reset is pure — the input object is never mutated',
+  _rsOrig.days[0].gym.done === true && _rsOrig.weights.length === 1 && _rsOrig.books.length === 1);
+
+// Don't invent fields on records that never had them.
+const _rsSparse = A.clearPillarData({ days: [{ id: 'd', date: '2026-04-05', gym: { done: true } }] }, { health: true });
+ok('reset does not add fields a day never had',
+  !('foodLog' in _rsSparse.data.days[0]) && !('eaten' in _rsSparse.data.days[0]));
+eq('reset with no areas selected changes nothing', A.clearPillarData(_rsData(), {}).counts.fields, 0);
+eq('reset survives empty data', A.clearPillarData({}, { health: true }).counts.days, 0);
+ok('reset counts what it touched, for an honest confirmation message',
+  _rsHB.counts.days === 1 && _rsHB.counts.fields > 0 && _rsHB.counts.lists.weights === 1);
+
+// Shell detection — used to offer pruning after a partial reset.
+ok('isDayEmpty: a bare id+date row is a shell', A.isDayEmpty({ id: 'd', date: '2026-04-05' }));
+ok('isDayEmpty: a day with only reading is NOT a shell', !A.isDayEmpty({ reading: { pages: 5 } }));
+ok('isDayEmpty: a day with only a note is NOT a shell', !A.isDayEmpty({ notes: 'thinking' }));
+// Clearing every pillar still leaves the free-text note, and that note alone is
+// enough to keep the day alive — notes belong to no pillar, so no reset removes them.
+const _rsAll = A.clearPillarData({ days: [_rsDay()] }, { health: true, business: true, reading: true });
+ok('isDayEmpty: an all-pillar reset keeps the day alive via its note',
+  !A.isDayEmpty(_rsAll.data.days[0]) && _rsAll.data.days[0].notes === 'felt good');
+ok('isDayEmpty: an all-pillar reset with no note IS a shell',
+  A.isDayEmpty(A.clearPillarData({ days: [Object.assign(_rsDay(), { notes: '' })] },
+    { health: true, business: true, reading: true }).data.days[0]));
 
 // ── Cross-hub game plan ──
 A.state.data = _iBase({ contacts: [{ id: 'c1', name: 'Jordan', status: 'warm', followUpDate: _iAgo(4) }] });

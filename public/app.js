@@ -1483,6 +1483,99 @@ async function reloadAfterConflict() {
   } catch { /* leave local state as-is */ }
 }
 
+// ── Data reset ──
+// Health and business are not separate tables — they are fields sitting side by
+// side inside every day record, so clearing one area is field-level surgery
+// rather than dropping rows. The empty shapes below deliberately match what the
+// quick-log writes for an untouched day, because renderers read d.food.rating
+// and d.gym.done directly: a zeroed object reads as "nothing logged", a missing
+// one throws.
+const RESET_AREAS = {
+  health: {
+    label: 'Health',
+    fields: {
+      gym:      () => ({ done: false, muscleGroup: '', duration: 0, notes: '' }),
+      food:     () => ({ rating: 0, notes: '' }),
+      water:    () => 0,
+      calories: () => 0,
+      eaten:    () => ({ protein: 0, carbs: 0, fat: 0 }),
+      foodLog:  () => []
+    },
+    lists: ['weights']
+  },
+  business: {
+    label: 'Business',
+    fields: {
+      money:      () => ({ activities: '', income: 0 }),
+      networking: () => ({ count: 0, notes: '' }),
+      spent:      () => 0
+    },
+    lists: ['weeks', 'ideas', 'contacts']
+  },
+  reading: {
+    label: 'Reading',
+    fields: {
+      reading: () => ({ pages: 0, bookId: '', bookTitle: '', summary: '' })
+    },
+    lists: ['books']
+  }
+};
+
+// Pure — never mutates `data`, so a caller can diff the result or throw it away.
+// Only overwrites keys a record already has: a day that never logged food should
+// not sprout an empty foodLog just because health was cleared. Goals, targets
+// and the nutrition profile are settings rather than logged history, so they
+// survive a reset; only what you entered day to day is removed.
+function clearPillarData(data, areas) {
+  const picked = Object.keys(RESET_AREAS).filter(k => areas && areas[k]);
+  const out = JSON.parse(JSON.stringify(data || {}));
+  const counts = { days: 0, fields: 0, lists: {} };
+  if (!picked.length) return { data: out, counts };
+
+  for (const day of (out.days || [])) {
+    let touched = false;
+    for (const area of picked) {
+      for (const key of Object.keys(RESET_AREAS[area].fields)) {
+        if (!(key in day)) continue;                      // don't invent fields
+        const blank = RESET_AREAS[area].fields[key]();
+        if (JSON.stringify(day[key]) === JSON.stringify(blank)) continue;  // already empty
+        day[key] = blank;
+        counts.fields++;
+        touched = true;
+      }
+    }
+    if (touched) counts.days++;
+  }
+  for (const area of picked) {
+    for (const list of RESET_AREAS[area].lists) {
+      if (Array.isArray(out[list]) && out[list].length) {
+        counts.lists[list] = out[list].length;
+        out[list] = [];
+      }
+    }
+  }
+  return { data: out, counts };
+}
+
+// A day carrying nothing but its id and date is a shell. Clearing one area can
+// leave these behind, so we count them and offer to prune rather than silently
+// keeping 60 empty rows that still draw on the charts.
+function isDayEmpty(day) {
+  if (!day) return true;
+  const e = day.eaten || {};
+  return ![
+    day.gym && (day.gym.done || day.gym.duration || day.gym.notes || (day.gym.exercises || []).length),
+    day.food && (day.food.rating || day.food.notes),
+    day.water, day.calories, day.spent,
+    day.money && (day.money.income || day.money.activities),
+    day.networking && (day.networking.count || day.networking.notes),
+    day.reading && (day.reading.pages || day.reading.summary || day.reading.quote),
+    (day.foodLog || []).length,
+    e.protein || e.carbs || e.fat,
+    day.notes
+  ].some(Boolean);
+}
+
 // ── Free trial + subscription gate ──
 function subStatus() {
   const p = (state.data && state.data.profile) || {};
@@ -12867,6 +12960,8 @@ function renderSettingsPage() {
     // Backup & data
     renderBackupCard() +
 
+    // Clear logged data but keep the account — the reversible option comes first
+    renderResetCard() +
     // Delete account (cloud accounts only) — required by the app stores
     renderDangerCard() +
     '</div>' +
@@ -12879,6 +12974,94 @@ function renderSettingsPage() {
       '<a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>' +
     '</div>';
 }
+// ── Start over: clear what you logged, keep the account ──
+// Sits above "Delete account" on purpose: almost everyone who wants a clean slate
+// wants this, not to lose their login. Areas are separate because health, business
+// and reading share the same day records — plenty of people want to reset their
+// training without losing a year of reading history.
+function renderResetCard() {
+  return '<div class="card">' +
+    '<h3 class="card-title">Start over</h3>' +
+    '<p class="card-sub">Clear what you’ve logged and begin from an empty slate. Your account, goals and body stats stay — only your day-to-day entries are removed.</p>' +
+    '<button type="button" class="btn btn-outline" onclick="openResetData()">Reset my data…</button>' +
+    '</div>';
+}
+function openResetData() {
+  document.getElementById('reset-data-modal')?.remove();
+  const m = document.createElement('div');
+  m.id = 'reset-data-modal';
+  m.className = 'modal-overlay';
+  m.innerHTML =
+    '<div class="modal-box da-box" onclick="event.stopPropagation()">' +
+    '<h3 class="da-title">Reset my data</h3>' +
+    '<p class="da-warn">Pick what to clear. This can’t be undone — export a backup first if there’s any chance you want it back.</p>' +
+    Object.keys(RESET_AREAS).map(k =>
+      '<label class="rs-area"><input type="checkbox" id="rs-' + escapeAttr(k) + '" onchange="rsSyncBtn()">' +
+      '<span>' + escapeHtml(RESET_AREAS[k].label) + '</span></label>').join('') +
+    // Real counts, not a vague warning: you should know it's 34 workouts and 9
+    // weigh-ins before you agree to lose them.
+    '<div id="rs-preview" class="rs-preview" role="status" aria-live="polite">Nothing selected yet.</div>' +
+    '<label class="da-label">Type <b>RESET</b> to confirm</label>' +
+    '<input type="text" id="rs-confirm" class="cf-input" autocomplete="off" oninput="rsSyncBtn()" placeholder="RESET">' +
+    '<div class="da-actions">' +
+    '<button type="button" class="btn btn-outline" onclick="closeResetData()">Cancel</button>' +
+    '<button type="button" id="rs-go" class="btn btn-danger" disabled onclick="confirmResetData()">Clear it</button>' +
+    '</div></div>';
+  m.addEventListener('click', closeResetData);
+  document.body.appendChild(m);
+  setTimeout(() => { document.getElementById('rs-health')?.focus(); }, 30);
+}
+function closeResetData() { document.getElementById('reset-data-modal')?.remove(); }
+function rsPicked() {
+  const out = {};
+  Object.keys(RESET_AREAS).forEach(k => { if (document.getElementById('rs-' + k)?.checked) out[k] = true; });
+  return out;
+}
+// clearPillarData being pure is what makes this preview possible: we run the real
+// reset against a copy and report the true counts without touching state.data.
+function rsSummary(areas) {
+  if (!Object.keys(areas).length) return 'Nothing selected yet.';
+  const { data, counts } = clearPillarData(state.data, areas);
+  const bits = [];
+  if (counts.fields) bits.push(counts.fields + ' entr' + (counts.fields === 1 ? 'y' : 'ies') + ' across ' + counts.days + ' day' + (counts.days === 1 ? '' : 's'));
+  Object.keys(counts.lists).forEach(l => bits.push(counts.lists[l] + ' ' + l.replace(/s$/, '') + (counts.lists[l] === 1 ? '' : 's')));
+  if (!bits.length) return 'Nothing to clear — those areas are already empty.';
+  const shells = (data.days || []).filter(isDayEmpty).length;
+  return 'Will clear ' + bits.join(', ') + '.' +
+    (shells ? ' ' + shells + ' day' + (shells === 1 ? '' : 's') + ' will be left holding nothing.' : '');
+}
+function rsSyncBtn() {
+  const areas = rsPicked();
+  const prev = document.getElementById('rs-preview');
+  if (prev) prev.textContent = rsSummary(areas);
+  const typed = (document.getElementById('rs-confirm')?.value || '').trim();
+  const btn = document.getElementById('rs-go');
+  if (btn) btn.disabled = !(Object.keys(areas).length && typed === 'RESET');
+}
+async function confirmResetData() {
+  const areas = rsPicked();
+  if ((document.getElementById('rs-confirm')?.value || '').trim() !== 'RESET' || !Object.keys(areas).length) return;
+  const btn = document.getElementById('rs-go');
+  if (btn) { btn.disabled = true; btn.textContent = 'Clearing…'; }
+  const { data, counts } = clearPillarData(state.data, areas);
+  state.data = data;
+  await saveData();
+  // A version conflict makes saveData reload the server's copy, which would put
+  // the data straight back. Re-running the reset is a cheap way to check it stuck:
+  // if there's still something to clear, the save didn't take.
+  const recheck = clearPillarData(state.data, areas);
+  if (recheck.counts.fields || Object.keys(recheck.counts.lists).length) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Clear it'; }
+    showToast('Reset didn’t stick — your data changed on another device. Try again.', 'error');
+    return;
+  }
+  closeResetData();
+  const labels = Object.keys(areas).map(k => RESET_AREAS[k].label).join(' + ');
+  showToast(labels + ' cleared — ' + counts.fields + ' entries removed. Fresh start.', 'success');
+  announce(labels + ' data cleared. Starting from an empty slate.');
+  navigate(state.page || 'settings');
+}
+
 // Permanent account deletion — a store requirement and a genuine user right.
 // Only shown for a signed-in cloud account (local-only mode has no server account).
 function renderDangerCard() {
