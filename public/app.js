@@ -2179,6 +2179,93 @@ const ADAPT = {
 
 const _dayMs = (d) => Date.parse(String(d) + 'T00:00:00Z');
 
+// ── Safety gate ──
+// Nothing in this app is medical advice and none of it has been reviewed by a
+// clinician. So rather than pretend to judge edge cases, the engine REFUSES to
+// run adaptive targets for the groups where an automated calorie cut can do real
+// harm, and falls back to maintenance with a pointer to a professional.
+//
+// The condition that matters most: this feature lowers calories when the scale
+// stalls. For someone with a restrictive eating disorder that is exactly the
+// wrong response, and the algorithm cannot tell the difference between a plateau
+// and a person who should not be dieting at all. So it doesn't try.
+const SAFETY = {
+  bmiUnderweight: 18.5,   // WHO underweight threshold
+  bmiSevere: 16.0,        // WHO severe thinness — no targets at all
+  bmiHighCare: 40.0,      // flag for clinical supervision, not a block
+  maxDeficitPct: 0.25,    // never prescribe more than a 25% cut off measured burn
+  maxLossPctPerWeek: 1.5, // faster than this and we intervene rather than encourage
+  floorFemale: 1200,
+  floorMale: 1500,
+  minAge: 18,
+  maxAge: 79
+};
+// Conditions where an automated target is not appropriate. Keys match the
+// checkboxes in the nutrition setup form.
+const SAFETY_FLAGS = {
+  pregnant:      'Pregnant or trying to conceive',
+  breastfeeding: 'Breastfeeding',
+  edHistory:     'History of an eating disorder',
+  diabetes:      'Diabetes on insulin or glucose-lowering medication',
+  kidney:        'Kidney or liver disease',
+  clinicalDiet:  'Following a diet set by a doctor or dietitian'
+};
+
+function bmiOf(heightCm, weightKg) {
+  const h = (+heightCm || 0) / 100, w = +weightKg || 0;
+  if (!h || !w) return 0;
+  return Math.round((w / (h * h)) * 10) / 10;
+}
+
+// Never prescribe below resting metabolic rate, and never below the conventional
+// consumer minimum for the person's sex. A flat 1,200 for everybody was the
+// weakest part of the previous version — it is far too low for a large adult and
+// arbitrary for everyone.
+function calorieFloor(n, bmr) {
+  const sexFloor = n && n.sex === 'female' ? SAFETY.floorFemale : SAFETY.floorMale;
+  return Math.max(sexFloor, Math.round(+bmr || 0));
+}
+
+// Pure. Decides whether adaptive targets may run, and what to warn about.
+// `blocked` means: show maintenance, adapt nothing, point at a professional.
+function nutritionSafety(n, trend) {
+  const out = { blocked: false, reasons: [], warnings: [], bmi: 0, allowLoss: true };
+  if (!n) return out;
+  const age = +n.age || 0;
+  const weightKg = (trend && trend.current) || +n.weightKg || 0;
+  out.bmi = bmiOf(n.heightCm, weightKg);
+
+  const flags = n.flags || {};
+  Object.keys(SAFETY_FLAGS).forEach(k => { if (flags[k]) { out.blocked = true; out.reasons.push(SAFETY_FLAGS[k]); } });
+
+  // Under-18s need paediatric growth charts, not adult BMR equations. Mifflin-St
+  // Jeor is not validated for them and a deficit can cost growth.
+  if (age && age < SAFETY.minAge) { out.blocked = true; out.reasons.push('Under 18 — calorie targets need a paediatric assessment'); }
+  if (age > SAFETY.maxAge) out.warnings.push('Over ' + SAFETY.maxAge + ' — worth confirming these targets with your doctor.');
+
+  if (out.bmi && out.bmi < SAFETY.bmiSevere) {
+    out.blocked = true;
+    out.reasons.push('Your BMI is in the severely underweight range');
+  } else if (out.bmi && out.bmi < SAFETY.bmiUnderweight) {
+    // Not a full block: gaining or maintaining is fine and probably wanted. Only
+    // the loss path is refused.
+    out.allowLoss = false;
+    out.warnings.push('Your BMI is in the underweight range, so weight-loss targets are switched off here.');
+  }
+  if (out.bmi && out.bmi >= SAFETY.bmiHighCare) {
+    out.warnings.push('At this BMI a doctor or dietitian can build something safer and faster than an app can.');
+  }
+
+  // Losing dangerously fast, whatever the goal says.
+  if (trend && trend.confident && weightKg) {
+    const pctPerWeek = (-trend.kgPerWeek / weightKg) * 100;
+    if (pctPerWeek > SAFETY.maxLossPctPerWeek) {
+      out.warnings.push('You’re losing ' + (Math.round(pctPerWeek * 10) / 10) + '% of your bodyweight a week — faster than is usually safe. Calories have been raised; please check in with a professional.');
+    }
+  }
+  return out;
+}
+
 // Target rate of change, scaled to bodyweight. Half a kilo a week is gentle for
 // someone at 120kg and aggressive at 55kg, so a percentage holds across sizes.
 // Losing faster than ~1%/week starts costing muscle; gaining faster than ~0.5%
@@ -2264,7 +2351,9 @@ function estimateTDEE(formulaTDEE, intake, trend) {
 //   corrected — enough weigh-ins, thin food logs: nudge the formula by how far
 //               off the observed rate is
 //   starting  — not enough data yet: formula, but at your CURRENT weight
-function adaptiveTarget(nut, trend, intake, goal) {
+function adaptiveTarget(nut, trend, intake, goal, limits) {
+  const lim = limits || {};
+  const floor = lim.floor > 0 ? lim.floor : ADAPT.floorKcal;
   const base = Math.round((nut && nut.calories) || 0);
   const weightKg = (trend && trend.current) || 0;
   const target = targetWeeklyRate(goal, weightKg);
@@ -2300,15 +2389,32 @@ function adaptiveTarget(nut, trend, intake, goal) {
     else res.calories = base + Math.round((target - res.actualRate) * ADAPT.kcalPerKg / 7);
   }
 
-  // Rails: one correction can't lurch more than maxStepKcal, the result can't
-  // stray more than maxDriftPct from the formula, and nothing goes below the floor.
-  const step = res.calories - base;
+  // Rails, applied in order of increasing authority. The first two are smoothing
+  // preferences: don't lurch by more than maxStepKcal, don't stray more than
+  // maxDriftPct from the formula. The last two are SAFETY limits and are allowed
+  // to override the smoothing ones — a cap that made someone eat less in order to
+  // change gently would be worthless. Note the consequence: both safety limits use
+  // Math.max, so they can only ever RAISE the target, never lower it. Nothing here
+  // can be the reason a user is told to eat less.
+  const desired = res.calories;                 // what the maths alone wanted
+  const step = desired - base;
   res.calories = base + Math.max(-ADAPT.maxStepKcal, Math.min(ADAPT.maxStepKcal, step));
   const drift = Math.round(base * ADAPT.maxDriftPct);
   res.calories = Math.max(base - drift, Math.min(base + drift, res.calories));
-  res.calories = Math.max(ADAPT.floorKcal, res.calories);
+  const smoothed = res.calories;                // after the smoothing rails
+
+  const maxDefPct = lim.maxDeficitPct > 0 ? lim.maxDeficitPct : SAFETY.maxDeficitPct;
+  if (res.tdee > 0) res.calories = Math.max(Math.round(res.tdee * (1 - maxDefPct)), res.calories);
+  res.floor = floor;
+  res.calories = Math.max(floor, res.calories);
+
   res.deltaKcal = res.calories - base;
-  res.railHit = res.calories !== base + step;
+  // Flags describe the OUTCOME, not which branch ran. railHit must only be true
+  // when the change was actually held back — otherwise the card told users it was
+  // "held to 400" while showing them a 621 change, which is just a lie.
+  res.railHit = Math.abs(res.deltaKcal) < Math.abs(step);
+  res.safetyRaised = res.calories > smoothed;
+  res.floorHit = res.calories === floor && smoothed < floor;
 
   // Typographic minus, and a flat trend gets words rather than "Trending 0 kg/wk"
   // — a stall is the single most common reason someone reads this card.
@@ -2342,15 +2448,32 @@ function nutritionPlan(profile, weights, days, today) {
   const liveWeight = trend.current || +n.weightKg || 0;
   const baseline = computeNutrition(Object.assign({}, n, { weightKg: liveWeight }));
   if (!baseline) return null;
-  const goal = NUTRITION_GOALS[n.goal] ? n.goal : 'maintain';
+
+  // Safety first, and it can override the user's stated goal. Someone who ticks
+  // "lose" while underweight gets maintenance, not a deficit — the app declining
+  // is the correct behaviour, not a bug.
+  const safety = nutritionSafety(n, trend);
+  let goal = NUTRITION_GOALS[n.goal] ? n.goal : 'maintain';
+  if (safety.blocked || (goal === 'lose' && !safety.allowLoss)) goal = 'maintain';
+
+  const floor = calorieFloor(n, baseline.bmr);
   const intake = avgIntake(days, today);
-  const adapt = adaptiveTarget(baseline, trend, intake, goal);
+  // Blocked accounts get a plain maintenance number and no adaptation at all.
+  const adapt = safety.blocked
+    ? { calories: Math.max(floor, Math.round(baseline.tdee)), baseline: Math.round(baseline.tdee), deltaKcal: 0,
+        tier: 'blocked', targetRate: 0, actualRate: (trend && trend.kgPerWeek) || 0,
+        tdee: Math.round(baseline.tdee), tdeeSource: 'formula', onTrack: null, floor: floor,
+        reason: 'Showing maintenance calories only. Based on what you told us, a target that adjusts itself isn’t appropriate here — please work with a doctor or registered dietitian.' }
+    : adaptiveTarget(baseline, trend, intake, goal, { floor: floor, maxDeficitPct: SAFETY.maxDeficitPct });
+  adapt.goal = goal;
+  adapt.goalOverridden = goal !== (NUTRITION_GOALS[n.goal] ? n.goal : 'maintain');
   // Recompute macros at the adapted calorie total, and at the live weight, so
   // protein-by-bodyweight tracks the body you have now.
-  const plan = computeNutrition(Object.assign({}, n, { weightKg: liveWeight }), adapt.calories);
+  const plan = computeNutrition(Object.assign({}, n, { weightKg: liveWeight, goal: goal }), adapt.calories);
   plan.adapt = adapt;
   plan.trend = trend;
   plan.intake = intake;
+  plan.safety = safety;
   plan.weightKg = liveWeight;
   plan.weightIsLogged = !!trend.current;
   return plan;
@@ -12457,9 +12580,29 @@ function renderAdaptCard(nut) {
   const TIERS = {
     starting: { badge: 'Tuning up', tone: 'idle' },
     corrected: { badge: 'Adjusting to you', tone: 'live' },
-    measured: { badge: 'Measured from your data', tone: 'live' }
+    measured: { badge: 'Measured from your data', tone: 'live' },
+    blocked: { badge: 'Maintenance only', tone: 'held' }
   };
   const tier = TIERS[a.tier] || TIERS.starting;
+
+  // Nothing here has been reviewed by a clinician, and the card is where a user
+  // actually reads the number — so the disclaimer belongs here, in every state,
+  // not buried in a settings page nobody opens.
+  const DISCLAIMER = '<div class="ad-legal">Not medical advice. These are estimates from your own logs — ' +
+    'check them with a doctor or registered dietitian before relying on them, especially if you have a health condition.</div>';
+
+  // A blocked account gets the reason, a maintenance number and nothing that
+  // looks like a prescription. No trend stats, no delta, no "next step" nudge.
+  if (a.tier === 'blocked') {
+    const why = (nut.safety && nut.safety.reasons || []).length
+      ? '<ul class="ad-why">' + nut.safety.reasons.map(r => '<li>' + escapeHtml(r) + '</li>').join('') + '</ul>'
+      : '';
+    return '<div class="card adapt-card ad-held">' +
+      '<div class="ad-badge">⚖️ Weight → Diet · ' + tier.badge + '</div>' +
+      '<div class="ad-reason">' + a.reason + '</div>' + why +
+      '<div class="ad-next">You can still log food and weight — the tracking all works. Only the self-adjusting target is switched off.</div>' +
+      DISCLAIMER + '</div>';
+  }
 
   const cell = (label, value, sub) =>
     '<div class="ad-cell"><div class="ad-val">' + value + '</div>' +
@@ -12490,15 +12633,32 @@ function renderAdaptCard(nut) {
   // The cap bounds how far the target can sit from the formula, and it is
   // recomputed from a 21-day trend rather than on a weekly timer — so the copy
   // must not promise a "next week" adjustment that no scheduler performs.
-  const railNote = a.railHit
-    ? '<div class="ad-next">Held to a ' + ADAPT.maxStepKcal + ' cal change for now — big jumps backfire. It keeps closing the gap as your trend updates.</div>'
+  // Only claim the change was held back when it actually was, and say so
+  // separately when a safety limit pushed the number UP past the smoothing cap.
+  const railNote = a.safetyRaised
+    ? '<div class="ad-next">Raised to keep you within a safe deficit of what you burn — that limit outranks the usual gradual-change cap.</div>'
+    : a.railHit
+      ? '<div class="ad-next">Held to a smaller change for now — big jumps backfire. It keeps closing the gap as your trend updates.</div>'
+      : '';
+
+  // Safety warnings sit above the numbers, because "you're losing too fast" has
+  // to be read before "here is your target".
+  const warns = (nut.safety && nut.safety.warnings || [])
+    .map(w => '<div class="ad-warn">⚠️ ' + escapeHtml(w) + '</div>').join('');
+  const override = a.goalOverridden
+    ? '<div class="ad-warn">⚠️ Your goal is set to lose weight, but these are maintenance calories — see the note above.</div>'
+    : '';
+  const floorNote = a.floorHit
+    ? '<div class="ad-next">Held at ' + a.floor.toLocaleString() + ' cal — your resting metabolism. Going under it isn’t something an app should tell you to do.</div>'
     : '';
 
   return '<div class="card adapt-card ad-' + tier.tone + '">' +
     '<div class="ad-badge">⚖️ Weight → Diet · ' + tier.badge + '</div>' +
+    warns + override +
     '<div class="ad-reason">' + a.reason + '</div>' +
     '<div class="ad-grid">' + stats + '</div>' +
-    delta + nextStep + railNote +
+    delta + nextStep + railNote + floorNote +
+    DISCLAIMER +
     '</div>';
 }
 
@@ -12553,6 +12713,18 @@ function renderNutritionSettingsCard() {
     '<select id="nut-meals">' +
     [3, 4, 5, 6, 7, 8].map(m => '<option value="' + m + '"' + ((+(n.mealsPerDay) || 3) === m ? ' selected' : '') + '>' + m + ' meals a day</option>').join('') +
     '</select></div>' +
+    // Screening. The self-adjusting target lowers calories when weight stalls,
+    // which is the wrong response for all of these groups — and no algorithm can
+    // spot them from a weight log. Asking is the only honest option. Framed as
+    // "tick anything that applies" with no penalty, so it isn't a barrier.
+    '<div class="form-group nut-screen">' +
+    '<label>Before we adjust anything — does any of this apply to you?</label>' +
+    '<p class="nut-screen-sub">If you tick any of these we’ll show maintenance calories and stop the target adjusting itself. Everything else in the app keeps working.</p>' +
+    Object.keys(SAFETY_FLAGS).map(k =>
+      '<label class="rs-area"><input type="checkbox" id="nut-flag-' + escapeAttr(k) + '"' +
+      ((n.flags && n.flags[k]) ? ' checked' : '') + '>' +
+      '<span>' + escapeHtml(SAFETY_FLAGS[k]) + '</span></label>').join('') +
+    '</div>' +
     '<button type="submit" class="btn btn-primary">Calculate & Save</button>' +
     '</form>' +
     '<div id="nutrition-results-wrap">' + renderNutritionResults(computeNutrition(n)) + '</div>' +
@@ -12582,6 +12754,14 @@ async function saveNutrition(e) {
   const weightKg = weightUnit === 'lbs' ? wRaw * LBS_TO_KG : wRaw;
   if (!age || !heightCm || !weightKg) { showToast('Fill in age, height and weight.', 'error'); return; }
 
+  // Safety flags gate the self-adjusting target. This handler REPLACES the whole
+  // nutrition object, so they have to be re-collected here — dropping them would
+  // silently switch adaptation back on for someone who declared a condition.
+  const flags = {};
+  Object.keys(SAFETY_FLAGS).forEach(k => {
+    if (document.getElementById('nut-flag-' + k)?.checked) flags[k] = true;
+  });
+
   state.data.profile.nutrition = {
     age, sex,
     heightCm: Math.round(heightCm * 10) / 10,
@@ -12590,7 +12770,8 @@ async function saveNutrition(e) {
     activity: document.getElementById('nut-activity').value,
     goal: document.getElementById('nut-goal').value,
     strategy: document.getElementById('nut-strategy').value,
-    mealsPerDay: parseInt(document.getElementById('nut-meals').value) || 3
+    mealsPerDay: parseInt(document.getElementById('nut-meals').value) || 3,
+    flags
   };
   await saveData();
   showToast('Nutrition targets updated! ', 'success');

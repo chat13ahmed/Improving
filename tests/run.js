@@ -72,7 +72,8 @@ function loadApp(fieldValues) {
     ' MUSCLE_PARTS, exercisePart, partMeta, exercisesByPart, libraryCount, PROGRAM_GROUPS, programSections, programPartLabel,' +
     ' safeUrl, linkHost, libGroups, hubEnabled, HUB_PILLARS, dayXp, dayCompleteStats, getLevel,' +
     ' RESET_AREAS, clearPillarData, isDayEmpty,' +
-    ' ADAPT, targetWeeklyRate, weightTrend, avgIntake, estimateTDEE, adaptiveTarget, nutritionPlan });';
+    ' ADAPT, targetWeeklyRate, weightTrend, avgIntake, estimateTDEE, adaptiveTarget, nutritionPlan,' +
+    ' SAFETY, SAFETY_FLAGS, bmiOf, calorieFloor, nutritionSafety, renderAdaptCard });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -1522,13 +1523,48 @@ ok('plan: a refinement never reads as "cut" when you are on track',
   /on track/i.test(_pOnMeasured.adapt.reason) && !/\bcut\b/i.test(_pOnMeasured.adapt.reason));
 
 // Safety rails, tested by trying to break them.
-ok('rails: one weekly correction can never exceed maxStepKcal',
-  Math.abs(A.nutritionPlan(_anProfile('lose'), _anWeights(3.5, 90, 21), [], _anToday).adapt.deltaKcal) <= A.ADAPT.maxStepKcal);
+// maxStepKcal bounds how far a correction may CUT. It does not bound upward moves,
+// because the deficit cap and the calorie floor are allowed to override it — a
+// safety limit that yielded to a smoothing preference would be worthless.
+ok('rails: a downward correction never exceeds maxStepKcal',
+  (() => { const d = A.nutritionPlan(_anProfile('lose'), _anWeights(3.5, 90, 21), [], _anToday).adapt.deltaKcal;
+    return d >= -A.ADAPT.maxStepKcal; })());
+// The invariant that actually matters: the two safety limits can only ever RAISE
+// the target. Neither can be the reason someone is told to eat less.
+ok('rails: safety limits only ever raise calories, never lower them',
+  (() => {
+    const cases = [
+      A.nutritionPlan(_anProfile('lose'), _anWeights(-1.8, 70, 21), _anDays(1600, 20), _anToday),
+      A.nutritionPlan(_anProfile('lose'), _anWeights(0, 90, 21), _anDays(2600, 20), _anToday),
+      A.nutritionPlan(_anProfile('lose'), _anWeights(3.5, 90, 21), [], _anToday)
+    ];
+    return cases.every(p => p.calories >= Math.min(p.adapt.baseline, Math.round(p.adapt.tdee * (1 - A.SAFETY.maxDeficitPct)))
+      && p.calories >= p.adapt.floor);
+  })());
+ok('rails: someone losing far too fast is raised ABOVE the step cap if safety needs it',
+  (() => { const p = A.nutritionPlan(_anProfile('lose'), _anWeights(-1.8, 70, 21), _anDays(1600, 20), _anToday);
+    return p.adapt.deltaKcal > A.ADAPT.maxStepKcal && p.calories >= Math.round(p.adapt.tdee * (1 - A.SAFETY.maxDeficitPct)); })());
 ok('rails: the target never drifts past maxDriftPct from the formula',
   (() => { const p = A.nutritionPlan(_anProfile('lose'), _anWeights(3.5, 90, 21), [], _anToday);
     return Math.abs(p.adapt.deltaKcal) <= Math.round(p.adapt.baseline * A.ADAPT.maxDriftPct); })());
-ok('rails: a breached rail is flagged, not hidden',
+ok('rails: a held-back change is flagged, not hidden',
   A.nutritionPlan(_anProfile('lose'), _anWeights(3.5, 90, 21), [], _anToday).adapt.railHit === true);
+// A held-back change and a safety-raised one can BOTH be true at once: the maths
+// wanted more than the step cap allows, then the deficit cap pushed the result back
+// up past that cap. What matters is that the card explains the outcome the user can
+// see, so the safety message must win — never "held to a smaller change" beside a
+// change larger than the cap.
+const _pRaised = A.nutritionPlan(_anProfile('lose'), _anWeights(-1.8, 70, 21), _anDays(1600, 20), _anToday);
+ok('rails: a safety-raised result is flagged as such', _pRaised.adapt.safetyRaised === true);
+ok('rails: a safety raise can exceed the step cap', _pRaised.adapt.deltaKcal > A.ADAPT.maxStepKcal);
+ok('rails: the card explains a safety raise, not a cap it did not apply',
+  (() => { const html = A.renderAdaptCard(_pRaised);
+    return /Raised to keep you within a safe deficit/.test(html) && !/Held to a smaller change/.test(html); })());
+ok('rails: a genuinely held-back change still says so',
+  (() => { const p = A.nutritionPlan(_anProfile('lose'), _anWeights(3.5, 90, 21), [], _anToday);
+    return p.adapt.railHit && !p.adapt.safetyRaised
+      ? /Held to a smaller change/.test(A.renderAdaptCard(p))
+      : true; })());
 ok('rails: calories never fall below the 1200 floor',
   A.nutritionPlan({ nutrition: { age: 70, sex: 'female', heightCm: 150, weightKg: 45, activity: 'sedentary', goal: 'lose', strategy: 'balanced', mealsPerDay: 3 } },
     _anWeights(0, 45, 21), [], _anToday).calories >= 1200);
@@ -1547,6 +1583,81 @@ ok('computeNutrition without an override is unchanged',
   A.computeNutrition({ age: 30, sex: 'male', heightCm: 180, weightKg: 90, activity: 'moderate', goal: 'lose', strategy: 'muscle', mealsPerDay: 4 }).calories > 1200);
 eq('computeNutrition honours an explicit calorie override',
   A.computeNutrition({ age: 30, sex: 'male', heightCm: 180, weightKg: 90, activity: 'moderate', goal: 'lose', strategy: 'muscle', mealsPerDay: 4 }, 2000).calories, 2000);
+
+// ── Nutrition safety gate — the refusals matter more than the feature ──
+// This engine lowers calories when the scale stalls. For several groups that is
+// the wrong response and the algorithm cannot tell them apart, so it must decline
+// rather than guess. Every branch below is a case where declining is correct.
+const _safeP = (over) => ({ nutrition: Object.assign({
+  age: 32, sex: 'female', heightCm: 165, weightKg: 62, activity: 'moderate',
+  goal: 'lose', strategy: 'balanced', mealsPerDay: 3
+}, over || {}) });
+const _safeW = (kg) => { const o = []; for (let i = 21; i >= 0; i -= 3) o.push({ date: _anDay(30 - i), kg: kg }); return o; };
+
+eq('bmi: standard formula', A.bmiOf(180, 81), 25);
+eq('bmi: missing inputs give 0 rather than Infinity', A.bmiOf(0, 80), 0);
+
+// The floor is no longer a flat 1200 for every human being.
+ok('floor: never below resting metabolic rate',
+  A.calorieFloor({ sex: 'male' }, 2100) === 2100);
+ok('floor: a large man gets a higher floor than a small woman',
+  A.calorieFloor({ sex: 'male' }, 1900) > A.calorieFloor({ sex: 'female' }, 1150));
+eq('floor: sex minimum applies when BMR is very low', A.calorieFloor({ sex: 'female' }, 900), A.SAFETY.floorFemale);
+
+// Declared conditions block adaptive targets outright.
+Object.keys(A.SAFETY_FLAGS).forEach(flag => {
+  const s = A.nutritionSafety(_safeP({ flags: { [flag]: true } }).nutrition, null);
+  ok('safety: "' + flag + '" blocks adaptive targets', s.blocked && s.reasons.length > 0);
+});
+const _pFlag = A.nutritionPlan(_safeP({ flags: { pregnant: true } }), _safeW(62), _anDays(1900, 20), _anToday);
+eq('safety: a blocked account gets the "blocked" tier', _pFlag.adapt.tier, 'blocked');
+eq('safety: a blocked account is never given a deficit', _pFlag.adapt.deltaKcal, 0);
+eq('safety: a blocked account is forced to maintenance', _pFlag.adapt.goal, 'maintain');
+ok('safety: a blocked account is pointed at a professional', /dietitian|doctor/i.test(_pFlag.adapt.reason));
+ok('safety: a blocked account still shows a usable number', _pFlag.calories > 1200);
+
+// Under-18s need paediatric assessment, not an adult BMR equation.
+ok('safety: under 18 is blocked', A.nutritionSafety(_safeP({ age: 15 }).nutrition, null).blocked);
+ok('safety: 18 and over is not blocked on age alone', !A.nutritionSafety(_safeP({ age: 18 }).nutrition, null).blocked);
+
+// The eating-disorder-shaped risk: underweight + a loss goal.
+const _sUnder = A.nutritionSafety(_safeP({ heightCm: 170, weightKg: 50 }).nutrition, null);
+ok('safety: an underweight BMI refuses the loss path', !_sUnder.allowLoss && _sUnder.warnings.length > 0);
+const _pUnder = A.nutritionPlan(_safeP({ heightCm: 170, weightKg: 50 }), _safeW(50), [], _anToday);
+eq('safety: "lose" while underweight is overridden to maintain', _pUnder.adapt.goal, 'maintain');
+ok('safety: the override is reported, not silent', _pUnder.adapt.goalOverridden === true);
+ok('safety: an underweight user is never told to cut calories', _pUnder.adapt.deltaKcal >= 0);
+// Severely underweight blocks everything, not just the loss path.
+ok('safety: a severely underweight BMI blocks all adaptation',
+  A.nutritionSafety(_safeP({ heightCm: 175, weightKg: 45 }).nutrition, null).blocked);
+// Gaining while underweight must still be allowed — that is the healthy direction.
+ok('safety: "gain" while underweight is still permitted',
+  A.nutritionPlan(_safeP({ heightCm: 170, weightKg: 50, goal: 'gain' }), _safeW(50), [], _anToday).adapt.goal === 'gain');
+
+// Losing dangerously fast gets a warning regardless of the stated goal.
+const _fastTrend = A.weightTrend(_anWeights(-1.6, 70, 21), _anToday);
+ok('safety: warns when losing faster than is safe for bodyweight',
+  A.nutritionSafety(_safeP({ heightCm: 170, weightKg: 70 }).nutrition, _fastTrend)
+    .warnings.some(w => /faster than is usually safe/i.test(w)));
+
+// The deficit cap is measured against real burn, so a bad trend can't starve someone.
+ok('safety: the deficit never exceeds maxDeficitPct of measured burn',
+  (() => { const p = A.nutritionPlan(_anProfile('lose'), _anWeights(0, 90, 21), _anDays(2600, 20), _anToday);
+    return p.calories >= Math.round(p.adapt.tdee * (1 - A.SAFETY.maxDeficitPct)); })());
+ok('safety: the applied floor is reported so the UI can explain it',
+  A.nutritionPlan(_anProfile('lose'), _anWeights(0, 90, 21), _anDays(2600, 20), _anToday).adapt.floor > 0);
+ok('safety: a healthy adult with no flags is NOT blocked or overridden',
+  (() => { const p = A.nutritionPlan(_anProfile('lose'), _anWeights(-0.6, 90, 21), _anDays(2200, 20), _anToday);
+    return p.adapt.tier === 'measured' && !p.adapt.goalOverridden && !p.safety.blocked; })());
+
+// The card must carry a disclaimer in every state — including blocked.
+['starting', 'measured', 'blocked'].forEach(tier => {
+  const p = tier === 'blocked' ? _pFlag
+    : tier === 'starting' ? A.nutritionPlan(_anProfile('lose'), [], [], _anToday)
+    : A.nutritionPlan(_anProfile('lose'), _anWeights(0, 90, 21), _anDays(2600, 20), _anToday);
+  const html = A.renderAdaptCard(p);
+  ok('card (' + tier + '): carries a not-medical-advice disclaimer', /not medical advice/i.test(html));
+});
 
 // ── Data reset — clearing one area must not touch the others ──
 // This backs the Settings "Reset my data" button. Health and business live in
