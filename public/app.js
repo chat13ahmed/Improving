@@ -1616,7 +1616,18 @@ function renderTrialBanner() {
     (state.paymentsLive ? ' · <button type="button" class="btn-link" onclick="goSubscribe()">Subscribe</button>' : '') + '</div>';
 }
 
-function todayStr() { return new Date().toISOString().split('T')[0]; }
+// A day in this app is a LOCAL calendar day — that is what a person means by
+// "did I train today". toISOString() formats in UTC, so using it to build a date
+// string silently reported the wrong day: east of Greenwich every log between
+// midnight and the UTC offset landed on yesterday (a nine-hour window in Tokyo),
+// and west of it every evening log landed on tomorrow. ymd() is the only correct
+// way to turn a Date into a date string here; nothing should call toISOString()
+// for that again.
+function ymd(d) {
+  d = d || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function todayStr() { return ymd(new Date()); }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function formatCurrency(n) { return '$' + Number(n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 function fmtDate(d) { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
@@ -1626,7 +1637,7 @@ function getWeekStart(dateStr) {
   const d = new Date((dateStr || todayStr()) + 'T00:00:00');
   const day = d.getDay();
   d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-  return d.toISOString().split('T')[0];
+  return ymd(d);
 }
 
 function getWeeklyAvg(weeks, n) {
@@ -3481,7 +3492,7 @@ function getLastWeekStats() {
   const thisWeekStart = getWeekStart(todayStr());
   const d = new Date(thisWeekStart + 'T00:00:00');
   d.setDate(d.getDate() - 7);
-  const lastWeekStart = d.toISOString().split('T')[0];
+  const lastWeekStart = ymd(d);
   const ld = state.data.days.filter(x => x.date >= lastWeekStart && x.date < thisWeekStart);
   const gymDays = ld.filter(x => x.gym?.done).length;
   const fr = ld.filter(x => x.food?.rating > 0).map(x => x.food.rating);
@@ -3712,7 +3723,7 @@ function daysSince(dateStr) {
 // A freeze is earned every 7-day streak (cap 2) and auto-bridges ONE missed day
 // so a single slip never breaks the chain. All three helpers below are pure so
 // the rules are locked by tests — a streak bug is a trust bug.
-function _isoShift(dateStr, delta) { const d = new Date(dateStr + 'T00:00:00'); d.setDate(d.getDate() + delta); return d.toISOString().slice(0, 10); }
+function _isoShift(dateStr, delta) { const d = new Date(dateStr + 'T00:00:00'); d.setDate(d.getDate() + delta); return ymd(d); }
 // Consecutive days up to today, counting frozen days as present. Today counts if
 // logged; otherwise the count runs through yesterday. (testable)
 function computeStreak(dateSet, frozenSet, today) {
@@ -4647,7 +4658,7 @@ function renderQuestCard() {
 // ─────────────────────────────────────────────────────────────
 function nutritionWeekStats(days, targetCal, targetProtein, today) {
   const start = new Date(today + 'T00:00:00'); start.setDate(start.getDate() - 6);
-  const startStr = start.toISOString().split('T')[0];
+  const startStr = ymd(start);
   const win = (days || []).filter(d => d.date >= startStr && d.date <= today && ((d.calories || 0) > 0 || (d.eaten && d.eaten.protein > 0)));
   const logged = win.length;
   if (!logged) return { logged: 0 };
@@ -6232,7 +6243,7 @@ function yearRange(days, weeksBack, today) {
   const cursor = new Date(getWeekStart(t) + 'T00:00:00');
   const weeks = [];
   for (let i = 0; i < weeksBack; i++) {
-    const ws = cursor.toISOString().split('T')[0];
+    const ws = ymd(cursor);
     weeks.unshift({ weekStart: ws, value: buckets[ws] || 0 });
     cursor.setDate(cursor.getDate() - 7);
   }
@@ -6385,7 +6396,7 @@ function renderMountainHero() {
   let wkDots = '', wkCount = 0;
   for (let i = 0; i < 7; i++) {
     const dt = new Date(wkBase); dt.setDate(wkBase.getDate() + i);
-    const ds = dt.toISOString().split('T')[0];
+    const ds = ymd(dt);
     const done = loggedSet.has(ds);
     if (done && ds <= today) wkCount++;
     const cls = 'mtn-wk' + (done ? ' mtn-wk-done' : '') + (ds === today ? ' mtn-wk-today' : '') + (ds > today ? ' mtn-wk-future' : '');
@@ -6688,7 +6699,7 @@ function identityVotes(days, on, windowDays, today) {
   on = on || {}; windowDays = windowDays || 30;
   const end = today || todayStr();
   const s = new Date(end + 'T00:00:00'); s.setDate(s.getDate() - (windowDays - 1));
-  const start = s.toISOString().split('T')[0];
+  const start = ymd(s);
   const inWin = (days || []).filter(d => d.date >= start && d.date <= end);
   const cnt = fn => inWin.filter(fn).length;
   const out = [{ id: 'show', icon: '🧗', label: 'someone who shows up', votes: inWin.length, color: '#7C3AED' }];
@@ -6715,7 +6726,7 @@ function renderIdentityCard() {
 function missedYesterday(days, today) {
   const end = today || todayStr();
   const set = new Set((days || []).map(d => d.date));
-  const shift = n => { const d = new Date(end + 'T00:00:00'); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]; };
+  const shift = n => { const d = new Date(end + 'T00:00:00'); d.setDate(d.getDate() + n); return ymd(d); };
   return !set.has(end) && !set.has(shift(-1)) && set.has(shift(-2));
 }
 function renderNeverMissTwice() {
@@ -6814,7 +6825,7 @@ function initIncomeChart() {
   // 12 week-start buckets ending with this week
   const thisWk = getWeekStart(todayStr());
   const buckets = [];
-  for (let i = 11; i >= 0; i--) { const d = new Date(thisWk + 'T00:00:00'); d.setDate(d.getDate() - i * 7); buckets.push(d.toISOString().split('T')[0]); }
+  for (let i = 11; i >= 0; i--) { const d = new Date(thisWk + 'T00:00:00'); d.setDate(d.getDate() - i * 7); buckets.push(ymd(d)); }
   const spendByWeek = {};
   (state.data.days || []).forEach(day => { if (day.spent > 0) { const ws = getWeekStart(day.date); spendByWeek[ws] = (spendByWeek[ws] || 0) + Number(day.spent); } });
   const incomeByWeek = {};
@@ -6854,7 +6865,7 @@ function lastNoteEntry() {
     .filter(x => x.date < todayStr() && (x.notes || (x.reading && x.reading.summary)))
     .sort((a, b) => new Date(b.date) - new Date(a.date));
   if (!prevs.length) return null;
-  const yday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const yday = ymd(new Date(Date.now() - 86400000));
   const e = prevs.find(p => p.date === yday) || prevs[0];
   return { date: e.date, text: e.notes || (e.reading && e.reading.summary) || '', isYesterday: e.date === yday };
 }
@@ -7958,7 +7969,7 @@ async function analyzeIdeas() {
 // single most important thing a top professional would tell you today.
 // Works offline, no AI key needed. Every rule is grounded and testable.
 // ═════════════════════════════════════════════════════════════
-function _isoDaysAgo(n) { const d = new Date(todayStr() + 'T00:00:00'); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
+function _isoDaysAgo(n) { const d = new Date(todayStr() + 'T00:00:00'); d.setDate(d.getDate() - n); return ymd(d); }
 // Map a logged muscle group to a movement pattern for balance analysis
 function _muscleCat(g) {
   g = String(g || '').toLowerCase();
@@ -9773,7 +9784,7 @@ async function clearApiKey() {
 function buildDemoData() {
   // A demo where EVERY section has life in it — no blank tabs for a curious visitor.
   const today = new Date();
-  const iso = (off) => { const d = new Date(today); d.setDate(d.getDate() - off); return d.toISOString().split('T')[0]; };
+  const iso = (off) => { const d = new Date(today); d.setDate(d.getDate() - off); return ymd(d); };
   const CH = ['Ch. 1 — The Rich Don’t Work for Money', 'Ch. 2 — Why Teach Financial Literacy', 'Ch. 3 — Mind Your Own Business', 'Ch. 4 — The History of Taxes'];
   // The reading journey through the current book — chapters, pages, quotes, notes (209 of 336)
   const READS = {
@@ -9805,7 +9816,7 @@ function buildDemoData() {
   const days = [];
   for (let i = 20; i >= 0; i--) {
     const d = new Date(today); d.setDate(d.getDate() - i);
-    const date = d.toISOString().split('T')[0];
+    const date = ymd(d);
     const weekend = d.getDay() === 0 || d.getDay() === 6;
     const rest = d.getDay() === 0 || i === 3 || i === 9 || i === 16;   // Sundays + a few rest days ≈ 5 sessions/week
     const wo = rest ? null : WORKOUTS[i % 3];
@@ -10391,7 +10402,7 @@ async function gradeVocabReview(correct) {
   if (w) {
     const box = nextReviewBox((w.review && w.review.box) || 0, correct);
     const due = new Date(); due.setDate(due.getDate() + reviewIntervalDays(box));
-    w.review = { box, due: due.toISOString().slice(0, 10), seen: ((w.review && w.review.seen) || 0) + 1, last: todayStr() };
+    w.review = { box, due: ymd(due), seen: ((w.review && w.review.seen) || 0) + 1, last: todayStr() };
     if (correct) r.got++; else r.missed++;
     await saveData();
   }
@@ -10437,7 +10448,7 @@ function readingBody() {
   if (activeBook && pagesLeft > 0 && pace >= 1) {
     const daysLeft = Math.ceil(pagesLeft / pace);
     const finish = new Date(); finish.setDate(finish.getDate() + daysLeft);
-    paceLine = '<div class="rbc-pace">📅 At ~' + Math.round(pace) + ' pg/day, <b>' + pagesLeft.toLocaleString() + '</b> to go — finish in ~<b>' + daysLeft + '</b> day' + (daysLeft === 1 ? '' : 's') + ' (' + fmtDate(finish.toISOString().slice(0, 10)) + ')</div>';
+    paceLine = '<div class="rbc-pace">📅 At ~' + Math.round(pace) + ' pg/day, <b>' + pagesLeft.toLocaleString() + '</b> to go — finish in ~<b>' + daysLeft + '</b> day' + (daysLeft === 1 ? '' : 's') + ' (' + fmtDate(ymd(finish)) + ')</div>';
   }
   // The questions this book was opened to answer — tap one when the book delivers
   const bookQs = ((activeBook && activeBook.questions) || []).filter(q => q && q.text);
@@ -11330,7 +11341,7 @@ async function gradeTakeawayQuiz(correct) {
   if (t) {
     const box = nextReviewBox((t.review && t.review.box) || 0, correct);
     const due = new Date(); due.setDate(due.getDate() + reviewIntervalDays(box));
-    t.review = { box, due: due.toISOString().slice(0, 10), seen: ((t.review && t.review.seen) || 0) + 1, last: todayStr() };
+    t.review = { box, due: ymd(due), seen: ((t.review && t.review.seen) || 0) + 1, last: todayStr() };
     t.seenAt = todayStr();   // keep the Overview's resurfacing card in sync
     if (correct) r.got++; else r.missed++;
     await saveData();

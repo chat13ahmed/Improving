@@ -10,6 +10,14 @@
 // their own tokens for fixture users. Without it the server generates a random
 // secret per boot and nothing can sign a matching token.
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-only-secret-not-used-in-production-0123456789';
+
+// Fixtures must describe LOCAL calendar days, exactly like the app does. Building
+// them with toISOString() formats in UTC, so for half the day in any negative-offset
+// zone (and the small hours in a positive one) the fixture's "today" was a different
+// day from the app's — which is the very bug these dates are used to test.
+const _ymd = (d) => { d = d || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const _ymdAgo = (n) => _ymd(new Date(Date.now() - n * 86400000));
 const vm = require('vm');
 const fs = require('fs');
 const path = require('path');
@@ -73,7 +81,7 @@ function loadApp(fieldValues) {
     ' safeUrl, linkHost, libGroups, hubEnabled, HUB_PILLARS, dayXp, dayCompleteStats, getLevel,' +
     ' RESET_AREAS, clearPillarData, isDayEmpty,' +
     ' ADAPT, targetWeeklyRate, weightTrend, avgIntake, estimateTDEE, adaptiveTarget, nutritionPlan,' +
-    ' SAFETY, SAFETY_FLAGS, bmiOf, calorieFloor, nutritionSafety, renderAdaptCard });';
+    ' SAFETY, SAFETY_FLAGS, bmiOf, calorieFloor, nutritionSafety, renderAdaptCard, ymd, _isoShift });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -198,7 +206,7 @@ ok('weekConnection needs gym variation (null if every day is gym)', A.weekConnec
 // The Climb Ahead — future-self forecast
 const _ft = '2026-06-14';
 const _fdays = [];
-for (let i = 0; i < 14; i++) { const dt = new Date('2026-06-14T00:00:00'); dt.setDate(dt.getDate() - i); _fdays.push({ date: dt.toISOString().split('T')[0], gym: { done: true }, reading: { pages: 20 } }); }
+for (let i = 0; i < 14; i++) { const dt = new Date('2026-06-14T00:00:00'); dt.setDate(dt.getDate() - i); _fdays.push({ date: _ymd(dt), gym: { done: true }, reading: { pages: 20 } }); }
 const _proj = A.projectFuture(_fdays, 90, _ft);
 ok('projectFuture projects pages forward from recent pace', _proj && _proj.pages > 100);
 ok('projectFuture estimates books from pages', _proj && _proj.books > 0);
@@ -218,7 +226,7 @@ ok('lifeWeb surfaces a strongest link', _web && _web.strongest && _web.strongest
 ok('lifeWeb needs enough days (null on too few)', A.lifeWeb(_wdays.slice(0, 3), ['gym', 'reading']) === null);
 // Your Year as a Range — weekly peaks
 const _yd = [];
-for (let i = 0; i < 28; i++) { const dt = new Date('2026-06-14T00:00:00'); dt.setDate(dt.getDate() - i); _yd.push({ date: dt.toISOString().split('T')[0], gym: { done: i % 3 === 0 }, reading: { pages: i % 2 === 0 ? 10 : 0 } }); }
+for (let i = 0; i < 28; i++) { const dt = new Date('2026-06-14T00:00:00'); dt.setDate(dt.getDate() - i); _yd.push({ date: _ymd(dt), gym: { done: i % 3 === 0 }, reading: { pages: i % 2 === 0 ? 10 : 0 } }); }
 const _yr = A.yearRange(_yd, 52, '2026-06-14');
 ok('yearRange builds weekly peaks', _yr && _yr.weeks.length >= 3);
 ok('yearRange counts active weeks', _yr && _yr.activeWeeks >= 3);
@@ -298,7 +306,7 @@ ok('reviewIntervalDays: higher box = longer interval', A.reviewIntervalDays(0) <
   eq('vocabMastered: box >= 4 counts as mastered', A.vocabMastered(vocab), 1);
 })();
 ok('readingPacePerDay: averages recent pages over 14 days', (() => {
-  const iso = (off) => { const d = new Date(); d.setDate(d.getDate() - off); return d.toISOString().slice(0, 10); };
+  const iso = (off) => { const d = new Date(); d.setDate(d.getDate() - off); return _ymd(d); };
   const days = [{ date: iso(0), reading: { pages: 14 } }, { date: iso(1), reading: { pages: 14 } }, { date: iso(30), reading: { pages: 999 } }];
   const p = A.readingPacePerDay(days);   // (14+14)/14 = 2, old day excluded
   return Math.abs(p - 2) < 0.001;
@@ -462,7 +470,7 @@ ok('todaysVotes maps logged actions to identities', _tv.some(v => /athlete/.test
 // guidedStepKeys — logged parts of today drop off the flow, fresh again tomorrow
 A.state.data = { profile: { pillars: A.defaultPillars() }, days: [], weeks: [], weights: [] };
 ok('guidedStepKeys shows everything when nothing is logged today', A.guidedStepKeys().includes('gym') && A.guidedStepKeys().includes('water'));
-A.state.data.days = [{ date: new Date().toISOString().split('T')[0], _logged: ['gym', 'food'] }];
+A.state.data.days = [{ date: _ymd(new Date()), _logged: ['gym', 'food'] }];
 ok('guidedStepKeys drops the parts already logged today', !A.guidedStepKeys().includes('gym') && !A.guidedStepKeys().includes('food') && A.guidedStepKeys().includes('reading'));
 // food splits into one step per meal when a meal plan exists (after the first log)
 A.state.data = { profile: { pillars: A.defaultPillars(), nutrition: { age: 28, sex: 'male', heightCm: 180, weightKg: 80, mealsPerDay: 3, activity: 'moderate', goal: 'maintain', strategy: 'muscle' } }, days: [{ date: '2020-01-01' }], weeks: [], weights: [] };
@@ -622,8 +630,8 @@ const bn = rf.find(f => f.name === 'Banana');
 ok('recent food remembers latest grams + count', bn.grams === 100 && bn.count === 2);
 
 // Previous-day note recall
-const _yday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-const _older = new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0];
+const _yday = _ymd(new Date(Date.now() - 86400000));
+const _older = _ymd(new Date(Date.now() - 5 * 86400000));
 A.state.data = { profile: { pillars: dp }, weeks: [], weights: [], days: [
   { date: _older, notes: 'old note' },
   { date: _yday, notes: 'crushed leg day, felt strong' }
@@ -637,7 +645,7 @@ eq('no notes → null', A.lastNoteEntry(), null);
 eq('no notes → empty banner', A.renderPrevNoteBanner(), '');
 
 // Checklist + reminders
-const _t = new Date().toISOString().split('T')[0];
+const _t = _ymd(new Date());
 A.state.data = { profile: {}, days: [], weeks: [], weights: [], checklist: [{ id: 'a', text: 'X' }, { id: 'b', text: 'Y' }], checkDone: { [_t]: ['a'] }, reminders: [] };
 ok('checklist progress = 1/2 today', (() => { const p = A.checklistProgress(); return p.done === 1 && p.total === 2; })());
 ok('isChecked true/false', A.isChecked('a') === true && A.isChecked('b') === false);
@@ -652,9 +660,9 @@ A.ensureChecklistData();
 ok('ensureChecklistData creates the fields', Array.isArray(A.state.data.checklistGroups) && Array.isArray(A.state.data.reminders) && typeof A.state.data.checkDone === 'object');
 
 // Shareable week card — streak + stats (pure; canvas itself needs a real browser)
-const _sd0 = new Date().toISOString().split('T')[0];
-const _sd1 = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-const _sd2 = new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0];
+const _sd0 = _ymd(new Date());
+const _sd1 = _ymd(new Date(Date.now() - 86400000));
+const _sd2 = _ymd(new Date(Date.now() - 2 * 86400000));
 A.state.data = { profile: { pillars: dp }, weeks: [], weights: [], days: [
   { date: _sd2, gym: { done: true } }, { date: _sd1, gym: { done: true } }, { date: _sd0, gym: { done: true } }
 ] };
@@ -713,7 +721,9 @@ ok('streakBreak: a frozen day counts toward the broken chain',
     return r && r.broken === 4; })());
 // ── the recovery card itself: fires, says the right things, and can be dismissed ──
 const _rcToday = A.todayStr();
-const _rcShift = (n) => { const x = new Date(_rcToday + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+// Local-midnight anchor + local setDate, so the whole chain stays on the same
+// calendar the app uses. A UTC anchor read back with _ymd would be a day out.
+const _rcShift = (n) => { const x = new Date(_rcToday + 'T00:00:00'); x.setDate(x.getDate() + n); return _ymd(x); };
 const _rcBase = (over) => Object.assign({
   profile: { pillars: dp }, days: [], weeks: [], weights: [], books: [], vocab: [],
   takeaways: [], library: [], ideas: [], contacts: [], finance: {}
@@ -763,16 +773,16 @@ ok('weekGoalRows shows value vs weekly target per goal', _rows.length >= 1 &&
   _rows.some(r => r.label === 'Workouts' && r.value === 1 && r.target === 5 && r.hit === false) &&
   _rows.some(r => r.label === 'Connections' && r.value === 3 && r.target === 3 && r.hit === true));
 // pendingShareMilestone — fires once per streak milestone, then is suppressed
-const _ms7 = []; for (let i = 0; i < 7; i++) { const dt = new Date(); dt.setDate(dt.getDate() - i); _ms7.push({ date: dt.toISOString().split('T')[0], gym: { done: true } }); }
+const _ms7 = []; for (let i = 0; i < 7; i++) { const dt = new Date(); dt.setDate(dt.getDate() - i); _ms7.push({ date: _ymd(dt), gym: { done: true } }); }
 A.state.data = { profile: { pillars: dp }, weeks: [], weights: [], days: _ms7 };
 ok('pendingShareMilestone fires at a 7-day streak', (() => { const m = A.pendingShareMilestone(); return m && m.kind === 'streak' && m.n === 7; })());
 ok('pendingShareMilestone suppressed once that milestone is seen', (() => { A.state.data.profile._sharePrompts = { s7: true }; return A.pendingShareMilestone() === null; })());
 
 // ── Onward Story — the weekly recap slideshow assembles from real data ──
 (() => {
-  const _wk = A.getWeekStart(new Date().toISOString().split('T')[0]);
-  const d0 = new Date().toISOString().split('T')[0];
-  const d1 = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const _wk = A.getWeekStart(_ymd(new Date()));
+  const d0 = _ymd(new Date());
+  const d1 = _ymd(new Date(Date.now() - 86400000));
   A.state.data = { profile: { pillars: dp, gymDaysPerWeek: 5, weeklyReadGoal: 100 }, weeks: [], weights: [], books: [], contacts: [], days: [
     { date: d1, gym: { done: true }, reading: { pages: 30 } },
     { date: d0, gym: { done: true }, reading: { pages: 20 }, networking: { count: 2 } }
@@ -804,8 +814,8 @@ ok('pendingShareMilestone suppressed once that milestone is seen', (() => { A.st
 })();
 
 // Money: weekly net = income − summed DAILY spend (spending is logged per day now)
-const _wkS = A.getWeekStart(new Date().toISOString().split('T')[0]);
-const _td0 = new Date().toISOString().split('T')[0];
+const _wkS = A.getWeekStart(_ymd(new Date()));
+const _td0 = _ymd(new Date());
 A.state.data = { profile: { pillars: dp }, weights: [], days: [{ date: _td0, spent: 300 }], weeks: [{ weekStart: _wkS, income: 1000 }] };
 const _m = A.getWeekStats();
 ok('weekStats net = income − daily spend', _m.weekIncome === 1000 && _m.weekExpenses === 300 && _m.weekNet === 700);
@@ -813,14 +823,14 @@ A.state.data = { profile: { pillars: dp }, weights: [], days: [{ date: _td0, spe
 ok('weekStats net goes negative when overspending', A.getWeekStats().weekNet === -300);
 
 // Patterns AI-cost throttle helper
-ok('daysSince today ≈ 0', A.daysSince(new Date().toISOString().split('T')[0]) < 1);
-ok('daysSince ~5 days ago (4–6, time-independent)', (() => { const v = A.daysSince(new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0]); return v >= 4 && v <= 6; })());
+ok('daysSince today ≈ 0', A.daysSince(_ymd(new Date())) < 1);
+ok('daysSince ~5 days ago (4–6, time-independent)', (() => { const v = A.daysSince(_ymd(new Date(Date.now() - 5 * 86400000))); return v >= 4 && v <= 6; })());
 ok('daysSince empty = Infinity', A.daysSince('') === Infinity);
 
 // Money redesign: daily spending + periodic income (weekly or monthly)
 ok('periodKeyFor monthly = YYYY-MM', A.periodKeyFor('2026-06-15', 'monthly') === '2026-06');
 ok('periodKeyFor weekly = weekStart', A.periodKeyFor('2026-06-15', 'weekly') === A.getWeekStart('2026-06-15'));
-const _today = new Date().toISOString().split('T')[0];
+const _today = _ymd(new Date());
 const _mKey = _today.slice(0, 7);
 A.state.data = { profile: { pillars: dp, incomeCadence: 'monthly' }, weeks: [], weights: [], incomes: {}, days: [{ date: _today, spent: 40 }] };
 A.setPeriodIncome('monthly', _mKey, 3000);
@@ -848,7 +858,7 @@ const _cm = new Date().toISOString().slice(0, 7);
 const _lm = (() => { const d = new Date(_cm + '-01T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() - 1); return d.toISOString().slice(0, 7); })();
 A.state.data = { profile: { pillars: dp, incomeCadence: 'monthly' }, weeks: [], weights: [],
   incomes: { [_lm]: 1000, [_cm]: 2000 },
-  days: [{ date: _lm + '-15', spent: 400 }, { date: new Date().toISOString().split('T')[0], spent: 500 }] };
+  days: [{ date: _lm + '-15', spent: 400 }, { date: _ymd(new Date()), spent: 500 }] };
 ok('carryover = prior period net (1000−400)', A.getCarryover() === 600);
 const _circ = A.getMoneyCircle();
 ok('money circle rolls savings forward', _circ.carryover === 600 && _circ.income === 2000 && _circ.spent === 500 && _circ.available === 2600 && _circ.savedTotal === 2100);
@@ -1151,7 +1161,7 @@ eq('normalizeLibMuscle: empty → ""', A.normalizeLibMuscle(''), '');
 // judgement, so a silent regression here is the costliest kind.
 // ─────────────────────────────────────────────────────────────
 const _iToday = A.todayStr();
-const _iAgo = (n) => { const d = new Date(_iToday + 'T00:00:00'); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+const _iAgo = (n) => { const d = new Date(_iToday + 'T00:00:00'); d.setDate(d.getDate() - n); return _ymd(d); };
 const _iBase = (over) => Object.assign({
   profile: { pillars: A.defaultPillars(), gymDaysPerWeek: 5, weeklyNetworkGoal: 3, weeklyReadGoal: 100 },
   days: [], weeks: [], weights: [], books: [], vocab: [], takeaways: [], library: [], ideas: [], contacts: [], finance: {}
@@ -1411,10 +1421,52 @@ ok('terrain grid: an empty history is a flat plain, not an error',
 ok('terrain grid: a silly column count is clamped to something drawable',
   A.terrainGrid([], 0).cols >= 2 && A.terrainGrid([], 1).cols >= 2);
 
+// ── Dates are LOCAL calendar days, never UTC ──
+// A day here means "did I train today", which is a local calendar day. Building a
+// date string via toISOString() formats in UTC and silently reports the wrong day:
+// east of Greenwich every log between midnight and the offset landed on yesterday
+// (nine hours a day in Tokyo); west of it every evening log landed on tomorrow.
+// The suite runs in one timezone, so the real guard is the source check below —
+// it is what stops the pattern coming back.
+const _appSrc = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
+const _utcDateStrings = (_appSrc.match(/toISOString\(\)\s*\.\s*(?:split\('T'\)\[0\]|slice\(0,\s*10\))/g) || []);
+eq('dates: no date string is ever built through UTC (use ymd)', _utcDateStrings.length, 0);
+
+// ymd() must read the LOCAL calendar fields, whatever the clock or zone.
+eq('ymd: formats a local date', A.ymd(new Date(2026, 7, 13, 12, 0, 0)), '2026-08-13');
+eq('ymd: pads single-digit month and day', A.ymd(new Date(2026, 0, 5, 12, 0, 0)), '2026-01-05');
+// 23:30 local must still be today — this is exactly the case UTC formatting broke
+// for anyone west of Greenwich.
+eq('ymd: 23:30 local is still today', A.ymd(new Date(2026, 7, 13, 23, 30, 0)), '2026-08-13');
+// 00:30 local must still be today — the case it broke east of Greenwich.
+eq('ymd: 00:30 local is still today', A.ymd(new Date(2026, 7, 13, 0, 30, 0)), '2026-08-13');
+eq('ymd: year boundary at 23:59 stays in the old year', A.ymd(new Date(2026, 11, 31, 23, 59, 0)), '2026-12-31');
+eq('ymd: leap day', A.ymd(new Date(2028, 1, 29, 12, 0, 0)), '2028-02-29');
+ok('ymd: matches todayStr for now', A.ymd(new Date()) === A.todayStr());
+
+// Week start must be a Monday and never in the future.
+['2026-08-10', '2026-08-13', '2026-08-16', '2026-01-01', '2026-12-31'].forEach(d => {
+  const ws = A.getWeekStart(d);
+  const wd = new Date(ws + 'T12:00:00').getDay();
+  ok('week start for ' + d + ' is a Monday', wd === 1);
+  ok('week start for ' + d + ' is not in the future', ws <= d);
+  ok('week start for ' + d + ' is within 6 days', (Date.parse(d + 'T12:00:00') - Date.parse(ws + 'T12:00:00')) / 86400000 <= 6);
+});
+eq('week start: Monday is its own week start', A.getWeekStart('2026-08-10'), '2026-08-10');
+eq('week start: Sunday belongs to the week that began Monday', A.getWeekStart('2026-08-16'), '2026-08-10');
+
+// Day shifts must be exactly one calendar day, including across a DST boundary
+// (US DST ends 2026-11-01, so 2026-11-01 has a 25-hour local day).
+eq('day shift: +1 across month end', A._isoShift('2026-08-31', 1), '2026-09-01');
+eq('day shift: -1 across month start', A._isoShift('2026-09-01', -1), '2026-08-31');
+eq('day shift: +1 across year end', A._isoShift('2026-12-31', 1), '2027-01-01');
+eq('day shift: DST-end day still advances one calendar day', A._isoShift('2026-11-01', 1), '2026-11-02');
+eq('day shift: DST-start day still advances one calendar day', A._isoShift('2026-03-08', 1), '2026-03-09');
+
 // ── Adaptive nutrition — the weight log drives the calorie target ──
 // This tells people how much to eat. Every branch is pinned, and the safety
 // rails are tested by trying to breach them.
-const _anDay = (n) => { const d = new Date(Date.UTC(2026, 3, 1)); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const _anDay = (n) => { const d = new Date(2026, 3, 1); d.setDate(d.getDate() + n); return _ymd(d); };
 const _anToday = _anDay(30);
 // A clean 21-day run of weigh-ins losing 0.5 kg/week from 90kg.
 const _anWeights = (perWeek, start, n, everyN) => {
