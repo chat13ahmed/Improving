@@ -2222,6 +2222,37 @@ const SAFETY_FLAGS = {
   clinicalDiet:  'Following a diet set by a doctor or dietitian'
 };
 
+// Plausible human ranges. Without these a single extra digit in the weight field
+// produced a 125,000 cal/day target, and entering grams instead of kilos produced
+// 993,000 — both shown to the user as advice. The BMI gate did not catch it
+// because a huge weight reads as a huge BMI, which only warns.
+const PLAUSIBLE = {
+  age:      { min: 13,  max: 100, label: 'Age', unit: '' },
+  heightCm: { min: 100, max: 250, label: 'Height', unit: 'cm' },
+  weightKg: { min: 25,  max: 400, label: 'Weight', unit: 'kg' }
+};
+// Pure. Returns every problem at once rather than the first, so the form can tell
+// you everything that's wrong in one go.
+function validateNutritionProfile(n) {
+  const errors = [];
+  if (!n) return { ok: false, errors: ['No profile given.'] };
+  for (const key of Object.keys(PLAUSIBLE)) {
+    const spec = PLAUSIBLE[key];
+    const v = Number(n[key]);
+    if (!isFinite(v) || v <= 0) { errors.push(spec.label + ' is required.'); continue; }
+    if (v < spec.min || v > spec.max) {
+      errors.push(spec.label + ' looks wrong — enter between ' + spec.min + ' and ' + spec.max + (spec.unit ? ' ' + spec.unit : '') + '.');
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+// True only for a weight a human could actually be. Used as the gate on every
+// weigh-in, so one mistyped entry can't poison the trend the diet now follows.
+function isPlausibleWeightKg(kg) {
+  const v = Number(kg);
+  return isFinite(v) && v >= PLAUSIBLE.weightKg.min && v <= PLAUSIBLE.weightKg.max;
+}
+
 function bmiOf(heightCm, weightKg) {
   const h = (+heightCm || 0) / 100, w = +weightKg || 0;
   if (!h || !w) return 0;
@@ -2566,11 +2597,17 @@ function renderFuelCard() {
 function weightUnitPref() { return (state.data.profile && state.data.profile.nutrition && state.data.profile.nutrition.weightUnit) || 'lbs'; }
 function kgToDisplay(kg) { return weightUnitPref() === 'lbs' ? kg / LBS_TO_KG : kg; }
 function displayToKg(v) { return weightUnitPref() === 'lbs' ? v * LBS_TO_KG : v; }
+// Returns false and stores nothing for an implausible weight. This is the single
+// choke point every weigh-in goes through, so guarding here covers the quick log,
+// the guided log and the goal tracker at once — and the calorie target now follows
+// this trend, so one bad entry would move what the app tells you to eat.
 function upsertWeight(date, kg) {
+  if (!isPlausibleWeightKg(kg)) return false;
   if (!state.data.weights) state.data.weights = [];
   const i = state.data.weights.findIndex(w => w.date === date);
   if (i >= 0) state.data.weights[i].kg = kg;
   else state.data.weights.push({ id: uid(), date, kg });
+  return true;
 }
 
 // Progress bar + text comparing calories eaten to the daily target
@@ -7082,7 +7119,11 @@ function writeStepToDay(day, key, d) {
   else if (key === 'networking') { if (isPillarOn('networking')) day.networking = { count: d.net || 0, notes: (day.networking && day.networking.notes) || '' }; }
   else if (key === 'money') { if (isPillarOn('money')) { day.spent = d.spent || 0; day.money = { activities: d.moneyActs || '', income: (day.money && day.money.income) || 0 }; } }
   else if (key === 'water') day.water = d.water || 0;
-  else if (key === 'weight') { if (d.weight) { const kg = Math.round(displayToKg(d.weight) * 10) / 10; upsertWeight(day.date, kg); if (state.data.profile.nutrition && state.data.profile.nutrition.heightCm) state.data.profile.nutrition.weightKg = kg; } }
+  // Only mirror the weigh-in into the profile if it was actually accepted —
+  // otherwise a rejected value would still end up driving the calorie target.
+  else if (key === 'weight') { if (d.weight) { const kg = Math.round(displayToKg(d.weight) * 10) / 10;
+    if (upsertWeight(day.date, kg)) { if (state.data.profile.nutrition && state.data.profile.nutrition.heightCm) state.data.profile.nutrition.weightKg = kg; }
+    else showToast('That weight looks off — enter between ' + PLAUSIBLE.weightKg.min + ' and ' + PLAUSIBLE.weightKg.max + ' kg.', 'error'); } }
   else if (key === 'notes') day.notes = d.notes || '';
 }
 function persistStep(key) {
@@ -7450,7 +7491,9 @@ async function commitDayFromForm() {
   const weighEl = document.getElementById('weigh-in');
   if (weighEl) {
     const wv = parseFloat(weighEl.value) || 0;
-    if (wv > 0) { const kg = Math.round(displayToKg(wv) * 10) / 10; upsertWeight(date, kg); if (state.data.profile.nutrition && state.data.profile.nutrition.heightCm) state.data.profile.nutrition.weightKg = kg; }
+    if (wv > 0) { const kg = Math.round(displayToKg(wv) * 10) / 10;
+      if (upsertWeight(date, kg)) { if (state.data.profile.nutrition && state.data.profile.nutrition.heightCm) state.data.profile.nutrition.weightKg = kg; }
+      else showToast('That weight looks off — enter between ' + PLAUSIBLE.weightKg.min + ' and ' + PLAUSIBLE.weightKg.max + ' kg.', 'error'); }
   }
   // Keep the protein-nudge snapshot fresh
   const nut = getNutrition(); const t = foodLogTotals(state._foodLog);
@@ -10108,8 +10151,11 @@ async function submitQuickLog() {
     const wv = parseFloat(weighEl.value) || 0;
     if (wv > 0) {
       const kg = Math.round(displayToKg(wv) * 10) / 10;
-      upsertWeight(today, kg);
-      if (state.data.profile.nutrition && state.data.profile.nutrition.heightCm) state.data.profile.nutrition.weightKg = kg;
+      if (upsertWeight(today, kg)) {
+        if (state.data.profile.nutrition && state.data.profile.nutrition.heightCm) state.data.profile.nutrition.weightKg = kg;
+      } else {
+        showToast('That weight looks off — enter between ' + PLAUSIBLE.weightKg.min + ' and ' + PLAUSIBLE.weightKg.max + ' kg.', 'error');
+      }
     }
   }
 
@@ -12671,7 +12717,7 @@ function renderNutritionSettingsCard() {
     '</div></div>' +
     '<div class="form-group"><label>Weight</label>' +
     '<div class="nut-unit-row">' +
-    '<input type="number" id="nut-weight" min="30" step="0.1" placeholder="' + (weightUnit === 'lbs' ? '170' : '77') + '" value="' + wVal + '" style="flex:1">' +
+    '<input type="number" id="nut-weight" min="25" max="400" step="0.1" placeholder="' + (weightUnit === 'lbs' ? '170' : '77') + '" value="' + wVal + '" style="flex:1">' +
     '<select id="nut-weight-unit" style="max-width:86px"><option value="lbs"' + sel(weightUnit, 'lbs') + '>lbs</option><option value="kg"' + sel(weightUnit, 'kg') + '>kg</option></select>' +
     '</div></div>' +
     '</div>' +
@@ -12729,7 +12775,10 @@ async function saveNutrition(e) {
   }
   const wRaw = parseFloat(document.getElementById('nut-weight').value) || 0;
   const weightKg = weightUnit === 'lbs' ? wRaw * LBS_TO_KG : wRaw;
-  if (!age || !heightCm || !weightKg) { showToast('Fill in age, height and weight.', 'error'); return; }
+  // The inputs carry min/max attributes, but native validation is easy to bypass
+  // and these numbers feed a calorie target, so the check has to happen here.
+  const _v = validateNutritionProfile({ age, heightCm, weightKg: Math.round(weightKg * 10) / 10 });
+  if (!_v.ok) { showToast(_v.errors[0], 'error'); announce(_v.errors.join(' '), true); return; }
 
   // Safety flags gate the self-adjusting target. This handler REPLACES the whole
   // nutrition object, so they have to be re-collected here — dropping them would

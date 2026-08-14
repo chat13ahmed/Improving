@@ -81,7 +81,7 @@ function loadApp(fieldValues) {
     ' safeUrl, linkHost, libGroups, hubEnabled, HUB_PILLARS, dayXp, dayCompleteStats, getLevel,' +
     ' RESET_AREAS, clearPillarData, isDayEmpty,' +
     ' ADAPT, targetWeeklyRate, weightTrend, avgIntake, estimateTDEE, adaptiveTarget, nutritionPlan,' +
-    ' SAFETY, SAFETY_FLAGS, bmiOf, calorieFloor, nutritionSafety, renderAdaptCard, ymd, _isoShift });';
+    ' SAFETY, SAFETY_FLAGS, bmiOf, calorieFloor, nutritionSafety, renderAdaptCard, ymd, _isoShift, PLAUSIBLE, validateNutritionProfile, isPlausibleWeightKg, upsertWeight });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -1645,6 +1645,43 @@ const _safeP = (over) => ({ nutrition: Object.assign({
   goal: 'lose', strategy: 'balanced', mealsPerDay: 3
 }, over || {}) });
 const _safeW = (kg) => { const o = []; for (let i = 21; i >= 0; i -= 3) o.push({ date: _anDay(30 - i), kg: kg }); return o; };
+
+// Implausible numbers must never reach the calorie maths. Before this guard, one
+// extra digit in the weight field produced a 125,000 cal/day target and entering
+// grams instead of kilos produced 993,000 — both shown to the user as advice.
+ok('validate: a realistic profile passes',
+  A.validateNutritionProfile({ age: 30, heightCm: 180, weightKg: 80 }).ok);
+ok('validate: an extra digit in weight is rejected',
+  !A.validateNutritionProfile({ age: 30, heightCm: 180, weightKg: 9999 }).ok);
+ok('validate: weight entered in grams is rejected',
+  !A.validateNutritionProfile({ age: 30, heightCm: 180, weightKg: 80000 }).ok);
+ok('validate: height entered in millimetres is rejected',
+  !A.validateNutritionProfile({ age: 30, heightCm: 1800, weightKg: 80 }).ok);
+ok('validate: an impossible age is rejected',
+  !A.validateNutritionProfile({ age: 999, heightCm: 180, weightKg: 80 }).ok);
+ok('validate: reports every problem, not just the first',
+  A.validateNutritionProfile({ age: 999, heightCm: 1800, weightKg: 9999 }).errors.length === 3);
+ok('validate: the message says the acceptable range',
+  /between 25 and 400/.test(A.validateNutritionProfile({ age: 30, heightCm: 180, weightKg: 9999 }).errors[0]));
+ok('validate: missing values are reported as required',
+  A.validateNutritionProfile({}).errors.length === 3);
+// Boundaries are inclusive.
+ok('validate: accepts the exact lower bounds', A.validateNutritionProfile({ age: 13, heightCm: 100, weightKg: 25 }).ok);
+ok('validate: accepts the exact upper bounds', A.validateNutritionProfile({ age: 100, heightCm: 250, weightKg: 400 }).ok);
+
+// upsertWeight is the choke point every weigh-in goes through.
+ok('weigh-in: a plausible weight is stored',
+  (() => { A.state.data = { weights: [] }; return A.upsertWeight('2026-08-13', 82) === true && A.state.data.weights.length === 1; })());
+ok('weigh-in: an implausible weight is rejected and stores nothing',
+  (() => { A.state.data = { weights: [] }; return A.upsertWeight('2026-08-13', 9999) === false && A.state.data.weights.length === 0; })());
+ok('weigh-in: zero and negative are rejected',
+  (() => { A.state.data = { weights: [] }; return !A.upsertWeight('2026-08-13', 0) && !A.upsertWeight('2026-08-13', -5) && A.state.data.weights.length === 0; })());
+ok('weigh-in: NaN from a garbage entry is rejected',
+  (() => { A.state.data = { weights: [] }; return !A.upsertWeight('2026-08-13', NaN) && A.state.data.weights.length === 0; })());
+ok('weigh-in: a rejected entry never overwrites a good one',
+  (() => { A.state.data = { weights: [] }; A.upsertWeight('2026-08-13', 82); A.upsertWeight('2026-08-13', 9999);
+    return A.state.data.weights.length === 1 && A.state.data.weights[0].kg === 82; })());
+ok('isPlausibleWeightKg: rejects Infinity', !A.isPlausibleWeightKg(Infinity));
 
 eq('bmi: standard formula', A.bmiOf(180, 81), 25);
 eq('bmi: missing inputs give 0 rather than Infinity', A.bmiOf(0, 80), 0);
