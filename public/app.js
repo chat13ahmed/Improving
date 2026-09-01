@@ -1373,9 +1373,20 @@ function paintNavIcons() {
   });
 }
 
+// Logging moved into the hubs, so these send you to the section that owns the
+// thing you're logging rather than to one page that asked about everything.
+function goLogFood()  { state._healthTab = 'nutrition'; navigate('health'); }
+function goLogGym()   { state._healthTab = 'training';  navigate('health'); }
+function goLogRead()  { navigate('knowledge'); }
+function goLogMoney() { navigate('finances'); }
+function goLogNet()   { navigate('contacts'); }
+
 function navigate(page) {
   if (page === 'admin' && !state.isOwner) page = 'dashboard';   // owner-only console (the server also enforces this)
   if (page === 'stats') page = 'dashboard';   // the stats page retired — its numbers live in each hub's overview now
+  // The single "log today" page retired — each pillar is logged in its own hub.
+  // Anything still asking for it lands on Health, the most-logged section.
+  if (page === 'log') { state._healthTab = state._healthTab || 'nutrition'; page = 'health'; }
   if (HUB_PILLARS[page] && !hubEnabled(page)) page = 'dashboard';   // a hub the user didn't choose — don't open it
   state.page = page;
   if (page !== 'workout') document.body.classList.remove('wo-fullscreen');   // restore the bottom nav when leaving the workout
@@ -1387,7 +1398,7 @@ function navigate(page) {
   // Sync the mobile bottom bar — highlight the matching tab, else "More"
   document.querySelectorAll('.bnav-item[data-page]').forEach(el => el.classList.toggle('active', el.dataset.page === page));
   const moreBtn = document.getElementById('bnav-more');
-  if (moreBtn) moreBtn.classList.toggle('active', !['dashboard', 'log', 'coach'].includes(page));
+  if (moreBtn) moreBtn.classList.toggle('active', !['dashboard', 'health', 'coach'].includes(page));
   document.getElementById('more-sheet')?.remove();
   // Ideas + Contacts + Finances live under the Business hub, so keep that nav item lit on their tabs
   if (['business', 'ideas', 'contacts', 'finances'].includes(page)) document.querySelector('.nav-item[data-page="business"]')?.classList.add('active');
@@ -2668,7 +2679,9 @@ function renderMealFocus(nut) {
   const pm = nut.meals.plan[i];
   const label = pm.label;
   const today = state.data.days.find(d => d.date === todayStr());
-  const log = (state.page === 'log' && state._foodLog) ? state._foodLog : ((today && today.foodLog) || []);
+  // The live draft is authoritative wherever the food logger is on screen — that
+  // is the Health hub now, not just the old log page.
+  const log = ((state.page === 'log' || state.page === 'health') && state._foodLog) ? state._foodLog : ((today && today.foodLog) || []);
   const t = foodLogTotals(log.filter(x => Math.min(Math.max(0, x.meal || 0), count - 1) === i));
   const calLeft = Math.max(0, pm.calories - Math.round(t.kcal));
   const pLeft = Math.max(0, pm.protein - Math.round(t.p));
@@ -2844,6 +2857,26 @@ function renderFoodLogTotals() {
     (advice ? '<div class="food-advice">' + advice + '</div>' : '');
 }
 
+// The food log used to be a draft that only reached the day record when the log
+// page's form was submitted. Now that it lives inside the Nutrition hub with no
+// form around it, every change writes straight through — navigating away can't
+// lose what you logged.
+function commitFoodLogToDay() {
+  if (state._editDayId) return;          // editing a past day still goes through the form
+  if (state._previewMode) return;
+  const date = todayStr();
+  const days = state.data.days = state.data.days || [];
+  let day = days.find(x => x.date === date);
+  if (!day) { day = { id: uid(), date, _logged: [] }; days.push(day); }
+  const log = state._foodLog || [];
+  const t = foodLogTotals(log);
+  day.foodLog = log.map(x => ({ ...x }));
+  day.calories = log.length ? Math.round(t.kcal) : 0;
+  day.eaten = log.length ? { protein: Math.round(t.p), carbs: Math.round(t.c), fat: Math.round(t.f) } : null;
+  if (!Array.isArray(day._logged)) day._logged = [];
+  if (log.length && !day._logged.includes('food')) day._logged.push('food');
+  saveData();
+}
 function addFoodToLog() {
   const pick = document.getElementById('food-pick');
   const food = findFood(pick?.value);
@@ -2926,6 +2959,7 @@ function quickAddRecent(i) {
 }
 
 function refreshFoodLog() {
+  commitFoodLogToDay();     // write through on every add/remove — no submit needed
   const listEl = document.getElementById('food-log-list');
   const totEl = document.getElementById('food-log-totals');
   if (listEl) listEl.innerHTML = renderFoodLogByMeal();
@@ -3549,7 +3583,7 @@ function setupProgress(d, ctx) {
   const fin = d.finance || {};
   const steps = [
     { id: 'log', icon: '✍️', label: 'Log your first day', hint: '30 seconds — this starts everything',
-      done: (d.days || []).length > 0, action: "navigate('log')" },
+      done: (d.days || []).length > 0, action: "goLogFood()" },
     { id: 'goals', icon: '🎯', label: 'Set your weekly goals', hint: 'so the app knows what winning means',
       done: !!(prof.weeklyReadGoal > 0 || prof.weeklyIncomeGoal > 0 || prof.savingsGoal > 0 || prof.weeklyNetworkGoal > 3),
       action: 'renderGoalSettings()' },
@@ -3616,7 +3650,7 @@ function renderReminderBanner() {
     : 'You haven\'t logged today yet.';
   return '<div class="reminder-banner' + (urgent ? ' reminder-urgent' : '') + '">' +
     '<span>' + msg + '</span>' +
-    '<button class="btn btn-primary" onclick="navigate(\'log\')" style="padding:6px 18px;font-size:13px;flex-shrink:0">Log Now →</button>' +
+    '<button class="btn btn-primary" onclick="goLogFood()" style="padding:6px 18px;font-size:13px;flex-shrink:0">Log Now →</button>' +
     '</div>';
 }
 
@@ -3702,7 +3736,7 @@ function renderHydrationStrip(stats) {
       (avg > 0 ? ' · avg ' + avg.toFixed(2) + ' gal/day this week' : '') + '</div>' +
     '</div>' +
     '<div class="hyd-bar-wrap"><div class="hyd-bar" style="width:' + pct + '%"></div></div>' +
-    '<button class="btn btn-outline hyd-btn" onclick="navigate(\'log\')">Log water</button>' +
+    '<button class="btn btn-outline hyd-btn" onclick="goLogFood()">Log water</button>' +
     '</div>';
 }
 
@@ -3874,7 +3908,7 @@ function dismissRecovery(goLog) {
   state.data.profile = state.data.profile || {};
   state.data.profile._recoveryDismissed = todayStr();
   saveData();
-  if (goLog) navigate('log'); else renderDashboard();
+  if (goLog) goLogFood(); else renderDashboard();
 }
 
 // ── One-tap shareable week card (the growth loop) ──
@@ -4541,11 +4575,11 @@ async function updateGoalProgress() {
 // Pure: pick the one next action from a snapshot of signals (testable)
 function pickNextStep(s) {
   if (s.goalReached) return { tone: 'good', title: 'You reached your goal!', sub: 'Huge. Set your next one to keep climbing.', ctaLabel: 'Set a new goal', ctaAction: 'openGoalForm()' };
-  if (!s.loggedToday) return { title: 'Log today', sub: 'Takes 30 seconds — keep your streak alive and your data honest.', ctaLabel: 'Log today', ctaAction: "navigate('log')" };
-  if (s.nutOn && s.anyFood && s.proteinLeft != null && s.proteinLeft >= 30) return { title: "You're " + s.proteinLeft + 'g short on protein', sub: (s.emptyMeal ? 'Make ' + s.emptyMeal.toLowerCase() + ' protein-heavy' : 'Add a protein-heavy bite') + ' — chicken, eggs, Greek yogurt, or a shake.', ctaLabel: 'Log food', ctaAction: "navigate('log')" };
-  if (s.gymOn && !s.gymDone) return { title: "Haven't trained yet today", sub: 'Even 20 minutes counts — log it when you do.', ctaLabel: 'Open log', ctaAction: "navigate('log')" };
-  if (s.nutOn && s.emptyMeal) return { title: 'Log your ' + s.emptyMeal.toLowerCase(), sub: 'Keep your meals on track for the day.', ctaLabel: 'Log food', ctaAction: "navigate('log')" };
-  if (s.moneyOn && s.moneyOver) return { tone: 'warn', title: "You're over budget this period", sub: 'Spending has passed your income — ease off where you can.', ctaLabel: 'See money', ctaAction: "navigate('log')" };
+  if (!s.loggedToday) return { title: 'Log today', sub: 'Takes 30 seconds — keep your streak alive and your data honest.', ctaLabel: 'Log today', ctaAction: "goLogFood()" };
+  if (s.nutOn && s.anyFood && s.proteinLeft != null && s.proteinLeft >= 30) return { title: "You're " + s.proteinLeft + 'g short on protein', sub: (s.emptyMeal ? 'Make ' + s.emptyMeal.toLowerCase() + ' protein-heavy' : 'Add a protein-heavy bite') + ' — chicken, eggs, Greek yogurt, or a shake.', ctaLabel: 'Log food', ctaAction: "goLogFood()" };
+  if (s.gymOn && !s.gymDone) return { title: "Haven't trained yet today", sub: 'Even 20 minutes counts — log it when you do.', ctaLabel: 'Log training', ctaAction: "goLogGym()" };
+  if (s.nutOn && s.emptyMeal) return { title: 'Log your ' + s.emptyMeal.toLowerCase(), sub: 'Keep your meals on track for the day.', ctaLabel: 'Log food', ctaAction: "goLogFood()" };
+  if (s.moneyOn && s.moneyOver) return { tone: 'warn', title: "You're over budget this period", sub: 'Spending has passed your income — ease off where you can.', ctaLabel: 'See money', ctaAction: "goLogMoney()" };
   if (s.goalBehind) return { tone: 'warn', title: 'Behind on "' + (s.goalTitle || 'your goal') + '"', sub: 'Pick one action today that moves it forward.', ctaLabel: 'View goal', ctaAction: 'openGoalForm()' };
   return { tone: 'good', title: "You're on track today", sub: 'Logged and on pace — keep the chain going.', ctaLabel: '', ctaAction: '' };
 }
@@ -4600,7 +4634,7 @@ function dailyQuests() {
     title: today ? 'Daily record secured' : 'Log the day',
     sub: today ? 'Your chain has a mark for today.' : 'Capture the day before it disappears.',
     done: !!today,
-    action: 'navigate(\'log\')',
+    action: 'goLogFood()',
     cta: today ? 'Review' : 'Log now'
   });
 
@@ -4610,7 +4644,7 @@ function dailyQuests() {
       title: done ? pillar('gym').label + ' done' : 'Move the body',
       sub: done ? 'Training is already feeding the rest of the system.' : 'One session, walk, or recovery block keeps momentum alive.',
       done,
-      action: 'navigate(\'log\')',
+      action: 'goLogFood()',
       cta: done ? 'View' : 'Train'
     });
   }
@@ -4621,7 +4655,7 @@ function dailyQuests() {
       title: left <= 10 ? 'Protein target protected' : 'Protein rescue',
       sub: left <= 10 ? 'You are close enough for today.' : 'Add about ' + left + 'g protein to support the climb.',
       done: left <= 10,
-      action: 'navigate(\'log\')',
+      action: 'goLogFood()',
       cta: 'Food'
     });
   } else if (isPillarOn('food')) {
@@ -4630,7 +4664,7 @@ function dailyQuests() {
       title: done ? 'Nutrition rated' : 'Rate the fuel',
       sub: done ? 'Food signal is logged.' : 'A simple 1-5 score gives the coach more pattern data.',
       done,
-      action: 'navigate(\'log\')',
+      action: 'goLogFood()',
       cta: 'Rate'
     });
   }
@@ -4666,7 +4700,7 @@ function dailyQuests() {
       title: done ? 'Money circle stable' : 'Close the spending leak',
       sub: done ? 'Income and spending are inside the current circle.' : formatCurrency(mc.spent - mc.available) + ' over plan. Log the reason while it is fresh.',
       done,
-      action: 'navigate(\'log\')',
+      action: 'goLogFood()',
       cta: 'Money'
     });
   }
@@ -4955,7 +4989,7 @@ function renderGymPlanCard() {
       : row('Calories', escapeHtml(p.diet.cals)) + row('Protein', escapeHtml(p.diet.protein))) +
     '</div>' +
     '<ul class="gp-diet-rules">' + p.diet.rules.map(r => '<li>' + escapeHtml(r) + '</li>').join('') + '</ul>' +
-    (nut ? '<button class="btn-link gp-diet-link" onclick="navigate(\'log\')">Log today\'s food →</button>' : '<button class="btn-link gp-diet-link" onclick="navigate(\'settings\')">Set up your nutrition →</button>') +
+    (nut ? '<button class="btn-link gp-diet-link" onclick="goLogFood()">Log today\'s food →</button>' : '<button class="btn-link gp-diet-link" onclick="navigate(\'settings\')">Set up your nutrition →</button>') +
     '</div>' +
     '<div class="gp-tip">' + escapeHtml(p.tip) + '</div>' +
     '</div>';
@@ -5625,7 +5659,7 @@ function showWorkoutSummary(tot, prCount) {
     '<div class="review-grid">' + grid + '</div>' +
     prLine + refuel +
     '<div class="wr-actions"><button class="btn btn-primary" onclick="document.getElementById(\'wo-summary\').remove()">Done</button>' +
-    (gap > 0 ? '<button class="btn-link" onclick="document.getElementById(\'wo-summary\').remove(); navigate(\'log\')">Log my food</button>' : '') +
+    (gap > 0 ? '<button class="btn-link" onclick="document.getElementById(\'wo-summary\').remove(); goLogFood()">Log my food</button>' : '') +
     '</div></div>';
   el.addEventListener('click', e => { if (e.target === el) el.remove(); });
   document.body.appendChild(el);
@@ -6264,7 +6298,7 @@ function renderLifeWeb() {
 function renderPillarNav() {
   const ids = PILLAR_IDS.filter(id => isPillarOn(id));
   if (!ids.length) return '';
-  const pills = ids.map(id => '<button type="button" class="pnav-pill" onclick="navigate(\'log\')">' + escapeHtml(pillar(id).label) + '</button>').join('');
+  const pills = ids.map(id => '<button type="button" class="pnav-pill" onclick="goLogFood()">' + escapeHtml(pillar(id).label) + '</button>').join('');
   return '<div class="pnav">' + pills + '<button type="button" class="pnav-pill pnav-more" onclick="openMoreSheet()">More</button></div>';
 }
 // ── Your Year as a Range — every week becomes a peak; your history as a
@@ -6427,7 +6461,7 @@ function renderMountainHero() {
   const loggedSet = new Set((state.data.days || []).map(d => d.date));
   const chip = loggedSet.has(today)
     ? '<span class="mtn-chip mtn-chip-ok"><span class="mtn-chip-dot"></span>On track today</span>'
-    : '<button type="button" class="mtn-chip mtn-chip-todo" onclick="navigate(\'log\')"><span class="mtn-chip-dot"></span>Log today</button>';
+    : '<button type="button" class="mtn-chip mtn-chip-todo" onclick="goLogFood()"><span class="mtn-chip-dot"></span>Log today</button>';
   const wkBase = new Date(getWeekStart(today) + 'T00:00:00');
   const wkLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   let wkDots = '', wkCount = 0;
@@ -6516,7 +6550,7 @@ function renderDashboard() {
         '<button class="btn-link-inline" onclick="navigate(\'settings\')" style="margin-top:4px">Set a savings goal</button></div>');
     } else {
       goalRows.push('<div class="sg-item"><span>' + pc.icon + ' ' + escapeHtml(pc.label) + '</span>' +
-        '<button class="btn-link-inline" onclick="navigate(\'log\')">Log spending →</button></div>');
+        '<button class="btn-link-inline" onclick="goLogFood()">Log spending →</button></div>');
     }
   }
   if (isPillarOn('gym')) {
@@ -6551,7 +6585,7 @@ function renderDashboard() {
     '<div class="score-right">' +
     '<div class="score-label">' + scoreLabel + '</div>' +
     '<div class="score-sub">of your weekly goals reached, across ' + onCount + ' active pillar' + (onCount === 1 ? '' : 's') + '</div>' +
-    '<button class="btn btn-outline" style="margin-top:12px;padding:7px 14px;font-size:13px" onclick="navigate(\'log\')">Check In</button>' +
+    '<button class="btn btn-outline" style="margin-top:12px;padding:7px 14px;font-size:13px" onclick="goLogFood()">Log today</button>' +
     '</div>' +
     '<div class="score-goals">' +
     goalRows.join('') +
@@ -6569,7 +6603,7 @@ function renderDashboard() {
     '<h3>Your mountain is waiting</h3>' +
     '<p>Log your first day to take the first step up — even 30 seconds counts. Every day you log moves your climber higher.</p>' +
     '<div class="empty-actions">' +
-    '<button class="btn btn-primary" onclick="navigate(\'log\')">Log my first day</button>' +
+    '<button class="btn btn-primary" onclick="goLogFood()">Log my first day</button>' +
     '</div></div>';
 
   const achievementsHtml = hasDays ? renderAchievementsSummary() : '';
@@ -6768,7 +6802,7 @@ function missedYesterday(days, today) {
 }
 function renderNeverMissTwice() {
   if (!missedYesterday(state.data.days)) return '';
-  return '<div class="card nmt-banner" onclick="navigate(\'log\')">' +
+  return '<div class="card nmt-banner" onclick="goLogFood()">' +
     '<span class="nmt-ic">⚡</span><div class="nmt-body"><b>You missed yesterday — don\'t miss twice.</b>' +
     '<div class="nmt-sub">Missing once is an accident. Log today and you\'re right back on.</div></div>' +
     '<span class="nmt-go">Log →</span></div>';
@@ -7126,13 +7160,16 @@ function writeStepToDay(day, key, d) {
     else showToast('That weight looks off — enter between ' + PLAUSIBLE.weightKg.min + ' and ' + PLAUSIBLE.weightKg.max + ' kg.', 'error'); } }
   else if (key === 'notes') day.notes = d.notes || '';
 }
-function persistStep(key) {
+// `draft` is optional: the guided flow keeps its draft on state._guided, while the
+// in-hub log cards pass one directly. Same writer either way, so both paths record
+// a day identically — including the _logged marks the streak counts.
+function persistStep(key, draft) {
   const date = todayStr();
   const days = state.data.days = state.data.days || [];
   let day = days.find(x => x.date === date);
   if (!day) { day = { id: uid(), date }; days.push(day); }
   if (!Array.isArray(day._logged)) day._logged = [];
-  writeStepToDay(day, key, state._guided.draft);
+  writeStepToDay(day, key, draft || (state._guided && state._guided.draft) || {});
   if (!day._logged.includes(key)) day._logged.push(key);
   saveData();
   return day;
@@ -7145,6 +7182,180 @@ function finishGuidedLog() {
   navigate('dashboard');
   if (day) setTimeout(() => showDayComplete(day), 250);   // votes + streak + your why
 }
+// ─────────────────────────────────────────────────────────────
+// IN-CONTEXT LOGGING — each pillar is logged where it lives
+// ─────────────────────────────────────────────────────────────
+// Instead of one long form that asks about everything at once, the question is
+// asked in the section it belongs to: training on the Training tab, food on
+// Nutrition, money on Finances. You answer it where you already are.
+//
+// These write through persistStep()/writeStepToDay() — the same path the guided
+// flow used — so a day logged in pieces is identical to one logged in one sitting,
+// and the streak counts it the same way.
+const HUB_LOG = {
+  gym:        { pillar: 'gym',        title: 'Did you train today?',  done: 'Training logged' },
+  food:       { pillar: 'food',       title: 'How did you eat today?', done: 'Food logged' },
+  reading:    { pillar: 'reading',    title: 'Pages read today',       done: 'Reading logged' },
+  networking: { pillar: 'networking', title: 'People reached today',   done: 'Networking logged' },
+  money:      { pillar: 'money',      title: 'Money today',            done: 'Money logged' },
+  water:      { pillar: null,         title: 'Water today',            done: 'Water logged' },
+  weight:     { pillar: null,         title: "Today's weigh-in",       done: 'Weigh-in logged' }
+};
+// What today's record already holds for this key, so the card can show the value
+// back instead of an empty box.
+function hubLogValue(key) {
+  const d = (state.data.days || []).find(x => x.date === todayStr()) || {};
+  switch (key) {
+    case 'gym':        return d.gym && d.gym.done ? (d.gym.muscleGroup || 'Trained') : (d.gym && 'done' in d.gym ? 'Rest day' : null);
+    case 'food':       return d.calories ? d.calories.toLocaleString() + ' cal' : null;
+    case 'reading':    return d.reading && d.reading.pages ? d.reading.pages + ' pages' : null;
+    case 'networking': return d.networking && d.networking.count ? d.networking.count + ' people' : null;
+    case 'money':      return (d.spent || (d.money && d.money.income)) ? formatCurrency(d.spent || 0) + ' spent' : null;
+    case 'water':      return d.water ? d.water + ' gal' : null;
+    case 'weight':     { const w = (state.data.weights || []).find(x => x.date === todayStr());
+                         return w ? Math.round(kgToDisplay(w.kg) * 10) / 10 + ' ' + (weightUnitPref() === 'lbs' ? 'lb' : 'kg') : null; }
+  }
+  return null;
+}
+function renderHubLog(key) {
+  const spec = HUB_LOG[key];
+  if (!spec) return '';
+  if (spec.pillar && !isPillarOn(spec.pillar)) return '';
+  const val = hubLogValue(key);
+  const id = (s) => 'hl-' + key + '-' + s;
+  const label = spec.pillar ? pillar(spec.pillar) : null;
+
+  // Already logged: show it back with a way to change it, rather than an empty
+  // form that makes you wonder whether it saved.
+  if (val !== null) {
+    return '<div class="card hublog hublog-done">' +
+      '<div class="hublog-head"><span class="hublog-tag">Today</span>' +
+      '<span class="hublog-val">✓ ' + escapeHtml(String(val)) + '</span></div>' +
+      '<button type="button" class="btn-link hublog-edit" onclick="hubLogReopen(\'' + escapeAttr(key) + '\')">Change</button>' +
+      '</div>';
+  }
+
+  let body;
+  if (key === 'gym') {
+    const groups = ['Push', 'Pull', 'Legs', 'Chest', 'Back', 'Shoulders', 'Arms', 'Core', 'Full Body', 'Cardio'];
+    body = '<div class="hublog-yn">' +
+      '<button type="button" class="hublog-btn hublog-yes" onclick="hubLogGym(true)">Yes, I trained</button>' +
+      '<button type="button" class="hublog-btn" onclick="hubLogGym(false)">Rest day</button></div>' +
+      '<div class="hublog-chips" id="' + id('groups') + '" style="display:none">' +
+      groups.map(g => '<button type="button" class="hublog-chip" onclick="hubLogGymGroup(\'' + escapeAttr(g) + '\')">' + escapeHtml(g) + '</button>').join('') +
+      '</div>';
+  } else if (key === 'money') {
+    const per = getMoneyPeriod() || { label: 'week', income: 0 };
+    body = '<div class="hublog-row">' +
+      '<label for="' + id('spent') + '">Spent today</label>' +
+      '<input type="number" id="' + id('spent') + '" min="0" step="0.01" placeholder="0" inputmode="decimal">' +
+      '</div><div class="hublog-row">' +
+      '<label for="' + id('income') + '">Income this ' + escapeHtml(per.label) + '</label>' +
+      '<input type="number" id="' + id('income') + '" min="0" step="0.01" placeholder="0" inputmode="decimal" value="' + (per.income || '') + '">' +
+      '</div>' + hubLogSaveBtn(key);
+  } else {
+    const cfg = {
+      food:       { unit: 'calories', min: 0, step: 10, ph: 'e.g. 2200' },
+      reading:    { unit: 'pages',    min: 0, step: 1,  ph: 'e.g. 20' },
+      networking: { unit: 'people',   min: 0, step: 1,  ph: 'e.g. 2' },
+      water:      { unit: 'gallons',  min: 0, step: 0.1, ph: 'e.g. 0.5' },
+      weight:     { unit: weightUnitPref() === 'lbs' ? 'lb' : 'kg', min: 0, step: 0.1, ph: 'e.g. 180' }
+    }[key];
+    body = '<div class="hublog-row">' +
+      '<input type="number" id="' + id('v') + '" min="' + cfg.min + '" step="' + cfg.step + '" placeholder="' + escapeAttr(cfg.ph) + '" inputmode="decimal" aria-label="' + escapeAttr(spec.title) + '">' +
+      '<span class="hublog-unit">' + escapeHtml(cfg.unit) + '</span>' +
+      '</div>' + hubLogSaveBtn(key);
+  }
+
+  return '<div class="card hublog">' +
+    '<div class="hublog-head"><span class="hublog-tag">Today</span>' +
+    '<span class="hublog-title">' + escapeHtml(label ? label.icon + ' ' + spec.title : spec.title) + '</span></div>' +
+    body + '</div>';
+}
+function hubLogSaveBtn(key) {
+  return '<button type="button" class="btn btn-primary hublog-save" onclick="saveHubLog(\'' + escapeAttr(key) + '\')">Save</button>';
+}
+// Gym answers on tap — no Save button, because "did you train" is one decision.
+function hubLogGym(done) {
+  persistStep('gym', { gymDone: done, gymGroup: '' });
+  if (done) {
+    const el = document.getElementById('hl-gym-groups');
+    if (el) { el.style.display = 'flex'; return; }   // let them pick a group before re-rendering
+  }
+  hubLogAfterSave('gym', done ? 'Training logged 💪' : 'Rest day logged');
+}
+function hubLogGymGroup(g) {
+  const day = (state.data.days || []).find(x => x.date === todayStr());
+  if (day && day.gym) { day.gym.muscleGroup = g; saveData(); }
+  hubLogAfterSave('gym', g + ' day logged 💪');
+}
+function saveHubLog(key) {
+  const num = (sfx) => { const el = document.getElementById('hl-' + key + '-' + sfx); return el ? parseFloat(el.value) : NaN; };
+  let draft = {}, msg = '';
+  if (key === 'food')            { const v = num('v'); if (!(v >= 0)) return hubLogNudge(key); draft = { cals: v, food: 0 }; msg = 'Food logged'; }
+  else if (key === 'reading')    { const v = num('v'); if (!(v >= 0)) return hubLogNudge(key); draft = { readPages: v }; msg = v + ' pages logged 📚'; }
+  else if (key === 'networking') { const v = num('v'); if (!(v >= 0)) return hubLogNudge(key); draft = { net: v }; msg = 'Networking logged 🤝'; }
+  else if (key === 'water')      { const v = num('v'); if (!(v >= 0)) return hubLogNudge(key); draft = { water: v }; msg = 'Water logged 💧'; }
+  else if (key === 'money')      { const s = num('spent'), i = num('income');
+                                   if (!(s >= 0) && !(i >= 0)) return hubLogNudge(key);
+                                   draft = { spent: s >= 0 ? s : 0, moneyActs: '' };
+                                   // setPeriodIncome writes to a specific cadence+period, not "now".
+                                   if (i >= 0) { const cad = moneyCadence(); setPeriodIncome(cad, periodKeyFor(todayStr(), cad), i); }
+                                   msg = 'Money logged 💰'; }
+  else if (key === 'weight')     { const v = num('v'); if (!(v > 0)) return hubLogNudge(key);
+                                   const kg = Math.round(displayToKg(v) * 10) / 10;
+                                   if (!upsertWeight(todayStr(), kg)) {
+                                     showToast('That weight looks off — enter between ' + PLAUSIBLE.weightKg.min + ' and ' + PLAUSIBLE.weightKg.max + ' kg.', 'error');
+                                     return;
+                                   }
+                                   if (state.data.profile.nutrition && state.data.profile.nutrition.heightCm) state.data.profile.nutrition.weightKg = kg;
+                                   const day = (state.data.days || []).find(x => x.date === todayStr()) || (() => { const nd = { id: uid(), date: todayStr(), _logged: [] }; (state.data.days = state.data.days || []).push(nd); return nd; })();
+                                   if (!Array.isArray(day._logged)) day._logged = [];
+                                   if (!day._logged.includes('weight')) day._logged.push('weight');
+                                   saveData();
+                                   return hubLogAfterSave('weight', 'Weigh-in logged ⚖️'); }
+  else return;
+  persistStep(key, draft);
+  hubLogAfterSave(key, msg);
+}
+function hubLogNudge(key) {
+  const el = document.getElementById('hl-' + key + '-v') || document.getElementById('hl-' + key + '-spent');
+  if (el) el.focus();
+  showToast('Enter a number first.', 'error');
+}
+// Re-render whichever hub we're on, so the card flips to its logged state and the
+// charts above it pick up the new entry immediately.
+function hubLogAfterSave(key, msg) {
+  showToast(msg, 'success');
+  announce(msg);
+  awardStreakFreeze();
+  renderCurrentPage();
+}
+function hubLogReopen(key) {
+  const day = (state.data.days || []).find(x => x.date === todayStr());
+  if (day && Array.isArray(day._logged)) day._logged = day._logged.filter(k => k !== key);
+  if (day) {
+    if (key === 'gym') delete day.gym;
+    else if (key === 'food') { day.calories = 0; day.mealLog = {}; }
+    else if (key === 'reading' && day.reading) day.reading.pages = 0;
+    else if (key === 'networking' && day.networking) day.networking.count = 0;
+    else if (key === 'money') { day.spent = 0; }
+    else if (key === 'water') day.water = 0;
+  }
+  if (key === 'weight') state.data.weights = (state.data.weights || []).filter(w => w.date !== todayStr());
+  saveData();
+  renderCurrentPage();
+}
+// Re-render the page the user is actually looking at.
+function renderCurrentPage() {
+  if (state.page === 'health') renderHealthPage();
+  else if (state.page === 'knowledge' || state.page === 'reading') renderKnowledgePage();
+  else if (state.page === 'finances') renderFinancesPage();
+  else if (state.page === 'contacts') renderContactsPage();
+  else if (state.page === 'business') renderBusinessPage();
+  else navigate(state.page || 'dashboard');
+}
+
 function renderLogToday(editDay) {
   const isEditing = !!editDay;
   // When not editing a past day, resume today's entry so the form shows what's
@@ -8551,6 +8762,8 @@ function renderHealthTraining(gymDays, gymGoal, streak) {
     ? '<div class="card" style="margin-top:14px"><h3 class="card-title">' + escapeHtml(pillar('gym').label) + ' Days per Week</h3><div class="chart-wrap"><canvas id="gymChart"></canvas></div></div>'
     : '';
   return '<div class="biz-insight">' + gymDays + ' / ' + gymGoal + ' workouts this week' + (streak > 1 ? ' · ' + streak + '-day streak 🔥' : '') + '</div>' +
+    // The training question is asked here now, not on a separate log page.
+    renderHubLog('gym') +
     '<button type="button" class="wo-add" onclick="openWorkout(\'health\')">🏋️ Track a workout</button>' +
     renderGymPlanCard() + renderTrainingProgramCard() + recent + gymChart;
 }
@@ -8563,13 +8776,23 @@ function renderHealthNutrition(nut, td, eatenCal, eatenP) {
     bar(Math.round(eatenP), nut.protein.g, 'Protein', 'g', 'var(--success)') +
     bar(Math.round(eaten.carbs || 0), nut.carbs.g, 'Carbs', 'g', 'var(--accent)') +
     bar(Math.round(eaten.fat || 0), nut.fat.g, 'Fat', 'g', '#A78BFA') +
-    '</div><button type="button" class="wo-add" onclick="navigate(\'log\')">＋ Log today\'s food</button>';
+    '</div><button type="button" class="wo-add" onclick="goLogFood()">＋ Log today\'s food</button>';
   // The two trend charts are peers — side by side on desktop
   const trendA = renderNutritionWeekCard(), trendB = renderWeightTrend();
   const trends = (trendA && trendB) ? '<div class="dash-grid">' + trendA + trendB + '</div>' : trendA + trendB;
   // The adapt card sits directly under the targets it explains: what to eat, then
   // why that number, then everything else.
-  return today + renderAdaptCard(nut) + renderHydrationStrip(getWeekStats()) + renderFuelCard() + renderMealPlan(nut) + trends;
+  // Food, water and the weigh-in are all asked for HERE now — this is the page
+  // you are on when you think about eating, so the question belongs on it.
+  // _foodLog is seeded from today's record so the logger resumes where you left it.
+  if (!state._editDayId) {
+    const todayRec = (state.data.days || []).find(x => x.date === todayStr());
+    state._foodLog = ((todayRec && todayRec.foodLog) || []).map(x => ({ ...x }));
+  }
+  return today +
+    renderLogNutritionSection(eatenCal) +
+    renderHubLog('water') + renderHubLog('weight') +
+    renderAdaptCard(nut) + renderHydrationStrip(getWeekStats()) + renderFuelCard() + renderMealPlan(nut) + trends;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -8903,7 +9126,7 @@ function renderFinancesPage() {
   const cashflowCard = showCashflow
     ? '<div class="card"><div class="fin-sec-h">📈 Money — last 12 weeks</div><div class="chart-wrap"><canvas id="incomeChart"></canvas></div></div>'
     : '';
-  document.getElementById('main').innerHTML = header + heroCard + ratios + renderMoneyMentorCard() + fiCard + allocCard + incomeCard + plCard + debtsCard + cashflowCard +
+  document.getElementById('main').innerHTML = header + renderHubLog('money') + heroCard + ratios + renderMoneyMentorCard() + fiCard + allocCard + incomeCard + plCard + debtsCard + cashflowCard +
     '<button type="button" class="btn btn-outline" style="width:100%;margin-top:4px" onclick="openFinanceEditor()">✏️ Update my finances</button>';
   initFinanceCharts(f);
   if (showCashflow) initIncomeChart();
@@ -9198,7 +9421,7 @@ function renderContactsPage() {
     '<div class="page-header"><h2 class="page-title">Network</h2>' +
     '<p class="page-sub">Your network is your pipeline. Nurture it — never let a warm lead go cold.</p></div>' +
     businessTabs('contacts') +
-    statsBar + renderDealPlaybookCard() + searchBar + addForm +
+    statsBar + renderHubLog('networking') + renderDealPlaybookCard() + searchBar + addForm +
     (all.length === 0
       ? '<div class="empty-state small"><p>No contacts yet. Add your first one above — start with someone you met this week.</p></div>'
       : (contacts.length === 0
@@ -10207,7 +10430,7 @@ function renderHistoryCalendar() {
 
     cells +=
       '<div class="cal-cell' + (isToday?' cal-today':'') + (day?' cal-has-data':'') + (isFuture?' cal-future':'') + '"' +
-      ' onclick="' + (isFuture ? '' : day ? 'showDayDetail(\'' + ds + '\')' : 'navigate(\'log\')') + '" title="' + ds + '">' +
+      ' onclick="' + (isFuture ? '' : day ? 'showDayDetail(\'' + ds + '\')' : 'goLogFood()') + '" title="' + ds + '">' +
       '<span class="cal-num">' + d + '</span>' +
       (dots ? '<div class="cal-dots">' + dots + '</div>' : '') +
       '</div>';
@@ -10630,7 +10853,7 @@ function renderReadingPlanCard() {
     '<div class="rp-bar"><div class="rp-bar-fill" style="width:' + pct + '%"></div></div>' +
     (hit
       ? '<div class="rp-done">Today’s pages done — streak protected. 🔥</div>'
-      : '<button type="button" class="btn btn-primary btn-sm" style="margin-top:10px" onclick="navigate(\'log\')">Log today’s reading →</button>') +
+      : '<button type="button" class="btn btn-primary btn-sm" style="margin-top:10px" onclick="goLogFood()">Log today’s reading →</button>') +
     '</div></div>';
 }
 // Per-book chapter list — define a book's chapters once, then pick them when logging.
@@ -11196,7 +11419,7 @@ function renderKnowledgePage() {
     '<h2 class="page-title">Knowledge</h2>' +
     '<p class="page-sub">Read, learn and remember — grow your mind, one page at a time</p>' +
     '</div>' +
-    knowledgeTabs(tab) + body;
+    knowledgeTabs(tab) + renderHubLog('reading') + body;
   if (tab === 'reading') ensureBookCovers(); // resolve any missing covers, then re-render
   wireStatRings();
 }
@@ -12524,7 +12747,7 @@ function showClimbStart(name) {
     '</div>';
   document.body.appendChild(modal);
 }
-function startClimbLog() { document.getElementById('climb-start-modal')?.remove(); navigate('log'); }
+function startClimbLog() { document.getElementById('climb-start-modal')?.remove(); goLogFood(); }
 function startClimbExplore() { document.getElementById('climb-start-modal')?.remove(); navigate('dashboard'); }
 
 async function skipOnboarding() {
@@ -12648,7 +12871,7 @@ function renderAdaptCard(nut) {
 
   // Each tier gets a concrete next step, so there's always something to do.
   const nextStep = a.tier === 'starting'
-    ? '<button type="button" class="btn btn-outline ad-cta" onclick="navigate(\'log\')">Log my weight</button>'
+    ? '<button type="button" class="btn btn-outline ad-cta" onclick="goLogFood()">Log my weight</button>'
     : a.tier === 'corrected'
       ? '<div class="ad-next">Log your meals too and this switches from estimating your burn to measuring it.</div>'
       : '';

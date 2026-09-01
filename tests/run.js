@@ -81,7 +81,7 @@ function loadApp(fieldValues) {
     ' safeUrl, linkHost, libGroups, hubEnabled, HUB_PILLARS, dayXp, dayCompleteStats, getLevel,' +
     ' RESET_AREAS, clearPillarData, isDayEmpty,' +
     ' ADAPT, targetWeeklyRate, weightTrend, avgIntake, estimateTDEE, adaptiveTarget, nutritionPlan,' +
-    ' SAFETY, SAFETY_FLAGS, bmiOf, calorieFloor, nutritionSafety, renderAdaptCard, ymd, _isoShift, PLAUSIBLE, validateNutritionProfile, isPlausibleWeightKg, upsertWeight });';
+    ' SAFETY, SAFETY_FLAGS, bmiOf, calorieFloor, nutritionSafety, renderAdaptCard, ymd, _isoShift, PLAUSIBLE, validateNutritionProfile, isPlausibleWeightKg, upsertWeight, persistStep, hubLogValue, HUB_LOG });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -1420,6 +1420,49 @@ ok('terrain grid: an empty history is a flat plain, not an error',
   (() => { const g = A.terrainGrid([], 12); return g.cols === 12 && g.grid.every(c => c.every(v => v === 0)); })());
 ok('terrain grid: a silly column count is clamped to something drawable',
   A.terrainGrid([], 0).cols >= 2 && A.terrainGrid([], 1).cols >= 2);
+
+// ── In-hub logging — each pillar is logged where it lives ──
+// The single "log today" page is gone. persistStep() is the shared writer, so a
+// day logged one pillar at a time in different hubs must end up identical to one
+// logged in a single sitting — including the _logged marks the streak reads.
+const _hlToday = A.todayStr();
+const _hlReset = () => { A.state.data = { profile: { pillars: A.defaultPillars() }, days: [], weights: [], weeks: [] };
+  A.state._guided = null; A.state._editDayId = null; A.state._previewMode = false; };
+const _hlDay = () => (A.state.data.days || []).find(d => d.date === _hlToday);
+
+_hlReset();
+A.persistStep('gym', { gymDone: true, gymGroup: 'Push' });
+ok('hub log: training writes into today', _hlDay() && _hlDay().gym.done === true);
+eq('hub log: the muscle group is kept', _hlDay().gym.muscleGroup, 'Push');
+ok('hub log: the key is marked so the streak counts it', _hlDay()._logged.includes('gym'));
+
+A.persistStep('reading', { readPages: 32 });
+A.persistStep('networking', { net: 3 });
+A.persistStep('money', { spent: 42.5, moneyActs: '' });
+A.persistStep('water', { water: 0.8 });
+eq('hub log: reading lands on the same day record', _hlDay().reading.pages, 32);
+eq('hub log: networking lands on the same day record', _hlDay().networking.count, 3);
+eq('hub log: money lands on the same day record', _hlDay().spent, 42.5);
+eq('hub log: water lands on the same day record', _hlDay().water, 0.8);
+eq('hub log: one day record holds them all, not five', (A.state.data.days || []).length, 1);
+ok('hub log: every key is marked',
+  ['gym', 'reading', 'networking', 'money', 'water'].every(k => _hlDay()._logged.includes(k)));
+
+// persistStep must not depend on the guided flow's state any more.
+ok('hub log: writing works with no guided session open', A.state._guided === null && _hlDay().reading.pages === 32);
+// A pillar the user switched off must not be written even if asked for.
+_hlReset();
+A.state.data.profile.pillars.reading.enabled = false;
+A.persistStep('reading', { readPages: 50 });
+ok('hub log: a disabled pillar is not written', !_hlDay().reading);
+
+// The card reads today's value back so it can show it instead of an empty box.
+_hlReset();
+eq('hub value: nothing logged yet reads as null', A.hubLogValue('reading'), null);
+A.persistStep('reading', { readPages: 12 });
+eq('hub value: reads back what was logged', A.hubLogValue('reading'), '12 pages');
+A.persistStep('gym', { gymDone: false, gymGroup: '' });
+eq('hub value: a rest day is still an answer, not a blank', A.hubLogValue('gym'), 'Rest day');
 
 // ── Dates are LOCAL calendar days, never UTC ──
 // A day here means "did I train today", which is a local calendar day. Building a

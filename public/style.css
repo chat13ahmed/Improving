@@ -4464,3 +4464,45 @@ body:has(#preview-banner) .wo-rest { bottom: calc(78px + env(safe-area-inset-bot
   background: var(--card-2); border-radius: 10px; padding: 11px 13px; margin-top: 12px;
   font-size: 13.5px; line-height: 1.5; color: var(--text-muted);
 }
+
+/* In-hub log cards. One question, asked in the section that owns it, so the
+   accent colour comes from the card it sits under rather than a generic form. */
+.hublog { border-left: 3px solid var(--accent); }
+.hublog-done { border-left-color: var(--success); }
+.hublog-head { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; margin-bottom: 11px; }
+.hublog-tag {
+  font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-muted); flex: none;
+}
+.hublog-title { font-size: 15.5px; font-weight: 800; color: var(--text); }
+.hublog-val { font-size: 15px; font-weight: 800; color: var(--success); }
+.hublog-edit { font-size: 12.5px; }
+.hublog-done { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.hublog-done .hublog-head { margin-bottom: 0; }
+/* Yes / rest-day: two equal targets, thumb-sized on a phone. */
+.hublog-yn { display: flex; gap: 9px; }
+.hublog-btn {
+  flex: 1; padding: 13px 10px; border-radius: 11px;
+  border: 1px solid var(--border); background: var(--card-2); color: var(--text);
+  font-family: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer;
+  transition: border-color .15s, transform .1s;
+}
+.hublog-btn:hover { border-color: var(--accent); }
+.hublog-btn:active { transform: scale(.98); }
+.hublog-yes { background: var(--success-bg); border-color: var(--success); color: var(--success); }
+.hublog-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
+.hublog-chip {
+  padding: 8px 13px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--card-2); color: var(--text);
+  font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.hublog-chip:hover { border-color: var(--accent); }
+.hublog-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.hublog-row label { font-size: 13px; font-weight: 700; color: var(--text-muted); flex: 1 1 auto; }
+.hublog-row input {
+  flex: 0 0 120px; padding: 11px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--field-bg); color: var(--text);
+  font-family: inherit; font-size: 17px; font-weight: 800; text-align: right;
+}
+.hublog-unit { font-size: 13px; font-weight: 700; color: var(--text-muted); flex: none; }
+.hublog-save { width: 100%; }
