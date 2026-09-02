@@ -538,8 +538,9 @@ function snapCounters(root) {
   (root || document).querySelectorAll('.anim-count').forEach(el => {
     const target = parseFloat(el.dataset.val || '0');
     const isDecimal = el.dataset.decimal === '1';
-    el.textContent = (el.dataset.prefix || '') +
-      (isDecimal ? target.toFixed(1) : Math.round(target)) + (el.dataset.suffix || '');
+    const grp = el.dataset.group === '1';
+    const shown = isDecimal ? target.toFixed(1) : (grp ? Math.round(target).toLocaleString() : Math.round(target));
+    el.textContent = (el.dataset.prefix || '') + shown + (el.dataset.suffix || '');
   });
 }
 function animateCounters() {
@@ -548,7 +549,10 @@ function animateCounters() {
     const isDecimal = el.dataset.decimal === '1';
     const prefix = el.dataset.prefix || '';
     const suffix = el.dataset.suffix || '';
-    const final = prefix + (isDecimal ? target.toFixed(1) : Math.round(target)) + suffix;
+    // Thousands separators, opt-in: "$10289" is hard to read at a glance.
+    const group = el.dataset.group === '1';
+    const fmt = (v) => isDecimal ? v.toFixed(1) : (group ? Math.round(v).toLocaleString() : String(Math.round(v)));
+    const final = prefix + fmt(target) + suffix;
     if (!target) { el.textContent = final; return; }
     const start = performance.now();
     const dur = 900;
@@ -557,7 +561,7 @@ function animateCounters() {
       const p = Math.min((now - start) / dur, 1);
       const eased = 1 - Math.pow(1 - p, 3);
       const v = eased * target;
-      el.textContent = prefix + (isDecimal ? v.toFixed(1) : Math.round(v)) + suffix;
+      el.textContent = prefix + fmt(v) + suffix;
       if (p < 1) requestAnimationFrame(tick); else done = true;
     }
     requestAnimationFrame(tick);
@@ -8725,6 +8729,7 @@ function renderHealthPage() {
   if (tab === 'nutrition' && (state.data.weights || []).length >= 2) initWeightChart();
   if (tab === 'training' && document.getElementById('gymChart')) initGymChart(state.data.days);
   wireStatRings();
+  playStatsIntro();
 }
 function renderHealthOverview(nut, gymDays, gymGoal, streak, eatenCal, eatenP, wDisp, wUnit) {
   const gymLeft = Math.max(0, gymGoal - gymDays);
@@ -8759,6 +8764,8 @@ function renderHealthOverview(nut, gymDays, gymGoal, streak, eatenCal, eatenP, w
     // The Training × Nutrition card used to render here AND on the Nutrition tab —
     // the same card twice, one tap apart. It belongs with the food detail, so this
     // tab stays a summary: four rings, each tapping through to where the depth is.
+    // Health's own numbers, in Health.
+    '<div class="stats-anim">' + renderStatsHero('health') + renderConsistencyCard('health') + renderTrendCards('health') + '</div>' +
     '<button type="button" class="wo-add" style="margin-top:4px" onclick="openWorkout(\'health\')">🏋️ Track a workout — sets, reps & rest timer</button>';
 }
 function renderHealthTraining(gymDays, gymGoal, streak) {
@@ -8884,10 +8891,13 @@ function renderBusinessPage() {
     '<div class="biz-insight">' + insight + '</div>' +
     businessBriefingCard() +
     '<div class="dash-section">This week</div>' + rings +
+    // Business's own numbers, in Business.
+    '<div class="stats-anim">' + renderStatsHero('business') + renderConsistencyCard('business') + renderTrendCards('business') + '</div>' +
     '<div class="dash-section">Pipeline</div>' + grid +
     focusRow +
     (moneyOn ? renderMoneyCircleCard() : '');
   wireStatRings();
+  playStatsIntro();
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -9593,22 +9603,47 @@ async function toggleStar(id) {
 // colour ramp, so it has to be a small honest integer rather than a score: five
 // pillars logged and four logged should look different, and an empty day should
 // look empty rather than faintly tinted.
-function dayIntensity(day) {
+// Each area owns the pillars it is responsible for, so a hub's stats only ever
+// describe that hub. One config drives the tiles, the calendar and the trends —
+// three near-identical copies would drift apart within a month.
+const STAT_AREAS = {
+  health:    { label: 'Health',    pillars: ['gym', 'food'] },
+  business:  { label: 'Business',  pillars: ['money', 'networking'] },
+  knowledge: { label: 'Knowledge', pillars: ['reading'] }
+};
+const ALL_STAT_PILLARS = ['gym', 'food', 'reading', 'networking', 'money'];
+// Did this pillar happen on this day? Defined once, so the calendar, the tiles
+// and the streak can never disagree about what "logged" means.
+function pillarLogged(day, id) {
+  if (!day) return false;
+  switch (id) {
+    case 'gym':        return !!(day.gym && day.gym.done);
+    case 'food':       return day.calories > 0 || !!(day.food && day.food.rating > 0);
+    case 'reading':    return !!(day.reading && day.reading.pages > 0);
+    case 'networking': return !!(day.networking && day.networking.count > 0);
+    case 'money':      return !!(day.money && day.money.income > 0) || day.spent > 0;
+  }
+  return false;
+}
+// How much of the given pillars you touched. `pillars` omitted means the whole
+// life; an area passes just its own.
+function dayIntensity(day, pillars) {
   if (!day) return 0;
+  const ids = (pillars && pillars.length ? pillars : ALL_STAT_PILLARS);
   let n = 0;
-  if (day.gym && day.gym.done) n++;
-  if (day.calories > 0 || (day.food && day.food.rating > 0)) n++;
-  if (day.reading && day.reading.pages > 0) n++;
-  if (day.networking && day.networking.count > 0) n++;
-  if ((day.money && day.money.income > 0) || day.spent > 0) n++;
+  ids.forEach(id => { if (pillarLogged(day, id)) n++; });
   return Math.min(4, n);
 }
 // A calendar grid of the last `weeks` weeks, laid out in columns of 7 so it reads
 // like a wall calendar: each column is a week, each row a weekday. Always ends on
 // today's column so the newest data sits where the eye lands last.
-function consistencyGrid(days, today, weeks) {
+function consistencyGrid(days, today, weeks, pillars) {
   const end = today || todayStr();
   const nWeeks = Math.max(1, Math.min(53, weeks || 18));
+  const ids = (pillars && pillars.length ? pillars : ALL_STAT_PILLARS);
+  // The ramp always spans 0–4, so an area tracking two pillars still reaches the
+  // darkest shade on a full day instead of topping out halfway.
+  const toLevel = (n) => n <= 0 ? 0 : Math.max(1, Math.round((n / ids.length) * 4));
   const byDate = {};
   (days || []).forEach(d => { if (d && d.date) byDate[d.date] = d; });
   // Walk back to the Monday that starts the earliest week we show.
@@ -9619,11 +9654,12 @@ function consistencyGrid(days, today, weeks) {
     const col = [];
     for (let i = 0; i < 7; i++) {
       const date = _isoShift(firstMonday, w * 7 + i);
-      col.push({ date, future: date > end, level: date > end ? 0 : dayIntensity(byDate[date]) });
+      const raw = date > end ? 0 : dayIntensity(byDate[date], ids);
+      col.push({ date, future: date > end, count: raw, level: date > end ? 0 : toLevel(raw) });
     }
     cols.push(col);
   }
-  return { cols, weeks: nWeeks, first: firstMonday, last: _isoShift(firstMonday, nWeeks * 7 - 1) };
+  return { cols, weeks: nWeeks, first: firstMonday, last: _isoShift(firstMonday, nWeeks * 7 - 1), pillars: ids };
 }
 // Weekly totals for one pillar, oldest first, plus the peak — enough to draw a
 // sparkline without the renderer doing any arithmetic of its own.
@@ -9642,11 +9678,21 @@ function pillarTrend(days, key, weeks, today) {
       default:           return 0;
     }
   };
-  (days || []).forEach(d => {
-    if (!d || !d.date || d.date < start || d.date > end) return;
-    const idx = Math.floor(daysBetween(start, getWeekStart(d.date)) / 7);
-    if (idx >= 0 && idx < n) buckets[idx] += valueOf(d);
-  });
+  if (key === 'money') {
+    // Income is recorded per week, not per day, so its buckets come from weeks[]
+    // rather than the day log — otherwise this line is flat for everyone.
+    ((state.data && state.data.weeks) || []).forEach(w => {
+      if (!w || !w.weekStart || w.weekStart < start || w.weekStart > end) return;
+      const idx = Math.floor(daysBetween(start, w.weekStart) / 7);
+      if (idx >= 0 && idx < n) buckets[idx] += (+w.income || 0);
+    });
+  } else {
+    (days || []).forEach(d => {
+      if (!d || !d.date || d.date < start || d.date > end) return;
+      const idx = Math.floor(daysBetween(start, getWeekStart(d.date)) / 7);
+      if (idx >= 0 && idx < n) buckets[idx] += valueOf(d);
+    });
+  }
   const peak = Math.max(...buckets, 0);
   const total = buckets.reduce((s, v) => s + v, 0);
   // Trend = this week vs the average of the weeks before it.
@@ -9657,25 +9703,44 @@ function pillarTrend(days, key, weeks, today) {
   return { buckets, peak, total, latest, delta, weeks: n };
 }
 // The headline numbers, each with the trend that gives it meaning.
-function progressStats(data, today) {
+// `area` scopes every number to one hub's pillars. Omitted, it describes the
+// whole life — the same function either way, so a hub's figures and the
+// whole-life figures can never be computed two different ways.
+function progressStats(data, today, area) {
   const d = data || {};
   const days = d.days || [];
   const end = today || todayStr();
-  const logged = days.filter(x => x && x.date && x.date <= end);
-  const grid = consistencyGrid(logged, end, 18);
-  const active = grid.cols.reduce((s, col) => s + col.filter(c => !c.future && c.level > 0).length, 0);
+  const spec = STAT_AREAS[area];
+  const ids = spec ? spec.pillars.filter(p => isPillarOn(p)) : ALL_STAT_PILLARS;
+  const all = days.filter(x => x && x.date && x.date <= end);
+  // "Logged" means logged for THIS area — a reading day is not a Health day.
+  const logged = spec ? all.filter(x => ids.some(id => pillarLogged(x, id))) : all;
+  const grid = consistencyGrid(all, end, 18, ids);
+  const active = grid.cols.reduce((s, col) => s + col.filter(c => !c.future && c.count > 0).length, 0);
   const shown = grid.cols.reduce((s, col) => s + col.filter(c => !c.future).length, 0);
+  const withCal = all.filter(x => x.calories > 0);
   return {
+    pillars: ids,
     daysLogged: logged.length,
     streak: loggingStreak(),
     best: bestStreak(),
     consistency: shown ? Math.round((active / shown) * 100) : 0,
     activeDays: active,
     windowDays: shown,
-    workouts: logged.filter(x => x.gym && x.gym.done).length,
-    pages: logged.reduce((s, x) => s + ((x.reading && x.reading.pages) || 0), 0),
-    contacts: logged.reduce((s, x) => s + ((x.networking && x.networking.count) || 0), 0),
-    perfectDays: logged.filter(x => dayIntensity(x) >= 4).length
+    workouts: all.filter(x => x.gym && x.gym.done).length,
+    pages: all.reduce((s, x) => s + ((x.reading && x.reading.pages) || 0), 0),
+    contacts: all.reduce((s, x) => s + ((x.networking && x.networking.count) || 0), 0),
+    // Income is NOT on day records — it lives per period, in weeks[] for the
+    // weekly cadence and incomes{} for monthly. Summing days showed $0 to every
+    // user who had logged any. Read only the CURRENT cadence, exactly as
+    // getPeriodIncome does; adding both double-counts anyone who ever switched.
+    income: moneyCadence() === 'weekly'
+      ? (d.weeks || []).reduce((s, w) => s + (+w.income || 0), 0)
+      : Object.keys(d.incomes || {}).reduce((s, k) => s + (+d.incomes[k] || 0), 0),
+    calories: withCal.length ? Math.round(withCal.reduce((s, x) => s + x.calories, 0) / withCal.length) : 0,
+    booksDone: ((d.books || []).filter(b => b && b.status === 'finished')).length,
+    // A "full" day means every pillar this area tracks, not a fixed four.
+    perfectDays: all.filter(x => dayIntensity(x, ids) >= (ids.length || 1)).length
   };
 }
 
@@ -9686,8 +9751,43 @@ function progressStats(data, today) {
 // itself left to right so you read it as time passing. Every animation is a CSS
 // transition on a class toggled one frame after paint, so prefers-reduced-motion
 // switches all of it off in one place.
-function renderStatsHero() {
-  const s = progressStats(state.data);
+// Which four numbers matter for a given hub. Each area answers its own question,
+// so Health never shows income and Business never shows pages read.
+function areaTiles(area, s) {
+  const has = (p) => s.pillars.indexOf(p) > -1;
+  if (area === 'health') {
+    return [
+      { icon: '💪', value: s.workouts, label: 'Workouts', color: 'var(--gym-color)', ink: 'var(--gym-ink)',
+        sub: s.perfectDays ? s.perfectDays + ' complete days' : '' },
+      { icon: '🔥', value: s.streak, label: 'Day streak', color: 'var(--accent)', ink: 'var(--text)',
+        sub: s.best > s.streak ? 'best ' + s.best : (s.streak ? 'your best yet' : '') },
+      { icon: '🎯', value: s.consistency, suffix: '%', label: 'Consistency', color: 'var(--success)', ink: 'var(--success)',
+        sub: s.activeDays + ' of ' + s.windowDays + ' days' },
+      has('food')
+        ? { icon: '🍽', value: s.calories, group: true, label: 'Avg calories', color: 'var(--food-color)', ink: 'var(--food-ink)', sub: 'on days you logged' }
+        : { icon: '📅', value: s.daysLogged, label: 'Days active', color: 'var(--food-color)', ink: 'var(--food-ink)', sub: '' }
+    ];
+  }
+  if (area === 'business') {
+    return [
+      { icon: '💰', value: s.income, group: true, prefix: '$', label: 'Income logged', color: 'var(--money-color)', ink: 'var(--money-ink)', sub: '' },
+      { icon: '🤝', value: s.contacts, label: 'People reached', color: 'var(--accent)', ink: 'var(--text)', sub: '' },
+      { icon: '🎯', value: s.consistency, suffix: '%', label: 'Consistency', color: 'var(--success)', ink: 'var(--success)',
+        sub: s.activeDays + ' of ' + s.windowDays + ' days' },
+      { icon: '📅', value: s.daysLogged, label: 'Active days', color: 'var(--gym-color)', ink: 'var(--gym-ink)',
+        sub: s.perfectDays ? s.perfectDays + ' complete days' : '' }
+    ];
+  }
+  return [
+    { icon: '📖', value: s.pages, group: true, label: 'Pages read', color: 'var(--accent)', ink: 'var(--food-ink)', sub: '' },
+    { icon: '📚', value: s.booksDone, label: 'Books finished', color: 'var(--money-color)', ink: 'var(--money-ink)', sub: '' },
+    { icon: '🎯', value: s.consistency, suffix: '%', label: 'Consistency', color: 'var(--success)', ink: 'var(--success)',
+      sub: s.activeDays + ' of ' + s.windowDays + ' days' },
+    { icon: '📅', value: s.daysLogged, label: 'Reading days', color: 'var(--gym-color)', ink: 'var(--gym-ink)', sub: '' }
+  ];
+}
+function renderStatsHero(area) {
+  const s = progressStats(state.data, todayStr(), area);
   if (!s.daysLogged) return '';
   // Two colours per tile, deliberately. The vivid one paints the corner wash; the
   // -ink one paints the number. Measured against the card in light theme, the raw
@@ -9697,25 +9797,21 @@ function renderStatsHero() {
     '<div class="st-tile" style="--st-color:' + o.color + ';--st-ink:' + (o.ink || o.color) + '">' +
     '<div class="st-ico" aria-hidden="true">' + o.icon + '</div>' +
     '<div class="st-num"><span class="anim-count" data-val="' + o.value + '"' +
+      (o.prefix ? ' data-prefix="' + escapeAttr(o.prefix) + '"' : '') +
+      (o.group ? ' data-group="1"' : '') +
       (o.suffix ? ' data-suffix="' + escapeAttr(o.suffix) + '"' : '') + '>0</span></div>' +
     '<div class="st-lbl">' + escapeHtml(o.label) + '</div>' +
     (o.sub ? '<div class="st-sub">' + escapeHtml(o.sub) + '</div>' : '') +
     '</div>';
-  return '<div class="stats-hero">' +
-    tile({ icon: '🗓', value: s.daysLogged, label: 'Days logged', color: 'var(--accent)', ink: 'var(--text)',
-           sub: s.perfectDays ? s.perfectDays + ' full days' : '' }) +
-    tile({ icon: '🔥', value: s.streak, label: 'Day streak', color: 'var(--gym-color)', ink: 'var(--gym-ink)',
-           sub: s.best > s.streak ? 'best ' + s.best : (s.streak ? 'your best yet' : '') }) +
-    tile({ icon: '🎯', value: s.consistency, suffix: '%', label: 'Consistency', color: 'var(--success)', ink: 'var(--success)',
-           sub: s.activeDays + ' of ' + s.windowDays + ' days' }) +
-    tile({ icon: '💪', value: s.workouts, label: 'Workouts', color: 'var(--money-color)', ink: 'var(--money-ink)',
-           sub: s.pages ? s.pages.toLocaleString() + ' pages read' : '' }) +
-    '</div>';
+  return '<div class="stats-hero">' + areaTiles(area, s).map(tile).join('') + '</div>';
 }
 // A wall calendar of the last 18 weeks. Reading a shape is faster than reading a
 // number, so this is the one place the page shows every day at once.
-function renderConsistencyCard() {
-  const g = consistencyGrid(state.data.days, todayStr(), 18);
+function renderConsistencyCard(area) {
+  const spec = STAT_AREAS[area];
+  const ids = spec ? spec.pillars.filter(p => isPillarOn(p)) : null;
+  if (spec && !ids.length) return '';
+  const g = consistencyGrid(state.data.days, todayStr(), 18, ids);
   const today = todayStr();
   const monthRow = g.cols.map((col, i) => {
     const first = col[0];
@@ -9733,8 +9829,8 @@ function renderConsistencyCard() {
     [0, 1, 2, 3, 4].map(l => '<span class="cg-cell cg-l' + l + '"></span>').join('') +
     '<span>More</span></div>';
   return '<div class="card cg-card">' +
-    '<div class="cg-head"><h3 class="card-title">Every day, at a glance</h3>' +
-    '<span class="cg-sub">Last 18 weeks · darker means more of your life logged</span></div>' +
+    '<div class="cg-head"><h3 class="card-title">' + escapeHtml(spec ? spec.label + ' — every day' : 'Every day, at a glance') + '</h3>' +
+    '<span class="cg-sub">Last 18 weeks · darker means more of ' + escapeHtml(spec ? spec.label.toLowerCase() : 'your life') + ' logged</span></div>' +
     '<div class="cg-scroll"><div class="cg-inner">' +
     '<div class="cg-months">' + monthRow + '</div>' +
     '<div class="cg-grid" role="img" aria-label="Consistency over the last 18 weeks">' + cells + '</div>' +
@@ -9742,13 +9838,14 @@ function renderConsistencyCard() {
 }
 // One sparkline per pillar you actually track, drawn as a path that reveals
 // itself. The number is the total; the line is the story behind it.
-function renderTrendCards() {
+function renderTrendCards(area) {
   const defs = [
     { key: 'gym',        label: 'Training',   unit: 'sessions', color: 'var(--gym-color)' },
     { key: 'reading',    label: 'Reading',    unit: 'pages',    color: 'var(--accent)' },
     { key: 'networking', label: 'Network',    unit: 'people',   color: 'var(--money-color)' },
     { key: 'money',      label: 'Income',     unit: '',         color: 'var(--success)' }
-  ].filter(d => isPillarOn(d.key));
+  // Only the pillars this hub owns — and only ones the user actually tracks.
+  ].filter(d => isPillarOn(d.key) && (!STAT_AREAS[area] || STAT_AREAS[area].pillars.indexOf(d.key) > -1));
   if (!defs.length) return '';
   const cards = defs.map((d, i) => {
     const t = pillarTrend(state.data.days, d.key, 12);
@@ -9845,14 +9942,9 @@ function renderHistoryPage() {
     '<div class="page-header"><h2 class="page-title">Your climb</h2>' +
     '<p class="page-sub">Every day you logged, as terrain</p></div>' +
     renderTerrainCard() +
-    // The old summary was four static numbers in a row. These three blocks share
-    // one .stats-anim wrapper so a single class toggle after paint drives the
-    // whole entrance — and reduced-motion turns all of it off in one place.
-    '<div class="stats-anim">' +
-      renderStatsHero() +
-      renderConsistencyCard() +
-      renderTrendCards() +
-    '</div>' +
+    // Progress keeps only the whole-life view: the terrain, and every entry. Each
+    // area's own numbers — tiles, calendar and trends — live in that area's hub,
+    // the same way its logging does.
     '<div class="dash-section">All entries</div>' +
     '<div class="view-toggle-row">' +
     '<button class="view-btn' + (view==='list'?' view-active':'') + '" onclick="switchHistoryView(\'list\')">List</button>' +
@@ -11670,9 +11762,13 @@ function renderKnowledgePage() {
     '<h2 class="page-title">Knowledge</h2>' +
     '<p class="page-sub">Read, learn and remember — grow your mind, one page at a time</p>' +
     '</div>' +
-    knowledgeTabs(tab) + renderHubLog('reading') + body;
+    knowledgeTabs(tab) + renderHubLog('reading') +
+    // Knowledge's own numbers, in Knowledge.
+    '<div class="stats-anim">' + renderStatsHero('knowledge') + renderConsistencyCard('knowledge') + renderTrendCards('knowledge') + '</div>' +
+    body;
   if (tab === 'reading') ensureBookCovers(); // resolve any missing covers, then re-render
   wireStatRings();
+  playStatsIntro();
 }
 function renderReadingPage() { state._knowledgeTab = 'reading'; renderKnowledgePage(); }
 // Reading notes now live here (moved off the daily Log). Capture today's pages,

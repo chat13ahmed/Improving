@@ -81,7 +81,7 @@ function loadApp(fieldValues) {
     ' safeUrl, linkHost, libGroups, hubEnabled, HUB_PILLARS, dayXp, dayCompleteStats, getLevel,' +
     ' RESET_AREAS, clearPillarData, isDayEmpty,' +
     ' ADAPT, targetWeeklyRate, weightTrend, avgIntake, estimateTDEE, adaptiveTarget, nutritionPlan,' +
-    ' SAFETY, SAFETY_FLAGS, bmiOf, calorieFloor, nutritionSafety, renderAdaptCard, ymd, _isoShift, PLAUSIBLE, validateNutritionProfile, isPlausibleWeightKg, upsertWeight, persistStep, hubLogValue, HUB_LOG, dayIntensity, consistencyGrid, pillarTrend, progressStats, snapCounters });';
+    ' SAFETY, SAFETY_FLAGS, bmiOf, calorieFloor, nutritionSafety, renderAdaptCard, ymd, _isoShift, PLAUSIBLE, validateNutritionProfile, isPlausibleWeightKg, upsertWeight, persistStep, hubLogValue, HUB_LOG, dayIntensity, consistencyGrid, pillarTrend, progressStats, snapCounters, STAT_AREAS, pillarLogged, areaTiles });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -1462,6 +1462,25 @@ ok('trend: no data gives zeroes, not NaN',
     return t.total === 0 && t.peak === 0 && t.delta === 0 && t.buckets.every(v => v === 0); })());
 ok('trend: days outside the window are excluded',
   A.pillarTrend([{ date: _tw(40), reading: { pages: 999 } }], 'reading', 12, A.todayStr()).total === 0);
+// Income is stored per WEEK, not per day. Reading it off day records showed $0 to
+// everyone who had ever logged income, so both the tile and the trend read weeks[].
+// Cadence matters: weekly income lives in weeks[], while monthly and daily both
+// live in incomes{}. Reading the wrong one shows $0 to a user who has logged
+// plenty, which is why this follows getPeriodIncome exactly rather than summing
+// both (that would double-count anyone who ever switched cadence).
+A.state.data = { profile: { pillars: A.defaultPillars(), incomeCadence: 'weekly' }, days: [], weights: [],
+  weeks: [{ weekStart: A.getWeekStart(A.todayStr()), income: 1200 }, { weekStart: _tw(1), income: 800 }] };
+eq('trend: weekly income comes from the weekly records', A.pillarTrend([], 'money', 12, A.todayStr()).total, 2000);
+eq('stats: weekly cadence totals weeks[]',
+  A.progressStats(A.state.data, A.todayStr(), 'business').income, 2000);
+// On the default (monthly) cadence the same weeks[] must be ignored.
+A.state.data.profile.incomeCadence = 'monthly';
+A.state.data.incomes = { '2026-07': 500, '2026-08': 700 };
+eq('stats: monthly cadence totals incomes{} and ignores weeks[]',
+  A.progressStats(A.state.data, A.todayStr(), 'business').income, 1200);
+A.state.data.profile.incomeCadence = 'weekly';
+eq('stats: no income anywhere is 0, not NaN',
+  A.progressStats({ profile: { incomeCadence: 'weekly' }, days: [], weeks: [] }, A.todayStr(), 'business').income, 0);
 
 // Headline numbers.
 A.state.data = { profile: { pillars: A.defaultPillars() }, days: [
@@ -1473,7 +1492,27 @@ eq('stats: counts workouts', _ps.workouts, 1);
 eq('stats: totals pages', _ps.pages, 20);
 ok('stats: consistency is a percentage of the visible window',
   _ps.consistency >= 0 && _ps.consistency <= 100);
-ok('stats: a 4-pillar day counts as a full day', _ps.perfectDays === 1);
+// "Full day" now means every pillar the area tracks, not a fixed four — so a day
+// missing one of five is not a full whole-life day, but IS a full Health day if
+// Health's two pillars were both logged.
+eq('stats: a day missing one of five pillars is not a full whole-life day', _ps.perfectDays, 0);
+eq('stats: both Health pillars logged is a full Health day',
+  A.progressStats(A.state.data, A.todayStr(), 'health').perfectDays, 1);
+eq('stats: Health stats count only Health pillars',
+  A.progressStats(A.state.data, A.todayStr(), 'health').pillars.join(','), 'gym,food');
+eq('stats: Business stats count only Business pillars',
+  A.progressStats(A.state.data, A.todayStr(), 'business').pillars.join(','), 'money,networking');
+ok('stats: a reading-only day is not a Health day',
+  A.progressStats({ days: [{ date: A.todayStr(), reading: { pages: 10 } }] }, A.todayStr(), 'health').daysLogged === 0);
+ok('stats: a reading-only day IS a Knowledge day',
+  A.progressStats({ days: [{ date: A.todayStr(), reading: { pages: 10 } }] }, A.todayStr(), 'knowledge').daysLogged === 1);
+// The calendar ramp must still reach its darkest shade for a two-pillar area.
+ok('grid: a full day in a 2-pillar area reaches the top of the ramp',
+  A.consistencyGrid([{ date: A.todayStr(), gym: { done: true }, calories: 2000 }], A.todayStr(), 18, ['gym', 'food'])
+    .cols[17].find(c => c.date === A.todayStr()).level === 4);
+ok('grid: half a 2-pillar day sits mid-ramp, not at zero',
+  (() => { const c = A.consistencyGrid([{ date: A.todayStr(), gym: { done: true } }], A.todayStr(), 18, ['gym', 'food'])
+    .cols[17].find(x => x.date === A.todayStr()); return c.level > 0 && c.level < 4; })());
 ok('stats: an empty account reports zeroes rather than NaN',
   (() => { const s = A.progressStats({ days: [] }, A.todayStr());
     return s.daysLogged === 0 && s.consistency === 0 && s.pages === 0; })());
