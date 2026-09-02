@@ -879,10 +879,10 @@ body {
 .api-key-banner input { background: var(--field-bg) !important; color: #0E7490 !important; border-color: rgba(245,158,11,0.3) !important; }
 
 /* ─── History ─────────────────────────────────── */
-.history-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
-.hs-item { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; box-shadow: var(--shadow); }
-.hs-item span { font-size: 11px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
-.hs-item strong { font-size: 20px; font-weight: 800; color: var(--text); }
+
+
+
+
 .history-filters { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
 .history-filters select { padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; background: var(--field-bg); color: var(--text); cursor: pointer; outline: none; min-width: 160px; }
 .history-filters select:focus { border-color: var(--primary); }
@@ -2323,7 +2323,7 @@ body.wo-fullscreen .bottom-nav { display: none !important; }   /* workout is an 
 @media (max-width: 520px) {
   .pillar-grid { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
-  .history-summary, .contacts-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .contacts-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .macro-grid { grid-template-columns: 1fr; }
   .dd-grid { grid-template-columns: 1fr; }
   .hydration-strip { flex-wrap: wrap; }
@@ -4506,3 +4506,113 @@ body:has(#preview-banner) .wo-rest { bottom: calc(78px + env(safe-area-inset-bot
 }
 .hublog-unit { font-size: 13px; font-weight: 700; color: var(--text-muted); flex: none; }
 .hublog-save { width: 100%; }
+
+/* ─── Progress stats: animated hero, consistency calendar, sparklines ───
+   Everything animates from a start state set here and released by .stats-shown,
+   added one frame after paint. That keeps the motion declarative — reduced-motion
+   just adds .stats-instant and every duration collapses to zero. */
+.stats-hero {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px; margin-bottom: 16px;
+}
+.st-tile {
+  position: relative; overflow: hidden;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 16px; padding: 16px 16px 14px;
+  opacity: 0; transform: translateY(14px);
+  transition: opacity .55s ease, transform .55s cubic-bezier(.22,.9,.3,1);
+}
+/* A tinted wash keyed to the tile's own colour, so four tiles read as a set
+   rather than four unrelated boxes. */
+.st-tile::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(120% 90% at 100% 0%, var(--st-color), transparent 62%);
+  opacity: .11; pointer-events: none;
+}
+.stats-shown .st-tile { opacity: 1; transform: none; }
+.stats-hero .st-tile:nth-child(1) { transition-delay: 0ms; }
+.stats-hero .st-tile:nth-child(2) { transition-delay: 70ms; }
+.stats-hero .st-tile:nth-child(3) { transition-delay: 140ms; }
+.stats-hero .st-tile:nth-child(4) { transition-delay: 210ms; }
+.st-ico { font-size: 17px; line-height: 1; margin-bottom: 9px; }
+.st-num {
+  font-size: 34px; font-weight: 900; line-height: 1; letter-spacing: -.03em;
+  color: var(--st-ink, var(--st-color)); font-variant-numeric: tabular-nums;
+}
+.st-lbl { font-size: 12.5px; font-weight: 700; color: var(--text); margin-top: 7px; }
+.st-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+
+/* Consistency calendar. Columns are weeks, rows are weekdays. */
+.cg-card { opacity: 0; transform: translateY(14px); transition: opacity .55s ease .24s, transform .55s cubic-bezier(.22,.9,.3,1) .24s; }
+.stats-shown .cg-card { opacity: 1; transform: none; }
+.cg-head { margin-bottom: 12px; }
+.cg-sub { display: block; font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+/* 18 weeks never fits a phone, so the grid scrolls inside the card rather than
+   shrinking cells to illegible dots or pushing the page sideways. */
+.cg-scroll { overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+.cg-inner { min-width: max-content; }
+.cg-months { display: flex; gap: 3px; margin-bottom: 5px; }
+.cg-m { width: 13px; font-size: 9.5px; font-weight: 700; color: var(--text-muted); flex: none; white-space: nowrap; }
+.cg-grid { display: flex; gap: 3px; }
+.cg-col { display: flex; flex-direction: column; gap: 3px; }
+.cg-cell {
+  width: 13px; height: 13px; border-radius: 3.5px; flex: none;
+  background: var(--border);
+  transform: scale(.35); opacity: 0;
+  transition: transform .34s cubic-bezier(.3,1.5,.5,1), opacity .34s ease;
+  transition-delay: var(--d, 0ms);
+}
+.stats-shown .cg-cell { transform: none; opacity: 1; }
+/* Four steps of one hue: intensity should read as "more of the same thing",
+   not as four different categories. */
+.cg-l0 { background: var(--border); }
+.cg-l1 { background: color-mix(in srgb, var(--success) 30%, var(--border)); }
+.cg-l2 { background: color-mix(in srgb, var(--success) 55%, var(--border)); }
+.cg-l3 { background: color-mix(in srgb, var(--success) 78%, var(--border)); }
+.cg-l4 { background: var(--success); }
+.cg-future { opacity: .35 !important; background: transparent; border: 1px dashed var(--border); }
+.cg-today { box-shadow: 0 0 0 2px var(--accent); }
+.cg-legend {
+  display: flex; align-items: center; gap: 5px; margin-top: 12px;
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+}
+.cg-legend .cg-cell { transform: none; opacity: 1; transition: none; }
+
+/* Sparklines. */
+.sp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-top: 14px; }
+.sp-card {
+  padding: 15px 16px 12px; overflow: hidden;
+  opacity: 0; transform: translateY(14px);
+  transition: opacity .55s ease, transform .55s cubic-bezier(.22,.9,.3,1);
+  transition-delay: calc(360ms + var(--sp-i, 0ms));
+}
+.stats-shown .sp-card { opacity: 1; transform: none; }
+.sp-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+.sp-label { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+.sp-delta { font-size: 11.5px; font-weight: 800; }
+.sp-up { color: var(--success); }
+.sp-down { color: var(--danger-ink); }
+.sp-flat { color: var(--text-muted); }
+.sp-total { font-size: 26px; font-weight: 900; letter-spacing: -.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+.sp-total span { font-size: 12.5px; font-weight: 700; color: var(--text-muted); letter-spacing: 0; }
+.sp-svg { display: block; width: 100%; height: 46px; margin-top: 8px; overflow: visible; }
+.sp-area { opacity: 0; transition: opacity .7s ease .5s; }
+.stats-shown .sp-area { opacity: 1; }
+.sp-foot { font-size: 10.5px; color: var(--text-muted); margin-top: 5px; }
+
+/* One switch turns the whole entrance off. */
+.stats-instant .st-tile, .stats-instant .cg-card, .stats-instant .sp-card,
+.stats-instant .cg-cell, .stats-instant .sp-area {
+  transition: none !important; transition-delay: 0ms !important;
+  opacity: 1 !important; transform: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-tile, .cg-card, .sp-card, .cg-cell, .sp-area {
+    transition: none !important; transition-delay: 0ms !important;
+    opacity: 1 !important; transform: none !important;
+  }
+}
+@media (max-width: 520px) {
+  .st-num { font-size: 28px; }
+  .stats-hero { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+}

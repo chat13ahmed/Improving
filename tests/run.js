@@ -81,7 +81,7 @@ function loadApp(fieldValues) {
     ' safeUrl, linkHost, libGroups, hubEnabled, HUB_PILLARS, dayXp, dayCompleteStats, getLevel,' +
     ' RESET_AREAS, clearPillarData, isDayEmpty,' +
     ' ADAPT, targetWeeklyRate, weightTrend, avgIntake, estimateTDEE, adaptiveTarget, nutritionPlan,' +
-    ' SAFETY, SAFETY_FLAGS, bmiOf, calorieFloor, nutritionSafety, renderAdaptCard, ymd, _isoShift, PLAUSIBLE, validateNutritionProfile, isPlausibleWeightKg, upsertWeight, persistStep, hubLogValue, HUB_LOG });';
+    ' SAFETY, SAFETY_FLAGS, bmiOf, calorieFloor, nutritionSafety, renderAdaptCard, ymd, _isoShift, PLAUSIBLE, validateNutritionProfile, isPlausibleWeightKg, upsertWeight, persistStep, hubLogValue, HUB_LOG, dayIntensity, consistencyGrid, pillarTrend, progressStats, snapCounters });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -1420,6 +1420,66 @@ ok('terrain grid: an empty history is a flat plain, not an error',
   (() => { const g = A.terrainGrid([], 12); return g.cols === 12 && g.grid.every(c => c.every(v => v === 0)); })());
 ok('terrain grid: a silly column count is clamped to something drawable',
   A.terrainGrid([], 0).cols >= 2 && A.terrainGrid([], 1).cols >= 2);
+
+// ── Progress stats — the data behind the animated view ──
+// The rendering is visual and checked in a browser; these pin the arithmetic so a
+// pretty view can't quietly show a wrong number.
+eq('intensity: an empty day is 0', A.dayIntensity({}), 0);
+eq('intensity: a missing day is 0', A.dayIntensity(null), 0);
+eq('intensity: one pillar logged is 1', A.dayIntensity({ gym: { done: true } }), 1);
+eq('intensity: five pillars cap at 4 so the ramp has a top',
+  A.dayIntensity({ gym: { done: true }, calories: 2000, reading: { pages: 5 }, networking: { count: 1 }, spent: 10 }), 4);
+ok('intensity: a rest day counts as nothing logged, not as activity', A.dayIntensity({ gym: { done: false } }) === 0);
+
+const _cg = A.consistencyGrid([{ date: A.todayStr(), gym: { done: true } }], A.todayStr(), 18);
+eq('grid: 18 weeks means 18 columns', _cg.cols.length, 18);
+ok('grid: every column is a full 7 days', _cg.cols.every(c => c.length === 7));
+eq('grid: 126 cells in total', _cg.cols.reduce((s, c) => s + c.length, 0), 126);
+ok('grid: it starts on a Monday', new Date(_cg.first + 'T12:00:00').getDay() === 1);
+ok('grid: today is inside the last column',
+  _cg.cols[17].some(c => c.date === A.todayStr()));
+ok('grid: today is not marked future', !_cg.cols[17].find(c => c.date === A.todayStr()).future);
+ok('grid: days after today are marked future and empty',
+  _cg.cols[17].filter(c => c.date > A.todayStr()).every(c => c.future && c.level === 0));
+ok('grid: a logged day shows a level', _cg.cols[17].find(c => c.date === A.todayStr()).level === 1);
+ok('grid: an empty history still returns a full grid, not an error',
+  A.consistencyGrid([], A.todayStr(), 18).cols.length === 18);
+
+// Sparkline buckets are weekly, oldest first.
+const _tw = (n) => A._isoShift(A.getWeekStart(A.todayStr()), -7 * n);
+const _trend = A.pillarTrend([
+  { date: _tw(3), reading: { pages: 10 } },
+  { date: _tw(1), reading: { pages: 40 } },
+  { date: A.todayStr(), reading: { pages: 50 } }
+], 'reading', 12, A.todayStr());
+eq('trend: 12 weekly buckets', _trend.buckets.length, 12);
+eq('trend: totals every page in the window', _trend.total, 100);
+eq('trend: the last bucket is this week', _trend.latest, 50);
+eq('trend: the peak is the biggest week', _trend.peak, 50);
+ok('trend: rising weeks give a positive delta', _trend.delta > 0);
+ok('trend: no data gives zeroes, not NaN',
+  (() => { const t = A.pillarTrend([], 'reading', 12, A.todayStr());
+    return t.total === 0 && t.peak === 0 && t.delta === 0 && t.buckets.every(v => v === 0); })());
+ok('trend: days outside the window are excluded',
+  A.pillarTrend([{ date: _tw(40), reading: { pages: 999 } }], 'reading', 12, A.todayStr()).total === 0);
+
+// Headline numbers.
+A.state.data = { profile: { pillars: A.defaultPillars() }, days: [
+  { date: A.todayStr(), gym: { done: true }, calories: 2000, reading: { pages: 20 }, networking: { count: 2 } }
+], weights: [], weeks: [] };
+const _ps = A.progressStats(A.state.data, A.todayStr());
+eq('stats: counts the days logged', _ps.daysLogged, 1);
+eq('stats: counts workouts', _ps.workouts, 1);
+eq('stats: totals pages', _ps.pages, 20);
+ok('stats: consistency is a percentage of the visible window',
+  _ps.consistency >= 0 && _ps.consistency <= 100);
+ok('stats: a 4-pillar day counts as a full day', _ps.perfectDays === 1);
+ok('stats: an empty account reports zeroes rather than NaN',
+  (() => { const s = A.progressStats({ days: [] }, A.todayStr());
+    return s.daysLogged === 0 && s.consistency === 0 && s.pages === 0; })());
+// Future-dated junk must not inflate the totals.
+ok('stats: days after today are ignored',
+  A.progressStats({ days: [{ date: A._isoShift(A.todayStr(), 5), gym: { done: true } }] }, A.todayStr()).daysLogged === 0);
 
 // ── In-hub logging — each pillar is logged where it lives ──
 // The single "log today" page is gone. persistStep() is the shared writer, so a

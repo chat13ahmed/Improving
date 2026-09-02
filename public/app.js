@@ -530,6 +530,18 @@ function closeAchievementsModal() { const o = document.getElementById('ach-overl
 // ─────────────────────────────────────────────────────────────
 // COUNTER ANIMATIONS
 // ─────────────────────────────────────────────────────────────
+// Write every counter's final value straight away, no animation. Used when the
+// tab is hidden: rAF is dead there and timers are throttled to about one a
+// second, so animateCounters' own fallback can leave a "0" on screen for ~2s.
+// A number nobody is watching should just be correct.
+function snapCounters(root) {
+  (root || document).querySelectorAll('.anim-count').forEach(el => {
+    const target = parseFloat(el.dataset.val || '0');
+    const isDecimal = el.dataset.decimal === '1';
+    el.textContent = (el.dataset.prefix || '') +
+      (isDecimal ? target.toFixed(1) : Math.round(target)) + (el.dataset.suffix || '');
+  });
+}
 function animateCounters() {
   document.querySelectorAll('.anim-count').forEach(el => {
     const target = parseFloat(el.dataset.val || '0');
@@ -9574,6 +9586,244 @@ async function toggleStar(id) {
 // ─────────────────────────────────────────────────────────────
 // HISTORY
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// PROGRESS STATS — the data behind the animated view (pure + testable)
+// ─────────────────────────────────────────────────────────────
+// How much of your life you touched on a given day, 0–4. Drives the heatmap's
+// colour ramp, so it has to be a small honest integer rather than a score: five
+// pillars logged and four logged should look different, and an empty day should
+// look empty rather than faintly tinted.
+function dayIntensity(day) {
+  if (!day) return 0;
+  let n = 0;
+  if (day.gym && day.gym.done) n++;
+  if (day.calories > 0 || (day.food && day.food.rating > 0)) n++;
+  if (day.reading && day.reading.pages > 0) n++;
+  if (day.networking && day.networking.count > 0) n++;
+  if ((day.money && day.money.income > 0) || day.spent > 0) n++;
+  return Math.min(4, n);
+}
+// A calendar grid of the last `weeks` weeks, laid out in columns of 7 so it reads
+// like a wall calendar: each column is a week, each row a weekday. Always ends on
+// today's column so the newest data sits where the eye lands last.
+function consistencyGrid(days, today, weeks) {
+  const end = today || todayStr();
+  const nWeeks = Math.max(1, Math.min(53, weeks || 18));
+  const byDate = {};
+  (days || []).forEach(d => { if (d && d.date) byDate[d.date] = d; });
+  // Walk back to the Monday that starts the earliest week we show.
+  const lastMonday = getWeekStart(end);
+  const firstMonday = _isoShift(lastMonday, -7 * (nWeeks - 1));
+  const cols = [];
+  for (let w = 0; w < nWeeks; w++) {
+    const col = [];
+    for (let i = 0; i < 7; i++) {
+      const date = _isoShift(firstMonday, w * 7 + i);
+      col.push({ date, future: date > end, level: date > end ? 0 : dayIntensity(byDate[date]) });
+    }
+    cols.push(col);
+  }
+  return { cols, weeks: nWeeks, first: firstMonday, last: _isoShift(firstMonday, nWeeks * 7 - 1) };
+}
+// Weekly totals for one pillar, oldest first, plus the peak — enough to draw a
+// sparkline without the renderer doing any arithmetic of its own.
+function pillarTrend(days, key, weeks, today) {
+  const end = today || todayStr();
+  const n = Math.max(2, Math.min(52, weeks || 12));
+  const start = _isoShift(getWeekStart(end), -7 * (n - 1));
+  const buckets = new Array(n).fill(0);
+  const valueOf = (d) => {
+    switch (key) {
+      case 'gym':        return d.gym && d.gym.done ? 1 : 0;
+      case 'reading':    return (d.reading && d.reading.pages) || 0;
+      case 'networking': return (d.networking && d.networking.count) || 0;
+      case 'money':      return (d.money && d.money.income) || 0;
+      case 'food':       return d.calories > 0 ? 1 : 0;
+      default:           return 0;
+    }
+  };
+  (days || []).forEach(d => {
+    if (!d || !d.date || d.date < start || d.date > end) return;
+    const idx = Math.floor(daysBetween(start, getWeekStart(d.date)) / 7);
+    if (idx >= 0 && idx < n) buckets[idx] += valueOf(d);
+  });
+  const peak = Math.max(...buckets, 0);
+  const total = buckets.reduce((s, v) => s + v, 0);
+  // Trend = this week vs the average of the weeks before it.
+  const prior = buckets.slice(0, -1);
+  const priorAvg = prior.length ? prior.reduce((s, v) => s + v, 0) / prior.length : 0;
+  const latest = buckets[buckets.length - 1] || 0;
+  const delta = priorAvg > 0 ? Math.round(((latest - priorAvg) / priorAvg) * 100) : (latest > 0 ? 100 : 0);
+  return { buckets, peak, total, latest, delta, weeks: n };
+}
+// The headline numbers, each with the trend that gives it meaning.
+function progressStats(data, today) {
+  const d = data || {};
+  const days = d.days || [];
+  const end = today || todayStr();
+  const logged = days.filter(x => x && x.date && x.date <= end);
+  const grid = consistencyGrid(logged, end, 18);
+  const active = grid.cols.reduce((s, col) => s + col.filter(c => !c.future && c.level > 0).length, 0);
+  const shown = grid.cols.reduce((s, col) => s + col.filter(c => !c.future).length, 0);
+  return {
+    daysLogged: logged.length,
+    streak: loggingStreak(),
+    best: bestStreak(),
+    consistency: shown ? Math.round((active / shown) * 100) : 0,
+    activeDays: active,
+    windowDays: shown,
+    workouts: logged.filter(x => x.gym && x.gym.done).length,
+    pages: logged.reduce((s, x) => s + ((x.reading && x.reading.pages) || 0), 0),
+    contacts: logged.reduce((s, x) => s + ((x.networking && x.networking.count) || 0), 0),
+    perfectDays: logged.filter(x => dayIntensity(x) >= 4).length
+  };
+}
+
+// ── The animated stats view ──
+// Three layers, each earning its motion: numbers count up so the size of a total
+// registers, the heatmap washes in diagonally so the shape of your consistency
+// arrives as a pattern rather than 126 separate facts, and each sparkline draws
+// itself left to right so you read it as time passing. Every animation is a CSS
+// transition on a class toggled one frame after paint, so prefers-reduced-motion
+// switches all of it off in one place.
+function renderStatsHero() {
+  const s = progressStats(state.data);
+  if (!s.daysLogged) return '';
+  // Two colours per tile, deliberately. The vivid one paints the corner wash; the
+  // -ink one paints the number. Measured against the card in light theme, the raw
+  // hues came out at 2.15:1 (accent) and 2.64:1 (money) — unreadable — while every
+  // -ink variant clears 5:1 in both themes. This is what the -ink tokens are for.
+  const tile = (o) =>
+    '<div class="st-tile" style="--st-color:' + o.color + ';--st-ink:' + (o.ink || o.color) + '">' +
+    '<div class="st-ico" aria-hidden="true">' + o.icon + '</div>' +
+    '<div class="st-num"><span class="anim-count" data-val="' + o.value + '"' +
+      (o.suffix ? ' data-suffix="' + escapeAttr(o.suffix) + '"' : '') + '>0</span></div>' +
+    '<div class="st-lbl">' + escapeHtml(o.label) + '</div>' +
+    (o.sub ? '<div class="st-sub">' + escapeHtml(o.sub) + '</div>' : '') +
+    '</div>';
+  return '<div class="stats-hero">' +
+    tile({ icon: '🗓', value: s.daysLogged, label: 'Days logged', color: 'var(--accent)', ink: 'var(--text)',
+           sub: s.perfectDays ? s.perfectDays + ' full days' : '' }) +
+    tile({ icon: '🔥', value: s.streak, label: 'Day streak', color: 'var(--gym-color)', ink: 'var(--gym-ink)',
+           sub: s.best > s.streak ? 'best ' + s.best : (s.streak ? 'your best yet' : '') }) +
+    tile({ icon: '🎯', value: s.consistency, suffix: '%', label: 'Consistency', color: 'var(--success)', ink: 'var(--success)',
+           sub: s.activeDays + ' of ' + s.windowDays + ' days' }) +
+    tile({ icon: '💪', value: s.workouts, label: 'Workouts', color: 'var(--money-color)', ink: 'var(--money-ink)',
+           sub: s.pages ? s.pages.toLocaleString() + ' pages read' : '' }) +
+    '</div>';
+}
+// A wall calendar of the last 18 weeks. Reading a shape is faster than reading a
+// number, so this is the one place the page shows every day at once.
+function renderConsistencyCard() {
+  const g = consistencyGrid(state.data.days, todayStr(), 18);
+  const today = todayStr();
+  const monthRow = g.cols.map((col, i) => {
+    const first = col[0];
+    const prev = i > 0 ? g.cols[i - 1][0].date.slice(5, 7) : '';
+    const m = first.date.slice(5, 7);
+    return '<span class="cg-m">' + (m !== prev ? new Date(first.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short' }) : '') + '</span>';
+  }).join('');
+  const cells = g.cols.map((col, ci) =>
+    '<div class="cg-col">' + col.map((c, ri) =>
+      '<span class="cg-cell cg-l' + c.level + (c.future ? ' cg-future' : '') + (c.date === today ? ' cg-today' : '') + '"' +
+      ' style="--d:' + ((ci + ri) * 11) + 'ms"' +
+      ' title="' + escapeAttr(fmtDate(c.date) + (c.future ? '' : ' — ' + (c.level ? c.level + ' logged' : 'nothing logged'))) + '"></span>'
+    ).join('') + '</div>').join('');
+  const legend = '<div class="cg-legend"><span>Less</span>' +
+    [0, 1, 2, 3, 4].map(l => '<span class="cg-cell cg-l' + l + '"></span>').join('') +
+    '<span>More</span></div>';
+  return '<div class="card cg-card">' +
+    '<div class="cg-head"><h3 class="card-title">Every day, at a glance</h3>' +
+    '<span class="cg-sub">Last 18 weeks · darker means more of your life logged</span></div>' +
+    '<div class="cg-scroll"><div class="cg-inner">' +
+    '<div class="cg-months">' + monthRow + '</div>' +
+    '<div class="cg-grid" role="img" aria-label="Consistency over the last 18 weeks">' + cells + '</div>' +
+    '</div></div>' + legend + '</div>';
+}
+// One sparkline per pillar you actually track, drawn as a path that reveals
+// itself. The number is the total; the line is the story behind it.
+function renderTrendCards() {
+  const defs = [
+    { key: 'gym',        label: 'Training',   unit: 'sessions', color: 'var(--gym-color)' },
+    { key: 'reading',    label: 'Reading',    unit: 'pages',    color: 'var(--accent)' },
+    { key: 'networking', label: 'Network',    unit: 'people',   color: 'var(--money-color)' },
+    { key: 'money',      label: 'Income',     unit: '',         color: 'var(--success)' }
+  ].filter(d => isPillarOn(d.key));
+  if (!defs.length) return '';
+  const cards = defs.map((d, i) => {
+    const t = pillarTrend(state.data.days, d.key, 12);
+    if (!t.total) return '';
+    const W = 240, H = 46;
+    const step = t.buckets.length > 1 ? W / (t.buckets.length - 1) : W;
+    const y = (v) => H - 3 - (t.peak ? (v / t.peak) * (H - 8) : 0);
+    const pts = t.buckets.map((v, j) => (j * step).toFixed(1) + ',' + y(v).toFixed(1));
+    const line = 'M' + pts.join(' L');
+    const area = line + ' L' + W + ',' + H + ' L0,' + H + ' Z';
+    const uid_ = 'sp' + d.key;
+    const total = d.key === 'money' ? formatCurrency(t.total) : t.total.toLocaleString();
+    const dir = t.delta > 4 ? 'up' : t.delta < -4 ? 'down' : 'flat';
+    const arrow = dir === 'up' ? '▲' : dir === 'down' ? '▼' : '→';
+    return '<div class="card sp-card" style="--sp-color:' + d.color + ';--sp-i:' + (i * 90) + 'ms">' +
+      '<div class="sp-top"><span class="sp-label">' + escapeHtml(d.label) + '</span>' +
+      '<span class="sp-delta sp-' + dir + '">' + arrow + ' ' + Math.abs(t.delta) + '%</span></div>' +
+      '<div class="sp-total">' + escapeHtml(total) + (d.unit ? ' <span>' + escapeHtml(d.unit) + '</span>' : '') + '</div>' +
+      '<svg class="sp-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">' +
+      '<defs><linearGradient id="' + uid_ + '" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="' + d.color + '" stop-opacity="0.28"/>' +
+      '<stop offset="100%" stop-color="' + d.color + '" stop-opacity="0"/>' +
+      '</linearGradient></defs>' +
+      '<path class="sp-area" d="' + area + '" fill="url(#' + uid_ + ')"/>' +
+      '<path class="sp-line" d="' + line + '" fill="none" stroke="' + d.color + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '</svg>' +
+      '<div class="sp-foot">last 12 weeks</div>' +
+      '</div>';
+  }).join('');
+  return cards ? '<div class="sp-grid">' + cards + '</div>' : '';
+}
+// Motion is added AFTER paint so the browser has a start state to transition from.
+// One class on the container drives every child; reduced-motion drops it entirely.
+function playStatsIntro() {
+  if (typeof window !== 'undefined' && window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.querySelectorAll('.stats-anim').forEach(el => el.classList.add('stats-shown', 'stats-instant'));
+    animateCounters();
+    return;
+  }
+  // The cards start at opacity 0, so whatever adds .stats-shown is load-bearing:
+  // if it never runs the stats are invisible, not merely unanimated. rAF is
+  // throttled to zero on a hidden tab, so it cannot be the only path — a timer
+  // still fires there and guarantees the reveal. Whichever lands first wins;
+  // `done` keeps the second one from re-running the draw.
+  let done = false;
+  const reveal = () => {
+    if (done) return;
+    done = true;
+    // A hidden tab does not composite, so a transition started there freezes at
+    // its start value — which for these cards is opacity 0. Jump straight to the
+    // end state instead: there is no animation to see on a tab nobody is looking
+    // at, and this way the page is never blank when they come back to it.
+    const hidden = typeof document !== 'undefined' && document.hidden;
+    document.querySelectorAll('.stats-anim').forEach(el => {
+      if (hidden) el.classList.add('stats-instant');
+      el.classList.add('stats-shown');
+    });
+    if (hidden) { snapCounters(); return; }
+    // Sparkline paths draw by animating their own dash offset to zero.
+    document.querySelectorAll('.sp-line').forEach(p => {
+      const len = p.getTotalLength ? p.getTotalLength() : 0;
+      if (!len) return;
+      p.style.strokeDasharray = len;
+      p.style.strokeDashoffset = len;
+      p.getBoundingClientRect();                    // force a reflow so the transition runs
+      p.style.transition = 'stroke-dashoffset 1100ms cubic-bezier(.22,.8,.28,1)';
+      p.style.strokeDashoffset = '0';
+    });
+    animateCounters();
+  };
+  requestAnimationFrame(() => requestAnimationFrame(reveal));
+  setTimeout(reveal, 120);
+}
+
 function renderHistoryPage() {
   const { days } = state.data;
   const sorted = [...days].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -9583,15 +9833,8 @@ function renderHistoryPage() {
   const netTotal  = days.reduce((s, d) => s + (d.networking?.count || 0), 0);
   const streak    = getGymStreak();
 
-  const summaryHtml = days.length > 0
-    ? '<div class="history-summary">' +
-      '<div class="hs-item"><span>Days Logged</span><strong style="color:var(--primary)">' + days.length + '</strong></div>' +
-      '<div class="hs-item"><span>Gym Workouts</span><strong style="color:var(--gym-color)">' + gymTotal + ' days</strong></div>' +
-      '<div class="hs-item"><span>Avg Food Rating</span><strong style="color:var(--food-color)">' + (foodAvg > 0 ? foodAvg.toFixed(1) + '/5' : '—') + '</strong></div>' +
-      '<div class="hs-item"><span>Total Connections</span><strong style="color:var(--network-color)">' + netTotal + '</strong></div>' +
-      '</div>'
-    : '';
-
+  // The flat four-number summary that lived here was replaced by the animated
+  // hero tiles, the consistency calendar and the sparklines above.
   const months = [...new Set(days.map(d => d.date.substring(0, 7)))].sort().reverse();
   const monthOpts = '<option value="">All Time</option>' +
     months.map(m => { const d = new Date(m + '-01T00:00:00'); return '<option value="' + m + '">' + d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) + '</option>'; }).join('');
@@ -9602,7 +9845,14 @@ function renderHistoryPage() {
     '<div class="page-header"><h2 class="page-title">Your climb</h2>' +
     '<p class="page-sub">Every day you logged, as terrain</p></div>' +
     renderTerrainCard() +
-    summaryHtml +
+    // The old summary was four static numbers in a row. These three blocks share
+    // one .stats-anim wrapper so a single class toggle after paint drives the
+    // whole entrance — and reduced-motion turns all of it off in one place.
+    '<div class="stats-anim">' +
+      renderStatsHero() +
+      renderConsistencyCard() +
+      renderTrendCards() +
+    '</div>' +
     '<div class="dash-section">All entries</div>' +
     '<div class="view-toggle-row">' +
     '<button class="view-btn' + (view==='list'?' view-active':'') + '" onclick="switchHistoryView(\'list\')">List</button>' +
@@ -9629,6 +9879,7 @@ function renderHistoryPage() {
       if (host) host.classList.add('terrain-off');
     }
   }, 30);
+  playStatsIntro();
 }
 // The terrain card: dark stage inside the light page, because depth and
 // atmospheric falloff only read against a dark ground.
