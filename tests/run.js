@@ -81,7 +81,8 @@ function loadApp(fieldValues) {
     ' safeUrl, linkHost, libGroups, hubEnabled, HUB_PILLARS, dayXp, dayCompleteStats, getLevel,' +
     ' RESET_AREAS, clearPillarData, isDayEmpty,' +
     ' ADAPT, targetWeeklyRate, weightTrend, avgIntake, estimateTDEE, adaptiveTarget, nutritionPlan,' +
-    ' SAFETY, SAFETY_FLAGS, bmiOf, calorieFloor, nutritionSafety, renderAdaptCard, ymd, _isoShift, PLAUSIBLE, validateNutritionProfile, isPlausibleWeightKg, upsertWeight, persistStep, hubLogValue, HUB_LOG, dayIntensity, consistencyGrid, pillarTrend, progressStats, snapCounters, STAT_AREAS, pillarLogged, areaTiles });';
+    ' SAFETY, SAFETY_FLAGS, bmiOf, calorieFloor, nutritionSafety, renderAdaptCard, ymd, _isoShift, PLAUSIBLE, validateNutritionProfile, isPlausibleWeightKg, upsertWeight, persistStep, hubLogValue, HUB_LOG, dayIntensity, consistencyGrid, pillarTrend, progressStats, snapCounters, STAT_AREAS, pillarLogged, areaTiles,' +
+    ' savedQuotes, nextQuoteIndex, quoteCardHtml, renderQuoteCard, QUOTE_FROM });';
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: 'app.js' });
   return sandbox.__exports__;
@@ -254,6 +255,73 @@ eq('sortTakeawaysByPriority: two never-seen keep created order (oldest first)',
   ]).map(t => t.id), ['old', 'new']);
 ok('sortTakeawaysByPriority handles empty/null safely',
   A.sortTakeawaysByPriority(null).length === 0 && A.sortTakeawaysByPriority([]).length === 0);
+// ── Saved quotes resurfaced on the dashboard ──
+const _sqData = {
+  takeaways: [{ id: 't1', text: 'Buy assets first.', book: 'Rich Dad Poor Dad' }],
+  library: [
+    { id: 'l1', type: 'quote', body: 'The obstacle is the way.', source: 'Marcus Aurelius' },
+    { id: 'l2', type: 'concept', body: 'Compound interest', source: 'Notes' }
+  ],
+  days: [
+    { date: '2026-09-01', reading: { quote: 'An asset puts money in your pocket.', bookTitle: 'Rich Dad Poor Dad' } },
+    { date: '2026-09-02', reading: { quote: '', bookTitle: 'Rich Dad Poor Dad' } },
+    { date: '2026-09-03' }
+  ]
+};
+const _sq = A.savedQuotes(_sqData);
+eq('savedQuotes: pools takeaways + library quotes + reading highlights', _sq.length, 3);
+eq('savedQuotes: tags where each line came from', _sq.map(q => q.from), ['lesson', 'library', 'reading']);
+eq('savedQuotes: carries the attribution', _sq[0].source, 'Rich Dad Poor Dad');
+ok('savedQuotes: skips library entries that are not quotes',
+  !_sq.some(q => /compound/i.test(q.text)));
+ok('savedQuotes: skips empty highlights', !_sq.some(q => !q.text));
+eq('savedQuotes: falls back to the library title when the body is empty',
+  A.savedQuotes({ library: [{ type: 'quote', title: 'Memento mori', body: '' }] })[0].text, 'Memento mori');
+// The same line saved twice (once highlighted, once as a takeaway) differs only
+// in punctuation and smart quotes — it should still surface once.
+eq('savedQuotes: dedupes the same line across sources', A.savedQuotes({
+  takeaways: [{ text: 'The obstacle is the way' }],
+  library: [{ type: 'quote', body: '“The obstacle is the way.”' }]
+}).length, 1);
+eq('savedQuotes: handles empty/null safely', A.savedQuotes(null).length, 0);
+// nextQuoteIndex — random, but never the one already on screen
+eq('nextQuoteIndex: no quotes → 0', A.nextQuoteIndex(0, undefined, 0.5), 0);
+eq('nextQuoteIndex: a single quote always returns it', A.nextQuoteIndex(1, 0, 0.99), 0);
+eq('nextQuoteIndex: first draw uses the full range (low)', A.nextQuoteIndex(4, undefined, 0), 0);
+eq('nextQuoteIndex: first draw uses the full range (high)', A.nextQuoteIndex(4, undefined, 0.999), 3);
+ok('nextQuoteIndex: never repeats the current one',
+  [0, 0.2, 0.4, 0.6, 0.8, 0.999].every(r =>
+    [0, 1, 2, 3].every(cur => A.nextQuoteIndex(4, cur, r) !== cur)));
+ok('nextQuoteIndex: always lands in range',
+  [0, 0.33, 0.66, 0.999].every(r =>
+    [0, 1, 2].every(cur => { const i = A.nextQuoteIndex(3, cur, r); return i >= 0 && i < 3; })));
+ok('nextQuoteIndex: reaches every other index from a given current', (() => {
+  const seen = new Set([0, 0.24, 0.49, 0.74, 0.999].map(r => A.nextQuoteIndex(4, 1, r)));
+  return seen.has(0) && seen.has(2) && seen.has(3) && !seen.has(1);
+})());
+// The card renders user-entered text, so it must be escaped, not interpolated raw.
+ok('quote card escapes saved text (no XSS from a highlighted quote)', (() => {
+  const html = A.quoteCardHtml('<img src=x onerror=alert(1)>', '<b>Book</b>', 'You highlighted this', true);
+  return html.indexOf('<img') < 0 && html.indexOf('<b>Book') < 0 && html.indexOf('&lt;img') > -1;
+})());
+ok('quote card only offers "Another" when there is more than one',
+  A.quoteCardHtml('a', 'b', 'c', true).includes('shuffleQuote()') &&
+  !A.quoteCardHtml('a', 'b', 'c', false).includes('shuffleQuote()'));
+ok('renderQuoteCard falls back to the built-in daily quote with nothing saved', (() => {
+  const before = A.state.data;
+  A.state.data = { days: [], takeaways: [], library: [] };
+  const html = A.renderQuoteCard();
+  A.state.data = before;
+  return html.includes("Today's Fuel") && !html.includes('shuffleQuote()');
+})());
+ok('renderQuoteCard shows a saved quote once you have one', (() => {
+  const before = A.state.data, beforeIdx = A.state._quoteIdx;
+  A.state.data = _sqData;
+  const html = A.renderQuoteCard();
+  A.state.data = before; A.state._quoteIdx = beforeIdx;
+  return html.includes('quote-from') && !html.includes("Today's Fuel") &&
+    A.QUOTE_FROM.reading === 'You highlighted this';
+})());
 // fuelStatus — the gym × nutrition connector
 eq('fuelStatus: under-eating while training hard → warn',
   A.fuelStatus({ trainedToday: false, gymDays: 4, proteinTarget: 150, proteinToday: 0, avgProteinWeek: 90 }).tone, 'warn');

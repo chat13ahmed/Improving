@@ -960,8 +960,29 @@ body {
   pointer-events: none;
 }
 .quote-mark { font-size: 40px; color: var(--accent); line-height: 1; flex-shrink: 0; margin-top: -4px; opacity: 0.6; font-family: Georgia, serif; }
-.quote-text { font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.6; font-style: italic; margin-bottom: 6px; }
-.quote-author { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+/* position:relative lifts the text above .quote-card::before, which is an
+   absolutely-positioned sheen and would otherwise paint over it. */
+.quote-body { position: relative; flex: 1; min-width: 0; }
+.quote-text { font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.6; font-style: italic; margin-bottom: 6px; overflow-wrap: anywhere; }
+.quote-author { font-size: 12px; color: var(--text-muted); font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* Says why this line is on screen — "You highlighted this", not a stock quote.
+   --warning-ink, not --accent: the raw amber fill is decorative and fails AA
+   as 11px text on a light ground. */
+.quote-from { color: var(--warning-ink); background: var(--tint-3); border-radius: 999px; padding: 2px 9px; font-size: 11px; letter-spacing: 0.01em; }
+.quote-another {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.quote-another:hover { color: var(--warning-ink); border-color: var(--accent); background: var(--tint-3); }
+.quote-another:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ─── Achievements ────────────────────────────── */
 .ach-progress-bar { height: 6px; background: var(--tint-3); border-radius: 3px; margin-bottom: 18px; overflow: hidden; }

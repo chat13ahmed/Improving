@@ -391,13 +391,78 @@ function getDailyQuote() {
   return QUOTES[dayOfYear % QUOTES.length];
 }
 
-function renderQuoteCard() {
-  const q = getDailyQuote();
-  return '<div class="quote-card">' +
+// ─────────────────────────────────────────────────────────────
+// YOUR OWN QUOTES — the lines you saved, resurfaced at random
+// ─────────────────────────────────────────────────────────────
+// Three separate places in the app already save a line worth keeping: a
+// highlighted quote on a reading log, a key takeaway, and a library entry
+// typed as a Quote. Each was only ever visible inside the page that saved
+// it, so a line you cared about six weeks ago was effectively gone. This
+// pools all three so the dashboard can bring one back unannounced.
+// Pure — takes the data, reads no state. (testable)
+function savedQuotes(data) {
+  data = data || {};
+  const out = [], seen = {};
+  const add = (text, source, from) => {
+    const t = String(text == null ? '' : text).trim();
+    if (!t) return;
+    // Dedupe on the words alone: the same line saved as both a reading
+    // highlight and a takeaway differs only in punctuation and smart quotes.
+    const key = t.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    if (!key || seen[key]) return;
+    seen[key] = 1;
+    out.push({ text: t, source: String(source == null ? '' : source).trim(), from });
+  };
+  (data.takeaways || []).forEach(t => { if (t) add(t.text, t.book, 'lesson'); });
+  (data.library || []).forEach(e => { if (e && e.type === 'quote') add(e.body || e.title, e.source, 'library'); });
+  (data.days || []).forEach(d => { if (d && d.reading) add(d.reading.quote, d.reading.bookTitle, 'reading'); });
+  return out;
+}
+// Where each one came from, so the card says why you're seeing it.
+const QUOTE_FROM = { lesson: 'Your takeaway', library: 'From your library', reading: 'You highlighted this' };
+
+// Pick a random index that ISN'T the one already showing, so "Another"
+// always changes the card when there's more than one to choose from.
+// `r` is the random number, injected so this stays deterministic. (testable)
+function nextQuoteIndex(len, current, r) {
+  len = Math.max(0, Math.floor(len || 0));
+  if (len <= 1) return 0;
+  const rnd = Math.min(0.999999, Math.max(0, typeof r === 'number' ? r : Math.random()));
+  const valid = Number.isInteger(current) && current >= 0 && current < len;
+  if (!valid) return Math.floor(rnd * len);
+  const i = Math.floor(rnd * (len - 1));
+  return i >= current ? i + 1 : i;      // walk over the current one
+}
+
+function quoteCardHtml(text, attribution, label, canShuffle) {
+  return '<div class="quote-card" id="quote-card">' +
     '<span class="quote-mark">"</span>' +
-    '<div class="quote-text">' + q.text + '</div>' +
-    '<div class="quote-author">— ' + q.author + ' &nbsp;·&nbsp; <span style="color:var(--text-muted)">Today\'s Fuel </span></div>' +
-    '</div>';
+    '<div class="quote-body">' +
+    '<div class="quote-text">' + escapeHtml(text) + '</div>' +
+    '<div class="quote-author">' +
+    (attribution ? '— ' + escapeHtml(attribution) + ' &nbsp;·&nbsp; ' : '') +
+    '<span class="quote-from">' + escapeHtml(label) + '</span>' +
+    (canShuffle ? '<button type="button" class="quote-another" onclick="shuffleQuote()">Another ↻</button>' : '') +
+    '</div></div></div>';
+}
+
+function renderQuoteCard() {
+  const mine = savedQuotes(state.data);
+  if (!mine.length) {
+    const q = getDailyQuote();
+    return quoteCardHtml(q.text, q.author, "Today's Fuel", false);
+  }
+  const idx = nextQuoteIndex(mine.length, state._quoteIdx);
+  state._quoteIdx = idx;
+  const q = mine[idx];
+  return quoteCardHtml(q.text, q.source, QUOTE_FROM[q.from] || 'You saved this', mine.length > 1);
+}
+
+// Swap just the card — a full dashboard re-render would jump the scroll
+// position back to the top, which is the opposite of a quiet re-read.
+function shuffleQuote() {
+  const el = document.getElementById('quote-card');
+  if (el) el.outerHTML = renderQuoteCard();
 }
 
 // ─────────────────────────────────────────────────────────────
